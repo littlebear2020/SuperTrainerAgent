@@ -362,7 +362,7 @@ export interface Translations {
   workspace: {
     settingsAndMore: string;
     about: string;
-    /** DEF-3 (2026-10-07): workspace home hero copy. */
+    /** Home hero, expandable course entries, and their six creation cards. */
     home: {
       eyebrow: string;
       titleLine1: string;
@@ -372,6 +372,27 @@ export interface Translations {
       subtitle: string;
       inputPlaceholder: string;
       expertAgents: string;
+      heroTitle: string;
+      createHeading: string;
+      videoCourse: string;
+      videoCourseDescription: string;
+      textCourse: string;
+      textCourseDescription: string;
+      playbackUnavailable: string;
+      courseItems: Record<
+        | "course-video"
+        | "ai_image"
+        | "ai_video"
+        | "creative-studio"
+        | "ppt-master"
+        | "co-writer",
+        {
+          title: string;
+          description: string;
+          badge: string;
+          mediaAlt: string;
+        }
+      >;
       recentProjects: string;
       viewAll: string;
     };

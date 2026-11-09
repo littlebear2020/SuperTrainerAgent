@@ -459,7 +459,7 @@ export const enUS: Translations = {
   workspace: {
     settingsAndMore: "Settings and more",
     about: "About Trainer AI",
-    // DEF-3 (2026-10-07): home hero copy moved into i18n (was hardcoded zh)
+    // Home hero and all visible creation-entry copy stay locale-aware.
     home: {
       eyebrow: "✦ Super agents ready",
       titleLine1: "What would you like to create?",
@@ -470,6 +470,51 @@ export const enUS: Translations = {
         "From course design to video scripts, from slide decks to deep analysis — describe your idea and AI agents will orchestrate the rest.",
       inputPlaceholder: "Describe what you want to create, or ask anything...",
       expertAgents: "Expert Agents",
+      heroTitle: "What would you like to create?",
+      createHeading: "Choose a creation flow to start your next work",
+      videoCourse: "Video course",
+      videoCourseDescription: "Turn course scripts into engaging video content",
+      textCourse: "Text-based course",
+      textCourseDescription: "Explain ideas with posters, slides, and articles",
+      playbackUnavailable: "Video is temporarily unavailable",
+      courseItems: {
+        "course-video": {
+          title: "Remotion motion",
+          description: "Turn course content into structured, animated videos",
+          badge: "Course video",
+          mediaAlt: "Remotion course motion sample",
+        },
+        ai_image: {
+          title: "Image motion",
+          description: "Generate visuals from scripts and bring still images to life",
+          badge: "AI image",
+          mediaAlt: "Image motion sample",
+        },
+        ai_video: {
+          title: "AI video",
+          description: "Generate dynamic shots to express richer scenes",
+          badge: "AI video",
+          mediaAlt: "AI video sample",
+        },
+        "creative-studio": {
+          title: "Poster design",
+          description: "Turn knowledge and key ideas into clear visual cards",
+          badge: "Visual design",
+          mediaAlt: "Knowledge card poster sample",
+        },
+        "ppt-master": {
+          title: "PPT creation",
+          description: "Create editable presentations from structured content",
+          badge: "Presentation",
+          mediaAlt: "Decorative presentation preview",
+        },
+        "co-writer": {
+          title: "Article writing",
+          description: "Collaborate on topics, structure, drafts, and revisions",
+          badge: "Co-writing",
+          mediaAlt: "Decorative article preview",
+        },
+      },
       recentProjects: "Recent Projects",
       viewAll: "View all →",
     },

@@ -1,16 +1,18 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
-import { useGlassStyle } from "@/core/theme/glass";
 import { useThreads } from "@/core/threads/hooks";
-import { cn } from "@/lib/utils";
 
+import { HomeCourseEntry } from "./home-course-entry";
+import type { HomeCourseItem } from "./home-course-catalog";
 import { ProjectList } from "./project-list";
-import { WorkflowGrid } from "./workflow-grid";
+import {
+  CreateTaskDialog,
+  type InitialVideoTaskType,
+} from "./video-gen/video-gen-create-dialog";
 
 // 关键词 → Agent 映射（按优先级顺序匹配）。
 // 2026-09-22 工作台恢复：路由表同步收缩到现役 6 agent——course-ppt 关键词由
@@ -101,158 +103,58 @@ export function matchAgent(input: string): string | null {
 export default function WorkspaceHome() {
   const router = useRouter();
   const { data: threads } = useThreads();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { glassStyle, isDark } = useGlassStyle();
-  // DEF-3（2026-10-07）：UI 文案走 i18n（workspace.home.*）——此前硬编码中文，
-  // cookie=en-US 首屏残片。ROUTING_RULES 的关键词是路由匹配语义，非 UI 文案，
-  // 刻意不入 i18n（英文态仍按中文关键词命中）。
   const { t } = useI18n();
+  const [createTaskType, setCreateTaskType] =
+    useState<InitialVideoTaskType | null>(null);
 
-  const startWorkflow = useCallback(
-    (agentName: string) => {
-      const userInput = inputRef.current?.value.trim();
-      const url = userInput
-        ? `/workspace/agents/${agentName}/chats/new?msg=${encodeURIComponent(userInput)}`
-        : `/workspace/agents/${agentName}/chats/new`;
-      router.push(url);
-    },
-    [router],
-  );
-
-  const startFree = useCallback(() => {
-    const userInput = inputRef.current?.value.trim();
-    if (!userInput) {
-      router.push("/workspace/agents/course-assistant/chats/new");
+  const handleSelect = (item: HomeCourseItem) => {
+    if (item.kind === "agent") {
+      router.push(`/workspace/agents/${item.agentName}/chats/new`);
       return;
     }
-    const matchedAgent = matchAgent(userInput);
-    const target = matchedAgent ?? "course-assistant";
-    router.push(
-      `/workspace/agents/${target}/chats/new?msg=${encodeURIComponent(userInput)}`,
-    );
-  }, [router]);
+    setCreateTaskType(item.initialTaskType);
+  };
 
   return (
     <div className="relative flex h-full flex-col overflow-y-auto">
-      {/* Ambient background — 3 orbs */}
       <div className="ws-ambient" aria-hidden="true" />
       <div className="ws-ambient-orb-cyan" aria-hidden="true" />
-
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-10">
-        {/* Hero — centered layout */}
-        <motion.div
-          className="mb-12 text-center"
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Eyebrow badge */}
-          <motion.div
-            className="ws-eyebrow mb-5"
-            initial={false}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            {t.workspace.home.eyebrow}
-          </motion.div>
-
-          <h1 className="text-foreground mb-3 text-4xl leading-[1.15] font-extrabold tracking-[-1.2px] sm:text-5xl md:text-[52px]">
-            {t.workspace.home.titleLine1}
-            <br />
-            {t.workspace.home.titleLine2Prefix}{" "}
-            <span
-              style={{
-                background: "linear-gradient(135deg, #6366f1, #ec4899)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              {t.workspace.home.titleLine2Brand}
-            </span>{" "}
-            {t.workspace.home.titleLine2Suffix}
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <header className="mb-8 text-center">
+          <h1 className="text-foreground text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
+            {t.workspace.home.heroTitle}
           </h1>
-          <p className="text-muted-foreground mx-auto mb-8 max-w-[480px] text-[15px] leading-relaxed">
-            {t.workspace.home.subtitle}
+          <p className="text-muted-foreground mt-3 text-sm sm:text-base">
+            {t.workspace.home.createHeading}
           </p>
-
-          {/* Centered input with send button */}
-          <motion.div
-            className="relative mx-auto max-w-[580px]"
-            initial={false}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <input
-              ref={inputRef}
-              style={glassStyle()}
-              className={cn(
-                "h-[52px] w-full rounded-2xl px-5 pr-14 text-sm shadow-xl outline-none",
-                isDark
-                  ? "text-white placeholder-slate-500"
-                  : "text-slate-800 placeholder-slate-400",
-              )}
-              placeholder={t.workspace.home.inputPlaceholder}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && e.currentTarget.value.trim()) {
-                  startFree();
-                }
-              }}
-            />
-            <button
-              className="absolute top-1/2 right-2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border-none bg-gradient-to-br from-[#6366f1] to-[#4f46e5] text-white shadow-[0_4px_12px_rgba(99,102,241,0.3)] transition-all duration-200 hover:scale-105 hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)]"
-              onClick={startFree}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
-          </motion.div>
-        </motion.div>
-
-        {/* Workflow Grid */}
-        <motion.div
-          className="mb-10"
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2.5 text-[17px] font-bold">
-              <span className="ws-section-bar" />
-              {t.workspace.home.expertAgents}
-            </h2>
-            <span
-              onClick={() => router.push("/workspace/agents")}
-              className="text-muted-foreground hover:text-primary cursor-pointer text-xs transition-colors"
-            >
-              {t.workspace.home.viewAll}
-            </span>
-          </div>
-          <WorkflowGrid onSelect={startWorkflow} />
-        </motion.div>
-
-        {/* Recent Projects */}
-        <motion.div initial={false} animate={{ opacity: 1, y: 0 }}>
+        </header>
+        <HomeCourseEntry onSelect={handleSelect} />
+        <section className="mt-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2.5 text-[17px] font-bold">
               <span className="ws-section-bar" />
               {t.workspace.home.recentProjects}
             </h2>
-            <span
+            <button
+              type="button"
               onClick={() => router.push("/workspace/agents")}
-              className="text-muted-foreground hover:text-primary cursor-pointer text-xs transition-colors"
+              className="text-muted-foreground hover:text-primary text-xs transition-colors"
             >
               {t.workspace.home.viewAll}
-            </span>
+            </button>
           </div>
           <ProjectList threads={threads ?? []} />
-        </motion.div>
+        </section>
       </div>
+      {createTaskType ? (
+        <CreateTaskDialog
+          open={true}
+          initialTaskType={createTaskType}
+          onOpenChange={(open) => {
+            if (!open) setCreateTaskType(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,12 +1,3 @@
-/**
- * DEF-3（2026-10-07）：工作台首页 hero 文案必须走 i18n。
- * 修前 workspace-home.tsx 硬编码中文——cookie=en-US 时首屏中文残片。
- *
- * 范围口径：WorkflowGrid / ProjectList 各有自己的硬编码中文（计划 §4 的
- * 127 文件清单内、本批不修），故 mock 掉子组件，断言精确覆盖本组件自有
- * 文案（eyebrow / h1 / 副标题 / 输入框 placeholder / 分区标题与 viewAll）。
- */
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -21,9 +12,6 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/core/threads/hooks", () => ({
   useThreads: () => ({ data: [] }),
 }));
-vi.mock("@/components/workspace/workflow-grid", () => ({
-  WorkflowGrid: () => <div data-testid="workflow-grid" />,
-}));
 vi.mock("@/components/workspace/project-list", () => ({
   ProjectList: () => <div data-testid="project-list" />,
 }));
@@ -32,26 +20,34 @@ vi.mock("@/components/workspace/project-list", () => ({
 
 const CJK = /[一-鿿]/;
 
-describe("DEF-3: workspace-home 首屏文案 locale 化", () => {
+describe("workspace-home course entry i18n", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
   });
 
   afterEach(async () => {
-    await act(async () => {
-      root.unmount();
-    });
+    await act(async () => root.unmount());
     container.remove();
   });
 
   async function renderHome(locale: "en-US" | "zh-CN") {
-    // DSN-003b：无 cookie 访客一律回落 zh-CN——en 断言必须显式钉 cookie
-    // （同 console-nav-label.test.tsx 头注的既定约定）。
     document.cookie = `locale=${locale}; path=/`;
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -67,31 +63,55 @@ describe("DEF-3: workspace-home 首屏文案 locale 化", () => {
     });
   }
 
-  it("en-US 态本组件自有文案零中文残片", async () => {
+  it("en-US home, both course entries, and six cards have no CJK fragments", async () => {
     await renderHome("en-US");
-
     const text = container.textContent ?? "";
-    expect(text).toContain("What would you like to create?");
-    expect(text).toContain("Super agents ready");
-    expect(text).toContain("Expert Agents");
-    expect(text).toContain("Recent Projects");
-    const placeholder = container.querySelector("input")?.placeholder ?? "";
-    expect(placeholder).toBe(
-      "Describe what you want to create, or ask anything...",
-    );
-
-    // DEF-3 核心断言：组件自有渲染文本无 CJK 残片
-    expect(CJK.test(text), `en-US 态仍有中文残片: ${text}`).toBe(false);
-    expect(CJK.test(placeholder)).toBe(false);
+    for (const copy of [
+      "What would you like to create?",
+      "Video course",
+      "Text-based course",
+      "Remotion motion",
+      "Image motion",
+      "AI video",
+      "Recent Projects",
+    ]) {
+      expect(text).toContain(copy);
+    }
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((item) => item.textContent?.includes("Text-based course"))
+        ?.click();
+    });
+    const expandedText = container.textContent ?? "";
+    for (const copy of ["Poster design", "PPT creation", "Article writing"]) {
+      expect(expandedText).toContain(copy);
+    }
+    expect(CJK.test(expandedText), `en-US contains CJK: ${expandedText}`).toBe(false);
+    expect(container.querySelector("input")).toBeNull();
+    expect(expandedText).not.toContain("Super agents ready");
   });
 
-  it("zh-CN 态文案不回退英文（键真实存在）", async () => {
+  it("zh-CN uses the confirmed home and six entry names", async () => {
     await renderHome("zh-CN");
-
     const text = container.textContent ?? "";
-    expect(text).toContain("想创造什么？");
-    expect(text).toContain("专家Agent");
-    expect(text).toContain("近期项目");
-    expect(text).toContain("超级智能体已就绪");
+    for (const copy of [
+      "想创造什么？",
+      "视频课",
+      "图文课",
+      "Remotion动效",
+      "图片动效",
+      "AI视频",
+      "近期项目",
+    ]) {
+      expect(text).toContain(copy);
+    }
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((item) => item.textContent?.includes("图文课"))
+        ?.click();
+    });
+    for (const copy of ["海报制作", "PPT制作", "文章写作"]) {
+      expect(container.textContent).toContain(copy);
+    }
   });
 });
