@@ -1,0 +1,63 @@
+name: Lint Check
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lint-check.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    # A6：'*' 不匹配 feature/x 类带斜杠分支名（会静默跳过 lint），须 '**'
+    branches: [ '**' ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/lint-check.yml'
+
+concurrency:
+  group: lint-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-frontend:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Use pinned pnpm version
+        run: corepack prepare pnpm@10.26.2 --activate
+
+      # setup-node 解析 pnpm cache 前需要 pnpm 已在 PATH，故在 corepack 固定版本后启用。
+      - name: Enable pnpm dependency cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          pnpm install --frozen-lockfile --prefer-offline
+
+      # A4（2026-10-08 CI 优化批）：静态门禁收编——与本地根 make check 的 frontend 侧
+      # 逐字同源（eslint+tsc+prettier-check+knip+i18n，即 frontend/Makefile check）；
+      # knip/i18n 从 Frontend Unit Tests 迁入，报警落点与内容一致。
+      # pnpm build 已去重：全仓唯一 build = E2E job 的 webServer（两工作流同受
+      # frontend/** 路径过滤，frontend 变更必经 E2E，build 覆盖不缩水）。
+      - name: Frontend static gates (make check)
+        working-directory: frontend
+        run: make check

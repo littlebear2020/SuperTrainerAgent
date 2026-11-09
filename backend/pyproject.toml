@@ -1,0 +1,103 @@
+[project]
+name = "deer-flow"
+version = "0.1.0"
+description = "LangGraph-based AI agent system with sandbox execution capabilities"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deerflow-harness",
+    "vimax",
+    "fastapi>=0.115.0",
+    "httpx>=0.28.0",
+    "python-multipart>=0.0.26",
+    "sse-starlette>=2.1.0",
+    "uvicorn[standard]>=0.34.0",
+    # R5/Q9（2026-09-24）：钉精确版本。feishu.py 的 loop patch 依赖 SDK 内部两处
+    # loop 捕获点（ws/client.py 模块级 + core/cache/expiring_cache.py 实例级），
+    # 升级必须人工重审 feishu.py `_run_ws` 的 patch 点位（结构守护测试
+    # tests/test_feishu_lark_loop_guard.py 会红）。
+    "lark-oapi==1.5.5",
+    "slack-sdk>=3.33.0",
+    "python-telegram-bot>=21.0",
+    "langgraph-sdk>=0.1.51",
+    "markdown-to-mrkdwn>=0.3.1",
+    "wecom-aibot-python-sdk>=0.1.6",
+    "dingtalk-stream>=0.24.3",
+    "bcrypt>=4.0.0",
+    "pyjwt>=2.9.0",
+    "email-validator>=2.0.0",
+    "python-pptx>=1.0.0",
+    "weasyprint>=60",
+    "markdown>=3.5",
+    "aiolimiter>=1.2.1",
+    "edge-tts>=7.2.8",
+    "faiss-cpu>=1.14.3",
+    "langchain-community>=0.4.2",
+    # graphic 视觉源（content-match 2026-08-14）：Pillow 确定性渲染 text_card/big_number/steps。
+    # 0.1：从 imageio 传递依赖提为直接依赖。2026-10-05（审计 A2）：floor 提至 12.3.0——
+    # 11.3.0 落在 CVE-2026-25990（12.1.1 修复）与 CVE-2026-59205（12.3.0 修复）区间。
+    "pillow>=12.3.0",
+]
+
+[project.optional-dependencies]
+postgres = ["deerflow-harness[postgres]"]
+
+[dependency-groups]
+dev = [
+    "blockbuster>=1.5.26,<1.6",
+    "prompt-toolkit>=3.0.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=6.0",
+    "pytest-xdist>=3.8.0",
+    "respx>=0.23.1",
+    "ruff>=0.14.11",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "no_auto_user: disable the conftest autouse contextvar fixture for this test",
+    "allow_blocking_io: opt out of the strict Blockbuster gate in tests/blocking_io/",
+    # 2026-10-05 基建批：分层选择标记（make test-fast 用）。live=需 RUN_LIVE/付费 key
+    # 的整文件门控（部分用例门控的文件不打——skipif 已零成本跳过）；e2e=跨多层
+    # 真实管线的 *_e2e 文件；slow=暂无合格者（登记占位，>1s 真等待出现时使用）。
+    "slow: real wall-clock wait >1s in the green path (hang-stubs excluded)",
+    "e2e: end-to-end tests exercising multiple real layers (*_e2e files)",
+    "integration: tests crossing process/service boundaries (reserved)",
+    "live: whole-file opt-in tests hitting real paid APIs (RUN_LIVE etc.)",
+]
+# pytest-asyncio defaults asyncio_default_fixture_loop_scope to None; pin it to
+# "function" so @pytest_asyncio fixtures share each async test's function-scoped
+# loop (required for async fixtures that must drive the same loop as the test body).
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv]
+index-url = "https://pypi.org/simple"
+# 2026-10-05 审计 A2（R-1 裁决）：moviepy 2.2.1（已是最新版）预防性封顶 pillow<12.0，
+# 与 CVE-2026-25990/59205 修复线（≥12.3.0）不相交。override 放行 12.3.0，
+# vimax 回归 + 后端全量绿后采用；moviepy 发新版后应移除本条并复核。
+override-dependencies = [
+    "pillow>=12.3.0",
+]
+
+[tool.uv.workspace]
+members = ["packages/harness", "packages/vimax"]
+
+[tool.uv.sources]
+deerflow-harness = { workspace = true }
+vimax = { workspace = true }
+
+
+# 2026-10-05 基建批：make test-cov 的覆盖率口径——先只做可见性（不设阈值门槛），
+# 用于找防护盲区；vimax 为 vendored lint 豁免区不计量。
+[tool.coverage.run]
+source = ["app", "packages/harness/deerflow"]
+omit = ["*/tests/*", "*/test_*", "*/__pycache__/*", "*/packages/vimax/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "if __name__ == .__main__.:",
+]

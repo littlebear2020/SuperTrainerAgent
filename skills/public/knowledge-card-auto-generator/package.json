@@ -1,0 +1,30 @@
+{
+  "name": "knowledge-card-auto-generator",
+  "version": "1.1.0",
+  "description": "OpenClaw skill for generating glassmorphism knowledge cards (SVG + MP4) from structured data",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx src/index.ts",
+    "studio": "remotion studio",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "remotion": "^4.0.441",
+    "@remotion/cli": "^4.0.441",
+    "@remotion/renderer": "^4.0.441",
+    "@remotion/bundler": "^4.0.441",
+    "@remotion/tailwind": "^4.0.441",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.19.0",
+    "tailwindcss": "^3.4.0",
+    "@types/node": "^22.0.0"
+  }
+}

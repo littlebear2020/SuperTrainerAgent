@@ -1,0 +1,12 @@
+name: vimax-video
+description: "VIMAX 视频大师：故事/剧情视频专家。澄清需求→规划蓝图→确认→调 generate_video 路由后端 ViMax 引擎渲染（有角色有剧情，角色跨镜一致性）"
+model: null
+# SEC-C2/C3 显式化（2026-09-02 B2 步骤3）：本 agent 依赖 video_engine 组的
+# generate_video/plan_storyboard/check_video_status（SOUL 明文不用沙箱文件
+# 工具——成片在网关侧存储）；不再隐式携带 bash/file:write。
+tool_groups:
+  - video_engine
+skills: []
+category: public
+created_by: admin
+created_at: "2026-07-15T00:00:00+00:00"

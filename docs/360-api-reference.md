@@ -1,0 +1,119 @@
+# 360智脑开放平台-官方文档
+
+> **镜像说明**：本文件是 [ai.360.com](https://ai.360.com/docs/quick-start.md) 官方文档索引的手工镜像，供仓内检索定位用；链接指向官方最新内容。**最近核对：2026-10-13**（vs 2026-09-13 版差异：新增 错误码/速率限制/前缀缓存/智能调度/seedance素材管理快速开始/语音合成TTS/模型发现新入口/Responses Schemas 全套；知识库 Docs+API 全部条目下架；「其他」更名「更多说明」、「web搜索」更名「web搜索(360智搜)」）。
+>
+> **本仓主要使用**：chat/completions（模型网关，`PatchedChatOpenAI`）、`/v1/images/generations|edits`（seedream 生图/参考图编辑）、`/v1/videos/async_generations`（seedance/hailuo 视频桥）、`/v1/responses`（gpt-6.1-sol 等 responses-only 上游，2026-10-13 实测 tools 可用）。TTS 粗评（2026-10-13 实测）：`volcengine/seed-tts-2.0` 走 `/v1/audio/stream_speech` 可用（文档示例形态）；`minimax/speech-2.8-*` 在目录在册但两代型号均 500 未接线，且平台无任何克隆/音色登记 API——声音克隆仍走火山 openspeech V3（voice_twin 现状）。
+
+## Docs
+- [快速开始](https://ai.360.com/docs/quick-start.md): 
+- 文本生成 [对话接口](https://ai.360.com/docs/77655148f0.md): 
+- [图片生成](https://ai.360.com/docs/77655141f0.md): 
+- [图片编辑](https://ai.360.com/docs/77655142f0.md): 
+- [视频生成](https://ai.360.com/docs/77655143f0.md): 
+- 视频生成 [seedance素材管理](https://ai.360.com/docs/93701022f0.md): 
+- 视频生成 > seedance素材管理 [快速开始](https://ai.360.com/docs/9397908m0.md): 
+- AI翻译 > 产品介绍 [文本翻译介绍](https://ai.360.com/docs/8256390m0.md): 
+- AI翻译 > 产品介绍 [图片翻译介绍](https://ai.360.com/docs/8256391m0.md): 
+- AI翻译 > 产品介绍 [文档翻译介绍](https://ai.360.com/docs/8256484m0.md): 
+- AI翻译 > 产品介绍 [错误码说明](https://ai.360.com/docs/8129192m0.md): 
+- [记忆库](https://ai.360.com/docs/77655137f0.md): 
+- 记忆库 [产品介绍](https://ai.360.com/docs/8257429m0.md): 
+- [web搜索(360智搜)](https://ai.360.com/docs/77655138f0.md): 
+- [文档解析](https://ai.360.com/docs/77655147f0.md): 
+- 更多说明 [更优雅地使用本文档](https://ai.360.com/docs/9335834m0.md): 
+- 更多说明 [错误码](https://ai.360.com/docs/errno.md): 
+- 更多说明 [速率限制](https://ai.360.com/docs/rate_limit.md): 
+- 更多说明 [前缀缓存](https://ai.360.com/docs/cache.md): 
+- 更多说明 [智能调度](https://ai.360.com/docs/router.md): 
+- 更多说明 > 第三方工具配置 [CC Switch + Claude Code 快速配置](https://ai.360.com/docs/8188245m0.md): 
+- 更多说明 > 第三方工具配置 [CC Switch + Codex快速配置](https://ai.360.com/docs/9069931m0.md): 
+
+## API Docs
+- 文本生成 > 对话接口 [chat/completions（OpenAI格式）](https://ai.360.com/docs/413291990e0.md): 根据提供的会话信息，返回模型生成的对话内容
+- 文本生成 > 对话接口 [messages（Claude格式）](https://ai.360.com/docs/417283364e0.md): 
+- 文本生成 > 对话接口 [Responses API（OpenAI格式）](https://ai.360.com/docs/437061603e0.md): OpenAI 最先进的模型响应生成接口。支持文本和图像输入，以及文本输出。通过将先前响应的输出作为输入，与模型建立具有状态的交互。利用内置的文件搜索、网络搜索、计算机操作等工具，扩展模型的功能。通过函数调用，允许模型访问外部系统和数据。
+- 文本生成 > tools工具箱 [搜索增强](https://ai.360.com/docs/413292007e0.md): 
+- 文本生成 > tools工具箱 [模板调用](https://ai.360.com/docs/prompt_template.md): 
+- 文本生成 > tools工具箱 [技能分发](https://ai.360.com/docs/413292022e0.md): ## 常见问题
+- 文本生成 > tools工具箱 [网页分析](https://ai.360.com/docs/413292023e0.md): ## 常见问题
+- 文本生成 > tools工具箱 [知识库增强](https://ai.360.com/docs/413291999e0.md): 
+- 文本生成 > tools工具箱 [知识库增强-模板调用](https://ai.360.com/docs/413291998e0.md): ### 前置说明：
+- 图片生成 [生成图片](https://ai.360.com/docs/413292017e0.md): 根据 prompt 生成图片
+- 图片编辑 [图片编辑](https://ai.360.com/docs/413292018e0.md): 根据 prompt 编辑图片
+- 视频生成 > seedance素材管理 [创建素材库](https://ai.360.com/docs/503198055e0.md): 创建素材库，响应中会返回素材库的 ID，例如`group-20260803163842-47dkx`。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318270?lang=zh)。
+- 视频生成 > seedance素材管理 [在素材库中创建素材](https://ai.360.com/docs/503214768e0.md): 在指定的素材库中创建素材，响应中会返回素材的 ID，例如：`asset-20260803164232-j68xm`。详情可参考[官方文档](
+- 视频生成 > seedance素材管理 [更新素材库](https://ai.360.com/docs/507627768e0.md): 更新单个 Asset Group（素材资产组合）信息。当前仅支持更新 Asset Group（素材资产组合）的 Name 和 Description。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318276?lang=zh)。
+- 视频生成 > seedance素材管理 [更新素材](https://ai.360.com/docs/507629223e0.md): 更新单个 Asset （素材资产）信息。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318277?lang=zh)
+- 视频生成 > seedance素材管理 [删除素材库](https://ai.360.com/docs/507632594e0.md): 删除素材资产组（Asset Group）。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2341606?lang=zh)。
+- 视频生成 > seedance素材管理 [删除素材](https://ai.360.com/docs/507633723e0.md): 删除素材资产（Asset）信息。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318278?lang=zh)
+- 视频生成 > seedance素材管理 [查询素材库列表](https://ai.360.com/docs/507645323e0.md): 查询符合筛选条件的 Asset Groups（素材资产组合）列表。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318272?lang=zh)。
+- 视频生成 > seedance素材管理 [查询素材库信息](https://ai.360.com/docs/507649450e0.md): 获取单个 Asset Group（素材资产组合）信息。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318275?lang=zh)。
+- 视频生成 > seedance素材管理 [查询素材列表](https://ai.360.com/docs/507652477e0.md): 查询符合筛选条件的 Assets（素材资产）列表。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318273?lang=zh)。
+- 视频生成 > seedance素材管理 [查询素材信息](https://ai.360.com/docs/507654080e0.md): 查询素材资产状态，确认素材是否已完成预处理并可用于推理。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2318274?lang=zh)。
+- 视频生成 > seedance素材管理 [查询真人素材库信息](https://ai.360.com/docs/507760331e0.md): 真人认证通过后（即当 Callback URL 后缀 resultCode 参数值返回 10000 时），可通过本接口获取本次真人认证创建的 Asset Group ID。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2333588?lang=zh)。
+- 视频生成 > seedance素材管理 [拉起真人认证 H5](https://ai.360.com/docs/507769796e0.md): 拉起端上 H5 真人认证页链接。详情可参考[官方文档](https://console.volcengine.com/ark/region:cn-beijing/docs/82379/2333587?lang=zh)。
+- 视频生成 [创建视频生成](https://ai.360.com/docs/413292019e0.md): 根据 prompt 和图片生成视频
+- 视频生成 [创建视频生成（vidu）](https://ai.360.com/docs/426207667e0.md): 该接口用于创建vidu模型的异步视频生成任务，支持以下 5 种生成类型：
+- 视频生成 [创建视频生成（kling）](https://ai.360.com/docs/432211828e0.md): 该接口用于创建kling模型的异步视频生成任务，支持以下 7 种生成类型：
+- 视频生成 [创建视频生成（seedance）](https://ai.360.com/docs/503146854e0.md): 该接口用于创建seedance模型的异步视频生成任务，支持以下 6 种生成类型：
+- 视频生成 [查询视频生成状态](https://ai.360.com/docs/413292020e0.md): 根据创建视频生成任务阶段返回 id 字段，获取视频 url
+- 音频处理 [语音识别（ASR）](https://ai.360.com/docs/413292021e0.md): 根据输入的音频，输出识别后的文字
+- 音频处理 [语音合成（TTS）](https://ai.360.com/docs/517632233e0.md): 根据输入的文本，生成对应的音频
+- AI翻译 [文本翻译](https://ai.360.com/docs/413292013e0.md): 
+- AI翻译 [图片翻译](https://ai.360.com/docs/413292014e0.md): 翻译输入的图片，返回实景贴合的译文图片
+- AI翻译 [文档翻译-创建任务（异步）](https://ai.360.com/docs/413292015e0.md): 文档翻译为异步接口，需先上传文档创建文档翻译任务，然后轮询结果。
+- AI翻译 [文档翻译-获取结果](https://ai.360.com/docs/413292016e0.md): 
+- 记忆库 [添加记忆](https://ai.360.com/docs/413292001e0.md): 输入对话的内容请求接口，系统自动提取记忆并添加，由于提取记忆耗时相对较长，因此接口为异步接口，需先提交信息，然后根据任务 id 获取最终提取的记忆。
+- 记忆库 [获取记忆结果](https://ai.360.com/docs/413292002e0.md): 
+- 记忆库 [检索记忆](https://ai.360.com/docs/413292003e0.md): 输入对话的内容请求接口，系统自动提取记忆并添加。
+- 记忆库 [获取记忆列表](https://ai.360.com/docs/413292004e0.md): 指定业务 id 和用户 id，获取用户下的全部记忆列表。
+- 记忆库 [删除全部记忆](https://ai.360.com/docs/413292005e0.md): 指定业务 id 和用户 id，删除用户下的全部记忆。
+- 记忆库 [删除单条记忆](https://ai.360.com/docs/413292006e0.md): 指定记忆 id，删除对应记忆。
+- web搜索(360智搜) [360智搜-基础版(SR)](https://ai.360.com/docs/421760042e0.md): 
+- web搜索(360智搜) [360智搜-进阶版(PRO)](https://ai.360.com/docs/421760325e0.md): 
+- web搜索(360智搜) [360智搜-极致版(MAX)](https://ai.360.com/docs/421760496e0.md): 
+- web搜索(360智搜) [360智搜-新闻](https://ai.360.com/docs/421765130e0.md): 
+- web搜索(360智搜) [360智搜-精品内容库](https://ai.360.com/docs/425209454e0.md): 
+- web搜索(360智搜) [360智搜-文搜图](https://ai.360.com/docs/421767143e0.md): 
+- web搜索(360智搜) [360智搜-图搜图](https://ai.360.com/docs/421767186e0.md): 
+- web搜索(360智搜) [360智搜-AI搜索](https://ai.360.com/docs/429775575e0.md): 
+- web搜索(360智搜) [360智搜-新闻垂搜](https://ai.360.com/docs/519648942e0.md): 
+- web搜索(360智搜) [360智搜-热点资讯](https://ai.360.com/docs/519653488e0.md): 
+- AI安全 [文本风险检测](https://ai.360.com/docs/413292008e0.md): 
+- AI安全 [图片风险检测](https://ai.360.com/docs/413292009e0.md): 
+- AI安全 [音频风险检测](https://ai.360.com/docs/413292010e0.md): 
+- AI安全 [视频风险检测](https://ai.360.com/docs/413292011e0.md): 先提交审核任务，再按需拉取送审结果
+- AI安全 [查询视频风险检测任务结果](https://ai.360.com/docs/413292012e0.md): 
+- 文档解析 [文档上传](https://ai.360.com/docs/413292024e0.md): 
+- 文档解析 [获取内容](https://ai.360.com/docs/413292025e0.md): 
+- 向量化 [向量生成](https://ai.360.com/docs/413291991e0.md): 根据输入的内容，生成向量表示
+- 向量化 [语义相似度计算](https://ai.360.com/docs/413291994e0.md): 根据输入一条查询内容和一组内容，计算待查询内容和这组内容里每一条的相似度
+- 更多说明 > 模型发现 [模型列表](https://ai.360.com/docs/models.md): 
+- 更多说明 > 模型发现 [模型详情](https://ai.360.com/docs/model-detail.md): 获取指定的模型详情
+
+## Schemas
+- Responses API [ResponseInputText](https://ai.360.com/docs/260085518d0.md): 
+- Responses API [ResponseInputImage](https://ai.360.com/docs/260085930d0.md): 
+- Responses API [ResponseInputFile](https://ai.360.com/docs/260091763d0.md): 
+- Responses API [ResponseError](https://ai.360.com/docs/260121954d0.md): 
+- Responses API [ResponseConversationParam](https://ai.360.com/docs/260570705d0.md): 
+- Responses API [ResponseIncludable](https://ai.360.com/docs/260570956d0.md): 
+- Responses API [ResponseInputMessageContentList](https://ai.360.com/docs/260572195d0.md): 
+- Responses API [EasyInputMessage](https://ai.360.com/docs/260573781d0.md): 
+- Responses API [ToolChoiceTypes](https://ai.360.com/docs/260574476d0.md): 
+- Responses API [ToolChoiceOptions](https://ai.360.com/docs/260574788d0.md): 
+- Responses API [ToolChoiceMcp](https://ai.360.com/docs/260574861d0.md): 
+- Responses API [ToolChoiceFunction](https://ai.360.com/docs/260574951d0.md): 
+- Responses API [ToolChoiceCustom](https://ai.360.com/docs/260574985d0.md): 
+- Responses API [ToolChoiceApplyPatch](https://ai.360.com/docs/260575000d0.md): 
+- Responses API [ToolChoiceAllowed](https://ai.360.com/docs/260575394d0.md): 
+- Responses API [Message](https://ai.360.com/docs/260578100d0.md): 
+- Responses API [FileCitation](https://ai.360.com/docs/260579022d0.md): 
+- Responses API [ContainerFileCitation](https://ai.360.com/docs/260579511d0.md): 
+- Responses API [URLCitation](https://ai.360.com/docs/260579475d0.md): 
+- Responses API [ToolChoiceShell](https://ai.360.com/docs/260574503d0.md): 
+- Responses API [FilePath](https://ai.360.com/docs/260579552d0.md): 
+- Responses API [ResponseOutputText](https://ai.360.com/docs/260579772d0.md): 
+- Responses API [ResponseOutputRefusal](https://ai.360.com/docs/260579777d0.md): 
+- Responses API [ResponseOutputMessage](https://ai.360.com/docs/260579843d0.md): 
+- [ErrorResponse](https://ai.360.com/docs/243750809d0.md): 

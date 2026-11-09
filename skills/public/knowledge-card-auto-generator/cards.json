@@ -1,0 +1,40 @@
+[
+  {
+    "id": "react-hooks",
+    "title": "React Hooks",
+    "subtitle": "Essential patterns for modern React",
+    "points": [
+      "useState for local state management",
+      "useEffect for side effects and lifecycle",
+      "useCallback for memoized callbacks",
+      "useMemo for expensive computation caching"
+    ],
+    "theme": "tech-blue",
+    "tags": ["react", "hooks", "frontend"]
+  },
+  {
+    "id": "typescript-basics",
+    "title": "TypeScript Essentials",
+    "subtitle": "Type-safe JavaScript development",
+    "points": [
+      "Static type checking at compile time",
+      "Interfaces and type aliases for contracts",
+      "Generics for reusable typed code",
+      "Union and intersection types"
+    ],
+    "theme": "neon-purple",
+    "tags": ["typescript", "types", "javascript"]
+  },
+  {
+    "id": "git-workflow",
+    "title": "Git Workflow Best Practices",
+    "points": [
+      "Feature branches for isolated development",
+      "Commit early, commit often with clear messages",
+      "Pull requests for code review",
+      "Rebase vs merge: choose your strategy"
+    ],
+    "theme": "emerald-green",
+    "tags": ["git", "workflow", "devops"]
+  }
+]

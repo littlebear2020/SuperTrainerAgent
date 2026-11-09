@@ -1,0 +1,87 @@
+minimum_pre_commit_version: '3.2.0'  # push 阶段 PRE_COMMIT_* 注入的稳定下限（main-push-path-guard 依赖，PR#14 评审）
+repos:
+  # Backend: ruff lint + format via uv (uses the same ruff version as backend deps)
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff lint
+        entry: bash -c 'cd backend && uv run ruff check --fix "${@/#backend\//}"' --
+        language: system
+        types_or: [python]
+        files: ^backend/
+        exclude: ^backend/packages/vimax/  # vendored third-party (ViMax), exempt from host lint
+      - id: ruff-format
+        name: ruff format
+        entry: bash -c 'cd backend && uv run ruff format "${@/#backend\//}"' --
+        language: system
+        types_or: [python]
+        files: ^backend/
+        exclude: ^backend/packages/vimax/  # vendored third-party (ViMax), exempt from host lint
+
+  # Frontend: eslint + prettier (must run from frontend/ for node_modules resolution)
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npx eslint --fix "${@/#frontend\//}"' --
+        language: system
+        types_or: [javascript, tsx, ts]
+        files: ^frontend/
+
+      - id: frontend-prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && npx prettier --write "${@/#frontend\//}"' --
+        language: system
+        files: ^frontend/
+        # markdown 2026-10-08 CI 优化批 A2 补入：堵 FRONTEND_MODULE_NOTES.md 类本地结构性漏拦
+        types_or: [javascript, tsx, ts, json, css, markdown]
+
+  # Secret scanning (2026-10-05 audit C5): brew install gitleaks; value-allowlist in .gitleaks.toml
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+        entry: gitleaks protect --staged --redact
+        language: system
+        pass_filenames: false
+
+  # docs 治理门禁前移（2026-10-17）：docs/ 文件变更时本地 commit 即拦截——原先只有 make check/CI
+  # 事后反馈，出过 agent 未跑门禁顺手新建 docs/demo-assets/ 违例目录的事故
+  - repo: local
+    hooks:
+      - id: docs-convention
+        name: docs convention check
+        entry: python3 scripts/check_docs_convention.py
+        language: system
+        files: ^docs/
+        pass_filenames: false
+
+  # Pre-push fast gates (2026-10-08 CI 优化批 A3，D1 决策的穷人版 required checks)：
+  # 利用 pre-push 阶段待推文件列表做路径过滤——docs-only 推送零触发。
+  # 应急绕过：git push --no-verify。首次启用须手动 pre-commit install --hook-type pre-push。
+  - repo: local
+    hooks:
+      - id: backend-push-gate
+        name: backend fast tests (pre-push)
+        entry: bash -c 'cd backend && make test-fast'
+        language: system
+        stages: [pre-push]
+        files: ^backend/
+        pass_filenames: false
+      - id: frontend-push-gate
+        name: frontend tests + typecheck (pre-push)
+        entry: bash -c 'cd frontend && pnpm test && pnpm typecheck'
+        language: system
+        stages: [pre-push]
+        files: ^frontend/
+        pass_filenames: false
+      # 核心路径禁直推 main（2026-10-13 MA-P0 C10：P0-2 补偿控制第一层 + P0-3 机械牙齿）：
+      # 推 main 且 diff 命中核心路径清单 → 阻断并提示走分支+PR；推功能分支/未命中 → 放行。
+      # 清单 SoT = scripts/check_main_push_paths.py（与 AGENTS.md 清单镜像，check 脚本校验项 19 互守）。
+      - id: main-push-path-guard
+        name: core paths no-direct-push (pre-push)
+        entry: python3 scripts/check_main_push_paths.py
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false

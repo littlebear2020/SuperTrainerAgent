@@ -1,0 +1,418 @@
+cases:
+  # ── 视觉设计 ──────────────────────────────
+  - id: case-tech-cover-01
+    title: 赛博朋克风·前沿科技文章封面
+    skill_name: trainerai-article-visuals
+    skill_description: 为你的文章或报告生成精美封面图与文内插图
+    category: 视觉设计
+    featured: true
+    thumbnail: /gallery/case_tech_cover_1779757583167.png
+    prompt: "为我的文章《AI发展趋势》生成一个科技风格的封面图，主色调蓝色系，包含发光的大脑和电路元素，数字艺术风格。"
+    prompt_template: "为我的文章《{article_title}》生成一个{style}风格的封面图，主色调{color_tone}系，{extra_requirements}。"
+    default_vars:
+      article_title: "AI发展趋势"
+      style: "科技"
+      color_tone: "蓝色"
+      extra_requirements: "包含发光的大脑和电路元素"
+    vars_config:
+      article_title:
+        label: "你想为什么文章做封面？"
+        type: "string"
+        required: true
+        placeholder: "输入文章标题，如：2026年AI行业报告"
+      style:
+        label: "你喜欢什么视觉风格？"
+        type: "select"
+        options: ["科技", "极简", "插画", "赛博朋克"]
+      color_tone:
+        label: "偏好什么主色调？"
+        type: "select"
+        options: ["蓝色", "紫色", "橙色", "绿色"]
+      extra_requirements:
+        label: "还有别的想法吗？"
+        type: "string"
+        required: false
+        placeholder: "如：想加入发光的神经网络元素、要有未来感..."
+    recipe:
+      title: "赛博朋克风文章封面"
+      goal: "为一篇科技文章生成具有赛博朋克美学的封面图"
+      approach: "渐进式细化法"
+      difficulty: "intermediate"
+      est_steps: 3
+      context_blocks:
+        - "你是一位专业的数字艺术家，擅长赛博朋克风格视觉设计"
+        - "参考美学：霓虹灯光、故障艺术、高对比度暗色调、数字未来感"
+      steps:
+        - instruction: "描述你的主题和情感基调"
+          template: "为《{topic}》生成封面，传达{mood}的感觉"
+          example: "为《AI发展趋势》生成封面，传达科技感和未来感"
+          tip: "先给方向，不要一上来就堆细节。AI 需要先理解你想要什么感觉"
+          vars:
+            topic:
+              label: "你的文章/项目标题是什么？"
+              type: "string"
+              required: true
+              placeholder: "如：2026年AI行业报告"
+            mood:
+              label: "想要什么感觉？"
+              type: "select"
+              options: ["科技感", "未来感", "艺术感", "神秘感"]
+        - instruction: "指定视觉元素和色彩"
+          template: "加入{main_element}作为主体元素，{bg_element}作为背景，主色调{color}"
+          example: "加入发光的大脑作为主体元素，电路纹理作为背景，主色调蓝紫"
+          tip: "具体的视觉锚点比抽象描述有效 10 倍"
+          vars:
+            main_element:
+              label: "主体元素是什么？"
+              type: "string"
+              required: true
+              placeholder: "如：发光的大脑、几何图形、人物剪影"
+            bg_element:
+              label: "背景元素？"
+              type: "string"
+              required: false
+              placeholder: "如：电路纹理、星空、渐变色块"
+            color:
+              label: "主色调？"
+              type: "select"
+              options: ["蓝紫", "暖橙红", "清新绿", "黑白金"]
+        - instruction: "精修和微调"
+          template: "基于当前结果，{refinement}"
+          example: "把主体元素放大占画面40%，霓虹光增加紫色高光"
+          tip: "微调时给出量化指令（'放大到40%'），比'大一点'有效得多"
+          vars:
+            refinement:
+              label: "你想怎么调整？"
+              type: "string"
+              required: false
+              placeholder: "如：颜色再亮一点、标题更醒目、加入故障效果"
+      pitfalls:
+        - "不要说'好看一点'，AI 不知道你觉得什么叫好看"
+        - "不要一次提太多修改，每次 1-2 个点"
+    showcase:
+      type: "image"
+      items:
+        - url: "/gallery/case_tech_cover_1779757583167.png"
+          caption: "科技蓝主色调的赛博朋克封面"
+
+  - id: case-poster-01
+    title: 渐变质感·课程宣传海报
+    skill_name: course-poster
+    skill_description: 快速生成课程、活动或产品的宣传海报
+    category: 视觉设计
+    featured: false
+    thumbnail: ""
+    prompt: "帮我设计一张Python入门课程的宣传海报，使用渐变蓝紫色调，现代简约风格，包含课程标题和关键信息。"
+    prompt_template: "帮我设计一张{course_name}的{poster_style}风格宣传海报，{color_theme}色调，包含课程标题和关键卖点。"
+    default_vars:
+      course_name: "Python入门课程"
+      poster_style: "现代简约"
+      color_theme: "渐变蓝紫"
+    vars_config:
+      course_name:
+        label: "课程或活动名称是什么？"
+        type: "string"
+        required: true
+        placeholder: "如：AI实战训练营、产品经理公开课"
+      poster_style:
+        label: "你想要什么风格的海报？"
+        type: "select"
+        options: ["现代简约", "活力运动", "学术正式", "卡通风"]
+      color_theme:
+        label: "偏好什么配色？"
+        type: "select"
+        options: ["渐变蓝紫", "暖橙红", "清新绿", "黑白金"]
+
+  - id: case-image-cards-01
+    title: 治愈系·知识卡片图组
+    skill_name: trainerai-image-cards
+    skill_description: 将知识点制作成精美的系列图片卡片
+    category: 视觉设计
+    featured: false
+    thumbnail: ""
+    prompt: "帮我制作一组关于'高效学习法'的知识卡片，共5张，使用温暖的插画风格，每张卡片包含一个核心方法和简短说明。"
+    prompt_template: "帮我制作一组关于「{topic}」的知识卡片，共{count}张，{art_style}风格，每张包含一个核心要点和简短说明。"
+    default_vars:
+      topic: "高效学习法"
+      count: "5"
+      art_style: "温暖插画"
+    vars_config:
+      topic:
+        label: "想做什么主题的知识卡片？"
+        type: "string"
+        required: true
+        placeholder: "如：职场沟通技巧、Python核心概念、育儿知识"
+      count:
+        label: "需要几张卡片？"
+        type: "select"
+        options: ["3", "5", "7", "10"]
+      art_style:
+        label: "喜欢什么视觉风格？"
+        type: "select"
+        options: ["温暖插画", "扁平商务", "日系清新", "手绘涂鸦"]
+
+  # ── 数据分析 ──────────────────────────────
+  - id: case-infographic-01
+    title: 玻璃拟物风·业务数据看板设计
+    skill_name: chart-visualization
+    skill_description: 将数据转化为美观的图表和可视化仪表盘
+    category: 数据分析
+    featured: true
+    thumbnail: /gallery/case_infographic_1779757598293.png
+    prompt: "帮我设计一个玻璃拟物风格的业务数据看板，包含折线图、柱状图和雷达图，使用渐变色彩体系，整体现代且清晰。"
+    prompt_template: "帮我设计一个{style}风格的{theme}数据看板，包含{chart_types}，使用{color_scheme}色彩体系，整体{mood}。"
+    default_vars:
+      style: "玻璃拟物"
+      theme: "业务"
+      chart_types: "折线图、柱状图和雷达图"
+      color_scheme: "渐变"
+      mood: "现代且清晰"
+    vars_config:
+      style:
+        label: "你偏好什么设计风格？"
+        type: "select"
+        options: ["玻璃拟物", "扁平化", "3D立体", "极简主义"]
+      theme:
+        label: "看板是关于什么业务的？"
+        type: "string"
+        required: true
+        placeholder: "如：电商销售分析、用户增长趋势、季度财报"
+      chart_types:
+        label: "想展示哪些图表？"
+        type: "string"
+        required: true
+        placeholder: "如：折线图看趋势、饼图看占比、柱状图看对比"
+      color_scheme:
+        label: "配色有什么偏好？"
+        type: "select"
+        options: ["渐变", "单色", "对比色", "莫兰迪色"]
+      mood:
+        label: "整体想要什么感觉？"
+        type: "select"
+        options: ["现代且清晰", "科技感", "商务正式", "活泼明快"]
+    showcase:
+      type: "image"
+      items:
+        - url: "/gallery/case_infographic_1779757598293.png"
+          caption: "玻璃拟物风格的业务数据看板"
+
+  - id: case-data-analysis-01
+    title: 一键生成·深度数据分析报告
+    skill_name: data-analysis
+    skill_description: 上传数据文件，AI自动完成清洗、分析和可视化
+    category: 数据分析
+    featured: false
+    thumbnail: ""
+    prompt: "帮我分析这份数据，给出关键趋势、异常值和可执行的洞察建议，并生成配套的可视化图表。"
+    prompt_template: "帮我分析这份{data_type}数据，重点看{focus_area}，给出{output_format}。"
+    default_vars:
+      data_type: "销售"
+      focus_area: "关键趋势和异常值"
+      output_format: "带图表的完整分析报告"
+    vars_config:
+      data_type:
+        label: "你的数据是关于什么的？"
+        type: "select"
+        options: ["销售", "用户行为", "财务", "运营", "其他"]
+      focus_area:
+        label: "最关心哪方面的洞察？"
+        type: "select"
+        options: ["关键趋势和异常值", "对比分析和排名", "预测未来走势", "全面综合分析"]
+      output_format:
+        label: "希望以什么形式呈现结果？"
+        type: "select"
+        options: ["带图表的完整分析报告", "简洁的摘要和结论", "数据表格+关键指标"]
+
+  # ── 内容创作 ──────────────────────────────
+  - id: case-comic-01
+    title: 吉卜力绘本风·童话风景插画
+    skill_name: trainerai-comic
+    skill_description: 创作具有故事感的漫画和插画
+    category: 内容创作
+    featured: false
+    thumbnail: /gallery/case_comic_1779757618008.png
+    prompt: "生成一张吉卜力风格的插画，画面中有一条小河和一座石桥，远处是一座魔法城堡，色彩鲜艳治愈。"
+    prompt_template: "生成一张{art_style}风格的插画，画面中有{scene_elements}，色彩{color_mood}。"
+    default_vars:
+      art_style: "吉卜力"
+      scene_elements: "一条小河和一座石桥，远处是一座魔法城堡"
+      color_mood: "鲜艳治愈"
+    vars_config:
+      art_style:
+        label: "你想象中这是什么画风？"
+        type: "select"
+        options: ["吉卜力", "赛博朋克", "水彩绘本", "油画写实", "像素风"]
+      scene_elements:
+        label: "闭上眼想象一下，你看到了什么画面？"
+        type: "string"
+        required: true
+        placeholder: "描述你脑海中的场景，如：森林中的小屋、星空下的湖泊..."
+      color_mood:
+        label: "想要什么样的氛围？"
+        type: "select"
+        options: ["鲜艳治愈", "暗黑神秘", "温暖复古", "清新淡雅"]
+    showcase:
+      type: "image"
+      items:
+        - url: "/gallery/case_comic_1779757618008.png"
+          caption: "吉卜力风格的童话风景插画"
+
+  - id: case-deep-research-01
+    title: AI 深度研究·行业趋势分析
+    skill_name: deep-research
+    skill_description: AI帮你进行深度互联网调研，产出结构化研究报告
+    category: 内容创作
+    featured: true
+    thumbnail: ""
+    prompt: "帮我做一份关于2026年AI Agent行业发展趋势的深度研究报告，包含市场规模、主要玩家、技术趋势和投资机会。"
+    prompt_template: "帮我做一份关于「{topic}」的深度研究报告，重点分析{aspects}，输出{depth}级别的报告。"
+    default_vars:
+      topic: "2026年AI Agent行业发展趋势"
+      aspects: "市场规模、主要玩家、技术趋势"
+      depth: "专业详细"
+    vars_config:
+      topic:
+        label: "你想深入了解什么话题？"
+        type: "string"
+        required: true
+        placeholder: "描述你感兴趣的主题，如：新能源汽车出海策略、Z世代消费趋势"
+      aspects:
+        label: "最关心哪几个方面？"
+        type: "string"
+        required: true
+        placeholder: "如：竞争格局、技术路线、政策影响"
+      depth:
+        label: "需要多详细的分析？"
+        type: "select"
+        options: ["快速概览（5分钟读完）", "专业详细（含数据和图表）", "全面深度（适合决策参考）"]
+    showcase:
+      type: "document"
+      items:
+        - url: "/gallery/showcase/case-deep-research-preview.png"
+          caption: "AI 深度研究报告示例"
+
+  # ── 办公效率 ──────────────────────────────
+  - id: case-ppt-01
+    title: PPT 大师·生成/改造/品牌复用
+    skill_name: ppt-master
+    skill_description: 从零生成精品 PPT（原生公式/图表/图标）、改现有 PPT 保原设计、美化重排不动文字
+    category: 办公效率
+    featured: true
+    thumbnail: ""
+    prompt: "帮我生成一份关于产品季度汇报的PPT，15页左右，风格简约商务，包含数据图表页和总结页。"
+    prompt_template: "帮我生成一份关于「{topic}」的PPT，{pages}页左右，{ppt_style}风格，{special_requirements}。"
+    default_vars:
+      topic: "产品季度汇报"
+      pages: "15"
+      ppt_style: "简约商务"
+      special_requirements: "包含数据图表页和总结页"
+    vars_config:
+      topic:
+        label: "这份 PPT 是关于什么的？"
+        type: "string"
+        required: true
+        placeholder: "如：年度工作总结、新产品发布方案、学术答辩"
+      pages:
+        label: "大概需要多少页？"
+        type: "select"
+        options: ["8-10", "12-15", "20-25"]
+      ppt_style:
+        label: "想要什么整体风格？"
+        type: "select"
+        options: ["简约商务", "科技未来", "学术正式", "创意活泼"]
+      special_requirements:
+        label: "有什么特殊需求吗？"
+        type: "string"
+        required: false
+        placeholder: "如：需要数据图表页、要包含团队介绍、末尾加致谢页..."
+    showcase:
+      type: "document"
+      items:
+        - url: "/gallery/showcase/case-ppt-preview.png"
+          caption: "AI 生成的专业演示文稿"
+
+  - id: case-docx-01
+    title: AI 撰写·专业文档一键生成
+    skill_name: docx
+    skill_description: AI帮你撰写合同、方案、报告等各类专业文档
+    category: 办公效率
+    featured: false
+    thumbnail: ""
+    prompt: "帮我撰写一份技术方案文档，包含项目背景、技术架构、实施计划和风险评估四个部分。"
+    prompt_template: "帮我撰写一份{doc_type}，{tone}风格，包含{sections}等核心内容。"
+    default_vars:
+      doc_type: "技术方案文档"
+      tone: "专业严谨"
+      sections: "项目背景、技术架构、实施计划、风险评估"
+    vars_config:
+      doc_type:
+        label: "你需要什么类型的文档？"
+        type: "select"
+        options: ["技术方案", "商业计划书", "项目总结报告", "工作汇报", "需求文档"]
+      tone:
+        label: "文档的语气风格是？"
+        type: "select"
+        options: ["专业严谨", "通俗易懂", "正式规范", "简明扼要"]
+      sections:
+        label: "想包含哪些章节内容？"
+        type: "string"
+        required: true
+        placeholder: "如：背景介绍、方案对比、预算估算、时间节点"
+
+  # ── 视频创作 ──────────────────────────────
+  - id: case-video-01
+    title: AI 短片·一键生成创意视频
+    skill_name: video-generation
+    skill_description: 描述你想要的画面，AI帮你生成创意短视频
+    category: 视频创作
+    featured: true
+    thumbnail: ""
+    prompt: "帮我生成一个10秒的科技感短视频，画面从宇宙星空推进到地球表面，展示未来城市天际线，配有光影特效。"
+    prompt_template: "帮我生成一个{duration}秒的{video_style}风格短视频，{scene_description}。"
+    default_vars:
+      duration: "10"
+      video_style: "科技未来感"
+      scene_description: "画面从宇宙星空推进到地球表面，展示未来城市天际线，配有光影特效"
+    vars_config:
+      duration:
+        label: "视频大概多长？"
+        type: "select"
+        options: ["5", "10", "15"]
+      video_style:
+        label: "想要什么视觉风格？"
+        type: "select"
+        options: ["科技未来感", "自然清新", "复古胶片", "动画卡通"]
+      scene_description:
+        label: "想象一下你想要的画面..."
+        type: "string"
+        required: true
+        placeholder: "描述画面内容和运镜，如：从城市上空俯拍到街道、阳光穿过树林..."
+
+  - id: case-tech-explainer-01
+    title: 前沿科普·科技文章一键转视频
+    skill_name: tech-explainer-video
+    skill_description: 上传科技文章，AI自动解析内容、撰写科普脚本、生成AI配音和视频画面，输出完整科普短视频
+    category: 视频创作
+    featured: true
+    thumbnail: ""
+    prompt: "帮我把这篇关于GPT-5的技术文章做成一个5分钟的科普视频，要求通俗易懂，科技感风格。"
+    prompt_template: "帮我把这篇关于{topic}的文章做成一个{duration}分钟的科普视频，{style_requirements}。"
+    default_vars:
+      topic: "GPT-5大模型技术突破"
+      duration: "5"
+      style_requirements: "要求通俗易懂，科技感风格"
+    vars_config:
+      topic:
+        label: "文章讲的是什么科技主题？"
+        type: "string"
+        required: true
+        placeholder: "如：量子计算最新突破、核聚变进展、脑机接口技术"
+      duration:
+        label: "视频大概多长？"
+        type: "select"
+        options: ["3", "5", "7"]
+      style_requirements:
+        label: "有什么特别要求吗？"
+        type: "string"
+        required: false
+        placeholder: "如：用震撼数据开场、偏理性分析、加入类比讲解..."

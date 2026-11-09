@@ -1,0 +1,36 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore: ['docs/**', '**.md', '.agents/**']  # docs 批次不烧 token（与 Batch A5 路径过滤同哲学）
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Batch B8 上线后 Dependabot 的 PR 拿不到仓库 Secrets（独立密仓）必红，且版本 bump 本无评审价值
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OCR_NO_UPDATE: '1'  # 关 launcher 后台自更新（update.js 分离式 npm i -g@latest 拆 /usr/local/bin/ocr 软链的窗口期会让 review 步骤 127；也护住 ocr_version 钉版不被 latest 漂移）
+    steps:
+      - name: Run OpenCodeReview
+        uses: alibaba/open-code-review@v1.12.12  # 钉 tag；Batch B7 落地后换 40 位 SHA（Dependabot 自动跟踪升版）
+        with:
+          ocr_version: '1.12.12'                    # npm 版本号；不钉则 CLI 走 latest，action 钉版只做一半
+          llm_url: ${{ vars.OCR_LLM_URL }}          # 必填：action 无 provider 输入且会 unset provider 配置，留空必败（§2 表第 2 行）
+          llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          llm_model: ${{ vars.OCR_LLM_MODEL }}      # 如 glm-5.3
+          llm_use_anthropic: 'false'                # OpenAI 兼容协议
+          language: Chinese
+          background: 'SuperTrainerAgent（基于 TrainerAI v2 与 DeerFlow 的多 agent 内容生产平台）：backend/ = FastAPI gateway + harness 框架，frontend/ = Next.js；仓库约定与红线见 AGENTS.md'
+          route_severity_below: low                 # low 发现改道 PR 摘要（fail-open 不丢弃），不刷行内评论
+          incremental: 'true'                       # 已发过的行内评论不重复贴（path+行范围去重）；默认 false 每次全量重贴

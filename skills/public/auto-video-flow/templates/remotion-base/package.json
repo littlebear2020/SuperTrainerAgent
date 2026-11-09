@@ -1,0 +1,29 @@
+{
+  "name": "remotion-video",
+  "version": "1.0.0",
+  "description": "Remotion video project",
+  "private": true,
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@remotion/cli": "4.0.522",
+    "@remotion/tailwind-v4": "4.0.522",
+    "@remotion/transitions": "4.0.522",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.522",
+    "tailwindcss": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

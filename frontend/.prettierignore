@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+.omc/
+src/content/**/*.mdx
+test-results/
+playwright-report/
+eslint-suppressions.json

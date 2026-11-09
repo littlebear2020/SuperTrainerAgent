@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trainer AI 工作台视觉对齐演示</title>
+    <style>
+      :root {
+        --bg: #f1f3f9;
+        --sidebar-bg: oklch(0.965 0.0098 87.47);
+        --card-bg: oklch(0.985 0.003 240);
+        --text: oklch(0.145 0 0);
+        --muted: oklch(0.556 0 0);
+        --border: oklch(0.922 0.0098 87.47);
+        --indigo: #6366f1;
+        --font: "Inter", system-ui, -apple-system, sans-serif;
+      }
+
+      .dark {
+        --bg: #040810;
+        --sidebar-bg: #0a1224;
+        --card-bg: #080b14;
+        --text: #f1f5f9;
+        --muted: #8b9dc3;
+        --border: rgba(255, 255, 255, 0.08);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+        height: 100vh;
+        transition:
+          background 0.5s,
+          color 0.5s;
+      }
+
+      /* ── Floating Blobs ── */
+      .blobs-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .blob {
+        position: absolute;
+        border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+        filter: blur(110px);
+        opacity: 0.15;
+        animation: float var(--dur) ease-in-out infinite;
+        animation-delay: var(--delay);
+      }
+      .dark .blob {
+        opacity: 0.2;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1) rotate(0deg);
+          border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+        }
+        25% {
+          transform: translate(var(--tx1), var(--ty1)) scale(var(--s1))
+            rotate(120deg);
+          border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+        }
+        50% {
+          transform: translate(var(--tx2), var(--ty2)) scale(var(--s2))
+            rotate(240deg);
+          border-radius: 40% 60% 30% 70% / 40% 50% 50% 60%;
+        }
+        75% {
+          transform: translate(var(--tx3), var(--ty3)) scale(var(--s3))
+            rotate(300deg);
+          border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+        }
+      }
+
+      /* Dot Grid */
+      .dot-grid {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          circle at center,
+          rgba(99, 102, 241, 0.03) 1px,
+          transparent 1px
+        );
+        background-size: 32px 32px;
+      }
+
+      /* ── Layout ── */
+      .layout {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        height: 100vh;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 260px;
+        background: var(--sidebar-bg);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        flex-shrink: 0;
+        transition:
+          background 0.5s,
+          border-color 0.5s;
+      }
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 24px;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .sidebar-logo {
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, var(--indigo), #a855f7);
+        border-radius: 6px;
+      }
+      .sidebar-item {
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 4px;
+        transition: background 0.2s;
+      }
+      .sidebar-item.active {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--indigo);
+        font-weight: 600;
+      }
+
+      /* Main content */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        /* TRANSPARENT — blobs show through */
+        background: transparent;
+      }
+      .main-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        font-size: 14px;
+        background: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        transition:
+          background 0.5s,
+          border-color 0.5s;
+      }
+      .dark .main-header {
+        background: rgba(10, 18, 36, 0.5);
+      }
+      .main-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* Chat message cards */
+      .msg-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        max-width: 600px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        transition:
+          background 0.5s,
+          border-color 0.5s,
+          box-shadow 0.5s;
+      }
+      .msg-card.user {
+        align-self: flex-end;
+        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.2);
+      }
+      .msg-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .msg-text {
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      /* Controls */
+      .controls {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 100;
+        display: flex;
+        gap: 8px;
+      }
+      .btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--text);
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .btn:hover {
+        border-color: var(--indigo);
+      }
+      .btn.active {
+        background: var(--indigo);
+        color: white;
+        border-color: var(--indigo);
+      }
+
+      .badge {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 100;
+        padding: 6px 12px;
+        border-radius: 20px;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        transition: all 0.5s;
+      }
+      .badge span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin-right: 6px;
+        background: #22c55e;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* ── Glass Glint Sweep ── */
+      .interactive-glass {
+        position: relative;
+        overflow: hidden;
+      }
+      .interactive-glass::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -150%;
+        width: 60%;
+        height: 100%;
+        background: linear-gradient(
+          to right,
+          transparent,
+          rgba(255, 255, 255, 0.4),
+          transparent
+        );
+        transform: skewX(-25deg);
+        transition: left 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+        z-index: 10;
+      }
+      .interactive-glass:hover::before {
+        left: 150%;
+      }
+      .dark .interactive-glass::before {
+        background: linear-gradient(
+          to right,
+          transparent,
+          rgba(255, 255, 255, 0.15),
+          transparent
+        );
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .interactive-glass::before {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body class="">
+    <!-- Floating Blobs Background -->
+    <div class="blobs-layer">
+      <!-- Blob 1: Blue, top-right -->
+      <div
+        class="blob"
+        style="
+          top: -150px;
+          right: -100px;
+          width: 700px;
+          height: 700px;
+          background: radial-gradient(circle, #3b82f6 0%, #1d4ed8 100%);
+          --dur: 22s;
+          --delay: 0s;
+          --tx1: 110px;
+          --ty1: -85px;
+          --s1: 1.2;
+          --tx2: -75px;
+          --ty2: 95px;
+          --s2: 0.85;
+          --tx3: 0px;
+          --ty3: 0px;
+          --s3: 1;
+        "
+      ></div>
+      <!-- Blob 2: Purple, bottom-left -->
+      <div
+        class="blob"
+        style="
+          bottom: -120px;
+          left: -80px;
+          width: 600px;
+          height: 600px;
+          background: radial-gradient(circle, #c084fc 0%, #8b5cf6 100%);
+          --dur: 19s;
+          --delay: 2s;
+          --tx1: -95px;
+          --ty1: 95px;
+          --s1: 0.85;
+          --tx2: 110px;
+          --ty2: -75px;
+          --s2: 1.25;
+          --tx3: 0px;
+          --ty3: 0px;
+          --s3: 1;
+        "
+      ></div>
+      <!-- Blob 3: Cyan, mid-left -->
+      <div
+        class="blob"
+        style="
+          top: 35%;
+          left: 10%;
+          width: 520px;
+          height: 520px;
+          background: radial-gradient(circle, #06b6d4 0%, #0891b2 100%);
+          --dur: 21s;
+          --delay: 4s;
+          --tx1: 85px;
+          --ty1: 95px;
+          --s1: 1.2;
+          --tx2: -95px;
+          --ty2: -85px;
+          --s2: 0.85;
+          --tx3: 0px;
+          --ty3: 0px;
+          --s3: 1;
+        "
+      ></div>
+      <!-- Blob 4: Pink, bottom-right -->
+      <div
+        class="blob"
+        style="
+          bottom: 20%;
+          right: 15%;
+          width: 450px;
+          height: 450px;
+          background: radial-gradient(circle, #f472b6 0%, #ec4899 100%);
+          --dur: 23s;
+          --delay: 6s;
+          --tx1: -75px;
+          --ty1: -85px;
+          --s1: 0.85;
+          --tx2: 85px;
+          --ty2: 75px;
+          --s2: 1.15;
+          --tx3: 0px;
+          --ty3: 0px;
+          --s3: 1;
+        "
+      ></div>
+    </div>
+    <div class="dot-grid"></div>
+
+    <!-- Layout -->
+    <div class="layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo"></div>
+          Trainer AI
+        </div>
+        <div class="sidebar-item active">💬 对话</div>
+        <div class="sidebar-item">🎨 灵感库</div>
+        <div class="sidebar-item">⚙️ 设置</div>
+      </aside>
+
+      <!-- Main Content (TRANSPARENT) -->
+      <main class="main">
+        <div class="main-header">🧵 新的对话</div>
+        <div class="main-content">
+          <div class="msg-card user interactive-glass">
+            <div class="msg-label">👤 You</div>
+            <div class="msg-text">帮我写一个 React 组件来处理文件上传</div>
+          </div>
+          <div class="msg-card interactive-glass">
+            <div class="msg-label">🤖 Trainer AI</div>
+            <div class="msg-text">
+              好的，我来为你创建一个支持拖拽、多文件和进度条的文件上传组件。以下是完整的实现...
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Controls -->
+    <div class="badge"><span></span>Blobs 背景运行中</div>
+    <div class="controls">
+      <button class="btn active" onclick="setTheme('light')" id="btn-light">
+        ☀️ 亮色
+      </button>
+      <button class="btn" onclick="setTheme('dark')" id="btn-dark">
+        🌙 暗色
+      </button>
+      <button class="btn" onclick="toggleBlobs()" id="btn-blobs">
+        🎯 Blobs: ON
+      </button>
+    </div>
+
+    <script>
+      function setTheme(t) {
+        document.body.classList.toggle("dark", t === "dark");
+        document
+          .getElementById("btn-light")
+          .classList.toggle("active", t === "light");
+        document
+          .getElementById("btn-dark")
+          .classList.toggle("active", t === "dark");
+      }
+      let blobsOn = true;
+      function toggleBlobs() {
+        blobsOn = !blobsOn;
+        document.querySelector(".blobs-layer").style.display = blobsOn
+          ? ""
+          : "none";
+        document.querySelector(".dot-grid").style.display = blobsOn
+          ? ""
+          : "none";
+        document.getElementById("btn-blobs").textContent = blobsOn
+          ? "🎯 Blobs: ON"
+          : "🎯 Blobs: OFF";
+      }
+    </script>
+  </body>
+</html>

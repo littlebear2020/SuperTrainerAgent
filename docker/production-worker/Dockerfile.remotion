@@ -1,0 +1,84 @@
+# Remotion Worker — 独立渲染池（2026-09-08 remotion-course 计划 T3）
+#
+# 与 ffmpeg 池（Dockerfile）共用 worker.py + pipelines/ 源码，叠加：
+#   Node 22 + Chrome headless shell（构建期预下载 COPY，公司服务器离线）+
+#   /opt/course-standard 模板（构建期 npm install + esbuild 校验 + browser ensure）
+#   + TEMPLATE_VERSION 内容 hash 戳（模板变更必须重建本镜像——防漂移）。
+#
+# ⚠️ 构建上下文必须是**仓库根**（COPY video-templates/）：
+#   docker build --platform linux/amd64 -f docker/production-worker/Dockerfile.remotion \
+#     -t trainer-ai-remotion-worker:latest .
+#
+# 运行配额（D18 128G 基准）：mem_limit 10g + shm_size 2g，WORKER_POOL=remotion，
+# MAX_CONCURRENT_TASKS=1（渲染槽）——见 docker-compose-deploy.yaml remotion-worker 节。
+
+# 基座 = 本地 ffmpeg worker 镜像（已含 ffmpeg + fonts-noto-cjk + fontconfig——
+# 直接 apt 装在 CN 网络下极慢；基座代码会被下方 COPY 覆盖，只有 apt 层被复用）。
+# 重建链：先 docker build -f docker/production-worker/Dockerfile -t trainer-ai-worker:latest
+# docker/production-worker/，再 build 本文件（上下文=仓库根）。
+FROM trainer-ai-worker:latest
+
+# ── Node 22（npmmirror 官方二进制 tarball——docker.io 拉取在 CN 网络不可达；
+#    glibc x64 官方构建，含 bin/node + lib/node_modules(npm/npx)，装进 /usr/local）──
+# Chrome headless shell 运行时依赖（libnspr4/libnss3/…——slim 基座无桌面栈，
+# 实测缺 libnspr4.so 直接启动失败；sandbox 镜像基座自带故那边不需要）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl xz-utils ca-certificates \
+    libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+    libgbm1 libpango-1.0-0 libcairo2 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG NODE_VERSION=22.14.0
+RUN ARCH=$(uname -m) \
+    && if [ "$ARCH" = "x86_64" ]; then NARCH=x64; elif [ "$ARCH" = "aarch64" ]; then NARCH=arm64; else echo "unsupported arch $ARCH"; exit 1; fi \
+    && curl -fsSL "https://registry.npmmirror.com/-/binary/node/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NARCH}.tar.xz" \
+       | tar -xJ -C /usr/local --strip-components=1 \
+    && node --version && npm --version
+
+# ── Worker 源码（与 ffmpeg 池同一份）──────────────────────────────────
+RUN ffmpeg -filters 2>&1 | grep -q 'blackdetect' || (echo "FATAL: ffmpeg missing blackdetect (QC needs it)" && exit 1)
+
+WORKDIR /app
+COPY docker/production-worker/worker.py docker/production-worker/pipeline.py ./
+COPY docker/production-worker/pipelines/ ./pipelines/
+
+# ── Chrome headless shell（预下载 COPY——服务器离线，不拉 Google）──────
+COPY docker/sandbox/cache/chrome-linux/chrome-headless-shell-linux64/ /opt/chrome-headless-shell/
+RUN chmod +x /opt/chrome-headless-shell/chrome-headless-shell
+
+# ── course-standard 模板（npm install + esbuild 校验 + browser ensure）──
+COPY video-templates/course-standard /opt/course-standard
+# TEMPLATE_VERSION 防漂移戳：模板内容 hash（node_modules/out/.baseline 不计）
+RUN cd /opt/course-standard \
+    && find . -type f -not -path "./node_modules/*" -not -path "./out*" -not -path "./.baseline-m0/*" -not -path "./build/*" -not -name ".DS_Store" -not -name "TEMPLATE_VERSION" | sort | xargs md5sum | md5sum | awk '{print $1}' > TEMPLATE_VERSION \
+    && echo "TEMPLATE_VERSION: $(cat TEMPLATE_VERSION)"
+# npm 走 npmmirror（registry.npmjs.org 在构建网络不可达；同 frontend Dockerfile
+# 的 NPM_REGISTRY 惯例）。lock 的 resolved 域构建期改写——npmmirror 是全量镜像，
+# integrity 哈希一致，锁定版本语义不变；仓库内 lock 保持 npmjs 域不动。
+RUN cd /opt/course-standard \
+    && sed -i 's|https://registry.npmjs.org/|https://registry.npmmirror.com/|g' package-lock.json \
+    && npm install --no-audit --no-fund --registry=https://registry.npmmirror.com \
+    && node -e "try { require('esbuild'); console.log('esbuild OK') } catch(e) { console.error('esbuild FAILED:', e.message); process.exit(1) }" \
+    && PUPPETEER_CHROMIUM_REVISION=skip npx remotion browser ensure --browser-executable=/opt/chrome-headless-shell/chrome-headless-shell \
+    && npx remotion compositions src/index.ts --browser-executable=/opt/chrome-headless-shell/chrome-headless-shell 2>&1 | grep -q "DataDrivenCourse" \
+    && rm -rf node_modules/.cache \
+    && echo "=== course-standard template ready ==="
+
+# rspack native binding（npm 可能静默跳过平台 optional 依赖，npm/cli#4828；
+# 参照 docker/sandbox/Dockerfile 同款处理）
+RUN ARCH=$(uname -m) \
+    && if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+         RSPACK_BINDING="@rspack/binding-linux-arm64-gnu"; \
+       else \
+         RSPACK_BINDING="@rspack/binding-linux-x64-gnu"; \
+       fi \
+    && cd /opt/course-standard \
+    && npm install --no-save "$RSPACK_BINDING" --no-audit --no-fund --registry=https://registry.npmmirror.com || echo "⚠ $RSPACK_BINDING install skipped (may need manual fix)" \
+    && node -e "try { require('@rspack/binding'); console.log('rspack binding OK') } catch(e) { console.error('rspack binding FAILED:', e.message); process.exit(1) }"
+
+EXPOSE 8040
+
+# WORKER_POOL 由 compose 注入（remotion）；此处不设默认，漏配=ffmpeg 池行为
+# （认领不到 remotion 任务，宁可哑火也不抢错）。
+CMD ["python", "worker.py"]

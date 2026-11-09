@@ -1,0 +1,289 @@
+{
+  "src/app/(auth)/setup/page.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/app/workspace/agents/new/page.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/app/workspace/assets/page.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/app/workspace/chats/[thread_id]/page.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/app/workspace/gallery/use-gallery-page-state.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/artifacts/artifact-file-detail.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/chats/chat-box.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/chats/use-chat-mode.ts": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/chats/use-thread-chat.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/command-palette.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/console/console-pricing-panel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/floating-blobs-background.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/input-box.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/messages/message-list.tsx": {
+    "react-hooks/refs": {
+      "count": 4
+    }
+  },
+  "src/components/workspace/messages/storyboard-confirm-card.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/prompt-dialog.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/settings/settings-dialog.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/audio-preview-bar.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/video-gen/brand-pack-section.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/character-sheet-lightbox.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/course-project-detail.tsx": {
+    "react-hooks/refs": {
+      "count": 2
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/remotion-course-storyboard.tsx": {
+    "react-hooks/refs": {
+      "count": 2
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/components/workspace/video-gen/still-preview.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/storyboard-route-split.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-create-dialog.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-detail-audio-settings.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-detail-subtitle-edit.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-detail.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-frame-strip.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-page.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/video-gen/video-gen-storyboard.tsx": {
+    "react-hooks/refs": {
+      "count": 13
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 4
+    }
+  },
+  "src/components/workspace/voice-twin/upload-panel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/voice-twin/voice-selector.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/voice-twin/voice-twin-page.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/voice-twin/waveform-preview.tsx": {
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/workspace-nav-menu.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/writer/extensions-panel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/workspace/writer/from-scratch-panel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/writer/share-dialog.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/writer/version-panel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/core/notification/hooks.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/core/threads/hooks.ts": {
+    "react-hooks/refs": {
+      "count": 2
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/core/threads/token-usage.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/core/video-gen/hooks-add-frame.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 1
+    }
+  },
+  "src/core/video-gen/hooks-regen-prompt.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 1
+    }
+  },
+  "src/core/video-gen/hooks-storyboard.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 2
+    }
+  },
+  "src/core/video-gen/hooks.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/core/voice-twin/hooks.ts": {
+    "react-hooks/refs": {
+      "count": 9
+    }
+  },
+  "src/hooks/use-mobile.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-mounted.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-performance-degrade.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "tests/unit/app/workspace/gallery/use-gallery-page-state-delete-confirm.dom.test.tsx": {
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "tests/unit/core/threads/token-usage-hook.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 1
+    }
+  },
+  "tests/unit/core/video-gen/useDefaultVoice.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 1
+    }
+  },
+  "tests/unit/core/video-gen/useSubmitVideo-error.dom.test.tsx": {
+    "react-hooks/globals": {
+      "count": 1
+    }
+  }
+}

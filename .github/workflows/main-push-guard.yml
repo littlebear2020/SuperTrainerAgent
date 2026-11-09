@@ -1,0 +1,31 @@
+name: main-push-guard
+
+# 核心路径触碰报告（2026-10-13 MA-P0 C10：P0-2 补偿控制第二层 + P0-3 兜底）：
+# push main 后跑报告模式——命中核心路径清单打 ::warning::（恒 exit 0，不阻断），
+# 兜 --no-verify / 未装 pre-commit 的直推；配套第一层 = 本机 pre-push 拦截
+# （scripts/check_main_push_paths.py，清单与 AGENTS.md「Git 约定」节镜像互守）。
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-push-guard
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 核心路径触碰报告（报告模式，不阻断）
+        env:
+          GUARD_BASE: ${{ github.event.before }}
+          GUARD_HEAD: ${{ github.sha }}
+        run: python3 scripts/check_main_push_paths.py --report "$GUARD_BASE" "$GUARD_HEAD"

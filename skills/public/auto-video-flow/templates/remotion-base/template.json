@@ -1,0 +1,10 @@
+{
+  "id": "remotion-base",
+  "name": "基础字幕",
+  "desc": "通用口播模板，深色背景 + 居中文字 + 字幕叠加",
+  "category": "general",
+  "tags": ["口播", "通用", "知识分享"],
+  "preview": "preview.mp4",
+  "supports_video_types": ["remotion"],
+  "params": []
+}

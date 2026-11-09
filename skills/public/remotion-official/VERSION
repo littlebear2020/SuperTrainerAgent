@@ -1,0 +1,6 @@
+upstream: https://github.com/remotion-dev/skills (remotion monorepo, Remotion License)
+version: 4.0.522
+commit: 11986e44eeb672b083354e68967f2b194df73b7c
+vendored_at: 2026-09-08T10:49:50Z
+skills: remotion-markup remotion-captions remotion-create remotion-render remotion-docs
+note: best-practices 路由包未 vendor（上游 issue #24 安装后子链接失效）

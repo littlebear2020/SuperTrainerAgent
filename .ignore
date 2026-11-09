@@ -1,0 +1,5 @@
+# AI 搜索降噪（2026-10-05）：vendored 素材与历史归档默认不参与全仓搜索
+docs/archive/
+docs/plans/archive/
+skills/public/ppt-master/templates/
+docker/sandbox/cache/

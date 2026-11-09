@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* 中文字体栈（2026-09-08 T1：原为 0 字节空文件，与 SKILL.md 自述要求矛盾）。
+   沙箱镜像预装 Noto Sans CJK；本机 macOS 回落 PingFang SC；Windows 回落微软雅黑。 */
+:root {
+  font-family:
+    "Noto Sans SC",
+    "Noto Sans CJK SC",
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+}

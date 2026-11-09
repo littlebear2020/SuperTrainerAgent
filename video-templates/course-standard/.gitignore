@@ -1,0 +1,6 @@
+# T-G3（R26，2026-09-09 feedback-round1）：模板构建/渲染产物不入库。
+# .baseline-m0/ 保留入库——画廊 76 张像素回归基线（scripts/diff-gallery.sh 消费）。
+out/
+out-*/
+build/
+*.mp4

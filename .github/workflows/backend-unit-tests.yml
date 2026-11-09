@@ -1,0 +1,93 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'backend/**'
+      - '!backend/**/*.md'
+      - '!backend/docs/**'
+      - '.github/workflows/backend-unit-tests.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'backend/**'
+      - '!backend/**/*.md'
+      - '!backend/docs/**'
+      - '.github/workflows/backend-unit-tests.yml'
+
+concurrency:
+  group: unit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-unit-tests:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Restore ffmpeg tool cache
+        id: ffmpeg-tool-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/ffmpeg
+          key: ffmpeg-6.1.0-linux-x64-20231201
+
+      # setup-ffmpeg v3 的 Linux 下载源 johnvansickle.com 当前不可达
+      # （2026-10-21 runner 与本机均 fetch failed）。用该 action 官方 Release
+      # 的 6.1 静态包按 SHA-256 预热其 tool cache，后续仍由 pinned action 接管 PATH。
+      - name: Seed ffmpeg tool cache
+        if: steps.ffmpeg-tool-cache.outputs.cache-hit != 'true'
+        env:
+          FFMPEG_ARCHIVE_SHA256: 36a92ef8b5c89723c7e7f9fbc601e5e6875fb7362c20961954270b4ec4f3bd33
+        run: |
+          set -euo pipefail
+          archive_path="${RUNNER_TEMP}/ffmpeg-linux-x64.tar.gz"
+          tool_path="${RUNNER_TOOL_CACHE}/ffmpeg/6.1.0/x64"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "${archive_path}" \
+            "https://github.com/federicocarboni/setup-ffmpeg/releases/download/ffmpeg-6.1-20231201/ffmpeg-linux-x64.tar.gz"
+          echo "${FFMPEG_ARCHIVE_SHA256}  ${archive_path}" | sha256sum --check --strict
+          mkdir -p "${tool_path}"
+          tar -xzf "${archive_path}" -C "${tool_path}" ffmpeg ffprobe
+          touch "${tool_path}.complete"
+
+      - name: Install ffmpeg
+        # 5 个音视频测试用 skipif(not _has_ffmpeg()) 静默跳过 23 个函数，
+        # pytest 仍 exit 0 -> CI 假绿。ffprobe 同包，无需额外字体包
+        # （这批测试不碰 subtitles/drawtext）。
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d # v3
+        with:
+          ffmpeg-version: '6.1.0'
+          architecture: x64
+
+      - name: Verify ffmpeg and ffprobe
+        run: |
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --group dev
+
+      - name: Run unit tests of backend
+        working-directory: backend
+        run: make test

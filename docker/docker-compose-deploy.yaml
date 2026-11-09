@@ -1,0 +1,278 @@
+# DeerFlow Deployment Environment (Offline Docker)
+# Usage:
+#   1. Place this file in ~/deerflow-deploy/ alongside config.yaml, .env, etc.
+#   2. Import images: gunzip -c *.tar.gz | docker load
+#   3. docker compose up -d
+#
+# Directory structure expected:
+#   ~/deerflow-deploy/
+#   ├── docker-compose.yaml     # This file
+#   ├── .env                    # API keys, secrets, image tags
+#   │                           #   MUST also define (absolute HOST paths, see gateway env below):
+#   │                           #     DEER_FLOW_HOST_BASE_DIR=<deploy-dir>/.deer-flow
+#   │                           #     DEER_FLOW_HOST_SKILLS_PATH=<deploy-dir>/skills
+#   ├── config.yaml             # Backend configuration
+#   ├── extensions-config/      # MCP/skills switches (extensions_config.json
+#   │                           #   inside; directory mount so atomic writes
+#   │                           #   work — see DEF-2 in gateway volumes below)
+#   ├── nginx/nginx.conf        # Reverse proxy config
+#   ├── frontend/.env           # Frontend environment (optional)
+#   ├── skills/public/          # Public skills
+#   ├── skills/custom/          # Custom skills (can be empty dir)
+#   └── .deer-flow/             # Runtime data (agents/, data/)
+#
+# Services (C7 2026-10-05 更新实况；2026-10-12 计数修正——六服务拓扑):
+#   - nginx:              Reverse proxy on port 2026
+#   - frontend:           Next.js production server on :3000
+#   - gateway:            FastAPI Gateway + agent runtime on :8001
+#   - ppt-converter:      LibreOffice sidecar (4 replicas)
+#   - production-worker:  ffmpeg 池 (3 replicas)
+#   - remotion-worker:    remotion 渲染池 (1 replica)
+
+services:
+  # ── PPT Converter Sidecar ──────────────────────────────────────────────
+  # 4 replicas for 10-20 concurrent users (single-threaded LibreOffice).
+  # 32-core tier (2026-08-28 调优)：10~20 人同时导出 PPT 时 3 副本(6 并发)会排队，
+  # 升 4 副本=8 并发；64 核/大几十人档可再升到 6 副本（12 并发）。
+  # 2026-08-31 落实并发闸：app.py 新增 _CONVERT_SEMAPHORE（默认 2/容器，env
+  # PPT_CONVERTER_MAX_CONCURRENT 可调）——修前注释声称 Semaphore(2) 但代码里
+  # 不存在，Flask threaded 突发时每副本无界 spawn soffice（每个 0.5~2G）。
+  # mem_limit 3g：每副本最多 2 个 soffice 并发 × ~1.5G 峰值 + 余量（此前无上限）。
+  ppt-converter:
+    image: ${PPT_CONVERTER_IMAGE:-littlebear2016/deerflow-ppt-converter:latest}
+    environment:
+      - TZ=Asia/Shanghai
+      - PPT_CONVERTER_SECRET=${PPT_CONVERTER_SECRET:?PPT_CONVERTER_SECRET must be set (generate via deploy script or .env)}
+      - PPT_CONVERTER_MAX_CONCURRENT=2
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 3g
+    mem_reservation: 512m
+    deploy:
+      replicas: 4
+
+  # ── Reverse Proxy ──────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: deer-flow-nginx
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "${PORT:-2026}:2026"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+    command: >
+      sh -c "cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf
+      && nginx -g 'daemon off;'"
+    depends_on:
+      frontend:
+        condition: service_started
+      gateway:
+        condition: service_healthy
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  # ── Frontend: Next.js Production ───────────────────────────────────────────
+  frontend:
+    image: ${FRONTEND_IMAGE:-littlebear2016/deerflow-frontend:latest}
+    container_name: deer-flow-frontend
+    environment:
+      - TZ=Asia/Shanghai
+      - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
+    env_file:
+      - ./frontend/.env
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  # ── Gateway API ────────────────────────────────────────────────────────────
+  gateway:
+    image: ${GATEWAY_IMAGE:-littlebear2016/deerflow-gateway:latest}
+    container_name: deer-flow-gateway
+    # NOTE: default 1 worker. Multiple workers cause "Run not found" 404s
+    # because RunManager/StreamBridge hold per-run state in process memory.
+    command: sh -c "cd backend && PYTHONPATH=. uv run --no-sync uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-1}"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      # DEF-2 (2026-10-07): mount the DIRECTORY, not the single file. A
+      # single-file bind mount denies `rename` onto the mounted file (EBUSY),
+      # so every atomic extensions_config.json write 500'd. Inside a directory
+      # mount, temp-file + os.replace is a real atomic path; the EBUSY
+      # in-place fallback in mcp.py stays as pure defense.
+      # Migration on the server: mkdir extensions-config && mv extensions_config.json extensions-config/
+      - ./extensions-config/:/app/extensions-config/
+      - ./skills/public:/app/skills/public:ro
+      - ./skills/custom:/app/skills/custom
+      - ./.deer-flow:/app/backend/.deer-flow
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Optional: CLI auth directories for auto-auth (Claude Code + Codex CLI).
+      # Uncomment if the server has ~/.claude and/or ~/.codex configured.
+      # - ${HOME}/.claude:/root/.claude:ro
+      # - ${HOME}/.codex:/root/.codex:ro
+    working_dir: /app
+    environment:
+      - TZ=Asia/Shanghai
+      - CI=true
+      - DEER_FLOW_HOME=/app/backend/.deer-flow
+      - DEER_FLOW_CONFIG_PATH=/app/backend/config.yaml
+      - DEER_FLOW_EXTENSIONS_CONFIG_PATH=/app/extensions-config/extensions_config.json
+      - DEER_FLOW_CHANNELS_LANGGRAPH_URL=${DEER_FLOW_CHANNELS_LANGGRAPH_URL:-http://gateway:8001/api}
+      - DEER_FLOW_CHANNELS_GATEWAY_URL=${DEER_FLOW_CHANNELS_GATEWAY_URL:-http://gateway:8001}
+      # NEW-3: gateway 探 worker 能力的地址。缺它会回落 localhost:8040 ——
+      # gateway 容器自身没人监听 8040（worker 是独立容器），探测必败 →
+      # caps=["v1"] → v2_mixed/v3_segmented 在生产完全不可达。
+      - WORKER_HEALTH_URL=${WORKER_HEALTH_URL:-http://production-worker:8040}
+      - GATEWAY_ENABLE_DOCS=false  # C8（审计 §1-4）：生产显式关
+      # Sandbox containers need HOST-side paths to bind-mount skills and data dirs
+      # (DooD: the host Docker daemon resolves bind sources against the host FS).
+      # Both vars MUST be set in .env to absolute paths under the deploy directory.
+      # Do NOT use ${PWD} here: sudo strips PWD from the environment, so
+      # `sudo docker compose up` silently yields "/.deer-flow" and every sandbox
+      # start fails with "bind source path does not exist". The :? guard turns a
+      # missing var into an immediate compose-up error instead of a runtime failure.
+      - DEER_FLOW_HOST_BASE_DIR=${DEER_FLOW_HOST_BASE_DIR:?set DEER_FLOW_HOST_BASE_DIR in .env to the absolute host path <deploy-dir>/.deer-flow}
+      - DEER_FLOW_HOST_SKILLS_PATH=${DEER_FLOW_HOST_SKILLS_PATH:?set DEER_FLOW_HOST_SKILLS_PATH in .env to the absolute host path <deploy-dir>/skills}
+      - DEER_FLOW_SANDBOX_HOST=host.docker.internal
+      # Attach sandbox containers to the deer-flow network (MTU 1450, Docker
+      # built-in DNS) instead of Docker's default bridge, which can't egress on
+      # the company server (PMTU black hole). Empty/unset keeps default behavior.
+      - DEER_FLOW_SANDBOX_NETWORK=deerflow-deploy_deer-flow
+      - PPT_CONVERTER_URL=http://ppt-converter:8030
+      - PPT_CONVERTER_SECRET=${PPT_CONVERTER_SECRET:?PPT_CONVERTER_SECRET must be set (generate via deploy script or .env)}
+      # Trust nginx proxy IPs so rate-limiters use X-Real-IP
+      - AUTH_TRUSTED_PROXIES=172.0.0.0/8
+      # Cap Gateway's ffmpeg thread pool at 4 (vs default min(8,cpu)). The Gateway
+      # only does thumbnails/audio splices; heavy ffmpeg xfade/concat is the Worker's
+      # job, so limit Gateway ffmpeg to leave CPU for orchestration under load.
+      - FFMPEG_MAX_WORKERS=4
+      # ── 32 核档网关闸门调优（2026-08-28）────────────────────────────
+      # 以下两个闸门在 config.yaml 的 video_gen 段（非 compose env），部署公司机时
+      # 同步设置：max_concurrent_tasks: 8→12（全局在飞任务闸）、max_tasks_per_user:
+      # 3→4（每用户闸）。网关单 worker async（IO 密集），32 核下 CPU 不是瓶颈，
+      # 闸门值才是；preview 并发闸（service.py _preview_sem=3）是代码常量，
+      # 10~20 人档暂不动，排队明显再改代码上调。64 核/大几十人档：12→16、4→6。
+    env_file:
+      - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 20g
+    mem_reservation: 6g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  # ── Production Worker ──────────────────────────────────────────────────
+  # ffmpeg video composition in an isolated container.
+  # Polls SQLite DB for composing tasks, runs ffmpeg pipeline.
+  # 32-core tier（2026-08-28 调优）：3 replicas × MAX_CONCURRENT_TASKS=3 = 9 concurrent
+  # compositions。规模账：10~20 用户 × 2~3 任务 = 20~30 并发任务，旧档 3×2=6 槽必排队。
+  # CPU（诚实账）：xfade 每任务 2~4 核，9 槽峰值 18~36 核——区间**上限超 32 物理核**，
+  # 且还要与 gateway（uvicorn+FFMPEG_MAX_WORKERS=4）、4×ppt、nginx、DooD 沙箱共存；
+  # 高峰同慢的风险真实存在，盯 worker_task_duration_seconds p95，恶化即回落 MCT=2。
+  # 内存（硬顶账，非消费量）：worker 3×8=24G + gateway 20G + ppt 4×3=12G = 56G/64G；
+  # 剩余 8G 给 frontend/nginx/docker/OS——DooD 沙箱容器经 docker.sock 动态创建**无
+  # 上限**，agent 重负载时须另行监控（mem_limit 是上限不是预留，典型消费远低于此）。
+  # 64 核/128G 升级档（未来）：replicas 6 × MAX_CONCURRENT_TASKS=3~4 = 18~24 槽，
+  # 先按 9 槽跑一周，用监控门禁（worker_task_duration_seconds p95 + CPU）确认后再升。
+  # NOTE: no static WORKER_ID — worker.py reads os.environ["HOSTNAME"]
+  # (compose assigns unique hostname per replica, e.g. deer-flow-worker-1/2/3).
+  production-worker:
+    image: ${PRODUCTION_WORKER_IMAGE:-littlebear2016/deerflow-production-worker:latest}
+    # 优雅退出预算：drain 对**每个**在跑线程顺序 join SHUTDOWN_JOIN_TIMEOUT(120s)，
+    # 最坏 = MAX_CONCURRENT_TASKS(3) × 120s = 360s + 释放租约余量；grace 小于它
+    # SIGKILL 会先于 release_my_leases → 任务卡到租约过期（1800s）+ recover。
+    # 调 MAX_CONCURRENT_TASKS 时必须同步本值（公式：槽数 × 120 + ≥60s 余量；
+    # 当前 3 槽 = 420s。test_metrics::test_docker_compose_grace_covers_drain_budget 守卫）。
+    # ⚠️ 运维：带载重部署时 compose 会对每副本等满本值（最长 ~7 分钟）——这是
+    # drain 设计使然，勿 Ctrl-C / docker kill（会重现 SIGKILL-before-release 病灶）。
+    stop_grace_period: 420s
+    environment:
+      - TZ=Asia/Shanghai
+      # T3 双池：ffmpeg 池显式声明（认领谓词=registry 派生白名单扣除 remotion 类型；
+      # 漏配回落 ffmpeg 行为，不会抢错 remotion 任务）
+      - WORKER_POOL=ffmpeg
+      - DB_PATH=/app/data/deerflow.db
+      - STORAGE_DIR=/app/backend/.deer-flow/voice-twins
+      - VIDEO_GEN_STORAGE_DIR=/app/backend/.deer-flow/video-gen
+      - POLL_INTERVAL=2
+      - LEASE_DURATION=1800
+      - MAX_CONCURRENT_TASKS=3
+    volumes:
+      - ./.deer-flow/voice-twins:/app/backend/.deer-flow/voice-twins
+      - ./.deer-flow/video-gen:/app/backend/.deer-flow/video-gen
+      - ./.deer-flow/data:/app/data
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 8g
+    mem_reservation: 1g
+    deploy:
+      replicas: 3
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8040/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Remotion 渲染池（2026-09-08 remotion-course 计划 T3；D18 128G 基准）──
+  # Chrome 1080p 渲染峰值 2-3G 内存 + 2-6 核，与 ffmpeg 池分池互不认领对方任务
+  # （worker.py 认领谓词按 WORKER_POOL 注入 task_type 过滤）。
+  # ⚠️ 128G 硬件到位为绝对前置（第三轮用户确认取消 64G 过渡配置）——4C/7.5G
+  # 测试机禁止按本档部署（D21：功能验证须用测试计划 §2 降级 override）。
+  remotion-worker:
+    # T-G1（R24）：init=true 收割孙进程——渲染超时 subprocess 只杀 npx，
+    # Chrome headless 孤儿进程会耗尽内存
+    init: true
+    image: ${REMOTION_WORKER_IMAGE:-littlebear2016/deerflow-remotion-worker:latest}
+    # 槽位 = 1 渲染槽 + 1 still 槽（T7）→ 2×120+60 = 300s（同公式；调槽数必须同步）
+    stop_grace_period: 300s
+    shm_size: 2g
+    environment:
+      - TZ=Asia/Shanghai
+      - WORKER_POOL=remotion
+      - DB_PATH=/app/data/deerflow.db
+      - STORAGE_DIR=/app/backend/.deer-flow/voice-twins
+      - VIDEO_GEN_STORAGE_DIR=/app/backend/.deer-flow/video-gen
+      - POLL_INTERVAL=2
+      - LEASE_DURATION=1800
+      # 渲染槽数（MAX_CONCURRENT_TASKS 语义更新为"渲染槽数"，still 槽独立计数见 T7）
+      - MAX_CONCURRENT_TASKS=1
+      - REMOTION_STILL_SLOTS=1
+    volumes:
+      - ./.deer-flow/voice-twins:/app/backend/.deer-flow/voice-twins
+      - ./.deer-flow/video-gen:/app/backend/.deer-flow/video-gen
+      - ./.deer-flow/data:/app/data
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 10g
+    mem_reservation: 2g
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8040/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  deer-flow:
+    # Pin the actual network name so the gateway env
+    # DEER_FLOW_SANDBOX_NETWORK=deerflow-deploy_deer-flow (used for
+    # `docker run --network` on sandbox containers) always matches. Without
+    # `name:`, Docker prefixes the compose project name (which defaults to the
+    # deploy directory name) — renaming the dir or `docker compose -p <other>`
+    # would yield a different network and sandbox startup would fail with
+    # "network not found".
+    name: deerflow-deploy_deer-flow
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450

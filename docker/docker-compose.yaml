@@ -1,0 +1,268 @@
+# DeerFlow 单机 quickstart（make up）
+# 定位：单机快速体验拓扑——七服务单副本（nginx/frontend/gateway/ppt-converter/
+# production-worker/remotion-worker + profiles 门控的 provisioner）。
+# 生产部署以 docker/docker-compose-deploy.yaml 为准（多副本+资源档）；
+# 本地开发用 docker/docker-compose-dev.yaml（make docker-start）。
+#
+# Key environment variables (set via .env or scripts/deploy.sh):
+#   DEER_FLOW_HOME                   — runtime data dir, default $REPO_ROOT/backend/.deer-flow
+#   DEER_FLOW_CONFIG_PATH            — path to config.yaml
+#   DEER_FLOW_EXTENSIONS_CONFIG_PATH — path to extensions_config.json
+#   DEER_FLOW_DOCKER_SOCKET          — Docker socket path, default /var/run/docker.sock
+#   DEER_FLOW_REPO_ROOT              — repo root (used for skills host path in DooD)
+#   PPT_CONVERTER_SECRET             — required（:? 校验），生成：openssl rand -hex 32
+#
+# Tracing 默认 Langfuse（compose.langfuse.yaml，端口仅绑 127.0.0.1）；
+# 历史 LangSmith 环境变量已无消费（LANGSMITH_* 为遗留命名，见 .env.example 注记）。
+#
+# Access: http://localhost:${PORT:-2026}
+
+services:
+  # ── Reverse Proxy ──────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: deer-flow-nginx
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "${PORT:-2026}:2026"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+    command: >
+      sh -c "cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf
+      && nginx -g 'daemon off;'"
+    depends_on:
+      frontend:
+        condition: service_started
+      gateway:
+        condition: service_healthy
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  # ── Frontend: Next.js Production ───────────────────────────────────────────
+  frontend:
+    build:
+      context: ../
+      dockerfile: frontend/Dockerfile
+      target: prod
+      args:
+        PNPM_STORE_PATH: ${PNPM_STORE_PATH:-/root/.local/share/pnpm/store}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
+    container_name: deer-flow-frontend
+    environment:
+      - TZ=Asia/Shanghai
+      - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
+    env_file:
+      - ../frontend/.env
+    networks:
+      - deer-flow
+    restart: unless-stopped
+
+  # ── Gateway API ────────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        UV_IMAGE: ${UV_IMAGE:-ghcr.io/astral-sh/uv:0.7.20}
+        UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.org/simple}
+        UV_EXTRAS: ${UV_EXTRAS:-}
+    container_name: deer-flow-gateway
+    # NOTE: default is 1 worker because RunManager and StreamBridge hold
+    # per-run state (asyncio tasks, SSE buffers) in process-local memory.
+    # Multiple workers cause "Run not found" 404s when a client reconnects
+    # to a run that was created in a different worker.  Increase only if
+    # you use a database backend AND implement shared run-bridge state.
+    command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers ${GATEWAY_WORKERS:-1}"
+    volumes:
+      - ${DEER_FLOW_CONFIG_PATH}:/app/backend/config.yaml:ro
+      - ${DEER_FLOW_EXTENSIONS_CONFIG_PATH}:/app/backend/extensions_config.json
+      - ../skills/public:/app/skills/public:ro
+      - ../skills/custom:/app/skills/custom
+      - ${DEER_FLOW_HOME}:/app/backend/.deer-flow
+      # DooD: AioSandboxProvider starts sandbox containers via host Docker daemon
+      - ${DEER_FLOW_DOCKER_SOCKET}:/var/run/docker.sock
+      # D-3（2026-10-05 审计 §4-5）：CLI 凭据目录默认不挂载（config 未启用 acp_agents，
+      # 摘除零成本且消除宿主凭据暴露面）。需要 ACP/CLI 沙箱时取消下述注释：
+#       # CLI auth directories for auto-auth (Claude Code + Codex CLI)
+#       - type: bind
+#         source: ${HOME:?HOME must be set}/.claude
+#         target: /root/.claude
+#         read_only: true
+#         bind:
+#           create_host_path: true
+#       - type: bind
+#         source: ${HOME:?HOME must be set}/.codex
+#         target: /root/.codex
+#         read_only: true
+#         bind:
+#           create_host_path: true
+    working_dir: /app
+    environment:
+      - TZ=Asia/Shanghai
+      - CI=true
+      - DEER_FLOW_HOME=/app/backend/.deer-flow
+      - DEER_FLOW_CONFIG_PATH=/app/backend/config.yaml
+      - DEER_FLOW_EXTENSIONS_CONFIG_PATH=/app/backend/extensions_config.json
+      - DEER_FLOW_CHANNELS_LANGGRAPH_URL=${DEER_FLOW_CHANNELS_LANGGRAPH_URL:-http://gateway:8001/api}
+      - DEER_FLOW_CHANNELS_GATEWAY_URL=${DEER_FLOW_CHANNELS_GATEWAY_URL:-http://gateway:8001}
+      # DooD path/network translation
+      - DEER_FLOW_HOST_BASE_DIR=${DEER_FLOW_HOME}
+      - DEER_FLOW_HOST_SKILLS_PATH=${DEER_FLOW_REPO_ROOT}/skills
+      - DEER_FLOW_SANDBOX_HOST=host.docker.internal
+      # Trust nginx proxy IPs so rate-limiters use X-Real-IP (real client)
+      # instead of the shared Docker container IP.
+      - AUTH_TRUSTED_PROXIES=172.0.0.0/8
+      # C8：默认已翻转为关；quickstart 探索场景显式开
+      - GATEWAY_ENABLE_DOCS=true
+      # worker 池探测（缺 WORKER_HEALTH_URL 时 gateway 回落 localhost:8040 必败，
+      # video-gen caps 探测降级——审计 §12-1）。默认值与 worker_probe.py 一致，显式留档。
+      - WORKER_HEALTH_URL=${WORKER_HEALTH_URL:-http://production-worker:8040}
+      - REMOTION_WORKER_HEALTH_URL=${REMOTION_WORKER_HEALTH_URL:-http://remotion-worker:8040}
+      - PPT_CONVERTER_URL=${PPT_CONVERTER_URL:-http://ppt-converter:8030}
+      - PPT_CONVERTER_SECRET=${PPT_CONVERTER_SECRET:?PPT_CONVERTER_SECRET must be set (generate with openssl rand -hex 32)}
+    env_file:
+      - ../.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  # ── PPT Converter Sidecar（单副本；生产 4 副本见 deploy compose）──────────
+  # LibreOffice + poppler 独立容器，Gateway 按需调用（ppt_extract.py）。
+  ppt-converter:
+    build:
+      context: ../
+      dockerfile: docker/ppt-converter/Dockerfile
+    container_name: deer-flow-ppt-converter
+    environment:
+      - TZ=Asia/Shanghai
+      - PPT_CONVERTER_SECRET=${PPT_CONVERTER_SECRET:?PPT_CONVERTER_SECRET must be set (generate with openssl rand -hex 32)}
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 3g
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8030/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Production Worker（ffmpeg 池单副本；生产 3 副本见 deploy compose）─────
+  # 轮询 SQLite 认领合成任务。无静态 WORKER_ID——worker.py 读 HOSTNAME
+  #（单副本下 compose 容器名即唯一主机名）。
+  production-worker:
+    build:
+      context: ./production-worker
+      dockerfile: Dockerfile
+    container_name: deer-flow-production-worker
+    # drain 每线程顺序 join 120s，默认 2 槽 → 2×120+60 = 300s 最坏 drain
+    stop_grace_period: 300s
+    environment:
+      - TZ=Asia/Shanghai
+      - WORKER_POOL=ffmpeg
+      - DB_PATH=/app/data/deerflow.db
+      - STORAGE_DIR=/app/backend/.deer-flow/voice-twins
+      - VIDEO_GEN_STORAGE_DIR=/app/backend/.deer-flow/video-gen  # 评审修复轮#3：ffmpeg 池认领 video_gen 任务，缺挂载产物落容器本地
+      - POLL_INTERVAL=2
+      - LEASE_DURATION=1800
+    volumes:
+      - ${DEER_FLOW_HOME}/voice-twins:/app/backend/.deer-flow/voice-twins
+      - ${DEER_FLOW_HOME}/video-gen:/app/backend/.deer-flow/video-gen
+      - ${DEER_FLOW_HOME}/data:/app/data
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 4g
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8040/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Remotion Worker（remotion 池单副本；quickstart 缩减档）────────────────
+  # init=true 收割渲染超时的 Chrome 孤儿进程；platform amd64 对齐 chrome 缓存包
+  #（Apple Silicon 走 Rosetta，与生产镜像同构）。
+  remotion-worker:
+    init: true
+    build:
+      # ⚠️ 上下文必须是仓库根（COPY video-templates/course-standard）
+      context: ../
+      dockerfile: docker/production-worker/Dockerfile.remotion
+    platform: linux/amd64
+    container_name: deer-flow-remotion-worker
+    stop_grace_period: 300s
+    shm_size: 2g
+    environment:
+      - TZ=Asia/Shanghai
+      - WORKER_POOL=remotion
+      - DB_PATH=/app/data/deerflow.db
+      - STORAGE_DIR=/app/backend/.deer-flow/voice-twins
+      - VIDEO_GEN_STORAGE_DIR=/app/backend/.deer-flow/video-gen
+      - POLL_INTERVAL=2
+      - LEASE_DURATION=1800
+      - MAX_CONCURRENT_TASKS=1
+      - REMOTION_STILL_SLOTS=1
+    volumes:
+      - ${DEER_FLOW_HOME}/voice-twins:/app/backend/.deer-flow/voice-twins
+      - ${DEER_FLOW_HOME}/video-gen:/app/backend/.deer-flow/video-gen
+      - ${DEER_FLOW_HOME}/data:/app/data
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    mem_limit: 6g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8040/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Sandbox Provisioner (optional, Kubernetes mode) ────────────────────────
+  # SEC-C6：无鉴权服务，profiles 门控——默认不随 make up 拉起，需要 K8s 沙箱时
+  # `docker compose --profile k8s up provisioner`。
+  provisioner:
+    profiles: ["k8s"]
+    build:
+      context: ./provisioner
+      dockerfile: Dockerfile
+      args:
+        APT_MIRROR: ${APT_MIRROR:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: deer-flow-provisioner
+    volumes:
+      - ~/.kube/config:/root/.kube/config:ro
+    environment:
+      - K8S_NAMESPACE=deer-flow
+      - SANDBOX_IMAGE=enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+      - SKILLS_HOST_PATH=${DEER_FLOW_REPO_ROOT}/skills
+      - THREADS_HOST_PATH=${DEER_FLOW_HOME}/threads
+      - KUBECONFIG_PATH=/root/.kube/config
+      - NODE_HOST=host.docker.internal
+      - K8S_API_SERVER=https://host.docker.internal:26443
+    env_file:
+      - ../.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - deer-flow
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+networks:
+  deer-flow:
+    driver: bridge

@@ -1,0 +1,1573 @@
+# Configuration for the DeerFlow application
+#
+# Guidelines:
+# - Copy this file to `config.yaml` and customize it for your environment
+# - The default path of this configuration file is `config.yaml` in the current working directory.
+#   However you can change it using the `DEER_FLOW_CONFIG_PATH` environment variable.
+# - Environment variables are available for all field values. Example: `api_key: $OPENAI_API_KEY`
+# - The `use` path is a string that looks like "package_name.sub_package_name.module_name:class_name/variable_name".
+
+# ============================================================================
+# Config Version (used to detect outdated config files)
+# ============================================================================
+# Bump this number when the config schema changes.
+# Run `make config-upgrade` to merge new fields into your local config.yaml.
+config_version: 29
+
+# ============================================================================
+# Run Recursion Budget
+# ============================================================================
+# Hard server-side ceiling for a client-supplied run recursion_limit.
+# Client values above this are clamped (2026-08-13 regression fix: the
+# frontend sends 2500, so 2500 is the effective web default; IM channels keep
+# the server default of 100). Prevents runaway LangGraph super-steps / LLM cost.
+# 2026-09-22: raised 1000 → 2500 (1000 steps ≈ 80-100 LLM rounds with the
+# middleware chain, too tight for tool-intensive long tasks).
+max_recursion_limit: 2500
+
+# ============================================================================
+# Slow LLM Call Observability (2026-09-22)
+# ============================================================================
+# A model call slower than this emits logger.warning + an `llm_slow` stream
+# event and is counted into the run row's slow_llm_call_count. Surfaces
+# provider-side silent-retry stalls (e.g. 180s request_timeout retries) that
+# otherwise leave no trace in logs or run events.
+slow_llm_warn_seconds: 90
+
+# ============================================================================
+# Empty-Response Governance（OBS-02，2026-09-23 批 1 A2/A3）
+# ============================================================================
+# 真实用户触发的 run 出现空终态 AIMessage 时的自动重试：预算内指数冷却
+# （仅异步生产路径），第 2 次重试起在推理窗口内轻量截断中段工具输出
+# （零 state 写，checkpoint 原文不动）。耗尽后落中文兜底 + llm_empty_fallback
+# 流事件 + run 行 empty_fallback_count 计数。回滚 = max_retries 调回 1。
+empty_response_max_retries: 3
+empty_response_cooldown_base_seconds: 2.0
+empty_response_cooldown_max_seconds: 8.0
+empty_response_trim_on_retry: true
+
+# ============================================================================
+# Sandbox Circuit Breaker（DEF-04 C1，2026-09-23 批 1）
+# ============================================================================
+# 连续 N 次工具结果携带 [SANDBOX_DEAD] 标记（容器不存在/连接拒绝/daemon 失联
+# ——源头 aio_sandbox 打标，正常非零退出天然豁免）→ 熔断终止本次 run：
+# error 态 + 中文文案 + checkpoint 保留（回复「继续」续作）。回滚 = 阈值调大。
+sandbox_failure_circuit_breaker_threshold: 5
+
+# ============================================================================
+# Disk Admission（DEF-04 C2，2026-09-23 批 1）
+# ============================================================================
+# run 启动 + 沙箱创建双检查点的磁盘准入，一次 shutil.disk_usage 微秒级探测。
+# 模式差异：docker/aio 沙箱模式强制拦截（渲染负载在容器侧）；local sandbox
+# 模式降级为 WARN 日志（本地开发无渲染负载、磁盘自管）。
+# 生产默认 5 GiB（渲染帧缓存余量）；测试机（64G 小盘）在自己 config.yaml
+# 覆盖为 2 GiB（2147483648）。余量 < warn 比例仅 WARNING，不拦截。
+disk_min_free_bytes_block: 5368709120   # 5 GiB
+disk_warn_free_ratio: 0.15
+
+# ============================================================================
+# Token Budget Warning（OBS-03 D3，2026-09-23 批 2）
+# ============================================================================
+# thread 累计 tokens（与 UI 徽章同口径）超过任务类型阈值 → Tokens 徽章变红 +
+# token_budget_warn 后端事件；只告警不阻断。12M 定标：5 页 PPT≈8M 不告警、
+# 33 页≈15M 为 80% 分位（第三轮由 5M 上调）；观察期后按分位数据校准。
+token_budget_warn_tokens:
+  default: 12000000
+  ppt-master: 12000000
+  course-video: 12000000
+
+# ============================================================================
+# Token Budget（2026-08-13 D7/T18 移植）
+# ============================================================================
+# 每 run token 预算熔断。出厂保持 enabled: false；公司服务器建议启用：
+# 2026-10-14 ppt-master 事故消耗 25M token 仍未交付，证明失控形态需要机械熔断。
+# 交付优先阈值（2026-10-15 拍板）：max_tokens=30000000、max_input_tokens=null
+# （本事故输入占大头，单独输入上限留 6M 会先误伤可交付长任务）；warn_threshold
+# 0.6 默认 → 18M 注入 wrap-up 提示，hard_stop 在 30M 拦真失控。
+# 注意：下方出厂值 8M/6M 为旧校准，非本批拍板阈值；公司服务器启用前须按部署
+# 手册 K17.5 覆盖为 max_tokens=30000000、max_input_tokens=null。
+token_budget:
+  enabled: false
+  max_tokens: 8000000        # 8M（近期成功 max 7.6M × 1.05）
+  max_input_tokens: 6000000  # 6M（输入爆炸形态二级防线）
+  warn_threshold: 0.6        # 4.8M 注入 wrap-up 提示
+  hard_stop_threshold: 1.0
+
+# ============================================================================
+# Logging
+# ============================================================================
+# Log level for deerflow modules (debug/info/warning/error)
+log_level: info
+
+# ============================================================================
+# Token Usage
+# ============================================================================
+# Enable token usage collection and display.
+# When enabled, DeerFlow records input/output/total tokens per model call
+# and shows usage metadata in the workspace UI when providers return it.
+token_usage:
+  enabled: true
+  # Per-run cumulative token count above which a run is logged and flagged in
+  # the operations console (/console). 0 disables the flag.
+  #
+  # Recording ONLY. Unlike upstream's token_budget_middleware this never warns
+  # the model, never strips tool_calls, and never ends a run early — long
+  # video-generation runs would otherwise be nudged into cutting their
+  # storyboards short, which looks like success but ships a worse video.
+  #
+  # The default (7,500,000) is the p95 of this deployment's 869 real runs
+  # measured 2026-08-03: median 121,182 / p95 7,462,994 / p99 29,634,502 /
+  # max 256,517,593. Upstream's 200,000 default would flag 387 of those runs,
+  # 370 of which succeeded. Re-measure before changing it.
+  attention_threshold_tokens: 7500000
+
+# ============================================================================
+# Models Configuration
+# ============================================================================
+# Configure available LLM models for the agent to use
+#
+# Cost reporting (optional): annotate any model with a `pricing` block and the
+# operations console will estimate spend per run / per day / per model.
+# ModelConfig allows extra fields, so no schema change is needed.
+#
+#   pricing:
+#     currency: CNY                     # must match across ALL models —
+#                                       #   mixed currencies disable cost
+#                                       #   reporting entirely
+#     input_per_million: 8              # input (cache-miss) price
+#     output_per_million: 32            # output price
+#     input_cache_hit_per_million: 0.8  # optional; omit to bill cache hits
+#                                       #   at the full input price
+#
+# A model with no pricing block (or with input/output both <= 0) is treated as
+# unpriced: the console reports its cost as null rather than inventing a value.
+
+models:
+  # ── 生产在用的模型清单（2026-10-12 调整）：360 网关 7 条——Ark 直连聊天已撤册
+  #    （Ark 通道本身保留：seedream/seedance 生图生视频与 video_gen.ark_api_key 仍在用）。──
+  # 360 网关（api.360.cn/v1，$QIHU_API_KEY）——显示名前缀「360·」：
+  #   qwen/qwen3.8-flash（360·Qwen 3.8 Flash（默认）——2026-10-12 三模型压测胜出提为
+  #     models[0]，650 样本证据 docs/2026-10-12-flash-trio-benchmark.md；title/
+  #     summarization/memory/skill_evolution.moderation 的 model_name 指向此条）
+  #   z-ai/glm-5.3-flash（360·GLM 5.3 Flash——2026-10-12 让出默认位降为 models[1]：
+  #     恒思考坐实致 TTFT 偏高，压测败于 qwen3.8-flash）
+  #   qwen/qwen3.8-max（360·Qwen 3.8 Max，多模态+思考；2026-10-12 起 vimax_llm_model 指向）
+  #   openai/gpt-5.6-terra（360·GPT 5.6 Terra，多模态+思考，2026-08-18 实测）
+  #   anthropic/claude-haiku-5-5、anthropic/claude-sonnet-5-5、anthropic/claude-opus-5-5
+  #   （2026-10-12 新增 3 条，模板见下方追加批注释；原计划第 4 条 gpt-6.1-sol 经
+  #   spike 证伪不入册——chat/completions 上 function tools 全形态 400，延后处理）
+  # （2026-10-12 撤册 7 条：xiaomi/mimo-v2.6-flash、mimo-v2.6-pro、openai/gpt-6-luna、
+  #   gpt-6-sol、google/gemini-3.8-flash、deepseek/deepseek-v4-flash-vision-exp（六条 360，
+  #   用户决策下架；gemini 系 360 通道双模态停顿失格管线默认）+ doubao-seed-2-1-pro-260628
+  #   （Ark 聊天）。历史 runs 的 model_name 行照常计费显示。更早撤册（2026-09-08/08-27
+  #   gemini-3.5/mimo-v2.5/qwen3.7 等）见 git 历史。）
+  # vision/thinking 标注以真实图片/顶层 thinking 键实测为准（最近一轮 2026-08-28，
+  # 留档 test-output/roster-probe-2026-08-27/）：
+  # **不要用 1x1 像素图探测**——退化图会让模型瞎猜或被上游拒（invalid image
+  # format），曾据此把 kimi-k3 与 qwen3.7-plus 误标成不支持 vision。探测脚本见
+  # backend/scripts/model_connectivity_check.py（256x256 纯色图 + thinking 顶层键）。
+  # 2026-08-28 探针结论：glm-5.3-flash / qwen3.8-flash / gemini-3.5-flash 三新条目
+  # connectivity、vision（答 "Red"）、thinking 顶层键全部通过——当时花名册 7 条
+  # 均 supports_thinking: true。2026-08-18：gpt-5.6-terra vision 答对、thinking 被接受；
+  # mimo-v2.5-pro vision 400 code=10137（3 次复测确定性失败）→ supports_vision: false（已下架）。
+  # 默认模型 = models[0]；title/summarization/memory 的 model_name: null = 跟随默认。
+  # B3 历史结论（2026-08-09，针对已撤册的 gemini-3.6-flash）：360 网关当时不接受
+  # Gemini thinking（extra_body.thinking → 400 "Cannot find field"）→ supports_thinking:
+  # false。注意 3.5 实测行为相反，勿按 3.6 外推。
+  # stream_chunk_timeout（2026-08-14 T6/C-02）：langchain-openai 1.2.1 支持该构造器参数，
+  # 默认 120s——thinking 模型（豆包/qwen/gpt-terra/gemini）长思考首字 90-150s 会撞超时。
+  # 生产思考型模型 config.yaml 里都应加 stream_chunk_timeout: 240
+  # （服务器手改项，见部署指南 K14；通路经 ModelConfig extra → 构造器，
+  # tests/test_model_factory.py 有守护）。
+  # 完整 entry 见本地 config.yaml (gitignored)。DeepSeek provider 吃 api_base, OpenAI 吃 base_url。
+  # - name: glm-5.2-ark
+  #   display_name: GLM 5.2 (字节直连)
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: glm-5-2-260617                       # Ark 原生 id (用户确认 2026-07-12)
+  #   base_url: https://ark.cn-beijing.volces.com/api/v3
+  #   api_key: $ARK_API_KEY
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: 0.7
+  #   stream_chunk_timeout: 240                 # 2026-08-14 T6：thinking 首字 90-150s > langchain 默认 120s
+  #   supports_vision: false                      # glm-5.2 vision 不工作
+  #   supports_thinking: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+  # ── 360 主力切换批（2026-08-21）追加模板（deepseek-v4-flash-vision-exp 模板已随
+  #    2026-10-12 删册移除；生产 script/subtitle 默认迁 qwen3.8-flash）──
+  # - name: bytedance/doubao-seed-2-1-pro         # E10 追加（supports_thinking: false 起步）
+  #   display_name: 豆包 Seed 2.1 Pro (360)
+  #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+  #   model: bytedance/doubao-seed-2-1-pro        # 360 网关在册 id
+  #   api_base: https://api.360.cn/v1
+  #   api_key: $QIHU_API_KEY
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   stream_chunk_timeout: 240
+  #   supports_vision: true
+  #   supports_thinking: false
+  # - name: deepseek-v4-pro-ark
+  #   display_name: DeepSeek V4 Pro (字节直连)
+  #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+  #   model: deepseek-v4-pro-260425               # Ark 原生 id (用户确认 2026-07-12)
+  #   api_base: https://ark.cn-beijing.volces.com/api/v3
+  #   api_key: $ARK_API_KEY
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: 0.7
+  #   supports_vision: false                      # DeepSeek V4 无 vision
+  #   supports_thinking: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+  # ── 2026-10-12 新增批模板（spike 定稿字段形态见仓库根 temp/results.json；生产条目
+  #    见 gitignored config.yaml。claude 系经 360 网关 OpenAI 兼容封装走 PatchedChatOpenAI；
+  #    vision 全答对主色、thinking 参数被接受但 reasoning_tokens=0 = 无效参数 → false；
+  #    usage 回执无 amount → pricing TBD 待 /api/admin/model-pricing 补录。gpt-6.1-sol
+  #    spike 证伪不入册：thinking 块被拒 + effort 不支持 none + chat/completions 上
+  #    function tools 全形态 400（上游要求 /v1/responses）——待上游/网关放开后重议）──
+  #    2026-10-13 事故修正：temperature 必须 null——Bedrock 上游对 claude 拒收该参数
+  #    （400 code 10137，测试机实测；spike 未带该参数组合故漏检）。None = 请求不携带。
+  # - name: claude-haiku-5-5
+  #   display_name: 360·Claude Haiku 5.5
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: anthropic/claude-haiku-5-5
+  #   api_key: $QIHU_API_KEY
+  #   base_url: https://api.360.cn/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: null
+  #   supports_vision: true                       # spike 实测答对主色（256×256 纯红图）
+  #   supports_thinking: false                    # spike：thinking 形态被接受但无 reasoning 产出
+  #   stream_chunk_timeout: 240
+  # - name: claude-sonnet-5-5                     # 同 haiku 形态（spike 同日实测）
+  #   display_name: 360·Claude Sonnet 5.5
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: anthropic/claude-sonnet-5-5
+  #   api_key: $QIHU_API_KEY
+  #   base_url: https://api.360.cn/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: null
+  #   supports_vision: true
+  #   supports_thinking: false
+  #   stream_chunk_timeout: 240
+  # - name: claude-opus-5-5                       # 同 haiku 形态（spike 同日实测）
+  #   display_name: 360·Claude Opus 5.5
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: anthropic/claude-opus-5-5
+  #   api_key: $QIHU_API_KEY
+  #   base_url: https://api.360.cn/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: null
+  #   supports_vision: true
+  #   supports_thinking: false
+  #   stream_chunk_timeout: 240
+
+  # Example: OpenAI model
+  # - name: gpt-4
+  #   display_name: GPT-4
+  #   use: langchain_openai:ChatOpenAI
+  #   model: gpt-4
+  #   api_key: $OPENAI_API_KEY # Use environment variable
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 4096
+  #   temperature: 0.7
+  #   supports_vision: true # Enable vision support for view_image tool
+
+  # Example: OpenAI Responses API model
+  # - name: gpt-5-responses
+  #   display_name: GPT-5 (Responses API)
+  #   use: langchain_openai:ChatOpenAI
+  #   model: gpt-5
+  #   api_key: $OPENAI_API_KEY
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   use_responses_api: true
+  #   output_version: responses/v1
+  #   supports_vision: true
+
+  # Example: Ollama (native provider — preserves thinking/reasoning content)
+  #
+  # IMPORTANT: Use langchain_ollama:ChatOllama instead of langchain_openai:ChatOpenAI
+  # for Ollama models. The OpenAI-compatible endpoint (/v1/chat/completions) does NOT
+  # return reasoning_content as a separate field — thinking content is either flattened
+  # into <think> tags or dropped entirely (ollama/ollama#15293). The native Ollama API
+  # (/api/chat) correctly separates thinking from response content.
+  #
+  # Install: cd backend && uv pip install 'deerflow-harness[ollama]'
+  #
+  # - name: qwen3-local
+  #   display_name: Qwen3 32B (Ollama)
+  #   use: langchain_ollama:ChatOllama
+  #   model: qwen3:32b
+  #   base_url: http://localhost:11434   # No /v1 suffix — uses native /api/chat
+  #   num_predict: 8192
+  #   temperature: 0.7
+  #   reasoning: true                    # Passes think:true to Ollama native API
+  #   supports_thinking: true
+  #   supports_vision: false
+  #
+  # - name: gemma4-local
+  #   display_name: Gemma 4 27B (Ollama)
+  #   use: langchain_ollama:ChatOllama
+  #   model: gemma4:27b
+  #   base_url: http://localhost:11434
+  #   num_predict: 8192
+  #   temperature: 0.7
+  #   reasoning: true
+  #   supports_thinking: true
+  #   supports_vision: true
+  #
+  # For Docker deployments, use host.docker.internal instead of localhost:
+  #   base_url: http://host.docker.internal:11434
+
+  # Example: Anthropic Claude model
+  # - name: claude-3-5-sonnet
+  #   display_name: Claude 3.5 Sonnet
+  #   use: langchain_anthropic:ChatAnthropic
+  #   model: claude-3-5-sonnet-20241022
+  #   api_key: $ANTHROPIC_API_KEY
+  #   default_request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 8192
+  #   supports_vision: true  # Enable vision support for view_image tool
+  #   when_thinking_enabled:
+  #     thinking:
+  #       type: enabled
+  #   when_thinking_disabled:
+  #     thinking:
+  #       type: disabled
+
+  # Example: Google Gemini model (native SDK, no thinking support)
+  # - name: gemini-2.5-pro
+  #   display_name: Gemini 2.5 Pro
+  #   use: langchain_google_genai:ChatGoogleGenerativeAI
+  #   model: gemini-2.5-pro
+  #   gemini_api_key: $GEMINI_API_KEY
+  #   timeout: 600.0
+  #   max_retries: 2
+  #   max_tokens: 8192
+  #   supports_vision: true
+
+  # Example: Gemini model via OpenAI-compatible gateway (with thinking support)
+  # Use PatchedChatOpenAI so that tool-call thought_signature values on tool_calls
+  # are preserved across multi-turn tool-call conversations — required by the
+  # Gemini API when thinking is enabled. See:
+  # https://docs.cloud.google.com/vertex-ai/generative-ai/docs/thought-signatures
+  # - name: gemini-2.5-pro-thinking
+  #   display_name: Gemini 2.5 Pro (Thinking)
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: google/gemini-2.5-pro-preview   # model name as expected by your gateway
+  #   api_key: $GEMINI_API_KEY
+  #   base_url: https://<your-openai-compat-gateway>/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 16384
+  #   supports_thinking: true
+  #   supports_vision: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+
+  # Example: DeepSeek model (with thinking support)
+  # - name: deepseek-v3
+  #   display_name: DeepSeek V3 (Thinking)
+  #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+  #   model: deepseek-reasoner
+  #   api_key: $DEEPSEEK_API_KEY
+  #   timeout: 600.0
+  #   max_retries: 2
+  #   max_tokens: 8192
+  #   supports_thinking: true
+  #   supports_vision: false  # DeepSeek V3 does not support vision
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+
+  # Example: Kimi K2.5 model
+  # - name: kimi-k2.5
+  #   display_name: Kimi K2.5
+  #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+  #   model: kimi-k2.5
+  #   api_base: https://api.moonshot.cn/v1
+  #   api_key: $MOONSHOT_API_KEY
+  #   timeout: 600.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   supports_thinking: true
+  #   supports_vision: true  # Check your specific model's capabilities
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+
+  # Example: Novita AI (OpenAI-compatible)
+  # Novita provides an OpenAI-compatible API with competitive pricing
+  # See: https://novita.ai
+  # - name: novita-deepseek-v3.2
+  #   display_name: Novita DeepSeek V3.2
+  #   use: langchain_openai:ChatOpenAI
+  #   model: deepseek/deepseek-v3.2
+  #   api_key: $NOVITA_API_KEY
+  #   base_url: https://api.novita.ai/openai
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 4096
+  #   temperature: 0.7
+  #   supports_thinking: true
+  #   supports_vision: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+
+  # 360 - Z.AI GLM-5 (外部 360 API)
+  # - name: z-ai-glm-5
+  #   display_name: Z.AI GLM-5
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: z-ai/glm-5
+  #   api_key: $QIHU_API_KEY
+  #   base_url: https://api.360.cn/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 4096
+  #   temperature: 0.7
+  #   supports_vision: true
+  #   supports_thinking: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+
+  # Example: OpenRouter (OpenAI-compatible)
+  # OpenRouter models use the same ChatOpenAI + base_url pattern as other OpenAI-compatible gateways.
+  # - name: openrouter-gemini-2.5-flash
+  #   display_name: Gemini 2.5 Flash (OpenRouter)
+  #   use: langchain_openai:ChatOpenAI
+  #   model: google/gemini-2.5-flash-preview
+  #   api_key: $OPENAI_API_KEY
+  #   base_url: https://openrouter.ai/api/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 8192
+  #   temperature: 0.7
+
+  # Example: vLLM 0.19.0 (OpenAI-compatible, with reasoning toggle)
+  # DeerFlow's vLLM provider preserves vLLM reasoning across tool-call turns and
+  # toggles Qwen-style reasoning by writing
+  # extra_body.chat_template_kwargs.enable_thinking=true/false.
+  # Some reasoning models also require the server to be started with
+  # `vllm serve ... --reasoning-parser <parser>`.
+  # - name: qwen3-32b-vllm
+  #   display_name: Qwen3 32B (vLLM)
+  #   use: deerflow.models.vllm_provider:VllmChatModel
+  #   model: Qwen/Qwen3-32B
+  #   api_key: $VLLM_API_KEY
+  #   base_url: http://localhost:8000/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 8192
+  #   supports_thinking: true
+  #   supports_vision: false
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       chat_template_kwargs:
+  #         enable_thinking: true
+
+
+  # Example: Qwen3-Coder deployed on MindIE Engine
+  # - name: Qwen3_Coder_480B_MindIE
+  #   display_name: Qwen3-Coder-480B (MindIE)
+  #   use: deerflow.models.mindie_provider:MindIEChatModel
+  #   model: Qwen3-Coder-480B-A35B-Instruct-Client
+  #   base_url: http://localhost:8989/v1
+  #   api_key: $OPENAI_API_KEY
+  #   temperature: 0
+  #   max_retries: 1
+  #   supports_thinking: false
+  #   supports_vision: false
+  #   supports_reasoning_effort: false
+  #   # --- Advanced Network Settings ---
+  #   # Due to MindIE's streaming limitations with tool calling, the provider
+  #   # uses mock-streaming (awaiting full generation). Extended timeouts are required.
+  #   read_timeout: 900.0     # 15 minutes to prevent drops during long document generation
+  #   connect_timeout: 30.0
+  #   write_timeout: 60.0
+  #   pool_timeout: 30.0
+
+# ============================================================================
+# Tool Groups Configuration
+# ============================================================================
+# Define groups of tools for organization and access control
+
+tool_groups:
+  - name: web
+  - name: file:read
+  - name: file:write
+  - name: bash
+  - name: video_engine   # generate_video tool (course-video agent only)
+
+# ============================================================================
+# Tools Configuration
+# ============================================================================
+# Configure available tools for the agent to use
+
+tools:
+  # Web search tool (uses DuckDuckGo, no API key required)
+  - name: web_search
+    group: web
+    use: deerflow.community.ddg_search.tools:web_search_tool
+    max_results: 5
+
+  # Web search tool (requires Tavily API key)
+  # - name: web_search
+  #   group: web
+  #   use: deerflow.community.tavily.tools:web_search_tool
+  #   max_results: 5
+  #   # api_key: $TAVILY_API_KEY  # Set if needed
+
+  # Web search tool (uses InfoQuest, requires InfoQuest API key)
+  # - name: web_search
+  #   group: web
+  #   use: deerflow.community.infoquest.tools:web_search_tool
+  #   # Used to limit the scope of search results, only returns content within the specified time range. Set to -1 to disable time filtering
+  #   search_time_range: 10
+
+  # Web search tool (uses Exa, requires EXA_API_KEY)
+  # - name: web_search
+  #   group: web
+  #   use: deerflow.community.exa.tools:web_search_tool
+  #   max_results: 5
+  #   search_type: auto  # Options: auto, neural, keyword
+  #   contents_max_characters: 1000
+  #   # api_key: $EXA_API_KEY
+
+  # Web search tool (uses Firecrawl, requires FIRECRAWL_API_KEY)
+  # - name: web_search
+  #   group: web
+  #   use: deerflow.community.firecrawl.tools:web_search_tool
+  #   max_results: 5
+  #   # api_key: $FIRECRAWL_API_KEY
+
+  # Web fetch tool (uses Exa)
+  # NOTE: Only one web_fetch provider can be active at a time.
+  # Comment out the Jina AI web_fetch entry below before enabling this one.
+  # - name: web_fetch
+  #   group: web
+  #   use: deerflow.community.exa.tools:web_fetch_tool
+  #   # api_key: $EXA_API_KEY
+
+  # Web fetch tool (uses Jina AI reader)
+  - name: web_fetch
+    group: web
+    use: deerflow.community.jina_ai.tools:web_fetch_tool
+    timeout: 10
+
+  # Web fetch tool (uses InfoQuest)
+  # - name: web_fetch
+  #   group: web
+  #   use: deerflow.community.infoquest.tools:web_fetch_tool
+  #   # Overall timeout for the entire crawling process (in seconds). Set to positive value to enable, -1 to disable
+  #   timeout: 10
+  #   # Waiting time after page loading (in seconds). Set to positive value to enable, -1 to disable
+  #   fetch_time: 10
+  #   # Timeout for navigating to the page (in seconds). Set to positive value to enable, -1 to disable
+  #   navigation_timeout: 30
+
+  # Web fetch tool (uses Firecrawl, requires FIRECRAWL_API_KEY)
+  # - name: web_fetch
+  #   group: web
+  #   use: deerflow.community.firecrawl.tools:web_fetch_tool
+  #   # api_key: $FIRECRAWL_API_KEY
+
+  # Image search tool (uses DuckDuckGo)
+  # Use this to find reference images before image generation
+  - name: image_search
+    group: web
+    use: deerflow.community.image_search.tools:image_search_tool
+    max_results: 5
+
+  # Image search tool (uses InfoQuest)
+  # - name: image_search
+  #   group: web
+  #   use: deerflow.community.infoquest.tools:image_search_tool
+  #   # Used to limit the scope of image search results, only returns content within the specified time range. Set to -1 to disable time filtering
+  #   image_search_time_range: 10
+  #   # Image size filter. Options: "l" (large), "m" (medium), "i" (icon).
+  #   image_size: "i"
+
+  # File operations tools
+  - name: ls
+    group: file:read
+    use: deerflow.sandbox.tools:ls_tool
+
+  - name: read_file
+    group: file:read
+    use: deerflow.sandbox.tools:read_file_tool
+
+  - name: glob
+    group: file:read
+    use: deerflow.sandbox.tools:glob_tool
+    max_results: 200
+
+  - name: grep
+    group: file:read
+    use: deerflow.sandbox.tools:grep_tool
+    max_results: 100
+
+  - name: write_file
+    group: file:write
+    use: deerflow.sandbox.tools:write_file_tool
+
+  - name: str_replace
+    group: file:write
+    use: deerflow.sandbox.tools:str_replace_tool
+
+  # Bash execution tool
+  # Active only when using an isolated shell sandbox or when
+  # sandbox.allow_host_bash: true explicitly opts into host bash.
+  - name: bash
+    group: bash
+    use: deerflow.sandbox.tools:bash_tool
+
+  # generate_video: agent→engine bridge (video-gen multi-engine, 阶段 1.6).
+  # Lives in the app layer (NOT harness) — calls app.gateway.video_gen engines.
+  # Assign to course-video agent via its config.yaml tool_groups: [video_engine].
+  - name: generate_video
+    group: video_engine
+    use: app.gateway.video_gen.engines.tool:generate_video_tool
+  # plan_storyboard: agent plans a draft blueprint (storyboard.json) + returns
+  # task_id for generate_video to render (阶段 1.8). Same group as generate_video.
+  - name: plan_storyboard
+    group: video_engine
+    use: app.gateway.video_gen.engines.plan_storyboard_tool:plan_storyboard_tool
+
+# ============================================================================
+# Tool Search Configuration (Deferred Tool Loading)
+# ============================================================================
+# When enabled, MCP tools are not loaded into the agent's context directly.
+# Instead, they are listed by name in the system prompt and discoverable
+# via the tool_search tool at runtime.
+# This reduces context usage and improves tool selection accuracy when
+# multiple MCP servers expose a large number of tools.
+
+tool_search:
+  enabled: false
+
+# ============================================================================
+# Provider Safety Termination Configuration
+# ============================================================================
+# Intercept AIMessages where the provider stopped generation for safety reasons
+# (e.g. OpenAI finish_reason='content_filter', Anthropic stop_reason='refusal',
+# Gemini finish_reason='SAFETY') while still returning tool_calls. The
+# tool_calls in such responses are typically truncated/unreliable and must
+# not be executed.
+
+
+# Sandbox Configuration
+# ============================================================================
+# Choose between local sandbox (direct execution) or Docker-based AIO sandbox
+
+# Option 1: Local Sandbox (Default)
+# Executes commands directly on the host machine
+uploads:
+  # Automatic Office/PDF conversion runs on the backend host before sandbox
+  # isolation applies. Keep this disabled unless uploads come from a fully
+  # trusted source and you intentionally accept host-side parser risk.
+  auto_convert_documents: false
+  # Controls which PDF-to-Markdown converter is used whenever PDF conversion
+  # runs. Automatic upload conversion is gated separately by
+  # auto_convert_documents.
+  # auto        — prefer pymupdf4llm when installed; fall back to MarkItDown for
+  #               image-based or encrypted PDFs (recommended default).
+  # pymupdf4llm — always use pymupdf4llm (must be installed: uv add pymupdf4llm).
+  #               Better heading/table extraction; faster on most files.
+  # markitdown  — always use MarkItDown (original behaviour, no extra dependency).
+  pdf_converter: auto
+  # Maximum size (bytes) for a single uploaded file. Files exceeding this
+  # limit are rejected with 413 before the full content is written to disk.
+  # Default 2 GiB.
+  max_file_size_bytes: 2147483648
+  # Maximum total bytes allowed across all files in a single thread's uploads
+  # directory. Exceeding this returns 413.
+  # Default 10 GiB.
+  max_thread_total_bytes: 10737418240
+  # Files larger than this (bytes) skip automatic Office/PDF conversion even
+  # when auto_convert_documents is enabled, preventing memory exhaustion from
+  # large presentations or documents. Default 50 MiB.
+  max_convert_size_bytes: 52428800
+  # Extension allowlist for thread (chat attachment) uploads (R2-1, 2026-10-07).
+  # Admission control — anything not listed returns 400 before a byte is
+  # written. This is a separate knob from auto-conversion: allowlist decides
+  # "may it enter", CONVERTIBLE_EXTENSIONS decides "convert after entering"
+  # (allowlist ⊇ convertible). Omit to use the built-in default:
+  # jpg/jpeg/png/webp/gif/mp4/mov/webm/mp3/wav/m4a/doc/docx/pdf/txt/md/csv/
+  # xlsx/pptx/zip/html. ttf/otf fonts, srt/vtt subtitles and heic are NOT in
+  # the default — add them here if a workflow needs them. Empty or malformed
+  # values fall back to the default (never blocks everything).
+  # allowed_extensions: [jpg, jpeg, png, webp, gif, mp4, mov, webm, mp3, wav, m4a, doc, docx, pdf, txt, md, csv, xlsx, pptx, zip, html]
+
+sandbox:
+  use: deerflow.sandbox.local:LocalSandboxProvider
+  # Host bash execution is disabled by default because LocalSandboxProvider is
+  # not a secure isolation boundary for shell access. Enable only for fully
+  # trusted, single-user local workflows.
+  allow_host_bash: false
+  # Optional: Mount additional host directories into the sandbox.
+  # Each mount maps a host path to a virtual container path accessible by the agent.
+  # mounts:
+  #   - host_path: /home/user/my-project    # Absolute path on the host machine
+  #     container_path: /mnt/my-project     # Virtual path inside the sandbox
+  #     read_only: true                     # Whether the mount is read-only (default: false)
+
+  # Tool output truncation limits (characters).
+  # bash uses middle-truncation (head + tail) since errors can appear anywhere in the output.
+  # read_file and ls use head-truncation since their content is front-loaded.
+  # Set to 0 to disable truncation.
+  bash_output_max_chars: 20000
+  read_file_output_max_chars: 50000
+  ls_output_max_chars: 20000
+  bash_command_timeout: 300     # T27 (2026-08-14)：单条 bash 命令输出静默超时（秒，映射 AIO no_change_timeout——零输出超 300s 击杀；不是挂钟上限，前台 sleep 300 同样会被杀）。旧实现硬编码 600，挂死命令最多拖 10 分钟
+
+# Option 2: Container-based AIO Sandbox
+# Executes commands in isolated containers (Docker or Apple Container)
+# On macOS: Automatically prefers Apple Container if available, falls back to Docker
+# On other platforms: Uses Docker
+# Uncomment to use:
+# sandbox:
+#   use: deerflow.community.aio_sandbox:AioSandboxProvider
+#
+#   # Optional: Container image to use (works with both Docker and Apple Container)
+#   # Default: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+#   # Recommended: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest (works on both x86_64 and arm64)
+#   # image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+#
+#   # Optional: Base port for sandbox containers (default: 8080)
+#   # port: 8080
+#
+#   # Optional: Container memory limit (default: 3g). Also sets --memory-swap to the
+#   # same value (swap disabled). Priority: env SANDBOX_MEM_LIMIT (empty string =
+#   # explicitly disabled, ops escape hatch) > this value > built-in default.
+#   # ⚠️ Loaded once at gateway startup (provider singleton) — changing this in
+#   # config.yaml requires a gateway restart, and old sandbox containers keep their
+#   # old limits until stopped. (F2, 2026-09-29)
+#   # mem_limit: 6g
+#
+#   # Optional: Container /dev/shm size (default: 2g, aligned with remotion-worker).
+#   # Docker's default 64M is too small for Chrome multi-process rendering (long-video
+#   # "Target closed" crashes). Priority: env SANDBOX_SHM_SIZE (empty string = disabled)
+#   # > this value > built-in default. Restart required to take effect. (F1/F2, 2026-09-29)
+#   # shm_size: 2g
+
+#   # Optional: Maximum number of concurrent sandbox containers (default: 3)
+#   # When the limit is reached the least-recently-used sandbox is evicted to
+#   # make room for new ones. Use a positive integer here; omit this field to use the default.
+#   # replicas: 3
+#
+#   # Optional: Prefix for container names (default: deer-flow-sandbox)
+#   # container_prefix: deer-flow-sandbox
+#
+#   # Optional: Additional mount directories from host to container
+#   # NOTE: Skills directory is automatically mounted from skills.path to skills.container_path
+#   # mounts:
+#   #   # Other custom mounts
+#   #   - host_path: /path/on/host
+#   #     container_path: /home/user/shared
+#   #     read_only: false
+#   #
+#   #   # DeerFlow will surface configured container_path values to the agent,
+#   #   # so it can directly read/write mounted directories such as /home/user/shared
+#
+#   # P1-S2（2026-09-30 上游移植，修 B2）：生产密钥不再经 sandbox.environment
+#   # 注入容器——容器内任意 `env` 即可读走（B2 洞）。该块保持为空；需要容器内
+#   # 密钥的技能在 SKILL.md frontmatter 声明 required-secrets（审计清单已登记：
+#   # video-dl / tech-explainer-video / corporate-video / auto-video-flow /
+#   # video-generation / trainerai-imagine），密钥走请求级带外
+#   # config.context.secrets。回退杆：部署事故期可临时恢复本块（分钟级止血），
+#   # 但 SEC-C4① 移除的 GITHUB_TOKEN / QIHU_TTS_*_VOICE_ID 不要加回。
+#   environment: {}
+
+# Option 3: Provisioner-managed AIO Sandbox (docker-compose-dev)
+# Each sandbox_id gets a dedicated Pod in k3s, managed by the provisioner.
+# Recommended for production or advanced users who want better isolation and scalability.:
+# sandbox:
+#   use: deerflow.community.aio_sandbox:AioSandboxProvider
+#   provisioner_url: http://provisioner:8002
+
+# ============================================================================
+# Subagents Configuration
+# ============================================================================
+# Configure timeouts for subagent execution
+# Subagents are background workers delegated tasks by the lead agent
+
+# subagents:
+#   # Default timeout in seconds for all subagents (default: 900 = 15 minutes)
+#   timeout_seconds: 900
+#   # Optional global max-turn override for all subagents
+#   # max_turns: 120
+#   # Max task delegations per run (default 12, clamp [1, 50]) — 2026-08-13 D3:
+#   # counted per run (since the last real user message), not per conversation
+#   max_total: 12
+#
+#   # Optional per-agent overrides (applies to both built-in and custom agents)
+#   agents:
+#     general-purpose:
+#       timeout_seconds: 1800  # 30 minutes for complex multi-step tasks
+#       max_turns: 160
+#       # model: qwen3:32b     # Use a specific model (default: inherit from lead agent)
+#       # skills:               # Skill whitelist (default: inherit all enabled skills)
+#       #   - web-search
+#       #   - data-analysis
+#     bash:
+#       timeout_seconds: 300   # 5 minutes for quick command execution
+#       max_turns: 80
+#       # skills: []            # No skills for bash agent
+#
+#   # Custom subagent types: define specialized agents with their own prompts,
+#   # tools, skills, and model configuration. Custom agents are available via
+#   # the `task` tool alongside built-in types (general-purpose, bash).
+#   # custom_agents:
+#   #   analysis:
+#   #     description: "Data analysis specialist for processing datasets and generating insights"
+#   #     system_prompt: |
+#   #       You are a data analysis subagent. Focus on:
+#   #       - Processing and analyzing datasets
+#   #       - Generating visualizations
+#   #       - Providing statistical insights
+#   #     tools:                  # Tool whitelist (null = inherit all)
+#   #       - bash
+#   #       - read_file
+#   #       - write_file
+#   #     skills:                 # Skill whitelist (null = inherit all, [] = none)
+#   #       - data-analysis
+#   #       - visualization
+#   #     model: inherit          # 'inherit' uses parent's model
+#   #     max_turns: 80
+#   #     timeout_seconds: 600
+#   #
+#   #   # Creative-studio 风格的多模式创作子代理示例（2026-09-09 创意工作合并后
+#   #   # 的现役技能；原 design-specialist + od-* 示例已随 open-design 整体退役删除）。
+#   #   creative-studio:
+#   #     description: |
+#   #       创意创作子代理。当用户要知识卡片/海报/信息图等视觉创作、案例研究或
+#   #       报告写作、视频剪辑时委派给它。不接通用代码任务。
+#   #     system_prompt: |
+#   #       你是资深创意工作者。产出任何作品前，先用 read_file 读取白名单中最相关
+#   #       技能的 SKILL.md 并引用至少一条具体规范；产物写入 /mnt/user-data/outputs
+#   #       并调用 present_files 展示。
+#   #     tools:
+#   #       - read_file
+#   #       - write_file
+#   #       - str_replace
+#   #       - bash
+#   #       - ls
+#   #       - present_files
+#   #     disallowed_tools:
+#   #       - task
+#   #       - ask_clarification
+#   #     skills:
+#   #       - deep-research
+#   #       - data-analysis
+#   #       - chart-visualization
+#   #       - trainerai-imagine
+#   #       - knowledge-card-auto-generator
+#   #       - docx
+#   #     model: inherit
+#   #     max_turns: 40
+#   #     timeout_seconds: 900
+#
+#   # Model override: by default, subagents inherit the lead agent's model.
+#   # Set `model` to use a different model (e.g., a local Ollama model for cost savings).
+#   # The model name must match a name defined in the `models:` section above.
+#
+#   # Thinking override (P1-2, 2026-09-29) — three-state, NOT a plain boolean:
+#   #   agents.<name>.thinking_enabled unset  = inherit the parent run's thinking mode (default)
+#   #   agents.<name>.thinking_enabled: true  = force thinking on for this subagent
+#   #   agents.<name>.thinking_enabled: false = force thinking off (cost control for executor-style agents)
+#   # Example — keep the bash executor quiet even when the ultra-tier lead thinks:
+#   # agents:
+#   #   bash:
+#   #     thinking_enabled: false
+
+# ============================================================================
+# ACP Agents Configuration
+# ============================================================================
+# Configure external ACP-compatible agents for the built-in `invoke_acp_agent` tool.
+
+# acp_agents:
+#   claude_code:
+#     # DeerFlow expects an ACP adapter here. The standard `claude` CLI does not
+#     # speak ACP directly. Install `claude-agent-acp` separately or use:
+#     command: npx
+#     args: ["-y", "@zed-industries/claude-agent-acp"]
+#     description: Claude Code for implementation, refactoring, and debugging
+#     model: null
+#     # auto_approve_permissions: false  # Set to true to auto-approve ACP permission requests
+#     # env:                             # Optional: inject environment variables into the agent subprocess
+#     #   ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY  # $VAR resolves from host environment
+#
+#   codex:
+#     # DeerFlow expects an ACP adapter here. The standard `codex` CLI does not
+#     # speak ACP directly. Install `codex-acp` separately or use:
+#     command: npx
+#     args: ["-y", "@zed-industries/codex-acp"]
+#     description: Codex CLI for repository tasks and code generation
+#     model: null
+#     # auto_approve_permissions: false  # Set to true to auto-approve ACP permission requests
+#     # env:                             # Optional: inject environment variables into the agent subprocess
+#     #   OPENAI_API_KEY: $OPENAI_API_KEY  # $VAR resolves from host environment
+
+# ============================================================================
+# Skills Configuration
+# ============================================================================
+# Configure skills directory for specialized agent workflows
+
+# P1-S3（2026-09-30 上游移植，修 B5）：SkillScan 静态闸门（CRITICAL 硬 block）。
+# 事故回退档：enabled: false = 静态层跳过（warn-only），LLM 第二闸门（fail-closed）
+# 仍生效；仅放行人工审核后的技能时使用，恢复后务必改回 true。
+skill_scan:
+  enabled: true
+
+skills:
+  # Path to skills directory on the host (relative to project root or absolute)
+  # Default: ../skills (relative to backend directory)
+  # Uncomment to customize:
+  # path: /absolute/path/to/custom/skills
+
+  # Path where skills are mounted in the sandbox container
+  # This is used by the agent to access skills in both local and Docker sandbox
+  # Default: /mnt/skills
+  container_path: /mnt/skills
+
+# Note: To restrict which skills are loaded for a specific custom agent,
+# define a `skills` list in that agent's `config.yaml` (e.g. `agents/my-agent/config.yaml`):
+# - Omitted or null: load all globally enabled skills (default)
+# - []: disable all skills for this agent
+# - ["skill-name"]: load only specific skills
+
+# ============================================================================
+# Title Generation Configuration
+# ============================================================================
+# Automatic conversation title generation settings
+
+title:
+  enabled: true
+  max_words: 6
+  max_chars: 60
+  model_name: null # null = models[0]（通常是最强最贵的模型）。建议填 models[] 里已注册的便宜模型 name，如 "qwen3.8-flash"
+
+# ============================================================================
+# Summarization Configuration
+# ============================================================================
+# Automatically summarize conversation history when token limits are approached
+# This helps maintain context in long conversations without exceeding model limits
+
+summarization:
+  enabled: true
+
+  # Model to use for summarization (null = models[0] 顶配；建议填便宜模型如 "qwen3.8-flash")
+  model_name: null
+
+  # Trigger conditions - at least one required
+  # Summarization runs when ANY threshold is met (OR logic)
+  # You can specify a single trigger or a list of triggers
+  trigger:
+    # Trigger when token count reaches 32000
+    - type: tokens
+      value: 32000
+    # Uncomment to also trigger when message count reaches 50
+    # - type: messages
+    #   value: 50
+    # Uncomment to trigger when 80% of model's max input tokens is reached
+    # - type: fraction
+    #   value: 0.8
+
+  # Context retention policy after summarization
+  # Specifies how much recent history to preserve
+  keep:
+    # Keep the most recent 10 messages (recommended)
+    type: messages
+    value: 10
+    # Alternative: Keep specific token count
+    # type: tokens
+    # value: 3000
+    # Alternative: Keep percentage of model's max input tokens
+    # type: fraction
+    # value: 0.3
+
+  # Maximum tokens to keep when preparing messages for summarization
+  # (the summarizer only sees this tail window; null falls back to the 30000
+  # code default in the lead-agent wiring)
+  trim_tokens_to_summarize: 30000
+
+  # Custom summary prompt template (null = use the built-in DeerFlow default,
+  # which extends the LangChain default with a mandatory
+  # "## 工作状态与产物清单 (WORKING STATE)" section — 2026-09-22)
+  # The prompt should guide the model to extract important context
+  summary_prompt: null
+
+  # Anti-compression-loop reuse guard (2026-09-22). The DeerFlow summarization
+  # middleware never mutates state, so once the trigger condition holds it
+  # would otherwise re-summarize on EVERY model call. With a stored
+  # summarization_checkpoint, the previous summary is reused until the
+  # conversation grew by at least resummarize_min_new_messages messages OR
+  # resummarize_min_new_tokens approximate tokens since it was taken.
+  # Setting BOTH to 0 restores the legacy re-summarize-every-call behavior.
+  resummarize_min_new_messages: 20
+  resummarize_min_new_tokens: 30000
+
+  # Recently-loaded skill files are excluded from summarization so the agent
+  # does not lose skill instructions after a compression pass. Claude Code uses
+  # a similar strategy (keep the most recent ~5 skills, ~25k total tokens, with
+  # a ~5k cap per skill). Set preserve_recent_skill_count to 0 to disable.
+  preserve_recent_skill_count: 5
+  preserve_recent_skill_tokens: 25000
+  preserve_recent_skill_tokens_per_skill: 5000
+  skill_file_read_tool_names:
+    - read_file
+    - read
+    - view
+    - cat
+
+  # Compact skill ledger (2026-10-06). When skill reads exceed the rescue
+  # budgets above and get folded into the summary, a name+path ledger (no
+  # bodies) stays in the inference window so the agent knows which SKILL.md
+  # to re-read. Keeps at most the newest N entries. Set to 0 to disable.
+  skill_ledger_max_entries: 8
+
+# ============================================================================
+# Loop Detection Configuration
+# ============================================================================
+# Safety against repetitive tool-call loops. Defaults preserve current
+# behaviour; raise limits or extend polling_exempt for long-running agents
+# (e.g. video generation) that legitimately poll a status many times.
+loop_detection:
+  enabled: true
+  hash_warn_threshold: 3 # inject a warning after N identical tool-call sets
+  hash_hard_limit: 5 # force-stop after N identical tool-call sets
+  window_size: 20 # sliding window of recent tool calls
+  tool_freq_warn: 60 # warn after N calls to the same tool type
+  tool_freq_hard_limit: 100 # force-stop after N calls to the same tool type
+  polling_exempt: # tools exempt from hash detection (status pollers)
+    - check_video_status
+    - check_task_status
+    - check_status
+    - get_video_status
+    - get_task_status
+
+# ============================================================================
+# Memory Configuration
+# ============================================================================
+# Global memory mechanism
+# Stores user context and conversation history for personalized responses
+memory:
+  enabled: true
+  storage_path: memory.json # Path relative to backend directory
+  debounce_seconds: 30 # Wait time before processing queued updates
+  model_name: null # null = models[0] 顶配；建议填便宜模型如 "qwen3.8-flash"（记忆事实抽取用 json.loads 解析自由文本）
+  max_facts: 100 # Maximum number of facts to store
+  fact_confidence_threshold: 0.7 # Minimum confidence for storing facts
+  injection_enabled: true # Whether to inject memory into system prompt
+  max_injection_tokens: 2000 # Maximum tokens for memory injection
+
+# ============================================================================
+# Custom Agent Management API
+# ============================================================================
+# Controls whether the HTTP gateway exposes custom-agent SOUL/USER.md management.
+# Keep this disabled unless the gateway is behind a trusted authenticated admin boundary.
+agents_api:
+  enabled: false
+
+# ============================================================================
+# Skill Self-Evolution Configuration
+# ============================================================================
+# Allow the agent to autonomously create and improve skills in skills/custom/.
+skill_evolution:
+  enabled: false # Set to true to allow agent-managed writes under skills/custom
+  moderation_model_name: null # null = models[0]；建议填便宜模型如 "qwen3.8-flash"
+
+# ============================================================================
+# Checkpointer Configuration (DEPRECATED — use `database` instead)
+# ============================================================================
+# Legacy standalone checkpointer config. Kept for backward compatibility.
+# Prefer the unified `database` section below, which drives BOTH the
+# LangGraph checkpointer AND DeerFlow application data (runs, feedback,
+# events) from a single backend setting.
+#
+# If both `checkpointer` and `database` are present, `checkpointer`
+# takes precedence for LangGraph state persistence only.
+#
+# checkpointer:
+#   type: sqlite
+#   connection_string: checkpoints.db
+#
+# checkpointer:
+#   type: postgres
+#   connection_string: postgresql://user:password@localhost:5432/deerflow
+
+# ============================================================================
+# Database
+# ============================================================================
+# Unified storage backend for LangGraph checkpointer and DeerFlow
+# application data (runs, threads metadata, feedback, etc.).
+#
+# backend: memory  -- No persistence, data lost on restart
+# backend: sqlite  -- Single-node deployment, files in sqlite_dir
+# backend: postgres -- Production multi-node deployment
+#
+# If this section is omitted or empty in config.yaml, DeerFlow uses:
+#   backend: sqlite
+#   sqlite_dir: .deer-flow/data
+#
+# SQLite mode uses a single deerflow.db file with WAL journal mode
+# for both checkpointer and application data.
+#
+# Postgres mode: put your connection URL in .env as DATABASE_URL,
+# then reference it here with $DATABASE_URL.
+# Install the driver first:
+#   Local:  uv sync --extra postgres
+#   Docker: UV_EXTRAS=postgres docker compose build
+#
+# NOTE: When both `checkpointer` and `database` are configured,
+# `checkpointer` takes precedence for LangGraph state persistence.
+# If you use `database`, you can remove the `checkpointer` section.
+# database:
+#   backend: sqlite
+#   sqlite_dir: .deer-flow/data
+#
+# database:
+#   backend: postgres
+#   postgres_url: $DATABASE_URL
+database:
+  backend: sqlite
+  sqlite_dir: .deer-flow/data
+
+# ============================================================================
+# Checkpoint Retention Prune (storage plan 2026-09-02 A1)
+# ============================================================================
+# Daily background pass that prunes every checkpoint stream (thread, ns) to
+# its newest `keep_per_thread` rows, deleting the matching `writes` rows in
+# small transactions (WAL single-writer friendly, skips threads with a
+# running run, failures only warn). Runs at `daily_hour` local time.
+#
+# Note: DELETE never shrinks the db file — space is reclaimed by the separate
+# VACUUM INTO maintenance step (plan A2). Non-sqlite backends never prune.
+checkpoint_prune:
+  enabled: true
+  # keep_per_thread: null means "the regenerate design window" (400 physical
+  # checkpoints per thread). ⚠️ LOWERING THIS IS A BEHAVIOR CHANGE:
+  # regenerate/edit-regenerate only stays semantically valid within the newest
+  # N checkpoints per thread.
+  keep_per_thread: null
+  daily_hour: 3
+  batch_rows: 1000
+
+# ============================================================================
+# Run Events Configuration
+# ============================================================================
+# Storage backend for run events (messages + execution traces).
+#
+# backend: memory  -- No persistence, data lost on restart (default)
+# backend: db      -- SQL database via ORM, full query capability (production)
+# backend: jsonl   -- Append-only JSONL files (lightweight single-node persistence)
+#
+# run_events:
+#   backend: memory            # 'db' persists events to SQLite (run_events table);
+#                              #   requires database.backend != memory, else silently
+#                              #   falls back to 'memory'. 'memory' = in-process only,
+#                              #   events lost on restart and accumulate in RAM (OOM risk
+#                              #   under long uptime). 'db' recommended for deployments.
+#   max_trace_content: 10240    # Truncation threshold for trace content (db backend, bytes)
+#   track_token_usage: true     # Accumulate token counts to RunRow
+run_events:
+  backend: db
+  max_trace_content: 10240
+  track_token_usage: true
+
+# ============================================================================
+# IM Channels Configuration
+# ============================================================================
+# Connect DeerFlow to external messaging platforms.
+# All channels use outbound connections (WebSocket or polling) — no public IP required.
+#
+# User-level IM channel credentials are AES-256-GCM encrypted at rest.
+# Set CREDENTIAL_ENCRYPTION_KEY (32-byte hex) in your environment.
+# Generate with: python -c 'import os; print(os.urandom(32).hex())'
+
+# channels:
+#   # LangGraph-compatible Gateway API base URL for thread/message management (default: http://localhost:8001/api)
+#   # For Docker deployments, use the Docker service name instead of localhost:
+#   #   langgraph_url: http://gateway:8001/api
+#   #   gateway_url: http://gateway:8001
+#   langgraph_url: http://localhost:8001/api
+#   # Gateway API URL for auxiliary queries like /models, /memory (default: http://localhost:8001)
+#   gateway_url: http://localhost:8001
+#   #
+#   # Docker Compose note:
+#   # If channels run inside the gateway container, use container DNS names instead
+#   # of localhost, for example:
+#   # langgraph_url: http://gateway:8001/api
+#   # gateway_url: http://gateway:8001
+#   # You can also set DEER_FLOW_CHANNELS_LANGGRAPH_URL / DEER_FLOW_CHANNELS_GATEWAY_URL.
+#
+#   # Optional: default mobile/session settings for all IM channels
+#   session:
+#     assistant_id: lead_agent  # or a custom agent name; custom agents route via lead_agent + agent_name
+#     config:
+#       recursion_limit: 100
+#     context:
+#       thinking_enabled: true
+#       is_plan_mode: false
+#       subagent_enabled: false
+#
+#   feishu:
+#     # OPS-2 (2026-10-07, D6): prefer PER-USER feishu instances (credentials
+#     # stored encrypted per user). A globally enabled feishu entry here AND a
+#     # personal instance cannot coexist — the user_registry guard refuses the
+#     # personal one with a skip explanation. Keep global entries disabled if
+#     # you need the template at all.
+#     enabled: false
+#     app_id: $FEISHU_APP_ID
+#     app_secret: $FEISHU_APP_SECRET
+#     # domain: https://open.feishu.cn       # China (default)
+#     # domain: https://open.larksuite.com   # International
+#
+#   slack:
+#     enabled: false
+#     bot_token: $SLACK_BOT_TOKEN     # xoxb-...
+#     app_token: $SLACK_APP_TOKEN     # xapp-... (Socket Mode)
+#     allowed_users: []               # empty = allow all; can also be a single Slack user ID string, e.g. U123456, but list form is recommended
+#
+#   telegram:
+#     enabled: false
+#     bot_token: $TELEGRAM_BOT_TOKEN
+#     allowed_users: []               # empty = allow all
+#
+#   wechat:
+#     enabled: false
+#     bot_token: $WECHAT_BOT_TOKEN
+#     ilink_bot_id: $WECHAT_ILINK_BOT_ID
+#     # Optional: allow first-time QR bootstrap when bot_token is absent
+#     qrcode_login_enabled: true
+#     # Optional: sent as iLink-App-Id header when provided
+#     ilink_app_id: ""
+#     # Optional: sent as SKRouteTag header when provided
+#     route_tag: ""
+#     allowed_users: []               # empty = allow all
+#     # Optional: long-polling timeout in seconds
+#     polling_timeout: 35
+#     # Optional: QR poll interval in seconds when qrcode_login_enabled is true
+#     qrcode_poll_interval: 2
+#     # Optional: QR bootstrap timeout in seconds
+#     qrcode_poll_timeout: 180
+#     # Optional: persist getupdates cursor under the gateway container volume
+#     state_dir: ./.deer-flow/wechat/state
+#     # Optional: max inbound image size in bytes before skipping download
+#     max_inbound_image_bytes: 20971520
+#     # Optional: max outbound image size in bytes before skipping upload
+#     max_outbound_image_bytes: 20971520
+#     # Optional: max inbound file size in bytes before skipping download
+#     max_inbound_file_bytes: 52428800
+#     # Optional: max outbound file size in bytes before skipping upload
+#     max_outbound_file_bytes: 52428800
+#     # Optional: allowed file extensions for regular file receive/send
+#     allowed_file_extensions: [".txt", ".md", ".pdf", ".csv", ".json", ".yaml", ".yml", ".xml", ".html", ".log", ".zip", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf"]
+#
+#     # Optional: channel-level session overrides
+#     session:
+#       assistant_id: mobile-agent  # custom agent names are supported here too
+#       context:
+#         thinking_enabled: false
+#
+#       # Optional: per-user overrides by user_id
+#       users:
+#         "123456789":
+#           assistant_id: vip-agent
+#           config:
+#             recursion_limit: 150
+#           context:
+#             thinking_enabled: true
+#             subagent_enabled: true
+#   wecom:
+#     enabled: false
+#     bot_id: $WECOM_BOT_ID
+#     bot_secret: $WECOM_BOT_SECRET
+#
+#   dingtalk:
+#     enabled: false
+#     client_id: $DINGTALK_CLIENT_ID
+#     client_secret: $DINGTALK_CLIENT_SECRET
+#     allowed_users: []               # empty = allow all
+#     card_template_id: ""            # Optional: AI Card template ID for streaming updates
+
+# ============================================================================
+# Guardrails Configuration
+# ============================================================================
+# Optional pre-execution authorization for tool calls.
+# When enabled, every tool call passes through the configured provider
+# before execution. Three options: built-in allowlist, OAP policy provider,
+# or custom provider. See backend/docs/GUARDRAILS.md for full documentation.
+#
+# Providers are loaded by class path via resolve_variable (same as models/tools).
+
+# --- Option 1: Built-in AllowlistProvider (zero external deps) ---
+# guardrails:
+#   enabled: true
+#   provider:
+#     use: deerflow.guardrails.builtin:AllowlistProvider
+#     config:
+#       denied_tools: ["bash", "write_file"]
+
+# --- Option 2: OAP passport provider (open standard, any implementation) ---
+#   The Open Agent Passport (OAP) spec defines passport format and decision codes.
+#   Any OAP-compliant provider works. Example using APort (reference implementation):
+#     pip install aport-agent-guardrails && aport setup --framework deerflow
+# guardrails:
+#   enabled: true
+#   provider:
+#     use: aport_guardrails.providers.generic:OAPGuardrailProvider
+
+# --- Option 3: Custom provider (any class with evaluate/aevaluate methods) ---
+# guardrails:
+#   enabled: true
+#   provider:
+#     use: my_package:MyGuardrailProvider
+#     config:
+#       key: value
+
+# ============================================================================
+# Circuit Breaker Configuration
+# ============================================================================
+# Circuit breaker for LLM calls prevents repeated requests to a failing provider.
+# When the failure threshold is reached, subsequent calls fast-fail until recovery.
+#
+# This is useful for:
+# - Avoiding rate-limit bans during provider outages
+# - Reducing resource exhaustion from retry loops
+# - Gracefully degrading when LLM services are unavailable
+
+# circuit_breaker:
+#   # Number of consecutive failures before opening the circuit (default: 5)
+#   failure_threshold: 5
+#   # Time in seconds before attempting to recover (default: 60)
+#   recovery_timeout_sec: 60
+
+# ============================================================================
+# Gallery Configuration (Skill Inspiration Library & UGC Ecosystem)
+# ============================================================================
+gallery:
+  # Master switch for the inspiration gallery UI (browsing official cases).
+  enabled: true
+  # Independent switch for community sharing (UGC submission + likes).
+  # Set false during content moderation while keeping the gallery read-only.
+  ugc_enabled: true
+  # OPS NOTE: UGC writes (ugc-cases.json / likes.json) use an in-process asyncio.Lock,
+  # safe only under a SINGLE worker process. Multi-worker / multi-process deployments
+  # will lose concurrent writes — migrate UGC storage to a DB or cross-process file
+  # lock before scaling horizontally. See docs/changelog-2026-06-30-gallery-optimization.md.
+
+# ============================================================================
+# Voice Clone Configuration (Volcengine Mega TTS)
+# ============================================================================
+# Lecturer voice cloning: upload audio → train clone → synthesize text with
+# the cloned voice. Requires a Volcengine account with Mega TTS enabled.
+#
+# Prerequisites:
+#   - ffmpeg installed on host (macOS: brew install ffmpeg)
+#   - Volcengine appid + token from console
+#
+# voice_clone:
+#   enabled: false
+#   appid: $VOLCENGINE_VOICE_APPID
+#   token: $VOLCENGINE_VOICE_TOKEN
+#   access_key: $VOLCENGINE_VOICE_ACCESS_KEY
+#   domain: https://openspeech.bytedance.com
+#   # （2026-08-09 B2：default_model_type 死配置已删除——默认模型五方统一为 5=ICL 3.0，
+#   #  用户在前端克隆面板自选 1-5）
+#   default_language: 0          # 0=Chinese
+#   max_upload_bytes: 10485760   # 10MB max audio file (matches Volcengine API limit)
+#   min_duration_seconds: 30     # Minimum audio duration
+#   training_timeout_minutes: 30          # 克隆训练超时（分钟），超时未就绪标 failed
+#   training_reaper_interval_minutes: 5   # 训练行巡检间隔（分钟），0=关闭 reaper
+#   status_query_timeout: 30.0            # 训练状态查询 HTTP 超时（秒）
+#   storage_dir: .deer-flow/voice-twins  # Local storage for audio files
+#   qihu_tts:
+#     api_key: $QIHU_API_KEY        # 360 TTS API key (shared with Qihu image/video providers)
+#     enabled: true                  # Enable 360 TTS preset voices
+#   edge_tts:
+#     enabled: true                  # edge-tts 免费音色 + 降级链末端兜底（默认开，服务器实测可达）
+#     timeout: 60.0                  # edge-tts 流式超时（秒）
+
+# ============================================================================
+# Video generation: script → storyboard → TTS → visual → compose.
+# Supports AI image/video, comic, and Remotion templates.
+#
+# Prerequisites:
+#   - ffmpeg installed on host (macOS: brew install ffmpeg)
+#   - At least one provider API key (qihu for AI image/video)
+#
+# video_gen:
+#   # ── 360 主力切换（2026-08-21，docs/plans/2026-08-21-video-gen-360-switch-impl-plan.md）──
+#   # 360 seedance 为主力（公示 10,000 RPM）；Ark 降为降级兜底（账号级 3 并发为最终
+#   # 方案，不升级企业认证）。回滚 = ai_video_provider 改回 seedance-ark。
+#   enabled: false
+#   ai_image_provider: gpt-image-2  # 通用文生图默认 (gpt-image-2=360 文生图 | seedream=字节Ark直连 | seedream-360=360通道+参考图 | dashscope)
+#   ai_video_provider: seedance     # 360 主力；ark_api_key 存在时自动挂 seedance-ark 兜底（429/5xx/超时触发，4xx 内容拒绝不降级）
+#   qihu_api_key: $QIHU_API_KEY
+#   kling_api_key: $KLING_API_KEY
+#   dashscope_api_key: $DASHSCOPE_API_KEY
+#   # ── 360 seedance（主力）型号与参数（id 为 2026-08-21 GET /v1/models 探针实测在册）──
+#   seedance_video_model: bytedance/seedance-2-0        # 主力（code default 同值，无需手改）
+#   seedance_video_resolution:                          # 可选 480p~4k；不设=交 360 默认（fast/mini 仅 480p/720p）
+#   seedance_fast_video_model: bytedance/seedance-2-0-fast      # 用户可选低成本档
+#   seedance_mini_video_model: bytedance/doubao-seedance-2-0-mini
+#   # ── ByteDance Ark 直连: 降级兜底位（seedance-ark）+ seedream 生图 ──
+#   ark_api_key: $ARK_API_KEY                       # 360 故障时的视频兜底 / Ark seedream 生图共用
+#   ark_base_url: https://ark.cn-beijing.volces.com/api/v3
+#   vimax_llm_model: qwen/qwen3.8-max             # 2026-10-12：豆包聊天删册迁回 360（base_url 同步切回；回滚=改回 doubao-seed-2-1-pro-260628 + base_url 切 Ark——前提该条网关侧仍在服务）
+#   vimax_llm_base_url: https://api.360.cn/v1
+#   seedream_image_model: doubao-seedream-5-0-pro-260628    # Stage 4.1
+#   seedance_ark_video_model: doubao-seedance-2-0-260128    # Stage 5.1（现为降级兜底）
+#   ark_video_max_inflight: 3                       # E3: Ark 在途闸（个人档 3 并发；360 故障转移洪峰闸在这）
+#   # ── 分镜/脚本 LLM（E6/E10：显式化，不回落 models[]）──
+#   script_model: qwen3.8-flash                     # 2026-10-12 迁此（deepseek-v4-flash-vision-exp 删册）：09-08 十轮×2负载实测备选位（逐帧 3.29s/调度表 33.3s 契约全过）+ 2026-10-12 压测默认位胜者（docs/2026-10-12-flash-trio-benchmark.md）
+#   #   ⚠️ 须在 models[] 有同名注册条目（360 网关，$QIHU_API_KEY）。
+#   # ── 分镜提示词逐帧化（E8）──
+#   prompt_chunk_size: 1                            # 1=逐帧（默认；批量回退改 >1，配置级不对用户暴露）
+#   prompt_frame_concurrency: 8                     # 逐帧并发闸
+#   # Task 6 (2026-08-01)：360 通道新增两个可选生成模型，供任务级「生成模型」下拉选用。
+#   # 两个 id 均已打 GET https://api.360.cn/v1/models 实测确认（HTTP 200 / 214 models），非猜测。
+#   # 代码 default 已是下列值，**无需手改**；仅在 360 侧改名时才需覆盖。
+#   seedream_360_image_model: bytedance/doubao-seedream-5.0-pro   # ⚠️ 是 "5.0"（点号），与 Ark 直连的 5-0-pro-260628 命名不同
+#   minimax_h3_video_model: minimax/MiniMax-H3                    # ⚠️ 大小写敏感；与现有 qihu(Hailuo 2.3) 并存而非替换
+#   storage_dir: .deer-flow/video-gen
+#   default_aspect: "16:9"        # Default aspect ratio (9:16, 16:9, 1:1)；生产已验证值（2026-07）
+#   # Phase 2: Seedance 续写（Tier E）——大缺口 ≥3s 自动付费延长（默认开启）
+#   video_extend_enabled: true       # false 禁用续写，全部交 worker 本地链兜底
+#   video_extend_min_gap: 3.0        # 触发续写的最小缺口（秒）
+#   video_extend_max_segments: 1     # 单帧最大续写段数（v2 单段，循环续写留后续）
+#   # E9 超发裁剪保险系数（2026-08-25）：请求时长=旁白×系数对齐栅格（封顶单次上限，
+#   # 超上限帧走续写）。默认 1.25 即生效无需手改；欠交付率长期为 0 可回退 1.0（旧行为）。
+#   duration_safety_factor: 1.25
+#   max_concurrent_tasks: 12      # 闸0: in-flight orchestration cap。32 核档（2026-08-28 调优）8→12：
+#                                 # 10~20 用户 × 2~3 任务 ≈ 20~30 并发，12 对 worker 9 槽（3×3）+ 预览直跑
+#                                 # 有余量；64 核档可再升。config.py default 仍 8，本行覆盖生效，
+#                                 # 部署 compose 时两者须一起核对（yaml overrides default）。
+#   max_tasks_per_user: 4         # 32 核档（2026-08-28）：3→4，与 max_concurrent_tasks 12 同档调整。
+#                                 # D11（2026-09-08 remotion-course 计划）：新基线 全局 20 / 每用户 6（编排
+#                                 # 是 IO 型不吃本地 CPU，AI API 闸 20 兜底）；服务器 config.yaml 手改同步，
+#                                 # 本地 example 注释留档。测试机 L4 用临时 2/4（撤场还原 6/20）。
+#   engine_arch: multi_engine     # ⚠️ ViMax 硬依赖：**必须** multi_engine，否则 ViMax 任务一启动就抛 ValueError
+#                                 # legacy (monolith _prepare_storyboard_video) | multi_engine (engine.render dispatch; 阶段 1)；生产已验证值（2026-07）
+#                                 # legacy 下 ai_image/ai_video 仍可用，但 vimax 走不到 engine dispatch → service.py 明确拒绝。
+#                                 # 历史事故：vg_7477487923ef 即此误配。config.yaml 是 gitignored，
+#                                 # 服务器部署后请实测确认：sudo docker exec <gateway> grep -A3 engine_arch /app/config.yaml
+#   remotion_engine: template     # LEGACY-only. Under multi_engine this is IGNORED — Remotion always uses the course-video agent + auto-video-flow skill path. Do not set expecting the template path.
+#   remotion_agent_timeout: 1500  # Hard timeout (s) for the agent Remotion path (LLM code-write+esbuild+`npx remotion render`); 600s times out mid-render — do NOT lower below 1500
+#   remotion_agent_assistant: course-video   # 已删除（2026-10-16 T1 零消费者死字段；残留键加载被容忍，部署侧可删）
+#   vimax_api_concurrency: 5        # Max concurrent 360 image+video API calls from ViMax (default 3)
+#   vimax_video_max_wait: 400      # Per-video-task poll timeout in seconds (default 400)
+#   vimax_burn_subtitles: true      # Burn subtitles into ViMax videos (default True; narration generates subtitle.srt)
+#   # ── C5（2026-10-12 vimax 切 360）：图像/视频后端开关（部署侧生效以 config 显式落值为准，
+#   #    C5c 角色 spike 是生产配置落值的硬门禁）──
+#   vimax_video_backend: seedance   # 默认（auto 同义保留兼容）= 360 seedance r2v；回滚位 = seedance-ark（Ark 直连）。
+#                                    # 未知值（typo）启动即 ValueError，不静默落分支。
+#   vimax_image_backend: "360"      # 新增：360 网关 seedream 5.0 Pro（点号命名，Seedream360GeneratorForViMax 桥
+#                                    # + qihu 凭据）| "ark"（Ark 直连，回滚位）。⚠️ "360" 必须带引号——YAML 裸 360 是 int。
+#   subtitle_llm_enabled: true      # T8 (2026-08-13): LLM 语义重切字幕（D3 默认开启；失败回退规则链）⚠️ restart-required
+#   subtitle_llm_model: qwen3.8-flash             # 字幕 LLM 模型（2026-10-12 起=代码默认值，随 deepseek-v4-flash-vision-exp 删册迁移；gemini 系 360 通道实测双模态停顿失格管线默认）
+#   TTS_DISABLE_EDGE_FALLBACK: "1"  # 国内仅可达部署推荐：360/doubao 失败 fail-loud 而非死链 edge 回退（env-only——须设在 .env；在 config.yaml 取消注释无效，config 层不读此键）
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 以下四段 2026-10-05 补齐（审计 C4 / §3-3）：此前 example 缺这四个顶层段，部署
+# 端无模板可抄。值为结构模板——凭据一律 $VAR 引用（在 .env 提供实际值）；键集
+# 与 config.yaml 实况一致（由 tests/test_config_example_parity.py 守护）。
+# ─────────────────────────────────────────────────────────────────────────────
+
+# subagents: 子代理档位与自定义执行器（thinking 三态：不写=继承父 run）
+#subagents:
+#  timeout_seconds: 900
+#  agents:
+#    bash:
+#      thinking_enabled: false   # 执行型子代理显式关思考，对冲继承默认的成本上升
+#  custom_agents: {}            # 自定义执行器（researcher/video-processor/slide-builder
+#                              # 形态见 config.yaml；system_prompt/tools/skills/max_turns/
+#                              # timeout_seconds 五键）
+#  container_path: /mnt/skills
+
+# channels: IM 渠道（凭证在 .env；各渠道形态见 backend/app/channels/）。
+# OPS-2（2026-10-07，D6）：feishu 走个人实例（按用户加密存凭证）——全局启用
+# 段会与个人实例双凭证冲突，user_registry 守卫将拒起个人实例；如需全局模板
+# 参见上方 IM Channels Configuration 段（feishu 建议 enabled: false）。
+
+# voice_clone: 声音分身（火山 openspeech；default_model_type 5=ICL 3.0）
+#voice_clone:
+#  enabled: true
+#  appid: $VOLCENGINE_VOICE_APPID
+#  token: $VOLCENGINE_VOICE_TOKEN
+#  access_key: $VOLCENGINE_VOICE_ACCESS_KEY
+#  domain: https://openspeech.bytedance.com
+#  default_model_type: 5
+#  default_language: 0
+#  max_upload_bytes: 10485760
+#  min_duration_seconds: 30
+#  storage_dir: .deer-flow/voice-twins
+
+# video_gen: 视频生成管线（provider 名册以 config.yaml 为准；⚠️ restart-required）
+#video_gen:
+#  enabled: true
+#  ai_image_provider: seedream-360
+#  ai_video_provider: seedance
+#  qihu_api_key: $QIHU_API_KEY
+#  storage_dir: .deer-flow/video-gen
+#  default_aspect: '16:9'
+#  max_concurrent_tasks: 20
+#  max_tasks_per_user: 6
+#  vimax_llm_model: qwen/qwen3.8-max
+#  vimax_llm_base_url: https://api.360.cn/v1
+#  ark_api_key: $ARK_API_KEY

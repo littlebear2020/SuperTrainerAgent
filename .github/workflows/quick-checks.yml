@@ -1,0 +1,105 @@
+name: Quick Checks
+
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: quick-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quick-checks:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.sha }}
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # base...head 校验与 gitleaks 完整范围
+          filter: blob:none
+
+      - name: Normalize base SHA
+        if: ${{ steps.checkout.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-parse HEAD~1)"
+            echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+          elif ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            BASE_SHA="$(git rev-parse HEAD~1)"
+            echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+            echo "SCAN_ALL=1" >> "$GITHUB_ENV"
+          fi
+          echo "quick-checks range: $BASE_SHA..$HEAD_SHA"
+
+      # 钉版二进制而非 gitleaks-action（2026-10-09 机械门禁批 ②）：与本地 pre-commit
+      # 的 gitleaks 8.30.1 同版同引擎。升级 = 人工改版号 + 重抄 sha256。
+      - name: "[secret-scan] Install gitleaks 8.30.1"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o /tmp/gitleaks.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          sudo tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+
+      - name: "[secret-scan] Scan PR/push range"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          if [ "${SCAN_ALL:-0}" = "1" ]; then
+            # force-push 丢弃了 before，无法构造可信增量范围 → 全历史兜底。
+            gitleaks git --redact .
+          else
+            gitleaks git --redact --log-opts "$BASE_SHA..$HEAD_SHA" .
+          fi
+
+      - name: "[docs-convention] Set up Python"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # 无路径过滤、全 PR 运行：根 .md、CLAUDE.md、测试落位等 docs/ 外违例也在覆盖面内。
+      - name: "[docs-convention] Check repo conventions"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: |
+          CONVENTION_BASE_SHA="$BASE_SHA" \
+            CONVENTION_HEAD_SHA="$HEAD_SHA" \
+            python3 scripts/check_docs_convention.py
+
+      - name: "[lint-backend] Detect backend changes"
+        id: backend
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          # 后端触发沿用 PR 语义（merge-base...head）；gitleaks 仍按提交可达范围扫描。
+          changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          if printf '%s\n' "$changed_files" | grep -qE '^(backend/|\.github/workflows/quick-checks\.yml$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "[lint-backend] Install uv"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' && steps.backend.outputs.changed == 'true' }}
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: "[lint-backend] uv sync + make lint"
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' && steps.backend.outputs.changed == 'true' }}
+        working-directory: backend
+        run: uv sync --group dev && make lint

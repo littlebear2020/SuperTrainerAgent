@@ -1,0 +1,62 @@
+name: Frontend Unit Tests
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'frontend/**'
+      - '!frontend/**/*.md'
+      - '.github/workflows/frontend-unit-tests.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'frontend/**'
+      - '!frontend/**/*.md'
+      - '.github/workflows/frontend-unit-tests.yml'
+
+concurrency:
+  group: frontend-unit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-unit-tests:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Use pinned pnpm version
+        run: corepack prepare pnpm@10.26.2 --activate
+
+      # setup-node 解析 pnpm cache 前需要 pnpm 已在 PATH，故在 corepack 固定版本后启用。
+      - name: Enable pnpm dependency cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Run unit tests of frontend
+        working-directory: frontend
+        run: make test
+
+      # knip / i18n 静态门禁已移入 Lint Check（2026-10-08 CI 优化批 A4）：
+      # 本工作流红 ⇔ vitest 红，报警可归因；静态检查与 frontend/Makefile check 逐字同源。

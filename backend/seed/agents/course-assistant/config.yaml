@@ -1,0 +1,21 @@
+name: course-assistant
+description: 'AI制课助手：自动识别制课需求，匹配专业工作流，协调并行任务'
+model: null
+# SEC-C2/C3 显式化（2026-09-02 B2 步骤3）：null = 挂载全部 config 工具
+# （含 bash/video_engine）。本 agent 的技能全部经沙箱脚本执行（config 的
+# web 组当前为空），实际依赖 = 沙箱三件套；不携带 video_engine。
+tool_groups:
+  - file:read
+  - file:write
+  - bash
+skills:
+  - auto-video-flow
+  - video-generation
+  - ppt-master
+  - course-poster
+  - knowledge-card-auto-generator
+  - video-clip
+memory_scope: global
+category: public
+created_by: null
+created_at: '2026-05-05T00:00:00+00:00'

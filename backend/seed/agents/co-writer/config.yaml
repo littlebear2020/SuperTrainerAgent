@@ -1,0 +1,16 @@
+name: co-writer
+description: "全能写作助手：按内容类型（公众号/案例/脚本/语音博客/技术课程/通用）提供差异化的 AI 写作与编辑能力"
+model: null
+# D-5（2026-07-27 裁定）：一次性全文编辑会话（最长 2 万字）——记忆提取 LLM
+# 调用与事实注入纯属污染（会话即弃，无跨会话价值）。
+memory_scope: none
+# D-4（2026-07-27 裁定）：仅保留 web（搜索/抓取）——联网搜索 + 间接 prompt
+# injection 可驱动 sandbox 写文件/执行命令的面被关闭（写作链路纯文本进出，
+# 不需要 file/bash）。course「验证代码」分支随之从 SOUL 移除；若未来确需
+# sandbox 执行示例代码，另行评估后单独加回。
+tool_groups:
+  - web
+skills: []
+category: public
+created_by: admin
+created_at: "2026-06-09T00:00:00+00:00"

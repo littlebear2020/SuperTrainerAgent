@@ -1,0 +1,38 @@
+name: dependency-scan
+
+# 2026-10-05 审计整改 C5：依赖漏洞扫描（report-only 起步——观察两周噪声后
+# 再决定是否去 continue-on-error 转阻塞）。gitleaks 走 pre-commit 本地钩子
+# （.gitleaks.toml 按值白名单），不在此扫 git 历史（历史残留按 D-7 轮换处置）。
+
+on:
+  schedule:
+    - cron: "23 3 * * 1" # 每周一（避开整点）
+  workflow_dispatch:
+
+jobs:
+  backend-pip-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true # report-only
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: Export locked requirements
+        run: uv export --frozen --no-dev --format requirements-txt -o /tmp/req.txt
+        working-directory: backend
+      - name: pip-audit
+        run: uvx pip-audit -r /tmp/req.txt --skip-editable
+
+  frontend-pnpm-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true # report-only
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: pnpm audit (prod deps only)
+        run: pnpm audit --prod
+        working-directory: frontend

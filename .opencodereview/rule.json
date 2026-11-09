@@ -1,0 +1,95 @@
+{
+  "$schema": "https://open-code-review.org/rule.schema.json",
+  "rules": [
+    {
+      "path": "frontend/src/components/ui/**",
+      "rule": "【禁区】registry 生成物（Shadcn/MagicUI/AI SDK）。手改会在下次生成/同步时被覆盖，且 ESLint 豁免无校验兜底。对此目录的任何实质修改都标 High，并建议：定制只能走 theme token / className / 上层封装组件。"
+    },
+    {
+      "path": "frontend/src/components/ai-elements/**",
+      "rule": "【禁区】registry 生成物（AI SDK）。手改会被覆盖且无 ESLint 校验兜底。任何实质修改标 High，定制走上层封装组件。"
+    },
+    {
+      "path": "backend/packages/vimax/**",
+      "rule": "【禁区】vendored 第三方 ViMax（pre-commit lint 豁免区）。改动必须走 vendored patch 口径，非 patch 口径的直接修改标 High。"
+    },
+    {
+      "path": "skills/public/ppt-master/**",
+      "rule": "【禁区】vendored 上游树。任何新增/修改文件必须同步在 TRAINERAI_PATCHES.md 登记，未登记的改动标 High（会污染补丁语义，下次对上游重打补丁时静默丢失）。"
+    },
+    {
+      "path": "docker/sandbox/cache/**",
+      "rule": "【禁区】离线 chrome/字体包（公司服务器离线镜像构建唯一来源）。任何删除/替换标 High。注意：本区主体为二进制文件，评审器对二进制 diff 无条件排除——二进制增删/替换不进 AI 评审（本条只守区内的文本文件），二进制改动须靠机械检查与人工把关兜底。"
+    },
+    {
+      "path": "video-templates/course-standard/.baseline-m0/**",
+      "rule": "【禁区】像素回归基线。只有刻意改版式时才允许随 diff-gallery 流程更新；无配套流程说明的改动标 Medium。注意：本区主体为 PNG 二进制，评审器对二进制 diff 无条件排除——图像文件改动不进 AI 评审（本条只守区内的文本文件），基线更新须走 diff-gallery 流程与人工把关。"
+    },
+    {
+      "path": "**/config.yaml",
+      "rule": "配置文件双重约定：1)【安全】不得硬编码密钥/token/数据库连接串/第三方 API 凭证（应来自环境变量而非明文），权限/安全相关默认值不可过宽，涉及真实凭证的改动标 High；2)【结构契约】config.yaml 的结构性改动必须同步 config.example.yaml 并递增 config_version（部署端 config 只读挂载，靠版本号触发升级提示），只改 config.yaml 未同步 example/version 的标 Medium。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/app/gateway/auth/**",
+      "rule": "认证核心代码（最高优先级）。重点审查：1) 密码比对必须用 bcrypt 等时序安全方式，禁止用 == 直接比对密码或 token；2) JWT 签发与校验的算法/过期/密钥来源是否正确，密钥不可硬编码；3) 凭证文件读取需限制路径防止目录遍历；4) 任何可能造成认证绕过、越权、凭证泄露的改动必须标为高优先级。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/app/gateway/{auth_middleware,csrf_middleware,langgraph_auth,internal_auth,admin_auth,authz}.py",
+      "rule": "安全中间件与授权逻辑。重点审查：1) 中间件执行顺序与短路逻辑是否正确；2) 是否每个受保护路由都被覆盖，白名单/放行路径是否过宽；3) 权限判断不可基于可篡改的客户端输入（如请求头/cookie 直接取值当权限标志）；4) 错误响应不可泄露内部信息。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/app/gateway/routers/**",
+      "rule": "API 路由层。重点审查：1) 每个端点是否挂载了正确的认证/权限校验，新增端点不可遗漏 middleware；2) 请求体须用 Pydantic 模型校验后再使用；3) 响应不可泄露敏感字段（密钥/token/内部 ID/密码哈希）；4) 敏感端点是否有速率限制；5) 错误处理不可吞掉异常或返回过多内部信息。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/app/gateway/video_gen/**",
+      "rule": "视频生成模块，含 subprocess/外部命令调用与模板渲染。重点审查：1) 传给 subprocess 的命令参数若来自用户输入是否做了转义/白名单（命令注入）；2) shell=True 是否可避免；3) 临时文件路径是否可控、是否可被预测或遍历；4) 外部进程（Remotion/vimax）的超时与资源回收；5) 模板渲染是否存在服务端模板注入（SSTI）。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "backend/**/*.py",
+      "rule": "后端为 FastAPI + LangGraph 的异步 AI Agent 系统（通用后端规则）。重点审查：1) 代码执行安全——subprocess/os.system/exec/eval/shell=True 必须确认命令参数非用户可控、且在预期沙箱内；2) SQL 注入——禁止字符串拼接 SQL，必须参数化；3) 异步正确性——async 函数中不可直接用同步阻塞 IO（requests/同步文件/长计算），须改为异步或丢入线程池，await 不可遗漏；4) 外部输入须校验后再使用；5) 硬编码密钥/token/凭证不得入库（发现即 High）。注意：纯代码风格问题团队已用 ruff 覆盖，不要发表风格意见。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "frontend/src/**/*.{ts,tsx}",
+      "rule": "Next.js 16 + React 19 严格 TypeScript 项目。重点审查：1) React hooks 依赖数组完整性，禁止条件式调用 hooks；2) 副作用清理（定时器/订阅/事件监听）是否遗漏导致内存泄漏；3) useEffect 中异步请求须处理竞态、取消与过时响应；4) 禁止 any 与类型断言滥用；5) 用户输入渲染到 dangerouslySetInnerHTML 或 markdown 时是否有 XSS 风险（项目用 rehype-sanitize，审查是否被绕过或关闭）；6) 客户端组件不可硬编码服务端密钥/URL（发现即 High）。注意：不要对 UI 样式数值或已确认的设计意图发表意见。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "**/{Dockerfile,docker-compose*.yaml,docker/**}",
+      "rule": "容器与部署配置。重点审查：1) 是否以 root 运行容器；2) 基础镜像是否固定版本；3) 是否暴露不必要的端口；4) 构建产物是否包含敏感文件（.env/config.yaml）。",
+      "merge_system_rule": true
+    },
+    {
+      "path": "**",
+      "rule": "通用红线（本条只覆盖未被上面任何条目命中的文件）：1) .env/密钥/证书类文件或内嵌密钥不得提交（发现即 High）；2) 不提交本地临时产物（temp/、pr-build/、探针脚本、会话状态等，见 .gitignore 本地产物节）。",
+      "merge_system_rule": true
+    }
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.lock",
+    "**/pnpm-lock.yaml",
+    "**/uv.lock",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/__pycache__/**",
+    "**/playwright-report/**",
+    "**/test-results/**",
+    "**/.deer-flow/**",
+    "**/site-packages/**",
+    "**/generated/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/*.mdx",
+    "**/docs/**"
+  ]
+}

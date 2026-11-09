@@ -1,0 +1,8 @@
+{
+  "tracks": [
+    { "id": "morning_piano", "name": "清晨钢琴", "tags": ["钢琴", "清晨", "轻快"], "filename": "morning_piano.mp3", "duration": 179, "source": "freesound", "license": "CC0 1.0", "author": "AngeloRizzo", "source_url": "https://freesound.org/people/AngeloRizzo/sounds/678956/" },
+    { "id": "reflective_piano", "name": "沉思钢琴", "tags": ["钢琴", "沉思", "安静"], "filename": "reflective_piano.mp3", "duration": 36, "source": "freesound", "license": "CC BY 4.0", "author": "Metris", "source_url": "https://freesound.org/people/Metris/sounds/840361/" },
+    { "id": "sleepy_piano", "name": "静谧钢琴", "tags": ["钢琴", "助眠", "安静"], "filename": "sleepy_piano.mp3", "duration": 116, "source": "freesound", "license": "CC0 1.0", "author": "blankie.rest", "source_url": "https://freesound.org/people/blankie.rest/sounds/859607/" },
+    { "id": "tranquility", "name": "宁静幸福", "tags": ["冥想", "安静", "氛围"], "filename": "tranquility.mp3", "duration": 41, "source": "freesound", "license": "CC BY 4.0", "author": "ViraMiller", "source_url": "https://freesound.org/people/ViraMiller/sounds/743366/" }
+  ]
+}

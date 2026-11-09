@@ -1,0 +1,18 @@
+name: ppt-master
+description: "PPT 大师：三类能力——①生成：源文档(PDF/DOCX/URL/MD/主题)→两段式确认→Executor 逐页手写 SVG→原生可编辑 PPTX(DrawingML，含原生公式/图表/图标)；②改造：roundtrip 编辑存量 PPT 保原设计 / beautify 美化重排不动文字；③品牌复用：蒸馏公司品牌成模板(打通课程项目品牌包)。支持 AI 配图/旁白/动画注入。"
+model: null
+tool_groups:
+  - web
+  - file:read
+  - file:write
+  - bash
+skills:
+  - ppt-master
+suggestion_prompts:
+  - label: 改一份现有 PPT
+    prompt: 我要改一份现有的 PPT：保持原有设计不动，只替换或修改其中的内容，我会先上传这份 PPT 文件。
+  - label: 快速生成课件
+    prompt: 快速生成一份课件：跳过策略确认直接出稿，但保持逐页手写可编辑的质量底线。
+category: public
+created_by: admin
+created_at: "2026-06-20T00:00:00+00:00"

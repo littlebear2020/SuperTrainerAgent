@@ -1,0 +1,57 @@
+{
+  "mcpServers": {
+    "metaso": {
+      "enabled": true,
+      "type": "http",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "https://metaso.cn/api/mcp",
+      "headers": {
+        "Authorization": "Bearer $METASO_API_KEY"
+      },
+      "oauth": null,
+      "description": "秘塔AI搜索 - 网页搜索、图片搜索、内容读取、智能问答"
+    },
+    "so_360_search_mcp": {
+      "enabled": false,
+      "type": "sse",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "$SO_360_SEARCH_MCP_URL",
+      "headers": {
+        "Authorization": "Bearer $SO_360_SEARCH_MCP_KEY"
+      },
+      "oauth": null,
+      "description": "360搜索 - 网页搜索(query必填搜索词, count可选每页结果数默认10)"
+    },
+    "so_spider": {
+      "enabled": false,
+      "type": "sse",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "$SO_SPIDER_MCP_URL",
+      "headers": {
+        "Authorization": "Bearer $SO_SPIDER_MCP_KEY"
+      },
+      "oauth": null,
+      "description": "360搜索爬虫 - 通用网页抓取(crawler_360)、深度层级采集(depth_crawler_360)、小红书抓取(crawler_redbook_360)、视频采集(crawler_video_360)"
+    },
+    "zhitumcp": {
+      "enabled": false,
+      "type": "sse",
+      "command": null,
+      "args": [],
+      "env": {},
+      "url": "$ZHIITU_MCP_URL",
+      "headers": {
+        "Authorization": "Bearer $ZHIITU_MCP_KEY"
+      },
+      "oauth": null,
+      "description": "智图AI - 图片理解(zhitu_img_understand)、视频理解(zhitu_video_understand)"
+    }
+  },
+  "skills": {}
+}

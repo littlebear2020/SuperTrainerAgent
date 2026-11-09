@@ -1,0 +1,27 @@
+{
+  "name": "course-standard",
+  "version": "1.0.0",
+  "description": "TrainerAI 课程视频标准模板（19 版式 × 4 主题，数据驱动 DataDrivenCourse）",
+  "private": true,
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@remotion/cli": "4.0.522",
+    "@remotion/transitions": "4.0.522",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.522"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "typecheck": "tsc --noEmit",
+    "render": "remotion render src/index.ts DataDrivenCourse out/course.mp4",
+    "gallery": "bash scripts/render-gallery.sh",
+    "upgrade": "remotion upgrade"
+  }
+}

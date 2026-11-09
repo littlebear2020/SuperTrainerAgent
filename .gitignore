@@ -1,0 +1,116 @@
+# DeerFlow docker image cache
+docker/.cache/
+# oh-my-claudecode state
+.omc/
+# OS generated files
+.DS_Store
+*.local
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv
+venv/
+
+# Chrome headless shell - Mac version (only needed locally, not for Linux deployment)
+**/chrome-headless-shell-mac-arm64/
+**/.remotion/chrome-headless-shell/mac-arm64/
+
+# Environment variables（2026-10-05 审计 A4：机密覆盖补齐——.env 变体与密钥/证书文件）
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*id_rsa*
+
+# Configuration files（config.yaml 锚定根目录——裸模式会吞掉
+# backend/seed/agents/*/config.yaml 等应入库的新建文件；mcp/extensions
+# 保持原样，其运行时副本由 .deer-flow 目录级规则覆盖）
+/config.yaml
+mcp_config.json
+extensions_config.json
+
+# IDE
+.idea/
+.vscode/
+
+# Coverage report
+coverage.xml
+coverage/
+.deer-flow/
+.deer-flow-wt/
+.claude/
+skills/custom/*
+# 2026-09-08 T8：5 个仓库托管定制技能入库（compose 三件套均挂载 skills/custom，
+# 不入库则新鲜克隆缺技能；运行时经 /api/skills/install 安装的后续技能仍被上行规则忽略）
+!skills/custom/card-poster/
+!skills/custom/case-article/
+!skills/custom/course-ppt/
+!skills/custom/course-video/
+!skills/custom/knowledge-extraction/
+logs/
+log/
+debug.log
+
+# Local git hooks (keep only on this machine, do not push)
+.githooks/
+
+# pnpm
+.pnpm-store
+sandbox_image_cache.tar
+
+# ignore the legacy `web` folder
+web/
+
+# Deployment artifacts
+backend/Dockerfile.langgraph
+config.yaml.bak
+config.yaml.bak-*
+.playwright-mcp
+/frontend/test-results/
+/frontend/playwright-report/
+.gstack/
+.worktrees
+node_modules
+# spike-generated artifacts (images from 0.0 cross-frame spike, etc.)
+backend/spike_0_0_output/
+backend/spike_*_output/
+
+# A/B test output (model-consolidation validation images — large, regenerable)
+backend/.ab_test_output*/
+
+# Malformed absolute-path writes: a Windows-style path passed to a file-writing
+# tool creates a file whose NAME contains literal backslashes (e.g.
+# "C:\Users\x\docs\note.md") instead of writing to that location. These names are
+# illegal on Windows and break clone/checkout there. Ignore so they are never
+# committed; delete any that appear.
+C:\\*
+*C:\\*
+test-output/
+
+# SEC-H5（批次 1）：docker.sh 本地生成的 PPT_CONVERTER_SECRET——勿入库
+docker/.ppt-converter-secret
+
+# 本地工作产物（探针/PR 证据/工具状态），无需入库（2026-09-30 治理）
+temp/
+pr-build/
+.superpowers/
+.opencodereview/*
+!.opencodereview/rule.json
+
+# 后端临时探针脚本 + ZCode 会话状态（2026-09-30 治理）
+backend/temp_*
+.zcode/plans/
+.agent/

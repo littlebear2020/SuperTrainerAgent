@@ -1,0 +1,18 @@
+name: course-video
+description: "视频课程专家：用 auto-video-flow 技能直接写 Remotion 代码渲染讲解/科普视频（图文动画、字幕驱动、无真人角色无剧情）"
+model: null
+tool_groups:
+  - web
+  - file:read
+  - file:write
+  - bash
+skills:
+  - deep-research
+  - auto-video-flow
+  - corporate-video
+  - tech-explainer-video
+  - chart-visualization
+  - trainerai-imagine
+category: public
+created_by: admin
+created_at: "2026-07-15T00:00:00+00:00"

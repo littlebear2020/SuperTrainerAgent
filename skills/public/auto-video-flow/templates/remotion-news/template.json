@@ -1,0 +1,15 @@
+{
+  "id": "remotion-news",
+  "name": "新闻播报",
+  "desc": "适合口播、新闻、知识分享，带标题栏和底部信息条",
+  "category": "presentation",
+  "tags": ["口播", "新闻", "知识", "专业"],
+  "preview": "preview.mp4",
+  "supports_video_types": ["remotion"],
+  "params": [
+    {"name": "title", "type": "text", "default": "", "label": "标题", "required": false},
+    {"name": "theme_color", "type": "color", "default": "#DC2626", "label": "主题色"},
+    {"name": "show_footer", "type": "boolean", "default": true, "label": "底部信息条"},
+    {"name": "render_date", "type": "text", "default": "", "label": "底部日期", "required": false}
+  ]
+}

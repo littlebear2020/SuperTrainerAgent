@@ -1,0 +1,41 @@
+# gitleaks 配置（2026-10-05 审计整改 C5）
+# 默认规则全量继承；allowlist 只放行**已核实的测试夹具假密钥**与文档脱敏占位符。
+# 原则：按值白名单（非按路径）——真密钥混进测试文件仍会被抓。
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "测试夹具假密钥（backend/tests 等，2026-10-05 逐个核实为 fake）"
+regexes = [
+  '''sk-live-abcdef123456''',
+  '''xoxb-test''',
+  '''xapp-test''',
+  '''mk-test-key-12345''',
+  '''MIIEowIBAAKCAQEA(testonly)*''',
+  '''BEGIN RSA PRIVATE KEY-----\\nsecret''',
+  '''password=hunter2''',
+  '''sk-secret-qihu-123456''',
+  '''aB3xK9mN_pQ7rT2w''',
+]
+
+[[allowlists]]
+description = "文档脱敏占位符（A1/B9/C5 批产物：已轮换/已过期凭证的 REDACTED 形态）"
+regexes = [
+  '''sk-REDACTED''',
+  '''X-Amz-Signature=REDACTED''',
+  '''X-Amz-Credential=AKIA-REDACTED''',
+]
+
+# 按路径白名单仅限"假密钥按构造成立"或"纯误报"的文件：
+[[allowlists]]
+description = "SkillScan 扫描器自测夹具——所有 key 串为构造的假值（文件本体就是密钥扫描测试）"
+paths = ['''backend/tests/test_skillscan_native\.py''']
+
+[[allowlists]]
+description = "auth 测试计划文档——curl 示例中的 token/cookie 均为占位假值（wrong-token 等）"
+paths = ['''backend/docs/AUTH_TEST_PLAN\.md''']
+
+[[allowlists]]
+description = "vendored ppt-master 动画预设 JSON——generic-api-key 对 base64 动画参数的误报（上游内容勿改）"
+paths = ['''skills/public/ppt-master/scripts/pptx_animation_presets\.json''']

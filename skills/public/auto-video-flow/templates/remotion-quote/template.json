@@ -1,0 +1,13 @@
+{
+  "id": "remotion-quote",
+  "name": "金句卡片",
+  "desc": "适合社交媒体分享、名言金句展示，大字居中 + 引号装饰",
+  "category": "social",
+  "tags": ["金句", "社交", "分享", "名言"],
+  "preview": "preview.mp4",
+  "supports_video_types": ["remotion"],
+  "params": [
+    {"name": "quote_char", "type": "enum", "default": "\"", "options": ["\"", "'", "「", "『"], "label": "引号样式"},
+    {"name": "bg_color", "type": "color", "default": "#1E293B", "label": "背景色"}
+  ]
+}

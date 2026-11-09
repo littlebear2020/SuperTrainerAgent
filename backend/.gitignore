@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.coverage
+.coverage.*
+.ruff_cache
+agent_history.gif
+static/browser_history/*.gif
+
+log/
+log/*
+
+# Virtual environments
+.venv
+venv/
+
+# User config file（锚定根目录——裸模式会吞掉 backend/seed/agents/*/config.yaml
+# 这类应入库的新建文件，2026-09-09 已实际咬人一次，见 changelog）
+/config.yaml
+
+# Langgraph
+.langgraph_api
+
+# Claude Code settings
+.claude/settings.local.json

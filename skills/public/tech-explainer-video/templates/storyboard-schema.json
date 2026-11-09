@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TechExplainerStoryboard",
+  "description": "前沿科技科普视频分镜脚本",
+  "type": "object",
+  "required": ["meta", "script", "storyboard"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["topic", "domain", "difficulty", "target_duration", "total_shots"],
+      "properties": {
+        "topic": { "type": "string", "description": "视频主题" },
+        "domain": { "type": "string", "enum": ["AI", "quantum", "biotech", "energy", "aerospace", "semiconductor", "materials", "general"] },
+        "difficulty": { "type": "string", "enum": ["beginner", "intermediate", "professional"] },
+        "target_duration": { "type": "integer", "description": "目标时长（秒）" },
+        "total_shots": { "type": "integer", "description": "总镜数（22-28）" },
+        "narrative_style": { "type": "string", "description": "叙事风格" },
+        "hook_strategy": { "type": "string", "description": "钩子策略" },
+        "voice_id": { "type": "string", "description": "TTS voice ID" }
+      }
+    },
+    "script": {
+      "type": "object",
+      "description": "脚本大纲",
+      "required": ["chapters"],
+      "properties": {
+        "strategy": { "type": "string", "description": "科普策略" },
+        "analogies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "concept": { "type": "string" },
+              "analogy": { "type": "string" }
+            }
+          }
+        },
+        "chapters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "phase", "duration_range", "shot_range", "purpose"],
+            "properties": {
+              "name": { "type": "string" },
+              "phase": { "type": "integer", "minimum": 1, "maximum": 4 },
+              "duration_range": { "type": "string" },
+              "shot_range": { "type": "string" },
+              "purpose": { "type": "string" },
+              "transition": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "storyboard": {
+      "type": "array",
+      "description": "分镜列表",
+      "items": {
+        "type": "object",
+        "required": ["shot", "chapter", "narration", "image_prompt", "video_prompt", "emotion", "visual_type", "camera"],
+        "properties": {
+          "shot": { "type": "integer", "description": "镜号" },
+          "chapter": { "type": "string", "description": "所属章节" },
+          "narration": { "type": "string", "description": "纯台词文本（30-40字）" },
+          "char_count": { "type": "integer", "description": "台词字数" },
+          "duration_sec": { "type": "number", "description": "配音时长（字数/3）" },
+          "transition_pause": { "type": "number", "description": "过渡停顿（0.5-1秒）" },
+          "image_prompt": { "type": "string", "description": "生图提示词（英文）" },
+          "video_prompt": { "type": "string", "description": "图生视频提示词（英文）" },
+          "emotion": { "type": "string", "description": "情绪标签" },
+          "visual_type": { "type": "string", "description": "可视化类型" },
+          "camera": { "type": "string", "description": "镜头类型" },
+          "source": { "type": "string", "description": "来源标注" }
+        }
+      }
+    }
+  }
+}
