@@ -67,8 +67,7 @@ export function WorkspaceHeader({ className }: { className?: string }) {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
-            // 2026-09-22 工作台恢复：回退精确匹配（37bb1563e 反向）——
-            // agent 聊天路由归「智能体」入口高亮，工作台只认 /workspace 本身。
+            // 首页只精确匹配 /workspace；Agent 新会话等深链不误亮首页。
             isActive={pathname === "/workspace" || pathname === "/workspace/"}
             asChild
           >

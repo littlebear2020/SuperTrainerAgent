@@ -205,7 +205,7 @@ export const enUS: Translations = {
   // Sidebar
   sidebar: {
     newChat: "New chat",
-    dashboard: "Dashboard",
+    dashboard: "Home",
     chats: "Chats",
     recentChats: "Recent chats",
     demoChats: "Demo chats",
@@ -213,7 +213,7 @@ export const enUS: Translations = {
     gallery: "Gallery",
     voiceTwin: "Dubbing",
     writer: "Writing",
-    videoGen: "Video",
+    videoGen: "Video assets",
     assets: "Assets",
     consoleSelf: "My usage",
     consoleAdmin: "Operations console",
@@ -461,15 +461,6 @@ export const enUS: Translations = {
     about: "About Trainer AI",
     // Home hero and all visible creation-entry copy stay locale-aware.
     home: {
-      eyebrow: "✦ Super agents ready",
-      titleLine1: "What would you like to create?",
-      titleLine2Prefix: "Let",
-      titleLine2Brand: "Trainer AI",
-      titleLine2Suffix: "help you",
-      subtitle:
-        "From course design to video scripts, from slide decks to deep analysis — describe your idea and AI agents will orchestrate the rest.",
-      inputPlaceholder: "Describe what you want to create, or ask anything...",
-      expertAgents: "Expert Agents",
       heroTitle: "What would you like to create?",
       createHeading: "Choose a creation flow to start your next work",
       videoCourse: "Video course",

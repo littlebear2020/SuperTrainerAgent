@@ -364,14 +364,6 @@ export interface Translations {
     about: string;
     /** Home hero, expandable course entries, and their six creation cards. */
     home: {
-      eyebrow: string;
-      titleLine1: string;
-      titleLine2Prefix: string;
-      titleLine2Brand: string;
-      titleLine2Suffix: string;
-      subtitle: string;
-      inputPlaceholder: string;
-      expertAgents: string;
       heroTitle: string;
       createHeading: string;
       videoCourse: string;

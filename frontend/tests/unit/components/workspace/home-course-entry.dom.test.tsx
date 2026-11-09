@@ -1,8 +1,17 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 
 import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
+import type { HomeCourseItem } from "@/components/workspace/home-course-catalog";
 import { translations } from "@/core/i18n/translations";
 
 vi.mock("@/core/i18n/hooks", () => ({
@@ -30,7 +39,7 @@ function button(text: string): HTMLButtonElement {
 describe("HomeCourseEntry", () => {
   let container: HTMLDivElement;
   let root: Root;
-  let onSelect: ReturnType<typeof vi.fn>;
+  let onSelect: Mock<(item: HomeCourseItem) => void>;
 
   beforeEach(() => {
     mediaQuery = {

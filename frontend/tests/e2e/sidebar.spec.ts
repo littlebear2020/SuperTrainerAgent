@@ -3,18 +3,34 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
-  test("sidebar contains Chats link and the Agents entry", async ({ page }) => {
-    mockLangGraphAPI(page);
-
-    await page.goto("/workspace/chats/new");
-
-    // Sidebar uses data-sidebar="menu-button" with asChild rendering on <Link>
-    const sidebar = page.locator("[data-sidebar='sidebar']");
-    await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
-      timeout: 15_000,
+  test("shows only home, video assets, console, recent chats, and settings", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page, {
+      threads: [{ thread_id: "sidebar-thread", title: "近期对话样例" }],
     });
-    // 2026-09-22 工作台恢复：侧边栏加回「智能体」入口（b68f3a7e4 反向，
-    // 经 nav-routes 单一事实源）。/workspace/agents 列表页路由一直保留。
-    await expect(sidebar.locator("a[href='/workspace/agents']")).toBeVisible();
+    await page.goto("/workspace");
+
+    const sidebar = page.locator("[data-sidebar='sidebar']");
+    const home = sidebar.locator("a[href='/workspace']");
+    await expect(home).toBeVisible({ timeout: 15_000 });
+    await expect(home).toHaveText("首页");
+    await expect(
+      sidebar.locator("a[href='/workspace/video-gen']"),
+    ).toContainText("视频资产");
+    await expect(sidebar.locator("a[href='/workspace/console']")).toBeVisible();
+
+    for (const href of [
+      "/workspace/chats",
+      "/workspace/agents",
+      "/workspace/gallery",
+      "/workspace/twins/voice",
+      "/workspace/writer",
+      "/workspace/assets",
+    ]) {
+      await expect(sidebar.locator(`a[href='${href}']`)).toHaveCount(0);
+    }
+    await expect(sidebar.getByText("最近的对话", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("设置和更多", { exact: true })).toBeVisible();
   });
 });

@@ -189,7 +189,7 @@ export const zhCN: Translations = {
   // Sidebar
   sidebar: {
     newChat: "新对话",
-    dashboard: "工作台",
+    dashboard: "首页",
     chats: "对话",
     recentChats: "最近的对话",
     demoChats: "演示对话",
@@ -197,7 +197,7 @@ export const zhCN: Translations = {
     gallery: "灵感库",
     voiceTwin: "配音",
     writer: "写作",
-    videoGen: "视频",
+    videoGen: "视频资产",
     assets: "资产中心",
     consoleSelf: "我的用量",
     consoleAdmin: "运营后台",
@@ -428,17 +428,8 @@ export const zhCN: Translations = {
   workspace: {
     settingsAndMore: "设置和更多",
     about: "关于 Trainer AI",
-    // DEF-3（2026-10-07）：工作台首页文案入 i18n（此前硬编码中文，英文态残片）
+    // 首页 hero、双入口与六张创作卡统一走 i18n。
     home: {
-      eyebrow: "✦ 超级智能体已就绪",
-      titleLine1: "想创造什么？",
-      titleLine2Prefix: "让",
-      titleLine2Brand: "Trainer AI",
-      titleLine2Suffix: "来帮你",
-      subtitle:
-        "从课程设计到视频脚本，从 PPT 到深度分析——描述你的想法，AI 智能体将为你编排一切。",
-      inputPlaceholder: "描述你想创建的内容，或输入任何问题...",
-      expertAgents: "专家Agent",
       heroTitle: "想创造什么？",
       createHeading: "选择一种创作方式，开始你的下一个作品",
       videoCourse: "视频课",

@@ -160,7 +160,7 @@ describe("CreateTaskDialog initialTaskType", () => {
     const select = taskTypeSelect();
     expect(select.value).toBe("ai_video");
     expect(select.selectedOptions[0]?.textContent).toBe(
-      TYPE_CONFIG.ai_video.label,
+      TYPE_CONFIG.ai_video!.label,
     );
     expect(select.value).not.toBe("ai_image");
   });
@@ -168,13 +168,13 @@ describe("CreateTaskDialog initialTaskType", () => {
   it("initializes ai_image and defaults to ai_image", async () => {
     await render("ai_image");
     expect(taskTypeSelect().selectedOptions[0]?.textContent).toBe(
-      TYPE_CONFIG.ai_image.label,
+      TYPE_CONFIG.ai_image!.label,
     );
     await act(async () => root.unmount());
     root = createRoot(container);
     await render();
     expect(taskTypeSelect().selectedOptions[0]?.textContent).toBe(
-      TYPE_CONFIG.ai_image.label,
+      TYPE_CONFIG.ai_image!.label,
     );
   });
 
