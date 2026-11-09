@@ -34,14 +34,23 @@ jobs:
         if: ${{ steps.checkout.outcome == 'success' }}
         run: |
           set -euo pipefail
-          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BASE_SHA="$(git rev-parse HEAD~1)"
-            echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
-          elif ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            BASE_SHA="$(git rev-parse HEAD~1)"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "HEAD_SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            if git cat-file -e 'HEAD~1^{commit}' 2>/dev/null; then
+              BASE_SHA="$(git rev-parse HEAD~1)"
+            else
+              BASE_SHA="$(git hash-object -t tree /dev/null)"
+            fi
             echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
             echo "SCAN_ALL=1" >> "$GITHUB_ENV"
           fi
+          if git cat-file -e 'HEAD~1^{commit}' 2>/dev/null; then
+            DOCS_BASE_SHA="$BASE_SHA"
+          else
+            DOCS_BASE_SHA="$HEAD_SHA"
+          fi
+          echo "DOCS_BASE_SHA=$DOCS_BASE_SHA" >> "$GITHUB_ENV"
           echo "quick-checks range: $BASE_SHA..$HEAD_SHA"
 
       # 钉版二进制而非 gitleaks-action（2026-10-09 机械门禁批 ②）：与本地 pre-commit
@@ -59,7 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${SCAN_ALL:-0}" = "1" ]; then
-            # force-push 丢弃了 before，无法构造可信增量范围 → 全历史兜底。
+            # 根提交没有父提交，force-push 也可能丢失 before；无法构造可信增量范围时全历史兜底。
             gitleaks git --redact .
           else
             gitleaks git --redact --log-opts "$BASE_SHA..$HEAD_SHA" .
@@ -75,7 +84,7 @@ jobs:
       - name: "[docs-convention] Check repo conventions"
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
         run: |
-          CONVENTION_BASE_SHA="$BASE_SHA" \
+          CONVENTION_BASE_SHA="$DOCS_BASE_SHA" \
             CONVENTION_HEAD_SHA="$HEAD_SHA" \
             python3 scripts/check_docs_convention.py
 
@@ -84,8 +93,12 @@ jobs:
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
         run: |
           set -euo pipefail
-          # 后端触发沿用 PR 语义（merge-base...head）；gitleaks 仍按提交可达范围扫描。
-          changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          # PR 沿用 merge-base 语义；根提交使用空树做两方比较，三方比较不接受 tree 对象。
+          if [ "$BASE_SHA" = "$(git hash-object -t tree /dev/null)" ]; then
+            changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          else
+            changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          fi
           if printf '%s\n' "$changed_files" | grep -qE '^(backend/|\.github/workflows/quick-checks\.yml$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
