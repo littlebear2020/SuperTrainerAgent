@@ -6,8 +6,8 @@ import { useState } from "react";
 import { useI18n } from "@/core/i18n/hooks";
 import { useThreads } from "@/core/threads/hooks";
 
-import { HomeCourseEntry } from "./home-course-entry";
 import type { HomeCourseItem } from "./home-course-catalog";
+import { HomeCourseEntry } from "./home-course-entry";
 import { ProjectList } from "./project-list";
 import {
   CreateTaskDialog,

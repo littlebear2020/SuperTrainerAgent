@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from "@playwright/test";
+import { type Page, type Route } from "@playwright/test";
 
 export type MockVideoTaskStatus =
   | "pending"
@@ -16,11 +16,26 @@ export interface MockVideoTask {
   status: MockVideoTaskStatus;
   progress: number;
   task_type?: string;
+  title?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  thumbnail_url?: string | null;
+  artifact_missing?: boolean;
   error_message?: string | null;
   dirty_frames?: number[];
   course_project_id?: string | null;
   payload?: Record<string, unknown>;
   result?: Record<string, unknown>;
+}
+
+export interface MockCourseProject {
+  id: string;
+  title: string;
+  visual_style_preset?: string | null;
+  color_palette?: Record<string, string | number | undefined> | null;
+  style_anchor_image?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MockStoryboardFrame {
@@ -60,8 +75,11 @@ export interface MockVideoAPI {
   readonly uploadVisualRequests: RecordedRequest[];
   readonly renderRequests: RecordedRequest[];
   readonly downloadRequests: RecordedRequest[];
+  readonly projectRequests: RecordedRequest[];
   readonly createdTaskId: string | undefined;
   seedTask(task: Partial<MockVideoTask> & { id: string }): void;
+  seedProject(project: MockCourseProject): MockCourseProject;
+  project(id: string): MockCourseProject | undefined;
   setTaskStatus(
     taskId: string,
     status: MockVideoTaskStatus,
@@ -120,14 +138,14 @@ function brief(task: MockVideoTask) {
     task_type: task.task_type ?? "ai_image",
     status: task.status,
     progress: task.progress,
-    title: null,
+    title: task.title ?? null,
     error_message: task.error_message ?? null,
     retry_count: 0,
     dirty_frames: task.dirty_frames ?? [],
-    created_at: now(),
-    updated_at: now(),
-    thumbnail_url: null,
-    artifact_missing: false,
+    created_at: task.created_at ?? null,
+    updated_at: task.updated_at ?? null,
+    thumbnail_url: task.thumbnail_url ?? null,
+    artifact_missing: task.artifact_missing ?? false,
     cost: null,
     currency: null,
     course_project_id: task.course_project_id ?? null,
@@ -166,27 +184,56 @@ function parseBody(route: Route): unknown {
  */
 export function mockVideoAPI(page: Page): MockVideoAPI {
   const tasks = new Map<string, MockVideoTask>();
+  const projects = new Map<string, MockCourseProject>();
   const storyboards = new Map<string, MockStoryboard | undefined>();
   const createRequests: RecordedRequest[] = [];
   const frameUpdateRequests: RecordedRequest[] = [];
   const uploadVisualRequests: RecordedRequest[] = [];
   const renderRequests: RecordedRequest[] = [];
   const downloadRequests: RecordedRequest[] = [];
+  const projectRequests: RecordedRequest[] = [];
   let failCreate: { status: 422 | 503; detail: unknown } | undefined;
   let createdTaskId: string | undefined;
+  let projectSequence = 0;
 
   function seedTask(input: Partial<MockVideoTask> & { id: string }) {
+    const seededAt = now();
     const task: MockVideoTask = {
       status: "draft",
       progress: 0,
       task_type: "ai_image",
       error_message: null,
       dirty_frames: [],
+      created_at: seededAt,
+      updated_at: seededAt,
       ...input,
     };
     tasks.set(task.id, task);
     if (!storyboards.has(task.id)) storyboards.set(task.id, undefined);
     return task;
+  }
+
+  function seedProject(input: MockCourseProject) {
+    const seededAt = now();
+    const project = {
+      created_at: seededAt,
+      updated_at: seededAt,
+      ...input,
+    };
+    projects.set(project.id, project);
+    return project;
+  }
+
+  function projectResponse(project: MockCourseProject) {
+    return {
+      user_id: "e2e-user",
+      character_sheets: [],
+      prop_assets: [],
+      voice_id: "",
+      tts_speed: null,
+      subtitle_style: "default",
+      ...project,
+    };
   }
 
   function setTaskStatus(
@@ -227,17 +274,70 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
         failCreate = undefined;
         return json(route, failure.status, { detail: failure.detail });
       }
-      const input = body as { video_type?: string };
+      const input = body as { video_type?: string; title?: string };
       const task = seedTask({
         id: CREATED_TASK_ID,
         status: "processing",
         progress: 10,
         task_type: input.video_type ?? "ai_image",
+        title: input.title ?? null,
         payload: input as Record<string, unknown>,
       });
       storyboards.set(task.id, { status: "generating", progress: 10 });
       createdTaskId = task.id;
       return json(route, 200, [brief(task)]);
+    }
+
+    if (path === "/api/video/projects") {
+      if (method === "GET") {
+        return json(route, 200, [...projects.values()].map(projectResponse));
+      }
+      if (method === "POST") {
+        const body = parseBody(route) as Partial<MockCourseProject>;
+        projectRequests.push({ method, url: path, body });
+        projectSequence += 1;
+        const project = seedProject({
+          id: `project-e2e-${projectSequence}`,
+          title: body.title ?? "未命名项目",
+          visual_style_preset: body.visual_style_preset ?? null,
+          color_palette: body.color_palette ?? null,
+        });
+        return json(route, 200, projectResponse(project));
+      }
+    }
+
+    const projectMatch = /^\/api\/video\/projects\/([^/]+)(?:\/(.*))?$/.exec(
+      path,
+    );
+    if (projectMatch) {
+      const projectId = decodeURIComponent(projectMatch[1] ?? "");
+      const suffix = projectMatch[2] ?? "";
+      const project = projects.get(projectId);
+      if (!project) return json(route, 404, { detail: "Project not found" });
+      if (suffix === "style-anchor-image" && method === "GET") {
+        if (!project.style_anchor_image) {
+          return json(route, 404, { detail: "Anchor image not found" });
+        }
+        return route.fulfill({
+          status: 200,
+          path: `${process.cwd()}/public/course-samples/knowledge-card.webp`,
+          contentType: "image/webp",
+        });
+      }
+      if (!suffix && method === "GET") {
+        return json(route, 200, projectResponse(project));
+      }
+      if (!suffix && method === "PUT") {
+        const body = parseBody(route) as Partial<MockCourseProject>;
+        projectRequests.push({ method, url: path, body });
+        Object.assign(project, body, { updated_at: now() });
+        return json(route, 200, projectResponse(project));
+      }
+      if (!suffix && method === "DELETE") {
+        projectRequests.push({ method, url: path, body: undefined });
+        projects.delete(projectId);
+        return route.fulfill({ status: 204, body: "" });
+      }
     }
 
     if (method === "GET" && path === "/api/video/tasks") {
@@ -294,12 +394,23 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
         return json(route, 200, storyboard);
       }
 
+      if (suffix === "thumbnail" && method === "GET") {
+        if (task.artifact_missing || !task.thumbnail_url) {
+          return json(route, 404, { detail: "Thumbnail not found" });
+        }
+        return route.fulfill({
+          status: 200,
+          path: `${process.cwd()}/public/course-samples/knowledge-card.webp`,
+          contentType: "image/webp",
+        });
+      }
+
       if (suffix === "download" && method === "GET") {
         downloadRequests.push({ method, url: path, body: undefined });
         return route.fulfill({
           status: 200,
+          path: `${process.cwd()}/public/course-samples/image-motion.mp4`,
           contentType: "video/mp4",
-          body: Buffer.from("mock mp4"),
         });
       }
 
@@ -425,10 +536,15 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     uploadVisualRequests,
     renderRequests,
     downloadRequests,
+    projectRequests,
     get createdTaskId() {
       return createdTaskId;
     },
     seedTask,
+    seedProject,
+    project(projectId: string) {
+      return projects.get(projectId);
+    },
     setTaskStatus,
     upsertStoryboard,
     failNextCreate(status: 422 | 503, detail: unknown) {

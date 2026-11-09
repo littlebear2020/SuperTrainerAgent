@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { mockLangGraphAPI } from "./utils/mock-api";
 import { mockVideoAPI, type MockStoryboard } from "./utils/mock-video-api";
 
 const STORYBOARD: MockStoryboard = {
@@ -32,10 +33,11 @@ const STORYBOARD: MockStoryboard = {
 test("video creation navigates to storyboard and polls until frames land", async ({
   page,
 }) => {
+  mockLangGraphAPI(page);
   const api = mockVideoAPI(page);
 
-  await page.goto("/workspace/video-gen");
-  await page.getByRole("button", { name: "新建任务" }).click();
+  await page.goto("/workspace");
+  await page.locator("[data-course-entry='ai_image']").click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

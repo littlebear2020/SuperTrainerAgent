@@ -30,7 +30,11 @@ test.describe("Sidebar navigation", () => {
     ]) {
       await expect(sidebar.locator(`a[href='${href}']`)).toHaveCount(0);
     }
-    await expect(sidebar.getByText("最近的对话", { exact: true })).toBeVisible();
-    await expect(sidebar.getByText("设置和更多", { exact: true })).toBeVisible();
+    await expect(
+      sidebar.getByText("最近的对话", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      sidebar.getByText("设置和更多", { exact: true }),
+    ).toBeVisible();
   });
 });

@@ -164,7 +164,11 @@ describe("CourseProjectPage assets", () => {
       expect(text).not.toContain(forbidden);
     }
     const grid = container.querySelector("[data-testid='course-project-grid']");
-    for (const className of ["grid-cols-1", "sm:grid-cols-2", "xl:grid-cols-3"]) {
+    for (const className of [
+      "grid-cols-1",
+      "sm:grid-cols-2",
+      "xl:grid-cols-3",
+    ]) {
       expect(grid?.className).toContain(className);
     }
   });

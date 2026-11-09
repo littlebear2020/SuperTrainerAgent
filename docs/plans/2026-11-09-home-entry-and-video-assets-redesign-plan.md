@@ -1,6 +1,6 @@
 # 首页与视频资产页重构实施计划
 
-> **状态**：未执行（待用户评审）
+> **状态**：已执行（任务 1–7 完成，代码已提交；部署待进行；[执行记录](../changelog/changelog-2026-11-09-home-entry-and-video-assets-redesign.md)）
 > **TL;DR**：将首页改为视频课/图文课双入口与六张创作卡，将视频页改为“我的作品/我的资产”；AI 创建框按入口初始化且关闭即卸载，作品仅前端筛选 ready 的 `ai_image/ai_video`、每次加载 6 个且最多最近 100 个；只改前端与 `public/course-samples/` 优化媒体，不改后端、API、数据库或部署数据结构。
 
 > **For agentic workers**：必须使用 `subagent-driven-development`（推荐）或 `executing-plans` 逐任务实施；所有步骤用 checkbox 顺序勾选，禁止跳步、并行改共享文件或先写实现后补失败证据。
@@ -119,24 +119,24 @@
   - `useCreateTaskForm` 接收同名可选参数，只用于 `taskType` 的 `useState` 初值；组件挂载后用户仍可通过既有 `handleTypeChange` 切换全部既有类型。
 - Later: Task 2 首页只传 `ai_image` 或 `ai_video`，并依赖关闭卸载来获得全新表单 state。
 
-- [ ] **Step 1：先写失败测试**
+- [x] **Step 1：先写失败测试**
 
 新建 `video-gen-create-dialog-initial-type.dom.test.tsx`，沿用现有 create-dialog 测试的完整 hooks mock，至少覆盖：
 - `initializes ai_video from initialTaskType`：以 `open={true} initialTaskType="ai_video"` 渲染，视频类型 trigger 显示 `TYPE_CONFIG.ai_video.label`，且不显示 `ai_image` 的选中态。
 - `initializes ai_image and defaults to ai_image`：分别显式传 `ai_image` 与不传 prop 两次全新 mount，均显示 `TYPE_CONFIG.ai_image.label`。
 - `does not rewrite task type on ordinary rerender`：同一 mount 内模拟用户切到另一既有类型后，以相同 `initialTaskType` 重渲染，断言用户选择未被 prop 重置；本计划只要求“初始值”，不得做成受控 `taskType`。
 
-- [ ] **Step 2：运行并确认因接口缺失而失败**
+- [x] **Step 2：运行并确认因接口缺失而失败**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/video-gen-create-dialog-initial-type.dom.test.tsx`
 
 Expected: FAIL；TypeScript/运行时尚不接受 `initialTaskType`，AI 视频用例仍显示默认 `AI 生图`。若失败是 mock 缺导出，先补齐 harness 再重跑，直到看到上述功能原因。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 在 `video-gen-create-dialog.tsx` 定义并导出上述联合类型，给 `CreateTaskDialog` 与 `useCreateTaskForm` 的参数增加 `initialTaskType = "ai_image"`，将现有 `useState<...>("ai_image")` 改为使用该初值并向下传递 prop。不要加 effect 监听 prop，不改 `handleTypeChange`、提交 payload、表单重置或其他类型标签。
 
-- [ ] **Step 4：运行定向与相邻回归并确认通过**
+- [x] **Step 4：运行定向与相邻回归并确认通过**
 
 Run:
 ```bash
@@ -147,7 +147,7 @@ pnpm exec vitest run --project node tests/unit/video-gen-create-payload.test.ts
 
 Expected: 全部 PASS；旧创建框调用方无需修改，payload 测试无变化。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/video-gen/video-gen-create-dialog.tsx frontend/tests/unit/components/workspace/video-gen/video-gen-create-dialog-initial-type.dom.test.tsx
@@ -188,7 +188,7 @@ git commit -m "feat(video-gen): 支持创建对话框指定初始 AI 任务类�
   - `t.workspace.home.courseItems[id]` 提供 `title/description/badge/mediaAlt`；`videoCourse/textCourse` 与 hero 新键在三种 locale 文件中同形。
 - Later: Task 7 E2E 以六 ID、Agent URL 和 AI 初始类型为行为契约。
 
-- [ ] **Step 1：先写失败测试**
+- [x] **Step 1：先写失败测试**
 
 `home-course-catalog.test.ts`：
 - `exposes exactly six confirmed routes in stable order`：`HOME_COURSE_ITEMS.map(i => i.id)` 精确等于六 ID 顺序；视频课前三、图文课后三。
@@ -208,7 +208,7 @@ git commit -m "feat(video-gen): 支持创建对话框指定初始 AI 任务类�
 
 将 `workspace-home-i18n.dom.test.tsx` 的过期 hero/专家网格断言更新为新契约：en-US 下双入口、六卡片、hero 与近期项目自有文案无 CJK，zh-CN 显示指定命名；保留 `workspace-home.test.ts` 原样，验证 `matchAgent/ROUTING_RULES` 未删。
 
-- [ ] **Step 2：运行并确认失败**
+- [x] **Step 2：运行并确认失败**
 
 Run:
 ```bash
@@ -219,7 +219,7 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/home-course-e
 
 Expected: 新 catalog 文件/组件不存在，旧首页没有六入口、条件创建框与新 i18n，故新用例 FAIL；旧 `matchAgent` 用例应 PASS，并作为后续兼容基线。
 
-- [ ] **Step 3：最小实现与媒体转码**
+- [x] **Step 3：最小实现与媒体转码**
 
 先实现静态目录和双入口：
 - `home-course-catalog.tsx` 只保存上述配置；`home-course-entry.tsx` 本地 `activeEntry` 默认 `video`，两个入口用 `aria-expanded/aria-controls`，panel 用 `role=region`，卡片用真实 `<button>`。视频不设无条件 `autoPlay`，由 effect 根据当前 panel、`document.hidden`、`prefers-reduced-motion` 调 `play/pause`；监听 media preference 与 visibility 变化并清理。失败 overlay 用 `role=status`，不拦截卡片点击。
@@ -239,7 +239,7 @@ ffmpeg -hide_banner -y -i "/Users/littlebear/Documents/trainer ai/temp/supertrai
 ```
 不得使用 `cp` 复制 MP4/PNG。若三个 5 秒起点不具代表性，只可调整 `-ss`，仍须保持 10 秒输出并人工看过首/中/尾帧；不得放宽编码、尺寸和体积门槛。
 
-- [ ] **Step 4：运行功能测试与 ffprobe 验收并确认通过**
+- [x] **Step 4：运行功能测试与 ffprobe 验收并确认通过**
 
 Run:
 ```bash
@@ -257,7 +257,7 @@ ffprobe -v error -show_entries stream=codec_name,width,height -of json public/co
 
 Expected: 测试全部 PASS；每段 MP4 `codec_name=h264`、`width=960`、`pix_fmt=yuv420p`、`duration` 在 8–12 秒、`size` 在 1,048,576–2,097,152 字节，音轨检查为空且每个 `test` 退出 0；知识卡 WebP 宽不超过 960。用浏览器/抽帧人工确认画面不是黑帧、不是重复错误段，三个样例与各自入口语义相符；`git status --short` 不得出现 Demo 文件改动或 `course-samples` 之外的新媒体。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/home-course-catalog.tsx frontend/src/components/workspace/home-course-entry.tsx frontend/src/components/workspace/workspace-home.tsx frontend/src/core/i18n/locales/types.ts frontend/src/core/i18n/locales/zh-CN.ts frontend/src/core/i18n/locales/en-US.ts frontend/public/course-samples frontend/tests/unit/components/workspace/home-course-catalog.test.ts frontend/tests/unit/components/workspace/home-course-entry.dom.test.tsx frontend/tests/unit/components/workspace/workspace-home-course-entry.dom.test.tsx frontend/tests/unit/components/workspace/workspace-home-i18n.dom.test.tsx
@@ -283,7 +283,7 @@ git commit -m "feat(workspace): 重构首页双入口并加入优化课程样例
 - Produces: `WORKSPACE_NAV_ITEMS.map(i => i.href) === ["/workspace/video-gen", "/workspace/console"]`，两者保留 `includeInPalette: true`，因此 `PALETTE_NAV_ITEMS` 同样只含这两个可见页面；`videoGen` 中文为“视频资产”，`dashboard` 中文为“首页”。
 - Compatibility: `WorkspaceNavItem`、`isNavItemActive` 签名不变，console 的 `labelRole` 与管理员/普通用户文案不变；隐藏页深链不删。
 
-- [ ] **Step 1：先写失败测试（更新旧导航断言）**
+- [x] **Step 1：先写失败测试（更新旧导航断言）**
 
 将 `agents-nav-entry.dom.test.tsx` 的套件改为“侧边栏可见入口收敛”，断言：
 - `only video assets and console remain in route navigation`：两个 href 精确存在，`/workspace/chats`、`/workspace/agents`、`/workspace/gallery`、`/workspace/twins/voice`、`/workspace/writer`、`/workspace/assets` 均不存在。
@@ -291,7 +291,7 @@ git commit -m "feat(workspace): 重构首页双入口并加入优化课程样例
 - `palette follows the same visible page set`：`PALETTE_NAV_ITEMS` 精确为视频资产与 console。
 - `sidebar.spec.ts` 改为真实浏览器断言首页、视频资产、console 可见，六个隐藏入口不可见，最近对话区域和“设置和更多”仍存在；不得只测数组而漏实际侧栏。
 
-- [ ] **Step 2：运行并确认旧导航导致失败**
+- [x] **Step 2：运行并确认旧导航导致失败**
 
 Run:
 ```bash
@@ -302,11 +302,11 @@ pnpm exec playwright test tests/e2e/sidebar.spec.ts
 
 Expected: FAIL，旧数组仍渲染 chats/agents 等入口且文案为“工作台/视频”；header 精确高亮基线应继续 PASS。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 删除 `nav-routes.ts` 中六个隐藏项及已不再使用的 lucide import，保留 `videoGen`、console 和既有类型/匹配函数；不要添加另一份硬编码侧栏。locale 只改 `sidebar.dashboard = 首页/Home`、`sidebar.videoGen = 视频资产/Video assets`，不删除其他翻译键。`workspace-header.tsx` 保持精确高亮与链接，只更新过时的“工作台恢复”注释。不得改最近对话、设置和路由文件。
 
-- [ ] **Step 4：运行定向回归并确认通过**
+- [x] **Step 4：运行定向回归并确认通过**
 
 Run:
 ```bash
@@ -318,7 +318,7 @@ node scripts/check_i18n_keys.mjs
 
 Expected: 全部 PASS；管理员/普通用户 console 文案测试不退化，i18n key 对照无缺失。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/core/workspace/nav-routes.ts frontend/src/components/workspace/workspace-header.tsx frontend/src/core/i18n/locales/zh-CN.ts frontend/src/core/i18n/locales/en-US.ts frontend/tests/unit/components/workspace/agents-nav-entry.dom.test.tsx frontend/tests/e2e/sidebar.spec.ts
@@ -344,7 +344,7 @@ git commit -m "feat(workspace): 收敛侧边栏为首页与视频资产"
   - 可选 `className` 通过 `cn()` 合并三种分支的默认尺寸，供 Task 5 传大封面；缺省 DOM 外观与旧测试一致。
 - Must not produce: 新 recompose 文件、新 `useRecomposeTask` 调用点或任何 `TaskCard` props 改动。
 
-- [ ] **Step 1：先写失败测试**
+- [x] **Step 1：先写失败测试**
 
 `task-thumbnail.dom.test.tsx`：
 - `supports large card class without changing fallback semantics`：直接从新路径渲染，传大尺寸 `className`，断言 img/missing/placeholder 三分支和 `onError → placeholder`、`url` 变化复位；这些断言可与旧测试共用 harness，但不能删除旧路径测试。
@@ -353,17 +353,17 @@ git commit -m "feat(workspace): 收敛侧边栏为首页与视频资产"
   - 页面仍包含 `useRecomposeTask(task.id`、`recomposeActionFor(task)`、`recomposeMut.mutate()`、`RecomposeConfirmDialog`，且这些字符串仍位于 `export function TaskCard` 之后的源码区。
   - 新 `task-thumbnail.tsx` 不含 `recompose`，防止以抽组件为名搬走重合成。
 
-- [ ] **Step 2：运行并确认失败**
+- [x] **Step 2：运行并确认失败**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/task-thumbnail.dom.test.tsx && pnpm exec vitest run --project node tests/unit/components/workspace/video-gen/video-gen-page-source-guard.test.ts`
 
 Expected: 新模块不存在或 re-export/静态断言 FAIL；不要用删除静态用例来通过。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 把旧 `TaskThumbnail` 实现移到新文件，只增加 `className` 与 `cn()`；页面保留 `TaskCard` 的 `<TaskThumbnail url={task.thumbnail_url} artifactMissing={task.artifact_missing} />`，添加 import/re-export。逐字保留 `TaskCard` 内 recompose hook、retry action、确认框和注释，不调整其位置到其他文件。
 
-- [ ] **Step 4：运行新旧缩略图与 recompose 回归并确认通过**
+- [x] **Step 4：运行新旧缩略图与 recompose 回归并确认通过**
 
 Run:
 ```bash
@@ -374,7 +374,7 @@ pnpm exec vitest run --project node tests/unit/components/workspace/video-gen/ta
 
 Expected: 全部 PASS，尤其旧文件仍从 `video-gen-page` 成功导入 `TaskThumbnail`，重合成确认前零副作用。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/video-gen/task-thumbnail.tsx frontend/src/components/workspace/video-gen/video-gen-page.tsx frontend/tests/unit/components/workspace/video-gen/task-thumbnail.dom.test.tsx frontend/tests/unit/components/workspace/video-gen/video-gen-page-source-guard.test.ts
@@ -400,7 +400,7 @@ git commit -m "refactor(video-gen): 抽出任务缩略图并保留重合成兼�
 - Local state: `visibleCount` 初始 6，`previewTaskId: string | null`，播放失败按 task id 记录；不请求新分页 API。
 - Later: Task 7 从 `useVideoTasks()` 传 `data ?? []`、`isLoading`、`isError`、`refetch`。
 
-- [ ] **Step 1：先写失败测试**
+- [x] **Step 1：先写失败测试**
 
 `completed-video-grid.test.ts`：
 - `filters only ready ai_image and ai_video`：混种 `remotion_course/vimax/failed/draft/running`，结果只含指定 ready AI 两类。
@@ -415,7 +415,7 @@ git commit -m "refactor(video-gen): 抽出任务缩略图并保留重合成兼�
 - `playback error replaces player with honest fallback`：dispatch `error` 后出现“视频预览暂不可用”，页面不崩溃、下载仍可点；空标题/空日期显示“未命名作品/更新时间未知”，无 `Invalid Date`。
 - loading、empty、error+retry 各有明确状态，不把 error 当空列表。
 
-- [ ] **Step 2：运行并确认模块缺失导致失败**
+- [x] **Step 2：运行并确认模块缺失导致失败**
 
 Run:
 ```bash
@@ -426,11 +426,11 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/com
 
 Expected: FAIL，`completed-video-grid` 尚不存在。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 在新组件中先写两个纯函数再写 UI：筛选完成后立即截最近 100，本地分页只切已筛选数组。作品网格与 `CourseProjectPage` 共用 `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3`，保证我的作品与我的资产同卡宽，两个作品左对齐、第三列自然留空。卡片用 `TaskThumbnail`，类型映射固定 `ai_image → 图片动效`、`ai_video → AI视频`，ready 标签复用既有状态文案，更新时间用 `formatDateTime(updated_at ?? created_at)`。查看仅对 actionable 卡片展开该 id 的 controls 播放器；下载不猜扩展名。missing 卡片保留但操作不可用，播放失败以状态块替代播放器。加载更多按 `min(visibleCount + 6, 100)` 更新，不显示额外统计面板。
 
-- [ ] **Step 4：运行定向与缩略图回归并确认通过**
+- [x] **Step 4：运行定向与缩略图回归并确认通过**
 
 Run:
 ```bash
@@ -441,7 +441,7 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/com
 
 Expected: 全部 PASS；没有修改 API/types/hooks，没有 recompose diff。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/video-gen/completed-video-grid.tsx frontend/tests/unit/components/workspace/video-gen/completed-video-grid.test.ts frontend/tests/unit/components/workspace/video-gen/completed-video-grid.dom.test.tsx
@@ -467,7 +467,7 @@ git commit -m "feat(video-gen): 新增我的作品网格与本地加载更多"
 - Cover component：按 candidates 顺序渲染，当前图 `onError` 推进下一张，全部失败后显示色块；project id/candidates 改变时重置失败状态。
 - Later: Task 7 E2E mock 必须支持锚图、项目 CRUD 和更新后的列表。
 
-- [ ] **Step 1：先写失败测试**
+- [x] **Step 1：先写失败测试**
 
 `course-project-cover.test.ts`：
 - `prioritizes anchor then style preview then color`：有锚图+已知风格时数组精确为锚图 serve URL、风格预览 URL；无锚图时首项风格预览；未知风格无预览；主色缺省返回 `#eef2ff`。
@@ -479,7 +479,7 @@ git commit -m "feat(video-gen): 新增我的作品网格与本地加载更多"
 - `opens existing detail for edit and passes onSelect for create`：点卡片渲染 `CourseProjectDetailPage(projectId)`；新建对话框 `onSelect(project)` 后选择新项目 id，从而复用创建后关闭并进入详情的既有能力。
 - loading、empty、error 状态诚实；detail 的 dirty guard/delete confirm 旧测试不删。
 
-- [ ] **Step 2：运行并确认失败**
+- [x] **Step 2：运行并确认失败**
 
 Run:
 ```bash
@@ -490,11 +490,11 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/cou
 
 Expected: FAIL，当前页面只有色条与“点击编辑详情”，没有封面候选、更新时间和新测试导出。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 只重构 `CourseProjectPage` 列表层：保留 `selectedId` 和 `CourseProjectDetailPage` 原调用；头部改“我的资产”，使用与作品网格一致的 `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3` 和三级封面，保证两个视图同卡宽。卡片显示真实标题、风格 label、`updated_at ?? created_at` 和“编辑项目”。`CourseProjectDialog` 增加 `onSelect={(project) => setSelectedId(project.id)}`，不修改其内部创建/删除逻辑。按 `updated_at ?? created_at` 在前端新到旧排序，空日期最后；不新增统计、关联视频封面或预览聚合。同步更新旧的“课程项目/色条”局部注释。
 
-- [ ] **Step 4：运行定向与项目 CRUD 回归并确认通过**
+- [x] **Step 4：运行定向与项目 CRUD 回归并确认通过**
 
 Run:
 ```bash
@@ -505,7 +505,7 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/cou
 
 Expected: 全部 PASS；编辑未保存内容不被 refetch 覆盖，删除仍需二次确认。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/video-gen/course-project-page.tsx frontend/tests/unit/components/workspace/video-gen/course-project-cover.test.ts frontend/tests/unit/components/workspace/video-gen/course-project-page.dom.test.tsx
@@ -537,7 +537,7 @@ git commit -m "feat(video-gen): 将课程项目网格重构为我的资产"
   - `MockCourseProject` 字段为 `id: string`、`title: string`、`visual_style_preset?: string | null`、`color_palette?: Record<string, string | number | undefined> | null`、`style_anchor_image?: string | null`、`created_at?: string`、`updated_at?: string`；`MockVideoAPI` 增加 `seedProject(project: MockCourseProject): MockCourseProject`、`project(id: string): MockCourseProject | undefined`、`projectRequests: RecordedRequest[]`。支持 `GET/POST /api/video/projects`、`GET/PUT/DELETE /api/video/projects/:id`。
   - mock 的 `GET .../thumbnail` 与 `GET .../style-anchor-image` 返回 `public/course-samples/knowledge-card.webp`，missing/无锚图时 404；`GET .../download` 返回 `public/course-samples/image-motion.mp4` 的真实字节，不再返回 `Buffer.from("mock mp4")`。
 
-- [ ] **Step 1：先写失败的行为测试与 mock 契约断言**
+- [x] **Step 1：先写失败的行为测试与 mock 契约断言**
 
 `home-course-entry.spec.ts` 至少包含以下 Playwright 测试（用 `mockLangGraphAPI` + `mockVideoAPI`，Agent 新页只断言 URL/既有页面壳，不提交付费任务）：
 1. `six confirmed entries open the right agent or AI dialog`：默认视频课三卡，切图文课三卡；四个 Agent URL 精确，两个 AI 对话框初始类型精确。六入口都必须实际点击，不能只读配置。
@@ -556,7 +556,7 @@ git commit -m "feat(video-gen): 将课程项目网格重构为我的资产"
 7. `video preview error and mobile tabs degrade honestly`：播放器 error 后出现“视频预览暂不可用”；390×844 无水平溢出，两个 tabs、加载更多、新建/编辑按钮可用。
 8. 更新既有创建入口契约：`/workspace/video-gen` 不再显示旧“新建任务”按钮；`video-gen-create-flow.spec.ts` 等相关用例改为从首页 AI 卡进入创建框，随后仍验证原有 payload、提交、分镜与错误状态，不通过保留旧按钮规避测试变更。
 
-- [ ] **Step 2：运行并确认集成前失败**
+- [x] **Step 2：运行并确认集成前失败**
 
 Run:
 ```bash
@@ -567,13 +567,13 @@ pnpm exec vitest run --project node tests/unit/components/workspace/video-gen/vi
 
 Expected: 新 E2E FAIL：旧 VideoGenPage 无双 tabs/作品网格，mock 无项目 CRUD/真实媒体；首页六入口测试若有个别选择器或 mock 问题，先修测试直到能区分真实功能失败。静态 recompose 守卫应 PASS。
 
-- [ ] **Step 3：最小实现**
+- [x] **Step 3：最小实现**
 
 - `VideoGenPage` 用本地双 tabs 组合两个既有/新组件，隐藏原标题、说明、类别 Tabs 和旧“新建任务”按钮，不再显示原页头；`CreateTaskDialog` 仍保留可复用，创建入口由首页承担。删除主函数不再使用的旧列表过滤、previewTaskId/deleteMut 代码，但不删除导出 `TaskCard` 及其 recompose。切换 tab 条件卸载，避免后台播放与隐藏面板查询；不用 URL query 或持久化。
 - 扩充 `mock-video-api.ts` 上述字段与路由。项目路由放在 task 路由之前，POST 创建确定 id、PUT 更新同一 map、DELETE 二次请求后移除；React Query invalidate 后 GET 返回最新值。`brief()` 使用播种的 title/thumbnail/timestamps/missing，静态媒体用 `route.fulfill({ path, contentType })` 读取 `process.cwd()/public/course-samples/...`。
 - 不修改现有 API/types/hooks，不加查询参数，不用 mock 统计数据迎合 UI；既有 `vg-created-e2e` processing 任务在新作品中自然被过滤，但创建后跳分镜逻辑不变。
 
-- [ ] **Step 4：运行定向行为与兼容回归并确认通过**
+- [x] **Step 4：运行定向行为与兼容回归并确认通过**
 
 Run:
 ```bash
@@ -585,7 +585,7 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/tas
 
 Expected: 全部 PASS；六入口、双 tabs、AI 交替无残留、ready 过滤、6→12、查看/下载、missing 阻断、无虚构字段、移动端和播放失败均有真实浏览器结果，旧创建/分镜/recompose 兼容不退化。
 
-- [ ] **Step 5：运行全量门禁**
+- [x] **Step 5：运行全量门禁**
 
 按根长命令规范依次执行（不得让多个 build 共用同一 `.next`）：
 ```bash
@@ -607,13 +607,13 @@ Expected:
 - 若 perf 超预算，先优化本批 import/条件挂载；仍必须改预算时停止并带测量结果回用户评审，不得直接抬线。若出现基准已有的 unrelated 红，记录原始失败与 `git diff`，不得顺手修范围外问题。
 - 检查 `git status --short` 和 `git diff --name-only 2f4848b840bd14b60511bb92d2b10f59b4f1a0db`（包含尚未提交的工作树改动）：无 backend、v3、数据库、docker、锁文件、Demo 改动，无测试生成的 report/log 被暂存；删除本次运行产生且交付不需要的未跟踪输出，保留 `.next/performance-results.json` 仅作本地证据，不提交。
 
-- [ ] **Step 6：写执行 changelog 并更新计划**
+- [x] **Step 6：写执行 changelog 并更新计划**
 
 - 按实际执行日创建唯一 changelog，TL;DR 不超过 5 行，写清影响面、部署仅需 frontend、无迁移；「验收记录」逐行使用 `命令 → 实际输出关键行`，包括 ffprobe、定向测试、全量 `pnpm check/test/test:e2e/perf:check`、根 `make check`、docs convention 与行为级用例，禁止预写“全绿”或粘贴臆测数字。
 - 勾选本计划已完成步骤，只修改顶部原状态行为 `已执行（任务 1–7...）` 并链接 changelog，不新增第二个状态头。若部署尚未执行，状态与 changelog 必须明确“代码已执行、部署待进行”，不能把未部署写成已上线。
 - 再跑 `python3 scripts/check_docs_convention.py` 确认唯一状态头、TL;DR、命名和 changelog 验收记录形态通过。
 
-- [ ] **Step 7：提交**
+- [x] **Step 7：提交**
 
 ```bash
 git add frontend/src/components/workspace/video-gen/video-gen-page.tsx frontend/tests/e2e/utils/mock-video-api.ts frontend/tests/e2e/home-course-entry.spec.ts frontend/tests/e2e/video-assets.spec.ts docs/plans/2026-11-09-home-entry-and-video-assets-redesign-plan.md "docs/changelog/changelog-$(date +%F)-home-entry-and-video-assets-redesign.md"
@@ -664,9 +664,9 @@ git commit -m "feat(video-gen): 完成视频资产双视图与行为验收"
 
 ## 完成前最终检查单
 
-- [ ] 七个任务均按“失败测试 → 确认失败 → 最小实现 → 确认通过 → 提交”顺序勾选，每次失败原因属于该任务。
-- [ ] `matchAgent/ROUTING_RULES` 与 `WORKFLOWS` 保留，recompose 未移动，旧深链未删；没有用隐藏旧 DOM 维持过期测试。
-- [ ] 只新增四个优化媒体到 `frontend/public/course-samples/`，ffprobe 与体积全部合格，Demo 目录零修改。
-- [ ] 六入口、双 tabs、AI 无残留、ready 过滤、6/100、missing 操作门控、下载/查看、字段诚实、移动端、reduced motion、播放失败均有行为证据。
-- [ ] `pnpm check`、`pnpm test`、`pnpm test:e2e`、`pnpm perf:check`、根 `make check`、docs convention 全部实际通过；无 backend pytest 要求，无 backend diff。
-- [ ] changelog 验收记录是真实命令输出，计划只有唯一状态头；部署与回滚均只涉及 frontend 镜像，回滚为纯 revert、无迁移。
+- [x] 七个任务均按“失败测试 → 确认失败 → 最小实现 → 确认通过 → 提交”顺序勾选，每次失败原因属于该任务。
+- [x] `matchAgent/ROUTING_RULES` 与 `WORKFLOWS` 保留，recompose 未移动，旧深链未删；没有用隐藏旧 DOM 维持过期测试。
+- [x] 只新增四个优化媒体到 `frontend/public/course-samples/`，ffprobe 与体积全部合格，Demo 目录零修改。
+- [x] 六入口、双 tabs、AI 无残留、ready 过滤、6/100、missing 操作门控、下载/查看、字段诚实、移动端、reduced motion、播放失败均有行为证据。
+- [x] `pnpm check`、`pnpm test`、`pnpm test:e2e`、`pnpm perf:check`、根 `make check`、docs convention 全部实际通过；无 backend pytest 要求，无 backend diff。
+- [x] changelog 验收记录是真实命令输出，计划只有唯一状态头；部署与回滚均只涉及 frontend 镜像，回滚为纯 revert、无迁移。

@@ -43,14 +43,14 @@ describe("TaskThumbnail extracted component", () => {
     expect(image?.className).toContain("aspect-video h-auto w-full");
     await act(async () => image?.dispatchEvent(new Event("error")));
     expect(
-      container.querySelector("[data-testid='thumbnail-placeholder']")?.className,
+      container.querySelector("[data-testid='thumbnail-placeholder']")
+        ?.className,
     ).toContain("aspect-video h-auto w-full");
 
     await render({ url: "/api/video/tasks/b/thumbnail" });
     expect(
-      container.querySelector<HTMLImageElement>(
-        "[data-testid='thumbnail-img']",
-      )?.src,
+      container.querySelector<HTMLImageElement>("[data-testid='thumbnail-img']")
+        ?.src,
     ).toContain("/api/video/tasks/b/thumbnail");
 
     await render({ url: "/private/anchor", artifactMissing: true });

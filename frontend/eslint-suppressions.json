@@ -150,11 +150,6 @@
       "count": 1
     }
   },
-  "src/components/workspace/video-gen/video-gen-page.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/workspace/video-gen/video-gen-storyboard.tsx": {
     "react-hooks/refs": {
       "count": 13

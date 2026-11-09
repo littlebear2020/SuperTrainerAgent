@@ -12,8 +12,12 @@ describe("HOME_COURSE_ITEMS", () => {
       "ppt-master",
       "co-writer",
     ]);
-    expect(HOME_COURSE_ITEMS.slice(0, 3).every((item) => item.entry === "video")).toBe(true);
-    expect(HOME_COURSE_ITEMS.slice(3).every((item) => item.entry === "text")).toBe(true);
+    expect(
+      HOME_COURSE_ITEMS.slice(0, 3).every((item) => item.entry === "video"),
+    ).toBe(true);
+    expect(
+      HOME_COURSE_ITEMS.slice(3).every((item) => item.entry === "text"),
+    ).toBe(true);
   });
 
   it("maps agent entries and AI entries without inventing remotion_course route", () => {
@@ -24,7 +28,9 @@ describe("HOME_COURSE_ITEMS", () => {
       "ppt-master",
       "co-writer",
     ]);
-    const aiItems = HOME_COURSE_ITEMS.filter((item) => item.kind === "video-task");
+    const aiItems = HOME_COURSE_ITEMS.filter(
+      (item) => item.kind === "video-task",
+    );
     expect(aiItems.map((item) => item.initialTaskType)).toEqual([
       "ai_image",
       "ai_video",

@@ -64,7 +64,7 @@ function CourseMedia({
   if (item.media.kind === "ppt") {
     return (
       <div
-        className="from-indigo-50 to-background relative aspect-video overflow-hidden bg-gradient-to-br p-8"
+        className="to-background relative aspect-video overflow-hidden bg-gradient-to-br from-indigo-50 p-8"
         role="img"
         aria-label={copy.mediaAlt}
       >
@@ -84,7 +84,7 @@ function CourseMedia({
   }
   return (
     <div
-      className="from-amber-50 to-background aspect-video bg-gradient-to-br p-8"
+      className="to-background aspect-video bg-gradient-to-br from-amber-50 p-8"
       role="img"
       aria-label={copy.mediaAlt}
     >

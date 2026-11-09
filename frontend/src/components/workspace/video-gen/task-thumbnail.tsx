@@ -39,10 +39,7 @@ export function TaskThumbnail({
         src={url}
         alt=""
         onError={() => setFailedUrl(url)}
-        className={cn(
-          "h-9 w-16 shrink-0 rounded-lg object-cover",
-          className,
-        )}
+        className={cn("h-9 w-16 shrink-0 rounded-lg object-cover", className)}
       />
     );
   }

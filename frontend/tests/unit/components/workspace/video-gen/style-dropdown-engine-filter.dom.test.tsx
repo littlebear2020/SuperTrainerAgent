@@ -115,7 +115,7 @@ vi.mock("@/components/ui/select", async () => {
   };
 });
 
-import { VideoGenPage } from "@/components/workspace/video-gen/video-gen-page";
+import { CreateTaskDialog } from "@/components/workspace/video-gen/video-gen-create-dialog";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -184,10 +184,7 @@ describe("T1: 创建对话框风格下拉按引擎分表（组件接线）", () 
 
   async function openDialogAndExpandAdvanced() {
     await act(async () => {
-      root.render(<VideoGenPage />);
-    });
-    await act(async () => {
-      findButton(document.body, "新建任务").click();
+      root.render(<CreateTaskDialog open={true} onOpenChange={vi.fn()} />);
     });
     expect(document.body.textContent).toContain("创建视频任务");
     await act(async () => {

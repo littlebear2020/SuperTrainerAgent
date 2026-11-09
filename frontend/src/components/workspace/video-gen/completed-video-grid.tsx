@@ -75,14 +75,20 @@ export function CompletedVideoGrid({
 
   if (isLoading) {
     return (
-      <div role="status" className="rounded-2xl border border-dashed p-10 text-center">
+      <div
+        role="status"
+        className="rounded-2xl border border-dashed p-10 text-center"
+      >
         正在加载作品…
       </div>
     );
   }
   if (isError) {
     return (
-      <div role="alert" className="rounded-2xl border border-dashed p-10 text-center">
+      <div
+        role="alert"
+        className="rounded-2xl border border-dashed p-10 text-center"
+      >
         <p>作品加载失败，请稍后重试</p>
         {onRetry ? (
           <Button variant="outline" className="mt-4" onClick={onRetry}>
@@ -96,7 +102,10 @@ export function CompletedVideoGrid({
   const works = selectCompletedWorks(tasks);
   if (works.length === 0) {
     return (
-      <div role="status" className="rounded-2xl border border-dashed p-10 text-center">
+      <div
+        role="status"
+        className="rounded-2xl border border-dashed p-10 text-center"
+      >
         暂无已完成作品
       </div>
     );
@@ -127,7 +136,7 @@ export function CompletedVideoGrid({
               <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="min-w-0 truncate font-semibold">
-                    {task.title || "未命名作品"}
+                    {task.title?.trim() ? task.title : "未命名作品"}
                   </h3>
                   <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
                     {getVideoTaskStatusLabel(task.status, task.progress)}
@@ -191,7 +200,10 @@ export function CompletedVideoGrid({
             variant="outline"
             onClick={() =>
               setVisibleCount((count) =>
-                Math.min(count + COMPLETED_WORK_PAGE_SIZE, COMPLETED_WORK_LIMIT),
+                Math.min(
+                  count + COMPLETED_WORK_PAGE_SIZE,
+                  COMPLETED_WORK_LIMIT,
+                ),
               )
             }
           >

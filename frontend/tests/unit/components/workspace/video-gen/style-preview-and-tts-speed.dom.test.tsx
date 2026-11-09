@@ -153,7 +153,7 @@ vi.mock("@/components/ui/select", async () => {
   };
 });
 
-import { VideoGenPage } from "@/components/workspace/video-gen/video-gen-page";
+import { CreateTaskDialog } from "@/components/workspace/video-gen/video-gen-create-dialog";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -217,10 +217,9 @@ function ttsSpeedControls() {
 
 async function openDialogFillScriptAndExpandAdvanced() {
   await act(async () => {
-    rootRef.current!.render(<VideoGenPage />);
-  });
-  await act(async () => {
-    findButton(document.body, "新建任务").click();
+    rootRef.current!.render(
+      <CreateTaskDialog open={true} onOpenChange={vi.fn()} />,
+    );
   });
   // fixed 模式 canSubmit 需要 script 非空
   await act(async () => {

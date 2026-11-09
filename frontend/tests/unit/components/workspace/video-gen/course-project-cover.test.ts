@@ -53,10 +53,12 @@ describe("course project cover", () => {
       courseProjectStyleLabel(project({ visual_style_preset: "3D render" })),
     ).toBe("3D 渲染");
     expect(
-      courseProjectStyleLabel(project({ visual_style_preset: "unknown-custom" })),
+      courseProjectStyleLabel(
+        project({ visual_style_preset: "unknown-custom" }),
+      ),
     ).toBe("unknown-custom");
-    expect(courseProjectStyleLabel(project({ visual_style_preset: null }))).toBe(
-      "未设置风格",
-    );
+    expect(
+      courseProjectStyleLabel(project({ visual_style_preset: null })),
+    ).toBe("未设置风格");
   });
 });

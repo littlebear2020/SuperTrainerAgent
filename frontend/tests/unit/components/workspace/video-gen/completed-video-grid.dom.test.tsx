@@ -57,7 +57,11 @@ describe("CompletedVideoGrid", () => {
 
   async function render(
     tasks: VideoTaskBrief[],
-    props: { isLoading?: boolean; isError?: boolean; onRetry?: () => void } = {},
+    props: {
+      isLoading?: boolean;
+      isError?: boolean;
+      onRetry?: () => void;
+    } = {},
   ) {
     await act(async () => {
       root.render(<CompletedVideoGrid tasks={tasks} {...props} />);
@@ -66,18 +70,33 @@ describe("CompletedVideoGrid", () => {
 
   it("renders six then loads six more without another request", async () => {
     const onRetry = vi.fn();
-    await render(Array.from({ length: 12 }, (_, i) => task(String(i + 1))), {
-      onRetry,
-    });
-    expect(container.querySelectorAll("[data-testid='completed-work-card']")).toHaveLength(6);
+    await render(
+      Array.from({ length: 12 }, (_, i) => task(String(i + 1))),
+      {
+        onRetry,
+      },
+    );
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(6);
     const grid = container.querySelector("[data-testid='completed-work-grid']");
-    for (const className of ["grid-cols-1", "sm:grid-cols-2", "xl:grid-cols-3"]) {
+    for (const className of [
+      "grid-cols-1",
+      "sm:grid-cols-2",
+      "xl:grid-cols-3",
+    ]) {
       expect(grid?.className).toContain(className);
     }
     expect(grid?.className).toContain("justify-start");
     await act(async () => button("加载更多").click());
-    expect(container.querySelectorAll("[data-testid='completed-work-card']")).toHaveLength(12);
-    expect(Array.from(container.querySelectorAll("button")).some((item) => item.textContent === "加载更多")).toBe(false);
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(12);
+    expect(
+      Array.from(container.querySelectorAll("button")).some(
+        (item) => item.textContent === "加载更多",
+      ),
+    ).toBe(false);
     expect(onRetry).not.toHaveBeenCalled();
   });
 
@@ -98,7 +117,19 @@ describe("CompletedVideoGrid", () => {
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
       "/api/video/tasks/1/thumbnail",
     );
-    for (const forbidden of ["99", "88", "77", "66", "时长", "分辨率", "完成时间", "项目统计", "花费", "系统健康", "Invalid Date"]) {
+    for (const forbidden of [
+      "99",
+      "88",
+      "77",
+      "66",
+      "时长",
+      "分辨率",
+      "完成时间",
+      "项目统计",
+      "花费",
+      "系统健康",
+      "Invalid Date",
+    ]) {
       expect(text).not.toContain(forbidden);
     }
   });

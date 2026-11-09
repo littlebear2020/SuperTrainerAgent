@@ -20,8 +20,8 @@ const STORYBOARD: MockStoryboard = {
 };
 
 async function openCreateDialog(page: Page) {
-  await page.goto("/workspace/video-gen");
-  await page.getByRole("button", { name: "新建任务" }).click();
+  await page.goto("/workspace");
+  await page.locator("[data-course-entry='ai_image']").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("视频类型")).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("video-gen error states", () => {
       timeout: 5_000,
     });
     await expect(dialog).toBeVisible();
-    await expect(page).toHaveURL(/\/workspace\/video-gen$/);
+    await expect(page).toHaveURL(/\/workspace$/);
   });
 
   test("create 503 reports the remotion pool outage and stays on the dialog", async ({
@@ -68,7 +68,7 @@ test.describe("video-gen error states", () => {
       timeout: 5_000,
     });
     await expect(dialog).toBeVisible();
-    await expect(page).toHaveURL(/\/workspace\/video-gen$/);
+    await expect(page).toHaveURL(/\/workspace$/);
   });
 
   test("storyboard 404 shows the load error state", async ({ page }) => {

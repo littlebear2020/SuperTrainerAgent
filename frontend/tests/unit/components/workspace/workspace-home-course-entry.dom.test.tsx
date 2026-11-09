@@ -38,9 +38,8 @@ vi.mock("@/components/workspace/project-list", () => ({
 }));
 
 vi.mock("@/components/workspace/home-course-entry", async () => {
-  const { HOME_COURSE_ITEMS } = await import(
-    "@/components/workspace/home-course-catalog"
-  );
+  const { HOME_COURSE_ITEMS } =
+    await import("@/components/workspace/home-course-catalog");
   return {
     HomeCourseEntry: ({
       onSelect,
@@ -63,7 +62,9 @@ vi.mock("@/components/workspace/video-gen/video-gen-create-dialog", () => ({
     h.dialogProps.push(props);
     return (
       <div data-testid="create-task-dialog">
-        <button onClick={() => (props.onOpenChange as (open: boolean) => void)(false)}>
+        <button
+          onClick={() => (props.onOpenChange as (open: boolean) => void)(false)}
+        >
           关闭创建框
         </button>
       </div>
@@ -121,11 +122,15 @@ describe("WorkspaceHome course entries", () => {
   });
 
   it("AI dialog is conditionally unmounted between alternating entries", async () => {
-    expect(document.querySelector("[data-testid='create-task-dialog']")).toBeNull();
+    expect(
+      document.querySelector("[data-testid='create-task-dialog']"),
+    ).toBeNull();
     await act(async () => entryButton("ai_image").click());
     expect(h.dialogProps.at(-1)?.initialTaskType).toBe("ai_image");
     await act(async () => entryButton("关闭创建框").click());
-    expect(document.querySelector("[data-testid='create-task-dialog']")).toBeNull();
+    expect(
+      document.querySelector("[data-testid='create-task-dialog']"),
+    ).toBeNull();
 
     await act(async () => entryButton("ai_video").click());
     expect(h.dialogProps.at(-1)?.initialTaskType).toBe("ai_video");

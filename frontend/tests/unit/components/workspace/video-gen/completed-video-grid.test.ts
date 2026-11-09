@@ -77,16 +77,25 @@ describe("selectCompletedWorks", () => {
       task("b", { created_at: "2026-01-01T00:00:00Z" }),
       task("a", { created_at: "2026-01-01T00:00:00Z" }),
     ];
-    expect(selectCompletedWorks(ties).map((item) => item.id)).toEqual(["a", "b"]);
-    expect(selectCompletedWorks([...ties].reverse()).map((item) => item.id)).toEqual(["a", "b"]);
+    expect(selectCompletedWorks(ties).map((item) => item.id)).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(
+      selectCompletedWorks([...ties].reverse()).map((item) => item.id),
+    ).toEqual(["a", "b"]);
   });
 });
 
 describe("canPreviewOrDownload", () => {
   it("gates preview and download on ready and non-missing", () => {
-    expect(canPreviewOrDownload({ status: "ready", artifact_missing: true })).toBe(false);
+    expect(
+      canPreviewOrDownload({ status: "ready", artifact_missing: true }),
+    ).toBe(false);
     expect(canPreviewOrDownload({ status: "ready" })).toBe(true);
-    expect(canPreviewOrDownload({ status: "ready", artifact_missing: false })).toBe(true);
+    expect(
+      canPreviewOrDownload({ status: "ready", artifact_missing: false }),
+    ).toBe(true);
     expect(canPreviewOrDownload({ status: "failed" })).toBe(false);
   });
 });

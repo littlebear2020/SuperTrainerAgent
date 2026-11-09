@@ -2,15 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { mockLangGraphAPI } from "./utils/mock-api";
 
-// 现役 6 agent 卡片名（2026-09-22 工作台恢复，R1 僵尸卡守卫）。
-const ACTIVE_AGENT_CARDS = [
-  "视频课程专家",
-  "VIMAX 视频大师",
-  "PPT Master",
-  "创意工作",
-  "协同写作专家",
-  "课程助理",
-];
+const HOME_VIDEO_ENTRIES = ["course-video", "ai_image", "ai_video"];
+const HOME_TEXT_ENTRIES = ["creative-studio", "ppt-master", "co-writer"];
 
 // DSN-003b（2026-09-14）：默认语言改中文——Playwright 全新 context 无
 // localStorage 语言偏好，走默认 zh-CN，CTA 显示「进入工作台」。正则取
@@ -51,17 +44,17 @@ test.describe("Landing page", () => {
       enterWorkspace.click(),
     ]);
 
-    // 2026-09-22 工作台恢复：/workspace 直接渲染九宫格工作台首页（hero +
-    // 专家 Agent 网格 + 近期项目），不再 307 跳转 course-assistant。URL 断言
-    // 必须整串精确——后缀式断言（/\/workspace$/）会被 /login?next=%2Fworkspace
-    // 假匹配。
+    // /workspace 直接渲染双入口首页；URL 必须精确，防止把登录跳转误判为成功。
     await page.waitForURL("**/workspace");
     await expect(page).toHaveURL("/workspace");
     await expect(page.getByText("想创造什么？")).toBeVisible();
 
-    // R1 守卫：恰好现役 6 张 agent 卡，无退役 agent 僵尸卡。
-    for (const cardName of ACTIVE_AGENT_CARDS) {
-      await expect(page.getByRole("heading", { name: cardName })).toBeVisible();
+    for (const id of HOME_VIDEO_ENTRIES) {
+      await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
+    }
+    await page.getByRole("button", { name: /图文课/ }).click();
+    for (const id of HOME_TEXT_ENTRIES) {
+      await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
     }
   });
 });

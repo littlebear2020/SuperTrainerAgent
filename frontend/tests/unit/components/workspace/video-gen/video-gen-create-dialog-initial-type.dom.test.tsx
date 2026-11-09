@@ -117,12 +117,8 @@ function taskTypeSelect(): HTMLSelectElement {
 
 async function changeTaskType(value: string) {
   const select = taskTypeSelect();
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLSelectElement.prototype,
-    "value",
-  )?.set;
   await act(async () => {
-    setter?.call(select, value);
+    Reflect.set(select, "value", value);
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }

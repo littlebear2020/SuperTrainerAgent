@@ -13,6 +13,8 @@
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { mockLangGraphAPI } from "./utils/mock-api";
+
 // ── Mock data ──────────────────────────────────────────────────────────
 
 const MOCK_TASK_ID = "vg-e2e-0001";
@@ -206,6 +208,17 @@ function mockVideoGenAPI(page: Page) {
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
 
+  void page.route("**/api/video/projects", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  void page.route("**/api/video/providers", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ image: [], video: [] }),
+    }),
+  );
+
   // Task list
   void page.route("**/api/video/tasks", (route) => {
     if (route.request().method() === "GET") {
@@ -342,8 +355,9 @@ function mockVideoGenAPI(page: Page) {
 
 test.describe("Video Gen — Create Task Dialog", () => {
   test.beforeEach(async ({ page }) => {
+    mockLangGraphAPI(page);
     mockVideoGenAPI(page);
-    await page.goto("/workspace/video-gen");
+    await page.goto("/workspace");
     // Wait for page to hydrate
     await page.waitForLoadState("networkidle");
   });
@@ -351,7 +365,7 @@ test.describe("Video Gen — Create Task Dialog", () => {
   test("language selector shows Chinese and English options", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "新建任务" }).click();
+    await page.locator("[data-course-entry='ai_image']").click();
     await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
 
     // Language label should be visible
@@ -361,7 +375,7 @@ test.describe("Video Gen — Create Task Dialog", () => {
   test("BGM dropdown shows built-in tracks in advanced settings", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "新建任务" }).click();
+    await page.locator("[data-course-entry='ai_image']").click();
     await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
 
     // Open advanced settings
@@ -389,7 +403,7 @@ test.describe("Video Gen — Create Task Dialog", () => {
   test("BGM track is actually clickable inside the dialog (not just visible)", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "新建任务" }).click();
+    await page.locator("[data-course-entry='ai_image']").click();
     await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
     await page.getByText("高级设置").click();
 

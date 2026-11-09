@@ -55,7 +55,11 @@ function CourseProjectCover({ project }: { project: CourseProject }) {
   return (
     <img
       src={src}
-      alt={candidateIndex === 0 && project.style_anchor_image ? "项目风格锚图" : "项目风格示意图"}
+      alt={
+        candidateIndex === 0 && project.style_anchor_image
+          ? "项目风格锚图"
+          : "项目风格示意图"
+      }
       className="aspect-video w-full object-cover"
       loading="lazy"
       onError={() => setCandidateIndex((index) => index + 1)}
@@ -107,9 +111,7 @@ export function CourseProjectPage({
           <FolderOpen className="h-5 w-5 text-indigo-500" />
           我的资产
         </h2>
-        <CourseProjectDialog
-          onSelect={(project) => setSelectedId(project.id)}
-        >
+        <CourseProjectDialog onSelect={(project) => setSelectedId(project.id)}>
           <Button size="sm">
             <Plus className="mr-1 h-4 w-4" />
             新建项目
@@ -118,7 +120,10 @@ export function CourseProjectPage({
       </div>
 
       {projectsQ.isLoading ? (
-        <p role="status" className="text-muted-foreground py-8 text-center text-sm">
+        <p
+          role="status"
+          className="text-muted-foreground py-8 text-center text-sm"
+        >
           正在加载资产…
         </p>
       ) : projectsQ.isError ? (

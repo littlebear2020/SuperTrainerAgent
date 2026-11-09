@@ -2,22 +2,15 @@
 
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Film,
   Loader2,
   Pencil,
   Play,
-  Plus,
   RefreshCw,
   Trash2,
-  Upload,
-  Volume2,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 
 import {
   AlertDialog,
@@ -31,70 +24,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { BetaBadge } from "@/components/workspace/beta-badge";
-import {
-  SpeedSliderControl,
-  VolumeSliderControl,
-} from "@/components/workspace/video-gen/audio-sliders";
 import { CourseProjectPage } from "@/components/workspace/video-gen/course-project-page";
-import { CourseProjectSelect } from "@/components/workspace/video-gen/course-project-select";
 import { RecomposeConfirmDialog } from "@/components/workspace/video-gen/video-gen-recompose-dialog";
 import { formatDateTime } from "@/core/utils/datetime";
 import { formatCost } from "@/core/utils/format";
-import { getVideoDownloadUrl } from "@/core/video-gen/api";
 import {
-  useBGMList,
-  useProviders,
-  useBGMUpload,
-  useCourseProjects,
-  useDefaultVoice,
-  useDeleteVideoTask,
-  useExtractScript,
   useRecomposeTask,
-  useSubmitVideo,
   useVideoTasks,
-  useVideoVoices,
   getStallWarning,
 } from "@/core/video-gen/hooks";
-import {
-  OUTPUT_FORMAT_OPTIONS,
-  type UiOutputFormat,
-} from "@/core/video-gen/output-formats";
-import {
-  buildProviderOptions,
-  DEFAULT_PROVIDER_VALUE,
-  providerFieldForTaskType,
-  providerValueToPayload,
-} from "@/core/video-gen/provider-options";
 import { recomposeActionFor } from "@/core/video-gen/resume-actions";
-import {
-  STYLE_PRESETS,
-  styleAfterTypeChange,
-  stylePreviewImage,
-  taskStyleOptions,
-} from "@/core/video-gen/style-presets";
-import {
-  SUBTITLE_STYLES,
-  type SubtitleStyle,
-  isSubtitleStyle,
-} from "@/core/video-gen/subtitle-styles";
 import {
   getVideoTaskStatusLabel,
   isTerminalVideoTaskStatus,
@@ -103,27 +42,14 @@ import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import { cn } from "@/lib/utils";
 
-import { shouldShowStyleSelector } from "./style-visibility";
+import { CompletedVideoGrid } from "./completed-video-grid";
 import { TaskThumbnail } from "./task-thumbnail";
-import { CreateTaskDialog } from "./video-gen-create-dialog";
 export { CreateTaskDialog, TYPE_CONFIG } from "./video-gen-create-dialog";
 export { TaskThumbnail } from "./task-thumbnail";
 
-// ── Task type tabs ──────────────────────────────────────────────────────
-
 const TABS = [
-  { value: "all", label: "全部" },
-  { value: "ai_image", label: "AI 生图" },
-  { value: "ai_video", label: "AI 生视频" },
-  // T-F1（D1，2026-09-09 feedback-round1）：入口归一——「文字动效」提交即走
-  // remotion_course 管线（course-standard 模板渲染）；原 chat-handoff 入口
-  // 彻底隐藏（不留二级入口），Agent Chat 能力保留在 Agent 工作台。
-  { value: "remotion_course", label: "文字动效" },
-  // R2-2（2026-10-07，D4 拍板）：「文字动效（旧）」tab 整体下线——存量
-  // chat-handoff 任务在「全部」tab 仍可见（task_type 联合类型与
-  // task-type-label 的「文字动效（旧）」标注保留，防存量任务渲染崩溃）。
-  { value: "vimax", label: "ViMax 故事" },
-  { value: "projects", label: "项目" },
+  { value: "works", label: "我的作品" },
+  { value: "assets", label: "我的资产" },
 ] as const;
 
 // ── Status badges ───────────────────────────────────────────────────────
@@ -353,107 +279,70 @@ export function TaskCard({
 
 export function VideoGenPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<string>("all");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("works");
   const tasksQuery = useVideoTasks();
-  const deleteMut = useDeleteVideoTask();
 
-  // Templates/projects tabs render their content IN-PLACE within the shell
-  // (see Tab content below) — do NOT early-return, that drops the header/tabs.
-
-  const filtered =
-    tab === "all"
-      ? tasksQuery.data
-      : tasksQuery.data?.filter((t) => t.task_type === tab);
+  const selectTab = (next: (typeof TABS)[number]["value"]) => {
+    setTab(next);
+    document.getElementById(`video-assets-tab-${next}`)?.focus();
+  };
 
   return (
-    <div className="scrollbar-none flex size-full flex-col overflow-y-auto p-6">
-      <div className="mx-auto w-full max-w-4xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-lg font-bold">
-              <Film className="h-5 w-5 text-indigo-500" />
-              视频
-              <BetaBadge />
-            </h1>
-            <p className="text-muted-foreground mt-1 text-xs">
-              AI 生图、AI 生视频、Remotion 渲染、ViMax 故事
-            </p>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} size="sm">
-            <Plus className="mr-1 h-4 w-4" />
-            新建任务
-          </Button>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-border/50 bg-muted/30 flex gap-1 rounded-lg border p-1">
-          {TABS.map((t) => (
+    <div className="scrollbar-none flex size-full flex-col overflow-y-auto p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <h1 className="text-lg font-bold">视频资产</h1>
+        <div
+          role="tablist"
+          aria-label="视频资产视图"
+          className="border-border/50 bg-muted/30 flex w-fit gap-1 rounded-lg border p-1"
+        >
+          {TABS.map((item) => (
             <button
-              key={t.value}
-              onClick={() => setTab(t.value)}
+              key={item.value}
+              id={`video-assets-tab-${item.value}`}
+              role="tab"
+              aria-selected={tab === item.value}
+              aria-controls={`video-assets-panel-${item.value}`}
+              tabIndex={tab === item.value ? 0 : -1}
+              onClick={() => setTab(item.value)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                  event.preventDefault();
+                  selectTab(tab === "works" ? "assets" : "works");
+                }
+              }}
               className={cn(
-                "flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                tab === t.value
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                tab === item.value
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {t.label}
+              {item.label}
             </button>
           ))}
         </div>
-
-        {/* Tab content — shell (header/tabs/new-task) always renders; only this area swaps */}
-        {tab === "projects" ? (
-          <CourseProjectPage
-            onOpenTask={(taskId) =>
-              router.push(`/workspace/video-gen/${taskId}`)
-            }
-          />
-        ) : (
-          <div className="space-y-2">
-            {tasksQuery.isLoading && (
-              <p className="text-muted-foreground py-8 text-center text-sm">
-                加载中...
-              </p>
-            )}
-            {filtered?.length === 0 && (
-              <p className="text-muted-foreground py-8 text-center text-sm">
-                暂无任务，点击&ldquo;新建任务&rdquo;开始
-              </p>
-            )}
-            {filtered?.map((task) => (
-              <div key={task.id}>
-                <TaskCard
-                  task={task}
-                  onDelete={(id) => deleteMut.mutate(id)}
-                  previewTaskId={previewTaskId}
-                  setPreviewTaskId={setPreviewTaskId}
-                  onNavigate={(id, path) =>
-                    router.push(
-                      `/workspace/video-gen/${id}${path ? `/${path}` : ""}`,
-                    )
-                  }
-                />
-                {previewTaskId === task.id && task.status === "ready" && (
-                  <div className="border-border/50 mt-2 overflow-hidden rounded-lg border bg-black">
-                    <video
-                      controls
-                      className="max-h-[50vh] w-full"
-                      src={getVideoDownloadUrl(task.id)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <div
+          id={`video-assets-panel-${tab}`}
+          role="tabpanel"
+          aria-labelledby={`video-assets-tab-${tab}`}
+        >
+          {tab === "works" ? (
+            <CompletedVideoGrid
+              tasks={tasksQuery.data ?? []}
+              isLoading={tasksQuery.isLoading}
+              isError={tasksQuery.isError}
+              onRetry={() => void tasksQuery.refetch()}
+            />
+          ) : (
+            <CourseProjectPage
+              onOpenTask={(taskId) =>
+                router.push(`/workspace/video-gen/${taskId}`)
+              }
+            />
+          )}
+        </div>
       </div>
-
-      <CreateTaskDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

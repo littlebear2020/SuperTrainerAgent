@@ -13,6 +13,8 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
+import { mockLangGraphAPI } from "./utils/mock-api";
+
 const MOCK_VOICES = [
   {
     id: "zh-CN-YunjianNeural",
@@ -52,6 +54,16 @@ function mockVideoGenAPI(page: Page) {
   void page.route("**/api/video/templates**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
+  void page.route("**/api/video/projects", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  void page.route("**/api/video/providers", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ image: [], video: [] }),
+    }),
+  );
   void page.route("**/api/video/tasks", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -67,13 +79,14 @@ function mockVideoGenAPI(page: Page) {
 
 test.describe("video-gen create dialog — advanced panel + width", () => {
   test.beforeEach(async ({ page }) => {
+    mockLangGraphAPI(page);
     mockVideoGenAPI(page);
-    await page.goto("/workspace/video-gen");
+    await page.goto("/workspace");
     await page.waitForLoadState("networkidle");
   });
 
   test("advanced settings expand and reveal all controls", async ({ page }) => {
-    await page.getByRole("button", { name: "新建任务" }).click();
+    await page.locator("[data-course-entry='ai_image']").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 5_000 });
     await expect(dialog.getByText("视频类型")).toBeVisible();

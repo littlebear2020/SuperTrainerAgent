@@ -86,7 +86,9 @@ describe("workspace-home course entry i18n", () => {
     for (const copy of ["Poster design", "PPT creation", "Article writing"]) {
       expect(expandedText).toContain(copy);
     }
-    expect(CJK.test(expandedText), `en-US contains CJK: ${expandedText}`).toBe(false);
+    expect(CJK.test(expandedText), `en-US contains CJK: ${expandedText}`).toBe(
+      false,
+    );
     expect(container.querySelector("input")).toBeNull();
     expect(expandedText).not.toContain("Super agents ready");
   });

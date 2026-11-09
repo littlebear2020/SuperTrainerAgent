@@ -123,7 +123,7 @@ vi.mock("@/components/ui/select", async () => {
   };
 });
 
-import { VideoGenPage } from "@/components/workspace/video-gen/video-gen-page";
+import { CreateTaskDialog } from "@/components/workspace/video-gen/video-gen-create-dialog";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -187,10 +187,7 @@ describe("创建对话框诚实化（EP1-5/FP2-11/FP2-20）", () => {
 
   async function openDialogAndExpandAdvanced() {
     await act(async () => {
-      root.render(<VideoGenPage />);
-    });
-    await act(async () => {
-      findButton(document.body, "新建任务").click();
+      root.render(<CreateTaskDialog open={true} onOpenChange={vi.fn()} />);
     });
     expect(document.body.textContent).toContain("创建视频任务");
     await act(async () => {
@@ -232,10 +229,7 @@ describe("创建对话框诚实化（EP1-5/FP2-11/FP2-20）", () => {
 
   it("脚本上传 accept 含 .pdf（FP2-20，后端已支持解析）", async () => {
     await act(async () => {
-      root.render(<VideoGenPage />);
-    });
-    await act(async () => {
-      findButton(document.body, "新建任务").click();
+      root.render(<CreateTaskDialog open={true} onOpenChange={vi.fn()} />);
     });
 
     const input = document.body.querySelector<HTMLInputElement>(
@@ -247,10 +241,7 @@ describe("创建对话框诚实化（EP1-5/FP2-11/FP2-20）", () => {
 
   it("vimax fixed 的目标时长在主表单，未展开高级设置也可见（E1）", async () => {
     await act(async () => {
-      root.render(<VideoGenPage />);
-    });
-    await act(async () => {
-      findButton(document.body, "新建任务").click();
+      root.render(<CreateTaskDialog open={true} onOpenChange={vi.fn()} />);
     });
     const typeSelect = findSelectByOption(document.body, "vimax");
     expect(typeSelect).not.toBeNull();

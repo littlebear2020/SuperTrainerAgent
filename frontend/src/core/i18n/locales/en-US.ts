@@ -477,7 +477,8 @@ export const enUS: Translations = {
         },
         ai_image: {
           title: "Image motion",
-          description: "Generate visuals from scripts and bring still images to life",
+          description:
+            "Generate visuals from scripts and bring still images to life",
           badge: "AI image",
           mediaAlt: "Image motion sample",
         },
@@ -501,7 +502,8 @@ export const enUS: Translations = {
         },
         "co-writer": {
           title: "Article writing",
-          description: "Collaborate on topics, structure, drafts, and revisions",
+          description:
+            "Collaborate on topics, structure, drafts, and revisions",
           badge: "Co-writing",
           mediaAlt: "Decorative article preview",
         },

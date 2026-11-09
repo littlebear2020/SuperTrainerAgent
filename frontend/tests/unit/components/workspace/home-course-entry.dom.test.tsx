@@ -10,8 +10,8 @@ import {
   vi,
 } from "vitest";
 
-import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
 import type { HomeCourseItem } from "@/components/workspace/home-course-catalog";
+import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
 import { translations } from "@/core/i18n/translations";
 
 vi.mock("@/core/i18n/hooks", () => ({
@@ -56,7 +56,9 @@ describe("HomeCourseEntry", () => {
       value: false,
     });
     playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
-    pauseSpy = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    pauseSpy = vi
+      .spyOn(HTMLMediaElement.prototype, "pause")
+      .mockImplementation(() => undefined);
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -107,12 +109,22 @@ describe("HomeCourseEntry", () => {
     expect(playSpy).not.toHaveBeenCalled();
     pauseSpy.mockClear();
 
-    Object.defineProperty(document, "hidden", { configurable: true, value: true });
-    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: true,
+    });
+    await act(async () =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
     expect(pauseSpy).toHaveBeenCalledTimes(3);
 
-    Object.defineProperty(document, "hidden", { configurable: true, value: false });
-    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
+    await act(async () =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
     mediaQuery.matches = false;
     await act(async () => {
       mediaQuery.addEventListener.mock.calls[0]?.[1]?.(new Event("change"));
