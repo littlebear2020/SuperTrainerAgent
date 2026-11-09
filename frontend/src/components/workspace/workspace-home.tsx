@@ -137,7 +137,7 @@ export default function WorkspaceHome() {
             </h2>
             <button
               type="button"
-              onClick={() => router.push("/workspace/agents")}
+              onClick={() => router.push("/workspace/chats")}
               className="text-muted-foreground hover:text-primary text-xs transition-colors"
             >
               {t.workspace.home.viewAll}

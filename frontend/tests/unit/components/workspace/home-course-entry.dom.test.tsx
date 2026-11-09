@@ -89,6 +89,27 @@ describe("HomeCourseEntry", () => {
     expect(document.querySelector("#home-course-panel-text")).toBeNull();
   });
 
+  it("uses demo-style icons arrows and real artwork for text cards", async () => {
+    await render();
+    expect(button("视频课").querySelector("svg")).not.toBeNull();
+    expect(
+      button("Remotion动效").querySelector(
+        "[data-testid='creation-arrow'] svg",
+      ),
+    ).not.toBeNull();
+    await act(async () => button("图文课").click());
+    for (const [title, src] of [
+      ["PPT制作", "/course-samples/ppt-work.webp"],
+      ["文章写作", "/course-samples/article-work.webp"],
+    ] as const) {
+      const card = button(title);
+      expect(card.querySelector("img")?.getAttribute("src")).toBe(src);
+      expect(
+        card.querySelector("[data-testid='creation-arrow']"),
+      ).not.toBeNull();
+    }
+  });
+
   it("switches to text course and pauses hidden panel video", async () => {
     await render();
     expect(playSpy).toHaveBeenCalledTimes(3);
@@ -136,6 +157,28 @@ describe("HomeCourseEntry", () => {
       mediaQuery.addEventListener.mock.calls[0]?.[1]?.(new Event("change"));
     });
     expect(pauseSpy).toHaveBeenCalled();
+  });
+
+  it("ignores play interruption caused by pause", async () => {
+    playSpy.mockRejectedValueOnce(
+      new DOMException("interrupted by pause", "AbortError"),
+    );
+    await render();
+    expect(document.body.textContent).not.toContain("视频暂时无法播放");
+  });
+
+  it("clears a previous failure after media reaches playing", async () => {
+    const video = document.querySelector("video");
+    expect(video).toBeNull();
+    playSpy.mockRejectedValue(new Error("not allowed"));
+    await render();
+    expect(document.body.textContent).toContain("视频暂时无法播放");
+    const current = document.querySelector("video");
+    await act(async () =>
+      current!.dispatchEvent(new Event("playing", { bubbles: true })),
+    );
+    const card = current!.closest("[data-course-entry]");
+    expect(card?.textContent).not.toContain("视频暂时无法播放");
   });
 
   it("play rejection and media error show fallback without disabling entry", async () => {

@@ -9,10 +9,7 @@ export type CourseItemId =
   | "ppt-master"
   | "co-writer";
 
-type HomeCourseMedia =
-  | { kind: "video"; src: string }
-  | { kind: "image"; src: string }
-  | { kind: "ppt" | "article" };
+type HomeCourseMedia = { kind: "video" | "image"; src: string };
 
 type HomeCourseItemBase = {
   id: CourseItemId;
@@ -67,13 +64,13 @@ export const HOME_COURSE_ITEMS: readonly HomeCourseItem[] = [
     entry: "text",
     kind: "agent",
     agentName: "ppt-master",
-    media: { kind: "ppt" },
+    media: { kind: "image", src: "/course-samples/ppt-work.webp" },
   },
   {
     id: "co-writer",
     entry: "text",
     kind: "agent",
     agentName: "co-writer",
-    media: { kind: "article" },
+    media: { kind: "image", src: "/course-samples/article-work.webp" },
   },
 ];

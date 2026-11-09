@@ -42,7 +42,14 @@ describe("HOME_COURSE_ITEMS", () => {
     const externalMedia = HOME_COURSE_ITEMS.flatMap((item) =>
       "src" in item.media ? [item.media.src] : [],
     );
-    expect(externalMedia).toHaveLength(4);
+    expect(externalMedia).toHaveLength(6);
+    expect(externalMedia).toEqual(
+      expect.arrayContaining([
+        "/course-samples/ppt-work.webp",
+        "/course-samples/article-work.webp",
+        "/course-samples/knowledge-card.webp",
+      ]),
+    );
     for (const src of externalMedia) {
       expect(src.startsWith("/course-samples/")).toBe(true);
       expect(src).not.toContain("assets/");

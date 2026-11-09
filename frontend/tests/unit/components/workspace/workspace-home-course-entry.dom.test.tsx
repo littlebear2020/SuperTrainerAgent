@@ -144,6 +144,11 @@ describe("WorkspaceHome course entries", () => {
     ]);
   });
 
+  it("routes view all recent projects to the existing chats search page", async () => {
+    await act(async () => entryButton("查看全部 →").click());
+    expect(h.push).toHaveBeenCalledWith("/workspace/chats");
+  });
+
   it("keeps real recent project list", () => {
     expect(h.projectThreads).toHaveLength(1);
     expect(h.projectThreads[0]).toMatchObject({

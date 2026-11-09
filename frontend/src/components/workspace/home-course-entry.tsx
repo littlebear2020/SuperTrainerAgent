@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, BookOpenText, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
@@ -16,88 +17,50 @@ function CourseMedia({
   failed,
   videoRef,
   onError,
+  onPlaying,
 }: {
   item: HomeCourseItem;
   failed: boolean;
   videoRef?: (element: HTMLVideoElement | null) => void;
   onError: () => void;
+  onPlaying?: () => void;
 }) {
   const { t } = useI18n();
   const copy = t.workspace.home.courseItems[item.id];
-  if (item.media.kind === "video") {
-    return (
-      <div className="bg-muted relative aspect-video overflow-hidden">
+  return (
+    <div className="bg-muted relative aspect-video overflow-hidden">
+      {item.media.kind === "video" ? (
         <video
           ref={videoRef}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.018]"
           src={item.media.src}
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           aria-label={copy.mediaAlt}
           onError={onError}
+          onPlaying={onPlaying}
         />
-        {failed ? (
-          <div
-            role="status"
-            className="bg-background/90 pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-sm"
-          >
-            {t.workspace.home.playbackUnavailable}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-  if (item.media.kind === "image") {
-    return (
-      <div className="bg-muted aspect-video overflow-hidden">
+      ) : (
         <img
           src={item.media.src}
           alt={copy.mediaAlt}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.018]"
           loading="lazy"
         />
-      </div>
-    );
-  }
-  if (item.media.kind === "ppt") {
-    return (
-      <div
-        className="to-background relative aspect-video overflow-hidden bg-gradient-to-br from-indigo-50 p-8"
-        role="img"
-        aria-label={copy.mediaAlt}
-      >
-        <div className="bg-background flex h-full flex-col rounded-lg border p-5 shadow-sm">
-          <span className="h-2 w-16 rounded-full bg-indigo-400" />
-          <span className="mt-5 text-xl font-bold">Course slides</span>
-          <span className="mt-3 h-2 w-4/5 rounded bg-slate-200" />
-          <span className="mt-2 h-2 w-3/5 rounded bg-slate-200" />
-          <div className="mt-auto flex gap-2">
-            <span className="h-10 flex-1 rounded bg-indigo-100" />
-            <span className="h-10 flex-1 rounded bg-pink-100" />
-            <span className="h-10 flex-1 rounded bg-teal-100" />
-          </div>
+      )}
+      <span className="absolute top-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap text-white backdrop-blur-sm">
+        {copy.badge}
+      </span>
+      {failed ? (
+        <div
+          role="status"
+          className="bg-background/90 pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-sm"
+        >
+          {t.workspace.home.playbackUnavailable}
         </div>
-      </div>
-    );
-  }
-  return (
-    <div
-      className="to-background aspect-video bg-gradient-to-br from-amber-50 p-8"
-      role="img"
-      aria-label={copy.mediaAlt}
-    >
-      <div className="bg-background h-full rounded-lg border p-5 shadow-sm">
-        <span className="block text-xs font-semibold tracking-widest text-amber-600 uppercase">
-          Article
-        </span>
-        <span className="mt-4 block text-lg font-bold">A clear story</span>
-        <span className="mt-4 block h-2 w-full rounded bg-slate-200" />
-        <span className="mt-2 block h-2 w-11/12 rounded bg-slate-200" />
-        <span className="mt-2 block h-2 w-4/5 rounded bg-slate-200" />
-        <span className="mt-5 block h-2 w-2/3 rounded bg-slate-100" />
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -137,7 +100,10 @@ export function HomeCourseEntry({
       return;
     }
     for (const video of videos) {
-      video.play().catch(() => {
+      video.play().catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
         const id = video.dataset.courseItem;
         if (id) setFailedMedia((current) => new Set(current).add(id));
       });
@@ -145,25 +111,28 @@ export function HomeCourseEntry({
     return () => videos.forEach((video) => video.pause());
   }, [activeEntry, reducedMotion, pageVisible]);
 
-  const entries: { id: CourseEntryId; label: string; description: string }[] = [
+  const entries = [
     {
-      id: "video",
+      id: "video" as const,
       label: t.workspace.home.videoCourse,
       description: t.workspace.home.videoCourseDescription,
+      icon: Video,
     },
     {
-      id: "text",
+      id: "text" as const,
       label: t.workspace.home.textCourse,
       description: t.workspace.home.textCourseDescription,
+      icon: BookOpenText,
     },
   ];
   const items = HOME_COURSE_ITEMS.filter((item) => item.entry === activeEntry);
 
   return (
     <section aria-label={t.workspace.home.createHeading}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {entries.map((entry) => {
           const active = entry.id === activeEntry;
+          const Icon = entry.icon;
           return (
             <button
               key={entry.id}
@@ -173,15 +142,31 @@ export function HomeCourseEntry({
               aria-controls={`home-course-panel-${entry.id}`}
               onClick={() => setActiveEntry(entry.id)}
               className={cn(
-                "rounded-2xl border p-5 text-left transition-colors",
+                "group relative min-h-32 overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg sm:p-6",
                 active
-                  ? "border-indigo-400 bg-indigo-50/70"
-                  : "bg-background/70 hover:border-indigo-200",
+                  ? "border-indigo-300 bg-gradient-to-br from-white to-indigo-50/80"
+                  : "border-border/70 bg-white/80",
               )}
             >
-              <span className="block text-lg font-semibold">{entry.label}</span>
-              <span className="text-muted-foreground mt-1 block text-sm">
-                {entry.description}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-8 -bottom-16 h-36 w-36 rounded-full bg-indigo-400/10 blur-2xl"
+              />
+              <span className="relative flex items-center justify-between gap-4">
+                <span className="flex min-w-0 items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100/80 text-indigo-600">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-lg font-semibold whitespace-nowrap">
+                      {entry.label}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-sm leading-5">
+                      {entry.description}
+                    </span>
+                  </span>
+                </span>
+                <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-600" />
               </span>
             </button>
           );
@@ -191,17 +176,21 @@ export function HomeCourseEntry({
         id={`home-course-panel-${activeEntry}`}
         role="region"
         aria-labelledby={`home-course-tab-${activeEntry}`}
-        className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3"
+        className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3"
       >
         {items.map((item) => {
           const copy = t.workspace.home.courseItems[item.id];
+          const targetLabel =
+            item.kind === "agent"
+              ? `${item.agentName} Agent`
+              : `video-gen · ${item.initialTaskType}`;
           return (
             <button
               key={item.id}
               type="button"
               data-course-entry={item.id}
               onClick={() => onSelect(item)}
-              className="bg-background group overflow-hidden rounded-2xl border text-left shadow-sm transition-shadow hover:shadow-md"
+              className="group bg-background min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
             >
               <CourseMedia
                 item={item}
@@ -221,16 +210,32 @@ export function HomeCourseEntry({
                 onError={() =>
                   setFailedMedia((current) => new Set(current).add(item.id))
                 }
+                onPlaying={() =>
+                  setFailedMedia((current) => {
+                    if (!current.has(item.id)) return current;
+                    const next = new Set(current);
+                    next.delete(item.id);
+                    return next;
+                  })
+                }
               />
-              <span className="block p-5">
+              <span className="block p-4 sm:p-5">
                 <span className="flex items-center justify-between gap-3">
-                  <span className="text-base font-semibold">{copy.title}</span>
-                  <span className="text-muted-foreground rounded-full bg-slate-100 px-2 py-1 text-xs">
-                    {copy.badge}
+                  <span className="min-w-0 text-base font-semibold whitespace-nowrap">
+                    {copy.title}
+                  </span>
+                  <span
+                    data-testid="creation-arrow"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
+                  >
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </span>
                 </span>
-                <span className="text-muted-foreground mt-2 block text-sm leading-6">
+                <span className="text-muted-foreground mt-2 block min-h-10 text-xs leading-5">
                   {copy.description}
+                </span>
+                <span className="text-muted-foreground mt-3 block truncate text-[11px]">
+                  {targetLabel}
                 </span>
               </span>
             </button>
