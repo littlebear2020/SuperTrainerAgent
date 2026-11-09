@@ -212,16 +212,20 @@ function StylePreviewPanel({ styleValue }: { styleValue: string }) {
  * 2026-10-06 拆分批：创建任务表单状态/逻辑抽为 hook（25+ useState 与全部
  * handler 上提；CreateTaskDialog 只剩 JSX 编排）。返回名册与解构一一对应。
  */
+export type InitialVideoTaskType = "ai_image" | "ai_video";
+
 function useCreateTaskForm({
   open,
   onOpenChange,
+  initialTaskType = "ai_image",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTaskType?: InitialVideoTaskType;
 }) {
   const [taskType, setTaskType] = useState<
     "ai_image" | "ai_video" | "remotion_course" | "vimax"
-  >("ai_image");
+  >(initialTaskType);
   const [mode, setMode] = useState<"fixed" | "generate">("fixed");
   // T7/T6（2026-09-10 独立管线计划）：remotion_course 解析双档 + docx 图片暂存信息
   const [courseParseMode, setCourseParseMode] = useState<
@@ -1622,9 +1626,11 @@ function DialogScriptInput(
 export function CreateTaskDialog({
   open,
   onOpenChange,
+  initialTaskType = "ai_image",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTaskType?: InitialVideoTaskType;
 }) {
   // T-E5（R20）：联合补全 remotion_course——修前 4 值联合 + as 强转把
   // remotion_course 挤到联合外（Select 值实际可为它）。
@@ -1715,7 +1721,7 @@ export function CreateTaskDialog({
     handleTypeChange,
     handleLangChange,
     canSubmit,
-  } = useCreateTaskForm({ open, onOpenChange });
+  } = useCreateTaskForm({ open, onOpenChange, initialTaskType });
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
