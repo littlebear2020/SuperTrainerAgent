@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Trash2,
   Upload,
-  Video,
   Volume2,
   XCircle,
 } from "lucide-react";
@@ -105,8 +104,10 @@ import type { VideoTaskBrief } from "@/core/video-gen/types";
 import { cn } from "@/lib/utils";
 
 import { shouldShowStyleSelector } from "./style-visibility";
+import { TaskThumbnail } from "./task-thumbnail";
 import { CreateTaskDialog } from "./video-gen-create-dialog";
 export { CreateTaskDialog, TYPE_CONFIG } from "./video-gen-create-dialog";
+export { TaskThumbnail } from "./task-thumbnail";
 
 // ── Task type tabs ──────────────────────────────────────────────────────
 
@@ -172,57 +173,6 @@ export function StatusBadge({
       <Icon className={cn("h-3 w-3", spin && "animate-spin")} />
       {getVideoTaskStatusLabel(status, progress)}
     </span>
-  );
-}
-
-// ── Task thumbnail（2026-09-13 死链修复 T4）──────────────────────────────
-
-/**
- * 列表卡缩略图：onError 降级 + 产物缺失标注。
- * - 后端响应层自清后正常路径不再下发死链，onError 是纵深防御（缓存行/竞态窗口）；
- *   出错后本组件内降级占位图标，url 变化时 useEffect 复位（React 复用同节点）。
- * - artifact_missing（后端派生）时不再请求图片，直接显示「产物已清理」。
- */
-export function TaskThumbnail({
-  url,
-  artifactMissing,
-}: {
-  url: string | null;
-  artifactMissing?: boolean;
-}) {
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    setErr(false);
-  }, [url]);
-  if (artifactMissing) {
-    return (
-      <div
-        data-testid="thumbnail-artifact-missing"
-        className="flex h-9 w-16 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-      >
-        产物已清理
-      </div>
-    );
-  }
-  if (url && !err) {
-    return (
-      <img
-        loading="lazy"
-        data-testid="thumbnail-img"
-        src={url}
-        alt=""
-        onError={() => setErr(true)}
-        className="h-9 w-16 shrink-0 rounded-lg object-cover"
-      />
-    );
-  }
-  return (
-    <div
-      data-testid="thumbnail-placeholder"
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30"
-    >
-      <Video className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-    </div>
   );
 }
 
