@@ -5,6 +5,7 @@ import {
   type AgentNewChatGuideId,
 } from "../../src/core/agents/new-chat";
 import { enUS, zhCN } from "../../src/core/i18n/locales";
+
 import { pinEnglishLocale } from "./utils/locale";
 import { mockLangGraphAPI, MOCK_THREAD_ID } from "./utils/mock-api";
 

@@ -153,11 +153,11 @@ vi.mock("@/components/workspace/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+import AgentChatPage from "@/app/workspace/agents/[agent_name]/chats/[thread_id]/page";
 import {
   PromptInputProvider,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
-import AgentChatPage from "@/app/workspace/agents/[agent_name]/chats/[thread_id]/page";
 import { I18nProvider } from "@/core/i18n/context";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
