@@ -209,4 +209,26 @@ test.describe("home course entries", () => {
       ),
     ).toBe(true);
   });
+
+  test("focused AI dialog uses an opaque surface", async ({ page }) => {
+    await page.goto("/workspace");
+    await page.locator("[data-course-entry='ai_image']").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    const surface = await dialog.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+      };
+    });
+    expect(surface.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(surface.backgroundImage).toBe("none");
+    await expect
+      .poll(() =>
+        dialog.evaluate((element) => getComputedStyle(element).opacity),
+      )
+      .toBe("1");
+  });
 });

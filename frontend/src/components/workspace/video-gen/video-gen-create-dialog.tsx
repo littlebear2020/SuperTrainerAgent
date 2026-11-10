@@ -1748,7 +1748,7 @@ export function CreateTaskDialog({
         className={cn(
           "flex max-h-[90vh] flex-col sm:max-w-2xl",
           focused &&
-            "rounded-3xl border-indigo-200/70 bg-gradient-to-b from-white via-indigo-50/40 to-white shadow-2xl",
+            "bg-background rounded-3xl border-indigo-200/70 shadow-2xl",
         )}
       >
         <DialogHeader

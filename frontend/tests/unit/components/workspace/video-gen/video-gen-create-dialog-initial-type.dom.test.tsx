@@ -187,11 +187,10 @@ describe("CreateTaskDialog initialTaskType", () => {
     expect(text).toContain("视频脚本");
     expect(findTaskTypeSelect()).toBeNull();
     expect(text).not.toContain("话题生成");
-    expect(
-      document
-        .querySelector("[role='dialog']")
-        ?.className.includes("from-white"),
-    ).toBe(true);
+    const dialogClass =
+      document.querySelector("[role='dialog']")?.className ?? "";
+    expect(dialogClass).toContain("bg-background");
+    expect(dialogClass).not.toContain("bg-gradient");
 
     const script = document.querySelector("textarea");
     if (!script) throw new Error("script textarea not found");
