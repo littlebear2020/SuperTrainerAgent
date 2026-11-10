@@ -57,6 +57,7 @@ describe("AgentNewChatGuide", () => {
   async function renderGuide({
     agentName = "course-video",
     handoffReady = true,
+    handoffKey = "test-handoff",
     status = "ready",
     disabled = false,
     initialInput = "",
@@ -66,6 +67,7 @@ describe("AgentNewChatGuide", () => {
   }: {
     agentName?: AgentNewChatGuideId;
     handoffReady?: boolean;
+    handoffKey?: string;
     status?: "loading" | "error" | "ready";
     disabled?: boolean;
     initialInput?: string;
@@ -81,6 +83,7 @@ describe("AgentNewChatGuide", () => {
             <AgentNewChatGuide
               agentName={agentName}
               handoffReady={handoffReady}
+              handoffKey={handoffKey}
               status={status}
               disabled={disabled}
               onRetry={onRetry}
@@ -238,6 +241,27 @@ describe("AgentNewChatGuide", () => {
     expect(composer().value).toBe(`我的草稿\n${prompt}`);
     expect(document.activeElement).toBe(composer());
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("invalidates a pending case when the handoff key changes", async () => {
+    await renderGuide({ initialInput: "handoff A" });
+    await click(caseButtons()[0]!);
+    expect(document.body.textContent).toContain("输入框已有内容");
+
+    await renderGuide({
+      initialInput: "handoff A",
+      handoffKey: "changed-handoff",
+      handoffReady: false,
+    });
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+
+    await renderGuide({
+      initialInput: "handoff A",
+      handoffKey: "changed-handoff",
+      handoffReady: true,
+    });
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+    expect(composer().value).toBe("handoff A");
   });
 
   it("does not rewrite a filled draft when the locale changes", async () => {

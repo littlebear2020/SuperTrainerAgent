@@ -56,21 +56,22 @@ export default function AgentChatPage() {
   // remount 丢失状态（见下方 onStart 注释），且会干扰 ?msg= 预填逻辑。
   const agent_name = resolveAgentName(agentNameParam);
   const guideAgentName = isAgentNewChatGuideId(agent_name) ? agent_name : null;
+  const { threadId, setThreadId, isNewThread, setIsNewThread } =
+    useThreadChat();
+  const showGuidedNewChat = isNewThread && guideAgentName !== null;
   const {
     agent,
     isLoading: agentLoading,
     error: agentError,
     refetch: refetchAgent,
-  } = useAgent(agent_name);
+  } = useAgent(agent_name, {
+    preventAutomaticErrorRecovery: showGuidedNewChat,
+  });
   const guideStatus = agentLoading
     ? "loading"
     : agentError || !agent
       ? "error"
       : "ready";
-
-  const { threadId, setThreadId, isNewThread, setIsNewThread } =
-    useThreadChat();
-  const showGuidedNewChat = isNewThread && guideAgentName !== null;
   const [settings, setSettings] = useThreadSettings(threadId);
   const { tokenUsageEnabled, tokenBudgetWarnTokens } = useModels();
   // D3 修订（review #4）：run 结束时递增 → 徽章总量重拉（与后端告警同源的
@@ -258,6 +259,7 @@ export default function AgentChatPage() {
                 <AgentNewChatGuide
                   agentName={guideAgentName}
                   handoffReady={handoffReady}
+                  handoffKey={handoffKey}
                   status={guideStatus}
                   disabled={demoMode}
                   onRetry={() => void refetchAgent()}

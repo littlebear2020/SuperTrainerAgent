@@ -338,8 +338,10 @@ test.describe("Agent new-chat task guides", () => {
     page,
   }) => {
     let allowSuccess = false;
+    let requestCount = 0;
     mockLangGraphAPI(page, { agents: [] });
     await page.route("**/api/agents/course-video", (route) => {
+      requestCount += 1;
       if (!allowSuccess) {
         return route.fulfill({
           status: 500,
@@ -359,7 +361,29 @@ test.describe("Agent new-chat task guides", () => {
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("agent-guide-cases")).toHaveCount(0);
 
+    const settledRequests = requestCount;
     allowSuccess = true;
+    await page.evaluate(async () => {
+      window.dispatchEvent(new Event("focus"));
+      window.dispatchEvent(new Event("online"));
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+    expect(requestCount).toBe(settledRequests);
+    await expect(
+      page.getByText(zhCN.agents.newChatGuide.loadFailed),
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: "首页", exact: true }).click();
+    await expect(page).toHaveURL("/workspace");
+    await page.goBack();
+    await expect(page).toHaveURL("/workspace/agents/course-video/chats/new");
+    await expect(
+      page.getByText(zhCN.agents.newChatGuide.loadFailed),
+    ).toBeVisible();
+    expect(requestCount).toBe(settledRequests);
+
     await page
       .getByRole("button", { name: zhCN.agents.newChatGuide.retry })
       .click();
@@ -397,6 +421,56 @@ test.describe("Agent new-chat task guides", () => {
       releaseAgent?.();
     }
     await expect(page.getByTestId("agent-guide-cases")).toBeVisible();
+  });
+
+  test("dark mode keeps the guide hero readable", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("theme", "dark");
+    });
+    mockGuideAPI(page);
+    await openGuide(page, "course-video");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.documentElement.classList.contains("dark"),
+        ),
+      )
+      .toBe(true);
+
+    const foreground = await page
+      .getByRole("heading", {
+        name: zhCN.agents.newChatGuides["course-video"].title,
+      })
+      .evaluate((element) => getComputedStyle(element).color);
+    const background = await page.evaluate(() =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--blob-root-bg")
+        .trim(),
+    );
+    expect(foreground).toBe("rgb(241, 245, 249)");
+    expect(background).toBe("#040810");
+    const parseRgb = (value: string) =>
+      value.match(/\d+/g)?.map((part) => Number(part)) ?? [];
+    const parseHex = (value: string) =>
+      value
+        .replace("#", "")
+        .match(/[\da-f]{2}/gi)
+        ?.map((part) => parseInt(part, 16)) ?? [];
+    const luminance = (values: number[]) => {
+      const [r = 0, g = 0, b = 0] = values.map((value) => {
+        const channel = value / 255;
+        return channel <= 0.03928
+          ? channel / 12.92
+          : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const foregroundLuminance = luminance(parseRgb(foreground));
+    const backgroundLuminance = luminance(parseHex(background));
+    const contrast =
+      (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+      (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
   });
 
   test("desktop and mobile keep regions separate and keyboard usable", async ({

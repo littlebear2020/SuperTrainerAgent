@@ -572,6 +572,8 @@ const INTERNAL_MARKER_RE = new RegExp(
   "g",
 );
 
+const STAGE_SIGNAL_PREFIXES = ["[[STAGE:OUTLINE]]", "[[STAGE:DRAFT]]"];
+
 /**
  * Strip every known backend-injected marker from message content.
  *
@@ -587,6 +589,9 @@ const INTERNAL_MARKER_RE = new RegExp(
  */
 export function stripInternalMarkers(content: string): string {
   const stripped = content.replace(INTERNAL_MARKER_RE, "").trim();
+  if (STAGE_SIGNAL_PREFIXES.some((prefix) => prefix.startsWith(stripped))) {
+    return "";
+  }
   return parseStageSignal(stripped).text.trim();
 }
 

@@ -311,6 +311,9 @@ export function InputBox({
     }
     activeDraftKeyRef.current = draftKey;
     if (!draftKey) {
+      if (isSwitch && prevKey) {
+        textInput.setInput("");
+      }
       return;
     }
     let saved = "";

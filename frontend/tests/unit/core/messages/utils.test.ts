@@ -187,6 +187,18 @@ describe("stripInternalMarkers — DEF-03 underscore variants", () => {
     );
   });
 
+  it.each(["[", "[[", "[[STAGE:OUT", "[[STAGE:D"])(
+    "withholds a partial leading stage marker: %s",
+    (partial) => {
+      expect(stripInternalMarkers(partial)).toBe("");
+    },
+  );
+
+  it("preserves content once a stage-like prefix diverges", () => {
+    const content = "[[STAGE:OTHER]]\n\n正文";
+    expect(stripInternalMarkers(content)).toBe(content);
+  });
+
   it("preserves a stage-like token embedded in body text", () => {
     const content = "正文提到 [[STAGE:OUTLINE]] 作为示例，不应删除。";
     expect(stripInternalMarkers(content)).toBe(content);

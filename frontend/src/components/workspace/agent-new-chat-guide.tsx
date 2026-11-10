@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 export function AgentNewChatGuide({
   agentName,
   handoffReady,
+  handoffKey,
   status,
   disabled = false,
   onRetry,
@@ -27,6 +28,7 @@ export function AgentNewChatGuide({
 }: {
   agentName: AgentNewChatGuideId;
   handoffReady: boolean;
+  handoffKey: string;
   status: "loading" | "error" | "ready";
   disabled?: boolean;
   onRetry?: () => void;
@@ -34,12 +36,20 @@ export function AgentNewChatGuide({
 }) {
   const { t } = useI18n();
   const { textInput } = usePromptInputController();
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<{
+    prompt: string;
+    handoffKey: string;
+  } | null>(null);
   const guide = t.agents.newChatGuides[agentName];
   const shared = t.agents.newChatGuide;
   const appearance = agentAppearance(agentName);
   const Icon = appearance.icon;
+  const confirmOpen =
+    pendingSelection !== null &&
+    pendingSelection.handoffKey === handoffKey &&
+    handoffReady &&
+    status === "ready" &&
+    !disabled;
 
   const focusComposer = () => {
     const composer = document.querySelector<HTMLTextAreaElement>(
@@ -54,19 +64,29 @@ export function AgentNewChatGuide({
     const current = textInput.value;
     const separator = append && current && !current.endsWith("\n") ? "\n" : "";
     textInput.setInput(append ? current + separator + prompt : prompt);
-    setConfirmOpen(false);
-    setPendingPrompt(null);
+    setPendingSelection(null);
     setTimeout(focusComposer, 0);
   };
 
   const selectCase = (prompt: string) => {
     if (!handoffReady || disabled || status !== "ready") return;
     if (textInput.value.trim()) {
-      setPendingPrompt(prompt);
-      setConfirmOpen(true);
+      setPendingSelection({ prompt, handoffKey });
       return;
     }
     applyPrompt(prompt, false);
+  };
+
+  const applyPending = (append: boolean) => {
+    if (
+      pendingSelection?.handoffKey !== handoffKey ||
+      !handoffReady ||
+      disabled ||
+      status !== "ready"
+    ) {
+      return;
+    }
+    applyPrompt(pendingSelection.prompt, append);
   };
 
   return (
@@ -84,11 +104,11 @@ export function AgentNewChatGuide({
           >
             <Icon className={cn("h-6 w-6", appearance.text)} />
           </span>
-          <p className="text-xs font-medium tracking-[0.18em] text-indigo-500 uppercase">
+          <p className="text-xs font-medium tracking-[0.18em] text-indigo-500 uppercase dark:text-indigo-300">
             {guide.displayName}
           </p>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
               {guide.title}
             </h1>
             <p className="text-muted-foreground mx-auto max-w-2xl text-sm leading-6 sm:text-base">
@@ -100,7 +120,7 @@ export function AgentNewChatGuide({
         {status === "ready" ? (
           <div className="space-y-3">
             <div className="text-center">
-              <h2 className="text-sm font-semibold text-slate-800">
+              <h2 className="text-foreground text-sm font-semibold">
                 {shared.casesTitle}
               </h2>
               <p className="text-muted-foreground mt-1 text-xs">
@@ -118,9 +138,9 @@ export function AgentNewChatGuide({
                   aria-label={item.title}
                   disabled={!handoffReady || disabled}
                   onClick={() => selectCase(item.prompt)}
-                  className="group rounded-2xl border border-indigo-100/80 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                  className="group rounded-2xl border border-indigo-100/80 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/60"
                 >
-                  <span className="block text-sm font-semibold text-slate-900 group-hover:text-indigo-700">
+                  <span className="text-foreground block text-sm font-semibold group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
                     {item.title}
                   </span>
                   <span className="text-muted-foreground mt-1 block text-xs leading-5">
@@ -133,7 +153,7 @@ export function AgentNewChatGuide({
         ) : (
           <div
             role="status"
-            className="rounded-2xl border border-indigo-100/80 bg-white/80 p-5 text-center text-sm text-slate-600"
+            className="text-muted-foreground rounded-2xl border border-indigo-100/80 bg-white/80 p-5 text-center text-sm dark:border-white/10 dark:bg-white/5"
           >
             <p>{status === "loading" ? shared.loading : shared.loadFailed}</p>
             {status === "error" && (
@@ -154,9 +174,9 @@ export function AgentNewChatGuide({
 
         <section
           data-testid="agent-guide-tips"
-          className="rounded-2xl border border-white/70 bg-white/45 px-5 py-4"
+          className="rounded-2xl border border-white/70 bg-white/45 px-5 py-4 dark:border-white/10 dark:bg-white/5"
         >
-          <h2 className="text-xs font-semibold text-slate-700">
+          <h2 className="text-foreground text-xs font-semibold">
             {shared.tipsTitle}
           </h2>
           <ul className="text-muted-foreground mt-2 grid gap-2 text-xs leading-5 sm:grid-cols-3">
@@ -175,8 +195,7 @@ export function AgentNewChatGuide({
       <Dialog
         open={confirmOpen}
         onOpenChange={(open) => {
-          setConfirmOpen(open);
-          if (!open) setPendingPrompt(null);
+          if (!open) setPendingSelection(null);
         }}
       >
         <DialogContent>
@@ -190,28 +209,18 @@ export function AgentNewChatGuide({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setConfirmOpen(false);
-                setPendingPrompt(null);
-              }}
+              onClick={() => setPendingSelection(null)}
             >
               {t.common.cancel}
             </Button>
             <Button
               type="button"
               variant="secondary"
-              onClick={() => {
-                if (pendingPrompt) applyPrompt(pendingPrompt, true);
-              }}
+              onClick={() => applyPending(true)}
             >
               {shared.draftConfirmAppend}
             </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                if (pendingPrompt) applyPrompt(pendingPrompt, false);
-              }}
-            >
+            <Button type="button" onClick={() => applyPending(false)}>
               {shared.draftConfirmReplace}
             </Button>
           </DialogFooter>

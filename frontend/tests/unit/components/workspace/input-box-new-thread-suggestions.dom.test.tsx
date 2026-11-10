@@ -77,11 +77,13 @@ describe("InputBox new-thread suggestion visibility", () => {
     agentSkills,
     threadId = "new",
     initialInput = "",
+    isNewThread = true,
   }: {
     showNewThreadSuggestions?: boolean;
     agentSkills: string[];
     threadId?: string;
     initialInput?: string;
+    isNewThread?: boolean;
   }) {
     await act(async () => {
       root.render(
@@ -90,7 +92,7 @@ describe("InputBox new-thread suggestion visibility", () => {
             <PromptInputProvider initialInput={initialInput}>
               <InputBox
                 threadId={threadId}
-                isNewThread
+                isNewThread={isNewThread}
                 context={{ model_name: "m1", mode: "flash" }}
                 agentSkills={agentSkills}
                 agentSuggestionPrompts={[
@@ -154,5 +156,25 @@ describe("InputBox new-thread suggestion visibility", () => {
       showNewThreadSuggestions: false,
     });
     expect(container.querySelector("textarea")?.value).toBe("handoff");
+  });
+
+  it("clears an existing-thread draft when entering a fresh session", async () => {
+    await renderInput({
+      agentSkills: [],
+      threadId: "existing-thread",
+      initialInput: "旧线程草稿",
+      isNewThread: false,
+      showNewThreadSuggestions: false,
+    });
+    expect(container.querySelector("textarea")?.value).toBe("旧线程草稿");
+
+    await renderInput({
+      agentSkills: [],
+      threadId: "provisional-new",
+      initialInput: "旧线程草稿",
+      isNewThread: true,
+      showNewThreadSuggestions: false,
+    });
+    expect(container.querySelector("textarea")?.value).toBe("");
   });
 });
