@@ -75,17 +75,21 @@ describe("InputBox new-thread suggestion visibility", () => {
   async function renderInput({
     showNewThreadSuggestions,
     agentSkills,
+    threadId = "new",
+    initialInput = "",
   }: {
     showNewThreadSuggestions?: boolean;
     agentSkills: string[];
+    threadId?: string;
+    initialInput?: string;
   }) {
     await act(async () => {
       root.render(
         <I18nProvider initialLocale="zh-CN">
           <ThreadContext.Provider value={{ thread: fakeThread }}>
-            <PromptInputProvider>
+            <PromptInputProvider initialInput={initialInput}>
               <InputBox
-                threadId="new"
+                threadId={threadId}
                 isNewThread
                 context={{ model_name: "m1", mode: "flash" }}
                 agentSkills={agentSkills}
@@ -132,5 +136,23 @@ describe("InputBox new-thread suggestion visibility", () => {
     await renderInput({ agentSkills: [] });
 
     expect(container.textContent).toContain("deep-research");
+  });
+
+  it("does not clear a new-session handoff when its provisional ID changes", async () => {
+    await renderInput({
+      agentSkills: [],
+      threadId: "provisional-1",
+      initialInput: "handoff",
+      showNewThreadSuggestions: false,
+    });
+    expect(container.querySelector("textarea")?.value).toBe("handoff");
+
+    await renderInput({
+      agentSkills: [],
+      threadId: "provisional-2",
+      initialInput: "handoff",
+      showNewThreadSuggestions: false,
+    });
+    expect(container.querySelector("textarea")?.value).toBe("handoff");
   });
 });

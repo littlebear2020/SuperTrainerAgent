@@ -11,12 +11,12 @@ export function useAgents() {
 }
 
 export function useAgent(name: string | null | undefined) {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["agents", name],
     queryFn: () => getAgent(name!),
     enabled: !!name,
   });
-  return { agent: data ?? null, isLoading, error };
+  return { agent: data ?? null, isLoading, error, refetch };
 }
 
 export function useDeleteAgent() {

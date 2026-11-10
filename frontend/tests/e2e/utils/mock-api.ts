@@ -31,11 +31,20 @@ export type MockAgent = {
   name: string;
   description?: string;
   system_prompt?: string;
+  skills?: string[] | null;
+  suggestion_prompts?: { label: string; prompt: string }[] | null;
+};
+
+export type MockSkill = {
+  name: string;
+  description?: string;
+  enabled?: boolean;
 };
 
 export type MockAPIOptions = {
   threads?: MockThread[];
   agents?: MockAgent[];
+  skills?: MockSkill[];
 };
 
 // ---------------------------------------------------------------------------
@@ -50,6 +59,7 @@ export type MockAPIOptions = {
 export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
   const threads = options?.threads ?? [];
   const agents = options?.agents ?? [];
+  const skills = options?.skills ?? [];
 
   // Thread search — sidebar thread list & chats list page
   void page.route("**/api/langgraph/threads/search", (route) => {
@@ -195,6 +205,20 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
   // Run stream — returns a minimal SSE response with an AI message
   void page.route("**/api/langgraph/runs/stream", handleRunStream);
   void page.route("**/api/langgraph/threads/*/runs/stream", handleRunStream);
+
+  // Skills list — target guides suppress this legacy area; non-target regression uses it.
+  void page.route("**/api/skills", (route) => {
+    if (route.request().method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          skills: skills.map((skill) => ({ enabled: true, ...skill })),
+        }),
+      });
+    }
+    return route.fallback();
+  });
 
   // Models list — model picker dropdown
   void page.route("**/api/models", (route) => {

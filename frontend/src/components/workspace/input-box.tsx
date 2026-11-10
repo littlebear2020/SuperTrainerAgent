@@ -277,9 +277,10 @@ export function InputBox({
   // P2-8 草稿持久化：按线程把输入框文本存进 localStorage，切线程/刷新后恢复。controller
   // 是全局单例，切线程时显式把目标线程的草稿 setInput 进去（无草稿则清空，避免上一个
   // 线程的文本串台）。initialValue prop 是历史死代码（无调用方），无需让路。
-  // "new"（未保存的新会话占位）不持久化——所有新会话共用 draft:new 会串台，且一旦创建
-  // 就拿到真实 id（B4-3）。
-  const draftKey = threadId && threadId !== "new" ? `draft:${threadId}` : null;
+  // 未保存的新会话不持久化：即使路由 hook 已分配临时 UUID，isNewThread 仍为 true，
+  // 不能把临时 ID 变化当作真实线程切换而清空 handoff。真实线程沿用既有持久化。
+  const draftKey =
+    !isNewThread && threadId && threadId !== "new" ? `draft:${threadId}` : null;
   const latestDraftRef = useRef(textInput.value);
   latestDraftRef.current = textInput.value;
   const activeDraftKeyRef = useRef(draftKey);

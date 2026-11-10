@@ -9,6 +9,7 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
+import { AgentNewChatGuide } from "@/components/workspace/agent-new-chat-guide";
 import { AgentWelcome } from "@/components/workspace/agent-welcome";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
 import { ChatBox, useThreadChat } from "@/components/workspace/chats";
@@ -24,7 +25,11 @@ import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
 import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { Tooltip } from "@/components/workspace/tooltip";
-import { resolveAgentName, useAgent } from "@/core/agents";
+import {
+  isAgentNewChatGuideId,
+  resolveAgentName,
+  useAgent,
+} from "@/core/agents";
 import { useI18n } from "@/core/i18n/hooks";
 import { useModels } from "@/core/models/hooks";
 import { useNotification } from "@/core/notification/hooks";
@@ -50,11 +55,22 @@ export default function AgentChatPage() {
   // 新名），线程照常续跑。不用 router.replace 重定向——本页 router 导航会
   // remount 丢失状态（见下方 onStart 注释），且会干扰 ?msg= 预填逻辑。
   const agent_name = resolveAgentName(agentNameParam);
-
-  const { agent } = useAgent(agent_name);
+  const guideAgentName = isAgentNewChatGuideId(agent_name) ? agent_name : null;
+  const {
+    agent,
+    isLoading: agentLoading,
+    error: agentError,
+    refetch: refetchAgent,
+  } = useAgent(agent_name);
+  const guideStatus = agentLoading
+    ? "loading"
+    : agentError || !agent
+      ? "error"
+      : "ready";
 
   const { threadId, setThreadId, isNewThread, setIsNewThread } =
     useThreadChat();
+  const showGuidedNewChat = isNewThread && guideAgentName !== null;
   const [settings, setSettings] = useThreadSettings(threadId);
   const { tokenUsageEnabled, tokenBudgetWarnTokens } = useModels();
   // D3 修订（review #4）：run 结束时递增 → 徽章总量重拉（与后端告警同源的
@@ -112,6 +128,9 @@ export default function AgentChatPage() {
   // (every navigation) and re-fills via the controller's setInput. readPendingPrompt
   // consumes the sessionStorage entry; prefillRunRef prevents re-filling the same prompt.
   const prefillSearchParams = useSearchParams();
+  const handoffKey = prefillSearchParams.toString();
+  const [handoffDoneKey, setHandoffDoneKey] = useState<string | null>(null);
+  const handoffReady = handoffDoneKey === handoffKey;
   const { textInput } = usePromptInputController();
   const prefillRunRef = useRef<string | null>(null);
   useEffect(() => {
@@ -122,10 +141,12 @@ export default function AgentChatPage() {
       prefillRunRef.current = prompt;
       textInput.setInput(prompt);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- publish completion of the external handoff read to the guide.
+    setHandoffDoneKey(handoffKey);
     // textInput.setInput is a stable useState setter — call directly, no dep on textInput
     // (the controller object is a new ref each render; depending on it would re-run every render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillSearchParams]);
+  }, [prefillSearchParams, handoffKey]);
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
@@ -143,6 +164,46 @@ export default function AgentChatPage() {
       MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM
     : undefined;
 
+  const demoMode = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
+  const guideDisplayName = guideAgentName
+    ? t.agents.newChatGuides[guideAgentName].displayName
+    : null;
+  const inputBox = (
+    <InputBox
+      className={cn(
+        "bg-background/5 w-full",
+        !showGuidedNewChat && "-translate-y-4",
+      )}
+      isNewThread={isNewThread}
+      threadId={threadId}
+      autoFocus={showGuidedNewChat ? false : isNewThread}
+      status={thread.error ? "error" : thread.isLoading ? "streaming" : "ready"}
+      context={settings.context}
+      extraHeader={
+        !showGuidedNewChat &&
+        isNewThread && <AgentWelcome agent={agent} agentName={agent_name} />
+      }
+      agentSkills={agent?.skills}
+      agentSuggestionPrompts={agent?.suggestion_prompts ?? null}
+      showNewThreadSuggestions={!showGuidedNewChat}
+      disabled={demoMode || (showGuidedNewChat && guideStatus !== "ready")}
+      onContextChange={(context) => setSettings("context", context)}
+      onFollowupsVisibilityChange={setShowFollowups}
+      onSubmit={handleSubmit}
+      onStop={handleStop}
+    />
+  );
+  const demoNotice = demoMode ? (
+    <div
+      className={cn(
+        "text-muted-foreground/67 w-full text-center text-xs",
+        showGuidedNewChat ? "mt-3" : "translate-y-12",
+      )}
+    >
+      {t.common.notAvailableInDemoMode}
+    </div>
+  ) : null;
+
   return (
     <ThreadContext.Provider value={{ thread }}>
       <ChatBox threadId={threadId}>
@@ -157,7 +218,7 @@ export default function AgentChatPage() {
             <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1">
               <BotIcon className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
               <span className="text-[10.5px] font-semibold text-indigo-600 dark:text-indigo-400">
-                {agent?.name ?? agent_name}
+                {guideDisplayName ?? agent?.name ?? agent_name}
               </span>
             </div>
 
@@ -192,74 +253,63 @@ export default function AgentChatPage() {
           </header>
 
           <main className="flex min-h-0 max-w-full grow flex-col">
-            <div className="flex size-full justify-center">
-              <MessageList
-                className={cn("size-full", !isNewThread && "pt-10")}
-                threadId={threadId}
-                thread={thread}
-                paddingBottom={messageListPaddingBottom}
-                tokenUsageEnabled={tokenUsageEnabled}
-                hasMoreHistory={hasMoreHistory}
-                loadMoreHistory={loadMoreHistory}
-                isHistoryLoading={isHistoryLoading}
-              />
-            </div>
-
-            <div className="absolute right-0 bottom-0 left-0 z-30 flex justify-center px-4">
-              <div
-                className={cn(
-                  "relative w-full",
-                  isNewThread && "-translate-y-[calc(50vh-96px)]",
-                  isNewThread
-                    ? "max-w-(--container-width-sm)"
-                    : "max-w-(--container-width-md)",
-                )}
-              >
-                <div className="absolute -top-4 right-0 left-0 z-0">
-                  <div className="absolute right-0 bottom-0 left-0">
-                    <TodoList
-                      className="bg-background/5"
-                      todos={thread.values.todos ?? []}
-                      hidden={
-                        !thread.values.todos || thread.values.todos.length === 0
-                      }
-                    />
-                  </div>
+            {showGuidedNewChat && guideAgentName ? (
+              <div className="size-full overflow-y-auto pt-12">
+                <AgentNewChatGuide
+                  agentName={guideAgentName}
+                  handoffReady={handoffReady}
+                  status={guideStatus}
+                  disabled={demoMode}
+                  onRetry={() => void refetchAgent()}
+                >
+                  {inputBox}
+                  {demoNotice}
+                </AgentNewChatGuide>
+              </div>
+            ) : (
+              <>
+                <div className="flex size-full justify-center">
+                  <MessageList
+                    className={cn("size-full", !isNewThread && "pt-10")}
+                    threadId={threadId}
+                    thread={thread}
+                    paddingBottom={messageListPaddingBottom}
+                    tokenUsageEnabled={tokenUsageEnabled}
+                    hasMoreHistory={hasMoreHistory}
+                    loadMoreHistory={loadMoreHistory}
+                    isHistoryLoading={isHistoryLoading}
+                  />
                 </div>
 
-                <InputBox
-                  className={cn("bg-background/5 w-full -translate-y-4")}
-                  isNewThread={isNewThread}
-                  threadId={threadId}
-                  autoFocus={isNewThread}
-                  status={
-                    thread.error
-                      ? "error"
-                      : thread.isLoading
-                        ? "streaming"
-                        : "ready"
-                  }
-                  context={settings.context}
-                  extraHeader={
-                    isNewThread && (
-                      <AgentWelcome agent={agent} agentName={agent_name} />
-                    )
-                  }
-                  agentSkills={agent?.skills}
-                  agentSuggestionPrompts={agent?.suggestion_prompts ?? null}
-                  disabled={env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"}
-                  onContextChange={(context) => setSettings("context", context)}
-                  onFollowupsVisibilityChange={setShowFollowups}
-                  onSubmit={handleSubmit}
-                  onStop={handleStop}
-                />
-                {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" && (
-                  <div className="text-muted-foreground/67 w-full translate-y-12 text-center text-xs">
-                    {t.common.notAvailableInDemoMode}
+                <div className="absolute right-0 bottom-0 left-0 z-30 flex justify-center px-4">
+                  <div
+                    className={cn(
+                      "relative w-full",
+                      isNewThread && "-translate-y-[calc(50vh-96px)]",
+                      isNewThread
+                        ? "max-w-(--container-width-sm)"
+                        : "max-w-(--container-width-md)",
+                    )}
+                  >
+                    <div className="absolute -top-4 right-0 left-0 z-0">
+                      <div className="absolute right-0 bottom-0 left-0">
+                        <TodoList
+                          className="bg-background/5"
+                          todos={thread.values.todos ?? []}
+                          hidden={
+                            !thread.values.todos ||
+                            thread.values.todos.length === 0
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {inputBox}
+                    {demoNotice}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </main>
         </div>
       </ChatBox>
