@@ -1,5 +1,27 @@
 import type { LucideIcon } from "lucide-react";
 
+import type { AgentNewChatGuideId } from "@/core/agents/new-chat";
+
+interface AgentNewChatCaseCopy {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+}
+
+interface AgentNewChatGuideCopy {
+  displayName: string;
+  title: string;
+  description: string;
+  cases: [
+    AgentNewChatCaseCopy,
+    AgentNewChatCaseCopy,
+    AgentNewChatCaseCopy,
+    AgentNewChatCaseCopy,
+  ];
+  tips: [string, string, string];
+}
+
 export interface Translations {
   // Locale meta
   locale: {
@@ -351,6 +373,19 @@ export interface Translations {
     publicAgents: string;
     customAgents: string;
     noCustomAgents: string;
+    newChatGuide: {
+      casesTitle: string;
+      casesDescription: string;
+      tipsTitle: string;
+      loading: string;
+      loadFailed: string;
+      retry: string;
+      draftConfirmTitle: string;
+      draftConfirmDescription: string;
+      draftConfirmAppend: string;
+      draftConfirmReplace: string;
+    };
+    newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };
 
   // Breadcrumb

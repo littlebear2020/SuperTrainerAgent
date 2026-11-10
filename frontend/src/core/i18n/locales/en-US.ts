@@ -448,6 +448,186 @@ export const enUS: Translations = {
     customAgents: "My Agents",
     noCustomAgents:
       "No custom agents yet. Click the button above to create one.",
+    newChatGuide: {
+      casesTitle: "Start with a real task",
+      casesDescription:
+        "Choosing an example only fills the prompt. You decide when to send it.",
+      tipsTitle: "Before you start",
+      loading: "Loading your creative assistant…",
+      loadFailed: "Could not load the creative assistant. Please try again.",
+      retry: "Retry",
+      draftConfirmTitle: "There is already text in the input",
+      draftConfirmDescription:
+        "Replace the current draft or append the example prompt after it.",
+      draftConfirmAppend: "Append",
+      draftConfirmReplace: "Replace",
+    },
+    newChatGuides: {
+      "course-video": {
+        displayName: "Course video",
+        title: "Turn knowledge into a video lesson",
+        description:
+          "Start with a topic or an existing script and create a lesson built for learning.",
+        cases: [
+          {
+            id: "knowledge-explainer",
+            title: "Explain one concept",
+            description: "Teach with concrete examples and motion visuals",
+            prompt:
+              "Create a [duration] explainer video about [topic] for [audience]. Confirm the script and storyboard with me first, focusing on the core concept and one concrete example.",
+          },
+          {
+            id: "product-tutorial",
+            title: "Create a product tutorial",
+            description: "Turn feature steps into a clear learning path",
+            prompt:
+              "Create a product tutorial for [product/feature] aimed at first-time users. Organize it as problem → action → result, and confirm the script and storyboard with me first.",
+          },
+          {
+            id: "concept-animation",
+            title: "Animate a concept",
+            description: "Break down an abstract process step by step",
+            prompt:
+              "Explain [concept/process] with motion visuals in a [duration] lesson for [audience]. Use clear steps and visual metaphors, and confirm the script and storyboard first.",
+          },
+          {
+            id: "script-to-video",
+            title: "Turn a script into video",
+            description: "Preserve meaning while shaping pacing and scenes",
+            prompt:
+              "I have an existing script to turn into a course video. Preserve its meaning and knowledge points, review the pacing, and draft the storyboard first:\n[Paste script]",
+          },
+        ],
+        tips: [
+          "Share the topic, target learners, and desired duration.",
+          "Paste an existing script directly if you have one.",
+          "Confirm the script and storyboard before video generation.",
+        ],
+      },
+      "ppt-master": {
+        displayName: "PPT creation",
+        title: "From source material to an editable PPT",
+        description:
+          "Start with a topic, document, or existing deck and get slides you can keep editing.",
+        cases: [
+          {
+            id: "from-scratch",
+            title: "Quickly create a course deck",
+            description: "Go straight from a topic to editable slides",
+            prompt:
+              "Quickly create a course deck about [topic]: skip strategy confirmation and go straight to the draft, while keeping every slide hand-crafted and editable.",
+          },
+          {
+            id: "roundtrip",
+            title: "Edit an existing PPT",
+            description: "Keep the original design and change only the content",
+            prompt:
+              "I want to edit an existing PPT: keep its original design unchanged and only replace or revise the content. I will upload the PPT file first.",
+          },
+          {
+            id: "beautify",
+            title: "Beautify an existing deck",
+            description: "Improve layout and visuals without rewriting text",
+            prompt:
+              "I will upload an existing PPT. Keep all text unchanged and improve only the layout, spacing, colors, and visual hierarchy. Deliver an editable PPTX.",
+          },
+          {
+            id: "brand-template",
+            title: "Reuse a brand template",
+            description: "Give a new deck a consistent visual identity",
+            prompt:
+              "Extract visual guidelines from the brand materials or existing PPT I provide, then create an editable deck about [topic] with consistent typography, colors, and layouts.",
+          },
+        ],
+        tips: [
+          "Upload a reference document or an existing PPT if available.",
+          "Share the audience, slide count, and presentation setting.",
+          "The final deliverable is an editable PPTX.",
+        ],
+      },
+      "creative-studio": {
+        displayName: "Visual design",
+        title: "Turn knowledge into beautiful images",
+        description:
+          "Transform key ideas, course content, and brand information into clear visual assets.",
+        cases: [
+          {
+            id: "knowledge-card",
+            title: "Create a knowledge card",
+            description: "Distill complex ideas into one readable card",
+            prompt:
+              "Create a knowledge card about [topic] for [audience], highlighting three key takeaways. Use a clear, modern course-visual style and suggest an appropriate size.",
+          },
+          {
+            id: "course-poster",
+            title: "Design a course poster",
+            description: "Highlight the topic and learning benefits",
+            prompt:
+              "Design a poster for the course [course name] aimed at [audience]. Highlight the topic, three learning benefits, and [brand style]. Make it suitable for course promotion.",
+          },
+          {
+            id: "infographic",
+            title: "Create an infographic",
+            description: "Explain steps and relationships visually",
+            prompt:
+              "Turn [content/process] into an infographic that helps [audience] understand the steps and relationships. Use a clear hierarchy, icons, concise text, and a size of [size].",
+          },
+          {
+            id: "series-card",
+            title: "Build a card series",
+            description: "Present related ideas with one visual system",
+            prompt:
+              "Design a series of four visual cards about [topic] for [audience], with consistent colors, typography, and layout. Explain one key idea per card at [size].",
+          },
+        ],
+        tips: [
+          "Share the topic, core information, and target audience.",
+          "Include size or brand-style requirements when known.",
+          "You can edit the example prompt before sending it.",
+        ],
+      },
+      "co-writer": {
+        displayName: "Collaborative writing",
+        title: "Turn ideas into strong content",
+        description:
+          "Move from topic and outline to a complete draft with a format-specific approach.",
+        cases: [
+          {
+            id: "article",
+            title: "Write an article",
+            description: "A clear point of view with engaging examples",
+            prompt:
+              "[类型: article]\n[从零创作]\nWrite a public-facing article about [topic] for [audience]. Start with an outline and find reliable recent examples or data online when needed.",
+          },
+          {
+            id: "case",
+            title: "Develop a business case",
+            description: "Cover context, solution, results, and lessons",
+            prompt:
+              "[类型: case]\n[从零创作]\nWrite a business case about [company/project], covering background, problem, solution, results, and lessons. Find real sources and name the source organization for any data.",
+          },
+          {
+            id: "script",
+            title: "Write a video script",
+            description: "Natural speech with pacing ready to record",
+            prompt:
+              "[类型: script]\n[从零创作]\nWrite a [duration] spoken video script about [topic] for [audience]. Use natural, visual language and provide a recording-ready draft directly.",
+          },
+          {
+            id: "podcast",
+            title: "Prepare a podcast script",
+            description: "Conversational writing designed for listening",
+            prompt:
+              "[类型: podcast]\n[从零创作]\nWrite a [duration] podcast script about [topic] with a natural conversational style, suitable for reading aloud.",
+          },
+        ],
+        tips: [
+          "Choose the content type closest to your goal.",
+          "Share the topic, audience, and intended use.",
+          "Long-form work confirms the outline before the full draft.",
+        ],
+      },
+    },
   },
 
   // Breadcrumb

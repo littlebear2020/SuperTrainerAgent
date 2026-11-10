@@ -417,6 +417,180 @@ export const zhCN: Translations = {
     publicAgents: "官方智能体",
     customAgents: "我的智能体",
     noCustomAgents: "还没有自定义智能体，点击上方按钮创建。",
+    newChatGuide: {
+      casesTitle: "从一个真实任务开始",
+      casesDescription: "选择案例只会填入提示词，确认后由你发送。",
+      tipsTitle: "开始之前",
+      loading: "正在加载创作助手…",
+      loadFailed: "创作助手信息加载失败，请重试。",
+      retry: "重试",
+      draftConfirmTitle: "输入框已有内容",
+      draftConfirmDescription: "选择替换现有内容，或在后面追加案例提示词。",
+      draftConfirmAppend: "追加",
+      draftConfirmReplace: "替换",
+    },
+    newChatGuides: {
+      "course-video": {
+        displayName: "课程视频",
+        title: "把知识讲成一堂视频课",
+        description: "从主题或既有讲稿出发，完成适合观看与学习的课程视频。",
+        cases: [
+          {
+            id: "knowledge-explainer",
+            title: "讲清一个知识点",
+            description: "用具体例子和动态图示完成知识科普",
+            prompt:
+              "请把[主题]制作成一堂约[时长]的知识科普视频，面向[受众]。先帮我确认讲稿和分镜，重点讲清核心概念与一个具体例子。",
+          },
+          {
+            id: "product-tutorial",
+            title: "制作产品教学",
+            description: "把功能操作组织成清楚的学习路径",
+            prompt:
+              "请把[产品/功能]制作成一段产品教学视频，面向第一次使用的用户。按“问题→操作→结果”组织内容，先确认讲稿和分镜。",
+          },
+          {
+            id: "concept-animation",
+            title: "把原理做成动画",
+            description: "拆解抽象概念，让过程更容易理解",
+            prompt:
+              "请用动态图示解释[原理/概念]，面向[受众]制作约[时长]的课程视频。用拆解步骤和视觉比喻讲清原理，先确认讲稿和分镜。",
+          },
+          {
+            id: "script-to-video",
+            title: "把讲稿变成视频",
+            description: "保留原意，整理节奏并设计分镜",
+            prompt:
+              "我有一段现成讲稿，希望转成课程视频。请保持原意和知识点不变，先帮我检查段落节奏并生成分镜：\n[粘贴讲稿]",
+          },
+        ],
+        tips: [
+          "告诉我主题、目标学员和期望时长。",
+          "已有讲稿可直接粘贴，无需重新整理。",
+          "先确认讲稿和分镜，再进入视频生成。",
+        ],
+      },
+      "ppt-master": {
+        displayName: "PPT 制作",
+        title: "从资料到可编辑的 PPT",
+        description: "从主题、文档或既有课件开始，得到能继续修改的演示文稿。",
+        cases: [
+          {
+            id: "from-scratch",
+            title: "快速生成课件",
+            description: "从一个主题直接生成可编辑课件",
+            prompt:
+              "快速生成一份关于[主题]的课件：跳过策略确认直接出稿，但保持逐页手写可编辑的质量底线。",
+          },
+          {
+            id: "roundtrip",
+            title: "改造现有 PPT",
+            description: "保留原设计，只调整需要的内容",
+            prompt:
+              "我要改一份现有的 PPT：保持原有设计不动，只替换或修改其中的内容，我会先上传这份 PPT 文件。",
+          },
+          {
+            id: "beautify",
+            title: "美化既有排版",
+            description: "不改文字，优化视觉与排版",
+            prompt:
+              "我会上传一份现有 PPT。请保持文字内容不变，只美化排版、间距、配色和视觉层级，并输出可编辑的 PPTX。",
+          },
+          {
+            id: "brand-template",
+            title: "复用品牌模板",
+            description: "让新课件延续既有品牌风格",
+            prompt:
+              "请先基于我提供的品牌资料或现有 PPT 提取视觉规范，再为[主题]生成一套可编辑课件，保持字体、配色和版式一致。",
+          },
+        ],
+        tips: [
+          "可以上传参考文档或一份现有 PPT。",
+          "说明受众、页数和使用场景会更高效。",
+          "最终产物是可继续编辑的 PPTX。",
+        ],
+      },
+      "creative-studio": {
+        displayName: "视觉设计",
+        title: "让知识成为好看的图片",
+        description: "把要点、课程内容与品牌信息做成清楚、美观的视觉作品。",
+        cases: [
+          {
+            id: "knowledge-card",
+            title: "制作知识卡片",
+            description: "把复杂要点压缩成易读的卡片",
+            prompt:
+              "请把[主题]制作成一张知识卡片，面向[受众]，突出3个核心要点。采用清晰、现代的课程视觉风格，并说明建议尺寸。",
+          },
+          {
+            id: "course-poster",
+            title: "设计课程海报",
+            description: "突出课程主题、亮点与学习收益",
+            prompt:
+              "请为课程[课程名称]设计一张海报，面向[受众]，突出课程主题、三个学习收益和[品牌风格]。画面需要适合课程宣传。",
+          },
+          {
+            id: "infographic",
+            title: "生成信息图",
+            description: "用结构化图形解释流程与关系",
+            prompt:
+              "请把[内容/流程]制作成一张信息图，帮助[受众]快速理解步骤和关系。使用清楚的层级、图标和适量文字，尺寸为[尺寸]。",
+          },
+          {
+            id: "series-card",
+            title: "做一组系列卡片",
+            description: "用统一视觉连续呈现一组知识点",
+            prompt:
+              "请围绕[主题]设计一组4张系列视觉卡片，保持统一配色、字体和版式。每张讲清一个要点，面向[受众]，尺寸为[尺寸]。",
+          },
+        ],
+        tips: [
+          "提供主题、核心信息和目标受众。",
+          "有尺寸或品牌风格要求可以一起说明。",
+          "选择案例后仍可修改提示词再发送。",
+        ],
+      },
+      "co-writer": {
+        displayName: "协同写作",
+        title: "把想法写成好内容",
+        description: "从选题、大纲到完整稿件，按内容类型组织合适的表达。",
+        cases: [
+          {
+            id: "article",
+            title: "写一篇公众号文章",
+            description: "有观点、有案例，也适合手机阅读",
+            prompt:
+              "[类型: article]\n[从零创作]\n请围绕[主题]写一篇公众号文章，面向[受众]。先给出大纲；需要最新案例或数据时请联网查找可靠来源。",
+          },
+          {
+            id: "case",
+            title: "整理商业案例",
+            description: "讲清背景、方案、结果与启示",
+            prompt:
+              "[类型: case]\n[从零创作]\n请围绕[企业/项目]写一篇商业案例，按背景、问题、方案、结果和启示展开；涉及数据时请查找并标注真实来源机构。",
+          },
+          {
+            id: "script",
+            title: "创作视频脚本",
+            description: "自然口语化，节奏适合直接录制",
+            prompt:
+              "[类型: script]\n[从零创作]\n请把[主题]写成一段约[时长]的口播视频脚本，面向[受众]，语言自然、有画面感，直接给我可用稿件。",
+          },
+          {
+            id: "podcast",
+            title: "准备播客文稿",
+            description: "对话感强，适合朗读和音频表达",
+            prompt:
+              "[类型: podcast]\n[从零创作]\n请围绕[主题]写一篇约[时长]的播客文稿，采用自然对话感，适合直接朗读。",
+          },
+        ],
+        tips: [
+          "先选择最接近的内容类型。",
+          "告诉我主题、受众和使用场景。",
+          "长文会先确认大纲，再完成全文。",
+        ],
+      },
+    },
   },
 
   // Breadcrumb
