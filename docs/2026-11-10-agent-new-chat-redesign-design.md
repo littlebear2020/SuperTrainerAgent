@@ -124,7 +124,7 @@ Course-video 不在界面展示 auto-video-flow；其现有 SOUL 和技能配置
 
 现有页面 effect 是 `?msg=` / sessionStorage 的唯一消费者，并会替换输入框内容。新增显式完成状态，而不是用 `useMounted()` 代替 handoff 契约：
 
-- 页面计算当前 `handoffKey = prefillSearchParams.toString()`，并记录 `handoffDoneKey`；只有两者相等时才允许案例点击。
+- 页面计算当前 `handoffKey = prefillSearchParams.toString()`，并记录 `handoffDoneKey`；只有两者相等时才允许案例点击。key 保留参数顺序敏感性，顺序变化视为新 key 并保守重新 gate，不额外排序或归一化。
 - 首次挂载及搜索参数变化时，现有 effect 完成 handoff 读取和必要预填后，将 `handoffDoneKey` 置为当前 key。key 变化时旧完成值自然不匹配，无需额外重置或 remount。
 - 这一处 effect-setState 是将已消费的外部 handoff 状态同步给 React 的必要接线，允许单点、带原因的内联 lint 处理；不得加入全局 suppression 文件，也不得改用隐式 mounted 时序。
 - `?msg=` 继续优先于 sessionStorage；现有 `prefillRunRef` 去重与消费规则不变。

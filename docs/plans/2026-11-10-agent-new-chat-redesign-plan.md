@@ -70,7 +70,7 @@ frontier 已清空；执行中不得重新发明上述决策。若新事实与�
 | `frontend/src/core/agents/{new-chat.ts,index.ts,hooks.ts}` | `backend/**`、`docker/**`、`skills/**`、`video-templates/**`、根 `config*.yaml`、`.env*` | **是，单执行者串行**：`core/agents/index.ts` 与 `hooks.ts` 只做本计划定义的导出和 `refetch` 透传，不改 retry。 |
 | `frontend/src/core/i18n/locales/{types,zh-CN,en-US}.ts` | 其他 locale/运行时配置；不绕过内容完整性测试 | **是**：三个 locale 文件只增加 `agents.newChatGuide(s)` 内容。 |
 | `frontend/src/components/workspace/{agent-new-chat-guide.tsx,input-box.tsx}` | `frontend/src/components/ui/**`、`frontend/src/components/ai-elements/**`、其他 InputBox 功能分支 | **是**：InputBox 只增加 `showNewThreadSuggestions` 门控，不重写上传、模型、follow-up 或提交。 |
-| `frontend/src/core/messages/utils.ts` | `message-list-item.tsx`、Writer 面板、`from-scratch-stage.ts`、其他消息渲染逻辑 | **是**：仅在现有 `stripInternalMarkers` 中复用 `parseStageSignal`；现成调用方不变。 |
+| `frontend/src/core/messages/utils.ts`；`frontend/src/core/streamdown/fences.ts`（仅 dependency-free 注释） | `message-list-item.tsx`、Writer 面板、`from-scratch-stage.ts`、其他消息渲染逻辑与 fence 实现 | **是**：仅在现有 `stripInternalMarkers` 中复用 `parseStageSignal`；现成调用方不变。 |
 | `frontend/src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` | 未列出的 App Router 页面、通用 `workspace/chats/[thread_id]/page.tsx`、`eslint-suppressions.json` | **是**：仅目标 Agent 新会话布局、短名、加载/错误和显式 handoff 门槛；已有会话保持原分支。 |
 | 本计划 Files 列出的 `frontend/tests/unit/**`、`frontend/tests/e2e/agent-new-chat-guide.spec.ts`、`frontend/tests/e2e/utils/mock-api.ts` | 当前旧批次五个脏文件：`video-gen-create-dialog.tsx`、其 initial-type 单测、`home-course-entry.spec.ts`、`video-gen-create-flow.spec.ts`、`video-gen-error-states.spec.ts`；其他无关测试 | **是**：`mock-api.ts` 可扩展 Agent fixture 和可选 `/api/skills` fixture，默认 skills 为空，不改变其他默认响应。 |
 | 本计划、已批准设计的状态头；执行时新增 `docs/changelog/changelog-YYYY-MM-DD-agent-new-chat-redesign.md` | 不新增第二份设计/报告；不修改 README、AGENTS.md 或性能预算 | 文档由同一执行者收尾，计划逐项勾选，changelog 必须含真实「验收记录」。 |
@@ -97,9 +97,11 @@ frontier 已清空；执行中不得重新发明上述决策。若新事实与�
 | `frontend/src/components/workspace/agent-new-chat-guide.tsx` | Create | Hero、案例、InputBox children、Tips、草稿确认对话框、加载/错误状态；只写现有 prompt controller。 |
 | `frontend/src/components/workspace/input-box.tsx` | Modify | 以 `showNewThreadSuggestions?: boolean` 显式门控旧新会话建议区，默认 true。 |
 | `frontend/src/core/messages/utils.ts` | Modify | 在现有 AI 消息/导出清理函数中剥离开头阶段标记，其他内部标签逻辑不变。 |
+| `frontend/src/core/streamdown/fences.ts` | Comment-only | 明确 fences 自身零依赖，不限制 consumer 的无环依赖；不改实现。 |
 | `frontend/src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx` | Modify | 目标新会话 page 级布局、短名、Agent 状态、显式 handoff gate；已有会话/非目标分支不变。 |
 | `frontend/tests/unit/core/agents/new-chat.test.ts` | Create | ID、别名、双语言案例完整性、PPT 语义、Co-writer 标记和禁用内部名。 |
-| `frontend/tests/unit/core/messages/utils.test.ts` | Modify | 开头 OUTLINE/DRAFT 剥离、正文中间保留、普通文本不变。 |
+| `frontend/tests/unit/core/messages/utils.test.ts` | Modify | 开头 OUTLINE/DRAFT 剥离、正文中间保留、普通文本不变与幂等。 |
+| `frontend/tests/unit/core/threads/export.test.ts` | Modify | 正面断言 Markdown 导出保留正文但不含阶段标记。 |
 | `frontend/tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx` | Create | 展示、预填、三选一、聚焦、语言与可用状态。 |
 | `frontend/tests/unit/components/workspace/input-box-new-thread-suggestions.dom.test.tsx` | Create | 目标关闭旧建议、非目标默认行为及空技能回退。 |
 | `frontend/tests/unit/app/workspace/agents/agent-chat-page.dom.test.tsx` | Create | 以重 stub 测页面分支、props、retry、autoFocus 与 InputBox 不重挂。 |
@@ -249,41 +251,48 @@ git commit -m "feat(agent): 完善案例预填与草稿确认交互"
 
 **Files:**
 - Modify: `frontend/src/core/messages/utils.ts`
+- Comment-only: `frontend/src/core/streamdown/fences.ts`
 - Test: `frontend/tests/unit/core/messages/utils.test.ts`
+- Test: `frontend/tests/unit/core/threads/export.test.ts`
+- Read-only regression: `frontend/tests/unit/core/writer/from-scratch-stage.test.ts`
 
 **Interfaces:**
 - Consumes 现有 `parseStageSignal(raw): { stage, text }`；不修改其文件或 Writer 面板。
 - 保持 `stripInternalMarkers(content: string): string` 签名不变；在既有 XML 内部标签清理后，再剥离消息开头的 OUTLINE/DRAFT stage token。
-- 现有 `message-list-item.tsx` 与 `core/threads/export.ts` 调用方不改。
+- 现有 `message-list-item.tsx` 与 `core/threads/export.ts` 调用方不改；Markdown 导出同样不得包含阶段标记。
 
 - [ ] **Step 1：写失败测试**
 
-在现有 utils 测试新增：`[[STAGE:OUTLINE]]\n\n# 大纲` 与 `[[STAGE:DRAFT]]\n\n正文` 分别只返回大纲/正文；普通文本不变；正文中间出现 `[[STAGE:OUTLINE]]` 时原样保留；与既有 `<system_reminder>` 组合时两类内部标记都清理。
+在现有 utils 测试新增：`[[STAGE:OUTLINE]]\n\n# 大纲` 与 `[[STAGE:DRAFT]]\n\n正文` 分别只返回大纲/正文；普通文本不变；正文中间出现 `[[STAGE:OUTLINE]]` 时原样保留；与既有 `<system_reminder>` 组合时两类内部标记都清理；同一文本连续调用两次 `stripInternalMarkers` 结果完全相同（幂等）。
 
-- [ ] **Step 2：确认阶段标记当前泄漏**
+在 `export.test.ts` 增加正面行为断言：含开头 `[[STAGE:OUTLINE]]` 的 AI 消息经 `formatThreadAsMarkdown` 后保留正文且不包含 `STAGE` 标记。
 
-Run: `cd frontend && pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts`
+- [ ] **Step 2：确认消息与导出当前均泄漏阶段标记**
 
-Expected: 仅新增 stage 用例 FAIL，现有用例 PASS。
+Run: `cd frontend && pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts tests/unit/core/threads/export.test.ts`
 
-- [ ] **Step 3：最小复用现有 parser**
+Expected: 仅新增 stage/导出/幂等用例 FAIL，现有用例 PASS。
+
+- [ ] **Step 3：最小复用现有 parser 并校订注释**
 
 在 `stripInternalMarkers` 中复用 `parseStageSignal` 处理完成既有标签清理后的文本，并保持最终 trim 语义。不得新增第二套阶段正则、移动 Writer 代码或修改消息组件。
 
-- [ ] **Step 4：运行消息与导出相关回归**
+同步校订 `core/streamdown/fences.ts` 顶部 dependency-free 注释：明确“fences 本身保持零依赖；consumer 可拥有自己的无环依赖”，避免被误读为 `core/messages/utils.ts` 永远不得 import。只改注释，不改 fence 正则或逻辑。
+
+- [ ] **Step 4：运行消息、导出与 Writer parser 回归**
 
 Run:
 ```bash
 cd frontend
-pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts tests/unit/core/threads/export.test.ts
+pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts tests/unit/core/threads/export.test.ts tests/unit/core/writer/from-scratch-stage.test.ts
 ```
-Expected: 两个既有测试文件全部 PASS；导出测试路径已核实存在。
+Expected: 三个既有测试文件全部 PASS，导出正面断言与幂等断言实际执行。
 
 - [ ] **Step 5：提交**
 
 ```bash
-git add frontend/src/core/messages/utils.ts frontend/tests/unit/core/messages/utils.test.ts
-git commit -m "fix(agent): 隐藏协同写作阶段内部标记"
+git add frontend/src/core/messages/utils.ts frontend/src/core/streamdown/fences.ts frontend/tests/unit/core/messages/utils.test.ts frontend/tests/unit/core/threads/export.test.ts
+git commit -m "feat(agent): 剥离协同写作阶段内部标记"
 ```
 
 ---
@@ -344,13 +353,13 @@ git commit -m "feat(agent): 支持新会话显式关闭旧建议区"
 - Consumes Tasks 1–5 的内容、guide、阶段清理和 `showNewThreadSuggestions`。
 - `useAgent(name)` 增加返回既有 query 的 `refetch`；其他字段、请求与 retry 策略不变。
 - 目标判定为 `isNewThread && isAgentNewChatGuideId(resolveAgentName(agentNameParam))`；已有线程和非目标 Agent 走原布局。
-- 页面以 `handoffKey = prefillSearchParams.toString()` 和 `handoffDoneKey` 派生 `handoffReady`；仅在现有 handoff effect 末尾将 doneKey 设为当前 key。允许这一处有原因的 Inline ESLint 处理，不改 suppression 文件，不给 wrapper/InputBox 加 key。
+- 页面以 `handoffKey = prefillSearchParams.toString()` 和 `handoffDoneKey` 派生 `handoffReady`；仅在现有 handoff effect 末尾将 doneKey 设为当前 key。允许这一处有原因的内联 ESLint 处理，不改 suppression 文件，不给 wrapper/InputBox 加 key。key 只用于同参数集判定，保留顺序敏感性：参数顺序变化视为新 key 并保守重新 gate，不排序、不归一化。
 - `MockAgent` 允许 `skills` / `suggestion_prompts`；`mockLangGraphAPI` 增加可选 skills fixture 并 mock `/api/skills`，默认 `{skills: []}`，其他默认响应不变。
 - E2E 用相对路径导入 `zhCN/enUS`，不复制 prompt；先以 `--list` 验证 Playwright 编译该依赖图。
 
 - [ ] **Step 1：在实现前写重 stub 页面 DOM 与完整行为级 E2E**
 
-页面 DOM 只测分支和接线，覆盖：目标新会话显示 guide、顶栏短名、`showNewThreadSuggestions=false`、`autoFocus=false`；已有目标线程不显示 guide；非目标仍用 AgentWelcome；loading/error props 与 retry/refetch；当前 handoff key 未完成时 `handoffReady=false`，effect 完成后才开放；搜索参数变化会重新关闭 gate 且同一个 InputBox stub 不发生 unmount/remount；静态 Demo 禁用。
+页面 DOM 用 `vi.mock` 将 ChatBox、MessageList、AgentNewChatGuide、InputBox、AgentWelcome 等重组件 stub；在 mock 实现中把最新 props 记录到 `vi.hoisted` 创建的 `h` 对象，以 `h.inputBoxProps` / `h.guideProps` 等 spy 断言接线，而非渲染真实重组件。覆盖：目标新会话显示 guide、顶栏短名、`showNewThreadSuggestions=false`、`autoFocus=false`；已有目标线程不显示 guide；非目标仍用 AgentWelcome；loading/error props 与 retry/refetch；当前 handoff key 未完成时 `handoffReady=false`，effect 完成后才开放；搜索参数变化会重新关闭 gate 且同一个 InputBox stub 不发生 unmount/remount；静态 Demo 禁用。
 
 新 E2E 使用真实页面、真实 i18n copy 和全 mock API，收集 `pageerror` 并记录 `/threads` POST 与 `/runs/stream` 请求数，至少覆盖：
 - 参数化四 Agent：短名/Hero/4 卡/Tips，逐一真实点击全部 16 卡并断言 locale 中的精确 prompt 与聚焦；后续点击走替换，发送计数始终 0；无 raw Skill/旧 chips/raw ID。
@@ -455,7 +464,7 @@ Run:
 cd frontend && pnpm test:e2e
 cd frontend && pnpm perf:check
 ```
-Expected: 全部 exit 0。不得把 perf 结果描述为目标 Agent 路由的直接性能测量，不改预算。
+Expected: 全部 exit 0；`perf:check` 仅确认五个既有路由无共享包体积回归，保留该完整门禁但不声称覆盖目标 Agent 页面，不改预算。
 
 - [ ] **Step 3：跑仓库根总门禁**
 
