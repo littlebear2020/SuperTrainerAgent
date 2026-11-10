@@ -24,7 +24,9 @@ async function openCreateDialog(page: Page) {
   await page.locator("[data-course-entry='ai_image']").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("视频类型")).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "创建图片动效" }),
+  ).toBeVisible();
   return dialog;
 }
 
@@ -36,13 +38,13 @@ test.describe("video-gen error states", () => {
     const dialog = await openCreateDialog(page);
 
     await dialog
-      .getByPlaceholder(/每句话对应一个画面/)
+      .getByPlaceholder(/每一句对应一个画面或镜头/)
       .fill("会被后端 schema 拒绝的脚本");
     api.failNextCreate(422, [
       { loc: ["body", "topic"], msg: "topic 字段非法" },
     ]);
 
-    await dialog.getByRole("button", { name: "生成视频" }).click();
+    await dialog.getByRole("button", { name: "创建并编辑分镜" }).click();
 
     await expect(page.getByText("topic 字段非法")).toBeVisible({
       timeout: 5_000,
@@ -57,12 +59,12 @@ test.describe("video-gen error states", () => {
     const api = mockVideoAPI(page);
     const dialog = await openCreateDialog(page);
 
-    await dialog.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "文字动效" }).click();
-    await dialog.getByPlaceholder(/粘贴\/上传课程脚本/).fill("课程脚本内容");
+    await dialog
+      .getByPlaceholder(/每一句对应一个画面或镜头/)
+      .fill("课程脚本内容");
     api.failNextCreate(503, "Remotion 渲染池不可用");
 
-    await dialog.getByRole("button", { name: "生成视频" }).click();
+    await dialog.getByRole("button", { name: "创建并编辑分镜" }).click();
 
     await expect(page.getByText("Remotion 渲染池不可用")).toBeVisible({
       timeout: 5_000,

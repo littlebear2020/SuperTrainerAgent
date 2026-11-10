@@ -366,7 +366,9 @@ test.describe("Video Gen — Create Task Dialog", () => {
     page,
   }) => {
     await page.locator("[data-course-entry='ai_image']").click();
-    await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible({ timeout: 5_000 });
 
     // Language label should be visible
     await expect(page.getByText("语言")).toBeVisible();
@@ -376,7 +378,9 @@ test.describe("Video Gen — Create Task Dialog", () => {
     page,
   }) => {
     await page.locator("[data-course-entry='ai_image']").click();
-    await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible({ timeout: 5_000 });
 
     // Open advanced settings
     await page.getByText("高级设置").click();
@@ -404,7 +408,9 @@ test.describe("Video Gen — Create Task Dialog", () => {
     page,
   }) => {
     await page.locator("[data-course-entry='ai_image']").click();
-    await expect(page.getByText("视频类型")).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible({ timeout: 5_000 });
     await page.getByText("高级设置").click();
 
     const trigger = page.getByRole("button", { name: "选择背景音乐" });

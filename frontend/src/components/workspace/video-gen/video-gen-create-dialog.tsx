@@ -1407,9 +1407,10 @@ function DialogScriptInput(
     | "isPending"
     | "cfg"
     | "handleLangChange"
-  >,
+  > & { focused?: boolean },
 ) {
   const {
+    focused = false,
     taskType,
     mode,
     courseParseMode,
@@ -1434,7 +1435,9 @@ function DialogScriptInput(
       {mode === "fixed" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">脚本</label>
+            <label className="text-sm font-medium">
+              {focused ? "视频脚本" : "脚本"}
+            </label>
             <Button
               type="button"
               variant="outline"
@@ -1499,12 +1502,18 @@ function DialogScriptInput(
           <Textarea
             value={script}
             onChange={(e) => setScript(e.target.value)}
-            placeholder={cfg.placeholder}
+            placeholder={
+              focused
+                ? "每一句对应一个画面或镜头。例如：\n先介绍今天要解决的问题。\n再用一个具体案例说明方法。"
+                : cfg.placeholder
+            }
+            className={cn(focused && "border-indigo-200/70 bg-white/80")}
             rows={5}
           />
           <p className="text-muted-foreground text-xs">
-            每句话对应一个画面，用句号或换行分隔；可上传 docx/doc/txt/md/pdf
-            文档自动解析
+            {focused
+              ? "每一句对应一个画面或镜头；可用句号或换行分隔，也可上传文档自动解析"
+              : "每句话对应一个画面，用句号或换行分隔；可上传 docx/doc/txt/md/pdf 文档自动解析"}
             <span
               className={cn("ml-2", script.length > 20000 && "text-red-500")}
             >
@@ -1626,12 +1635,23 @@ function DialogScriptInput(
 export function CreateTaskDialog({
   open,
   onOpenChange,
-  initialTaskType = "ai_image",
+  initialTaskType,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialTaskType?: InitialVideoTaskType;
 }) {
+  const focused = initialTaskType !== undefined;
+  const presentation =
+    initialTaskType === "ai_video"
+      ? {
+          title: "创建 AI 动态视频",
+          description: "用脚本生成连贯的动态场景，让内容以视频形式呈现",
+        }
+      : {
+          title: "创建图片动效",
+          description: "用脚本生成静态画面，再通过镜头运动串成视频",
+        };
   // T-E5（R20）：联合补全 remotion_course——修前 4 值联合 + as 强转把
   // remotion_course 挤到联合外（Select 值实际可为它）。
   const {
@@ -1724,47 +1744,78 @@ export function CreateTaskDialog({
   } = useCreateTaskForm({ open, onOpenChange, initialTaskType });
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Film className="h-5 w-5 text-indigo-500" />
-            创建视频任务
+      <DialogContent
+        className={cn(
+          "flex max-h-[90vh] flex-col sm:max-w-2xl",
+          focused &&
+            "rounded-3xl border-indigo-200/70 bg-gradient-to-b from-white via-indigo-50/40 to-white shadow-2xl",
+        )}
+      >
+        <DialogHeader
+          className={
+            focused
+              ? "rounded-2xl border border-indigo-100/70 bg-white/75 p-4"
+              : undefined
+          }
+        >
+          <DialogTitle className="flex items-center gap-3">
+            <span className={cn(focused && "rounded-xl bg-indigo-100 p-2")}>
+              <Film className="h-5 w-5 text-indigo-500" />
+            </span>
+            {focused ? presentation.title : "创建视频任务"}
           </DialogTitle>
+          {focused ? (
+            <p className="text-muted-foreground text-sm">
+              {presentation.description}
+            </p>
+          ) : null}
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4">
+        <div
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto py-4",
+            focused ? "space-y-5" : "space-y-4",
+          )}
+        >
           {/* ── Basic settings ──────────────────────────────────── */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">视频类型</label>
-            <Select value={taskType} onValueChange={handleTypeChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {/* T12（四轮修订）：两个创建 tab 间加选型指引 */}
-                <p className="text-muted-foreground mt-1 text-xs">
-                  有成稿/课件 → 文字动效；只有想法/主题 → AI 生图
-                </p>
-                {Object.entries(TYPE_CONFIG).map(([key, val]) => (
-                  <SelectItem key={key} value={key}>
-                    {val.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">{cfg.desc}</p>
-          </div>
+          {!focused ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">视频类型</label>
+              <Select value={taskType} onValueChange={handleTypeChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* T12（四轮修订）：两个创建 tab 间加选型指引 */}
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    有成稿/课件 → 文字动效；只有想法/主题 → AI 生图
+                  </p>
+                  {Object.entries(TYPE_CONFIG).map(([key, val]) => (
+                    <SelectItem key={key} value={key}>
+                      {val.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">{cfg.desc}</p>
+            </div>
+          ) : null}
 
           {/* 2026-10-20 Task 5：任务标题（所有类型可见；空则取脚本前 30 字）。 */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">任务标题（可选）</label>
+            <label className="text-sm font-medium">
+              {focused ? "作品标题（可选）" : "任务标题（可选）"}
+            </label>
             <input
               type="text"
               maxLength={80}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="留空则取脚本前 30 字"
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className={cn(
+                "border-input bg-background h-9 w-full rounded-md border px-3 text-sm",
+                focused && "border-indigo-200/70 bg-white/80",
+              )}
             />
           </div>
 
@@ -1780,7 +1831,7 @@ export function CreateTaskDialog({
             </p>
           </div>
 
-          {cfg.supportsGenerate && (
+          {!focused && cfg.supportsGenerate && (
             <div className="space-y-2">
               <label className="text-sm font-medium">生成方式</label>
               <div className="border-border/50 bg-muted/30 flex gap-1 rounded-lg border p-1">
@@ -1812,7 +1863,7 @@ export function CreateTaskDialog({
             </div>
           )}
 
-          {mode === "generate" && cfg.supportsGenerate && (
+          {!focused && mode === "generate" && cfg.supportsGenerate && (
             <div className="space-y-2">
               <label className="text-sm font-medium">话题</label>
               <Textarea
@@ -1843,6 +1894,7 @@ export function CreateTaskDialog({
             isPending={isPending}
             cfg={cfg}
             handleLangChange={handleLangChange}
+            focused={focused}
           />
 
           {/* 2026-10-20 Task 5（已拍板）：Vimax fixed 目标时长放在创建主表单，
@@ -1930,7 +1982,7 @@ export function CreateTaskDialog({
           </Button>
           <Button onClick={handleSubmit} disabled={isPending || !canSubmit}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            生成视频
+            {focused ? "创建并编辑分镜" : "生成视频"}
           </Button>
         </DialogFooter>
       </DialogContent>

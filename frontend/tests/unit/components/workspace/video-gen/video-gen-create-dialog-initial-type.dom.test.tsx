@@ -2,6 +2,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const h = vi.hoisted(() => ({ submitMutate: vi.fn() }));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
 }));
@@ -11,7 +13,11 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/core/video-gen/hooks", () => ({
-  useSubmitVideo: () => ({ mutate: vi.fn(), isPending: false, reset: vi.fn() }),
+  useSubmitVideo: () => ({
+    mutate: h.submitMutate,
+    isPending: false,
+    reset: vi.fn(),
+  }),
   useBGMUpload: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -107,20 +113,29 @@ import {
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function taskTypeSelect(): HTMLSelectElement {
-  const select = Array.from(document.querySelectorAll("select")).find((item) =>
-    Array.from(item.options).some((option) => option.value === "vimax"),
+function findTaskTypeSelect(): HTMLSelectElement | null {
+  return (
+    Array.from(document.querySelectorAll("select")).find((item) =>
+      Array.from(item.options).some((option) => option.value === "vimax"),
+    ) ?? null
   );
-  if (!select) throw new Error("task type select not found");
-  return select;
 }
 
 async function changeTaskType(value: string) {
-  const select = taskTypeSelect();
+  const select = findTaskTypeSelect();
+  if (!select) throw new Error("task type select not found");
   await act(async () => {
     Reflect.set(select, "value", value);
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
+}
+
+function button(text: string): HTMLButtonElement {
+  const result = Array.from(document.querySelectorAll("button")).find((item) =>
+    item.textContent?.includes(text),
+  );
+  if (!result) throw new Error(`button not found: ${text}`);
+  return result;
 }
 
 describe("CreateTaskDialog initialTaskType", () => {
@@ -128,6 +143,7 @@ describe("CreateTaskDialog initialTaskType", () => {
   let root: Root;
 
   beforeEach(() => {
+    h.submitMutate.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -151,34 +167,66 @@ describe("CreateTaskDialog initialTaskType", () => {
     });
   }
 
-  it("initializes ai_video from initialTaskType", async () => {
+  it("uses focused AI dynamic video copy without type or topic controls", async () => {
     await render("ai_video");
-    const select = taskTypeSelect();
-    expect(select.value).toBe("ai_video");
-    expect(select.selectedOptions[0]?.textContent).toBe(
-      TYPE_CONFIG.ai_video!.label,
-    );
-    expect(select.value).not.toBe("ai_image");
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("创建 AI 动态视频");
+    expect(text).toContain("用脚本生成连贯的动态场景");
+    expect(text).not.toContain("视频类型");
+    expect(text).not.toContain("生成方式");
+    expect(text).not.toContain("话题生成");
+    expect(findTaskTypeSelect()).toBeNull();
   });
 
-  it("initializes ai_image and defaults to ai_image", async () => {
+  it("uses image-motion copy and submits the existing fixed-script payload", async () => {
     await render("ai_image");
-    expect(taskTypeSelect().selectedOptions[0]?.textContent).toBe(
-      TYPE_CONFIG.ai_image!.label,
-    );
-    await act(async () => root.unmount());
-    root = createRoot(container);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("创建图片动效");
+    expect(text).toContain("通过镜头运动串成视频");
+    expect(text).toContain("作品标题（可选）");
+    expect(text).toContain("视频脚本");
+    expect(findTaskTypeSelect()).toBeNull();
+    expect(text).not.toContain("话题生成");
+    expect(
+      document
+        .querySelector("[role='dialog']")
+        ?.className.includes("from-white"),
+    ).toBe(true);
+
+    const script = document.querySelector("textarea");
+    if (!script) throw new Error("script textarea not found");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set?.call(script, "第一句。\n第二句。");
+      script.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button("创建并编辑分镜").click());
+    expect(h.submitMutate).toHaveBeenCalledTimes(1);
+    expect(h.submitMutate.mock.calls[0]?.[0]).toMatchObject({
+      video_type: "ai_image",
+      mode: "fixed",
+      script: "第一句。\n第二句。",
+    });
+  });
+
+  it("keeps the legacy generic dialog and default ai_image without initialTaskType", async () => {
     await render();
-    expect(taskTypeSelect().selectedOptions[0]?.textContent).toBe(
+    expect(document.body.textContent).toContain("创建视频任务");
+    expect(document.body.textContent).toContain("生成方式");
+    const select = findTaskTypeSelect();
+    expect(select?.value).toBe("ai_image");
+    expect(select?.selectedOptions[0]?.textContent).toBe(
       TYPE_CONFIG.ai_image!.label,
     );
   });
 
-  it("does not rewrite task type on ordinary rerender", async () => {
-    await render("ai_video");
+  it("does not rewrite legacy task type on ordinary rerender", async () => {
+    await render();
     await changeTaskType("remotion_course");
-    expect(taskTypeSelect().value).toBe("remotion_course");
-    await render("ai_video");
-    expect(taskTypeSelect().value).toBe("remotion_course");
+    expect(findTaskTypeSelect()?.value).toBe("remotion_course");
+    await render();
+    expect(findTaskTypeSelect()?.value).toBe("remotion_course");
   });
 });

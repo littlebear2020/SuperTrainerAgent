@@ -37,11 +37,17 @@ test.describe("home course entries", () => {
     await page.goto("/workspace");
     await page.locator("[data-course-entry='ai_image']").click();
     let dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("combobox").first()).toHaveText("AI 生图");
+    await expect(
+      dialog.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible();
+    await expect(dialog.getByText("视频类型")).toHaveCount(0);
+    await expect(dialog.getByText("话题生成")).toHaveCount(0);
     await dialog.getByRole("button", { name: "取消" }).click();
     await page.locator("[data-course-entry='ai_video']").click();
     dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("combobox").first()).toHaveText("AI 生视频");
+    await expect(
+      dialog.getByRole("heading", { name: "创建 AI 动态视频" }),
+    ).toBeVisible();
   });
 
   test("alternating AI entries starts clean after close", async ({ page }) => {
@@ -50,7 +56,7 @@ test.describe("home course entries", () => {
     let dialog = page.getByRole("dialog");
     await dialog.getByPlaceholder("留空则取脚本前 30 字").fill("残留标题");
     await dialog
-      .getByPlaceholder(/每句话对应一个画面/)
+      .getByPlaceholder(/每一句对应一个画面或镜头/)
       .fill("不应残留的旧脚本");
     await dialog.getByRole("button", { name: /高级设置/ }).click();
     await dialog.getByRole("checkbox", { name: "跟随默认" }).uncheck();
@@ -58,11 +64,15 @@ test.describe("home course entries", () => {
 
     await page.locator("[data-course-entry='ai_video']").click();
     dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("combobox").first()).toHaveText("AI 生视频");
+    await expect(
+      dialog.getByRole("heading", { name: "创建 AI 动态视频" }),
+    ).toBeVisible();
     await expect(dialog.getByPlaceholder("留空则取脚本前 30 字")).toHaveValue(
       "",
     );
-    await expect(dialog.getByPlaceholder(/每句话对应一个画面/)).toHaveValue("");
+    await expect(
+      dialog.getByPlaceholder(/每一句对应一个画面或镜头/),
+    ).toHaveValue("");
     await expect(
       dialog.getByRole("checkbox", { name: "跟随默认" }),
     ).toHaveCount(0);
@@ -74,11 +84,17 @@ test.describe("home course entries", () => {
 
     await page.locator("[data-course-entry='ai_image']").click();
     dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("combobox").first()).toHaveText("AI 生图");
+    await expect(
+      dialog.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible();
+    await expect(dialog.getByText("视频类型")).toHaveCount(0);
+    await expect(dialog.getByText("话题生成")).toHaveCount(0);
     await expect(dialog.getByPlaceholder("留空则取脚本前 30 字")).toHaveValue(
       "",
     );
-    await expect(dialog.getByPlaceholder(/每句话对应一个画面/)).toHaveValue("");
+    await expect(
+      dialog.getByPlaceholder(/每一句对应一个画面或镜头/),
+    ).toHaveValue("");
     await expect(
       dialog.getByRole("checkbox", { name: "跟随默认" }),
     ).toHaveCount(0);

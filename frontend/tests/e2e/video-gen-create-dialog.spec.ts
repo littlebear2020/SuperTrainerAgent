@@ -89,7 +89,9 @@ test.describe("video-gen create dialog — advanced panel + width", () => {
     await page.locator("[data-course-entry='ai_image']").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: 5_000 });
-    await expect(dialog.getByText("视频类型")).toBeVisible();
+    await expect(
+      dialog.getByRole("heading", { name: "创建图片动效" }),
+    ).toBeVisible();
 
     // Advanced controls are collapsed by default.
     await expect(dialog.getByText("字幕样式")).toHaveCount(0);

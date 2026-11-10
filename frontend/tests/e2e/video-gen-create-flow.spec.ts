@@ -41,17 +41,19 @@ test("video creation navigates to storyboard and polls until frames land", async
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("视频类型")).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "创建图片动效" }),
+  ).toBeVisible();
 
   await dialog
-    .getByPlaceholder(/每句话对应一个画面/)
+    .getByPlaceholder(/每一句对应一个画面或镜头/)
     .fill("欢迎加入团队。第一天重点了解安全与合规。");
 
-  const languageTrigger = dialog.getByRole("combobox").nth(3);
+  const languageTrigger = dialog.getByRole("combobox").nth(2);
   await languageTrigger.click();
   await page.getByRole("option", { name: "中文" }).click();
 
-  const voiceTrigger = dialog.getByRole("combobox").nth(4);
+  const voiceTrigger = dialog.getByRole("combobox").nth(3);
   await voiceTrigger.click();
   await page.getByRole("option", { name: /云健/ }).click();
 
@@ -59,7 +61,7 @@ test("video creation navigates to storyboard and polls until frames land", async
   await dialog.getByRole("button", { name: "选择背景音乐" }).click();
   await page.getByRole("option", { name: /清晨钢琴/ }).click();
 
-  await dialog.getByRole("button", { name: "生成视频" }).click();
+  await dialog.getByRole("button", { name: "创建并编辑分镜" }).click();
 
   await expect(page).toHaveURL(
     /\/workspace\/video-gen\/vg-created-e2e\/storyboard$/,
