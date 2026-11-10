@@ -1,6 +1,6 @@
 # Agent 新会话引导页重构实施计划
 
-> **状态**：待执行（两轮设计评审已批准；须先收尾创建框批次，任务 1–8 均未执行）。
+> **状态**：已执行（任务 1–8 完成；独立审查 Important 项已修复；[执行记录](../changelog/changelog-2026-11-10-agent-new-chat-redesign.md)；未 push、未部署）。
 > **TL;DR**：仅为四个目标 Agent 的 `chats/new` 增加页面级双语任务引导、16 张案例卡与明确的预填状态机，并清理 Co-writer 阶段内部标记；不改后端、seed、SOUL、技能或性能预算；单执行者按 TDD 串行提交，真实链路留作另行授权的人工验收。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 本批明确采用单执行者串行，不使用 subagent-driven-development，不并行修改共享文件。
@@ -126,23 +126,23 @@ frontier 已清空；执行中不得重新发明上述决策。若新事实与�
 - 每个 case 含稳定 `id/title/description/prompt`；共享 `Translations.agents.newChatGuide` 含案例区、Tips、加载、失败、重试和草稿三选一文案。
 - `types.ts` 可从 `core/agents/new-chat` import 类型；`new-chat.ts` 不得反向 import i18n。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 在 node 测试中断言：四个 ID 顺序与设计表一致；`resolveAgentName("card-poster")` 与 `resolveAgentName("course-ppt")` 经守卫分别命中 Creative/PPT；`test-agent` 不命中。对 zh/en 两语言逐 Agent 断言恰好 4 个非空案例、3 条 Tips、案例 ID 集合一致；Creative IDs 固定为 `knowledge-card/course-poster/infographic/series-card`，Co-writer IDs 固定为 `article/case/script/podcast`，其 prompt 分别含对应 `[类型: …]` 和 `[从零创作]`。四个中文 Hero 标题逐字等于设计 §5。
 
 逐一断言 16 个案例的标题/说明/prompt 不含 `auto-video-flow`、`deep-research`、`/skill` 或作为内部 Skill 名的 `ppt-master`。PPT 的 from-scratch prompt 明确保留“快速生成/跳过策略确认”语义，roundtrip prompt 明确保留“现有 PPT/保持原设计”语义；英文用对应自然语言，不要求中文字面相同。
 
-- [ ] **Step 2：确认因模块和翻译键缺失而失败**
+- [x] **Step 2：确认因模块和翻译键缺失而失败**
 
 Run: `cd frontend && pnpm exec vitest run --project node tests/unit/core/agents/new-chat.test.ts`
 
 Expected: FAIL，原因是 `new-chat.ts` 尚不存在；若先出现 import harness 拼写错误，修正后必须看到这一功能原因。
 
-- [ ] **Step 3：最小实现内容与类型**
+- [x] **Step 3：最小实现内容与类型**
 
 创建无 React 依赖的 ID 常量/守卫并从 agents index 导出；扩展 i18n 类型和两个语言包。案例自然语言围绕设计 §5，英文 prompt 翻译自然语言但保留 Co-writer 标记；不得写入 raw Skill 名、虚构能力或自动提交指令。现有 i18n 脚本不深入 Record 内部，不得以该脚本通过替代上述内容测试。
 
-- [ ] **Step 4：确认内容测试和静态门禁通过**
+- [x] **Step 4：确认内容测试和静态门禁通过**
 
 Run:
 ```bash
@@ -153,7 +153,7 @@ pnpm exec eslint src/core/agents/new-chat.ts src/core/agents/index.ts src/core/i
 ```
 Expected: 全部 exit 0。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/core/agents/new-chat.ts frontend/src/core/agents/index.ts frontend/src/core/i18n/locales/types.ts frontend/src/core/i18n/locales/zh-CN.ts frontend/src/core/i18n/locales/en-US.ts frontend/tests/unit/core/agents/new-chat.test.ts
@@ -174,21 +174,21 @@ git commit -m "feat(agent): 添加新会话双语案例内容契约"
 - `agentName: AgentNewChatGuideId`；`handoffReady: boolean`；`status: "loading" | "error" | "ready"`；`disabled?: boolean`；`onRetry?: () => void`；`children: ReactNode` 为现有 InputBox。
 - 组件顺序固定 Hero → 4 案例 → children/InputBox → 3 Tips；loading/error 不渲染案例，error 显示重试。
 
-- [ ] **Step 1：写展示失败测试**
+- [x] **Step 1：写展示失败测试**
 
 用真实 I18nProvider 和简单 `<textarea name="message">` child 渲染。断言：中文 Hero/短名/4 卡/3 Tips；图标来自 `agentAppearance` 而非 Bot；案例 button 的 accessible name 为案例标题；组件含正常文档流容器而非 absolute/固定 translate；`handoffReady=false` 或 `disabled=true` 时按钮禁用；loading/error 无案例，error retry 调用一次 `onRetry`。
 
-- [ ] **Step 2：确认组件不存在导致失败**
+- [x] **Step 2：确认组件不存在导致失败**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx`
 
 Expected: FAIL，原因是组件模块不存在。
 
-- [ ] **Step 3：实现最小展示**
+- [x] **Step 3：实现最小展示**
 
 实现上述 props、语义 heading/button、两列桌面/单列移动端类、可滚动容器和状态分支；从 i18n 与 appearance 取词/图标，不建立复制表。此时案例只负责展示，预填由 Task 3 接入；不得添加自动提交。
 
-- [ ] **Step 4：确认展示测试与格式通过**
+- [x] **Step 4：确认展示测试与格式通过**
 
 Run:
 ```bash
@@ -198,7 +198,7 @@ pnpm exec prettier --check src/components/workspace/agent-new-chat-guide.tsx tes
 ```
 Expected: 全部 PASS / exit 0。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/agent-new-chat-guide.tsx frontend/tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx
@@ -218,27 +218,27 @@ git commit -m "feat(agent): 新增任务型新会话引导组件"
 - Task 2 的对外 props 不变；组件内部管理 pending prompt 和确认框。
 - 空/纯空白草稿直接 set prompt；非空草稿经确认后 replace 为 prompt，或 append 为“原草稿 + 必要的一个换行 + prompt”；取消不改值。所有路径只聚焦，不提交。
 
-- [ ] **Step 1：增加行为失败测试**
+- [x] **Step 1：增加行为失败测试**
 
 在 PromptInputProvider 下覆盖：空草稿点击写入当前 locale 的精确 prompt；非空点击先开框且值不变；取消不变；替换精确等于 prompt；追加保留原草稿并以换行连接；替换/追加后 textarea 聚焦且光标在末尾，不选中 Co-writer 类型标记；handoff 未 ready/disabled 时无变化；locale 切换只改变后续案例，不改已经预填的值。
 
-- [ ] **Step 2：确认因缺少预填和确认框而失败**
+- [x] **Step 2：确认因缺少预填和确认框而失败**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx`
 
 Expected: 新行为用例 FAIL（textarea 未取得 prompt / 确认框不存在），Task 2 展示用例仍 PASS。
 
-- [ ] **Step 3：实现最小状态机**
+- [x] **Step 3：实现最小状态机**
 
 在组件内使用现有 controller、Dialog 和 i18n 文案实现三选一；状态提交后用一次短任务聚焦现有 `textarea[name='message']`，不引入全局输入状态、不自动 `requestSubmit`、不调用 `onSubmit`。追加不得删除原草稿内容。
 
-- [ ] **Step 4：确认全部组件测试通过**
+- [x] **Step 4：确认全部组件测试通过**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx`
 
 Expected: 展示与全部行为用例 PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/agent-new-chat-guide.tsx frontend/tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx
@@ -261,25 +261,25 @@ git commit -m "feat(agent): 完善案例预填与草稿确认交互"
 - 保持 `stripInternalMarkers(content: string): string` 签名不变；在既有 XML 内部标签清理后，再剥离消息开头的 OUTLINE/DRAFT stage token。
 - 现有 `message-list-item.tsx` 与 `core/threads/export.ts` 调用方不改；Markdown 导出同样不得包含阶段标记。
 
-- [ ] **Step 1：写失败测试**
+- [x] **Step 1：写失败测试**
 
 在现有 utils 测试新增：`[[STAGE:OUTLINE]]\n\n# 大纲` 与 `[[STAGE:DRAFT]]\n\n正文` 分别只返回大纲/正文；普通文本不变；正文中间出现 `[[STAGE:OUTLINE]]` 时原样保留；与既有 `<system_reminder>` 组合时两类内部标记都清理；同一文本连续调用两次 `stripInternalMarkers` 结果完全相同（幂等）。
 
 在 `export.test.ts` 增加正面行为断言：含开头 `[[STAGE:OUTLINE]]` 的 AI 消息经 `formatThreadAsMarkdown` 后保留正文且不包含 `STAGE` 标记。
 
-- [ ] **Step 2：确认消息与导出当前均泄漏阶段标记**
+- [x] **Step 2：确认消息与导出当前均泄漏阶段标记**
 
 Run: `cd frontend && pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts tests/unit/core/threads/export.test.ts`
 
-Expected: 仅新增 stage/导出/幂等用例 FAIL，现有用例 PASS。
+Expected: 仅新增 stage/导出用例 FAIL；幂等、正文保留与现有用例 PASS。
 
-- [ ] **Step 3：最小复用现有 parser 并校订注释**
+- [x] **Step 3：最小复用现有 parser 并校订注释**
 
 在 `stripInternalMarkers` 中复用 `parseStageSignal` 处理完成既有标签清理后的文本，并保持最终 trim 语义。不得新增第二套阶段正则、移动 Writer 代码或修改消息组件。
 
 同步校订 `core/streamdown/fences.ts` 顶部 dependency-free 注释：明确“fences 本身保持零依赖；consumer 可拥有自己的无环依赖”，避免被误读为 `core/messages/utils.ts` 永远不得 import。只改注释，不改 fence 正则或逻辑。
 
-- [ ] **Step 4：运行消息、导出与 Writer parser 回归**
+- [x] **Step 4：运行消息、导出与 Writer parser 回归**
 
 Run:
 ```bash
@@ -288,7 +288,7 @@ pnpm exec vitest run --project node tests/unit/core/messages/utils.test.ts tests
 ```
 Expected: 三个既有测试文件全部 PASS，导出正面断言与幂等断言实际执行。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/core/messages/utils.ts frontend/src/core/streamdown/fences.ts frontend/tests/unit/core/messages/utils.test.ts frontend/tests/unit/core/threads/export.test.ts
@@ -308,21 +308,21 @@ git commit -m "feat(agent): 剥离协同写作阶段内部标记"
 - 唯一行为变化：现有 `isNewThread && mounted && mode !== "skill"` 渲染条件 additionally 要求 `showNewThreadSuggestions`。
 - 非目标调用方不传 prop；不得改 `SuggestionList`、follow-up、上传、模型或提交逻辑。
 
-- [ ] **Step 1：写两个方向的失败/回归测试**
+- [x] **Step 1：写两个方向的失败/回归测试**
 
 沿用现有 InputBox harness。传 `false + isNewThread=true` 时，分别用有专属 skills/prompts 与 `skills=[] + 全站 enabled skills` 两种 fixture，断言 raw Skill、惊喜、Agent chip、通用建议、创建菜单和分类列表均不在 DOM。默认不传 prop 时，原有专属 chips 和 `skills=[]` 的全站回退仍显示，覆盖 vimax 语义。
 
-- [ ] **Step 2：确认新 prop 尚未生效**
+- [x] **Step 2：确认新 prop 尚未生效**
 
 Run: `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/input-box-new-thread-suggestions.dom.test.tsx`
 
 Expected: `showNewThreadSuggestions=false` 用例 FAIL，旧建议仍在；默认行为回归用例 PASS。
 
-- [ ] **Step 3：添加单点门控**
+- [x] **Step 3：添加单点门控**
 
 增加默认 true 的可选 prop，并只修改新会话 SuggestionList 的渲染谓词。不得通过 CSS 隐藏、空数组或删除 SuggestionList 实现。
 
-- [ ] **Step 4：运行定向和 InputBox 相邻回归**
+- [x] **Step 4：运行定向和 InputBox 相邻回归**
 
 Run:
 ```bash
@@ -331,7 +331,7 @@ pnpm exec vitest run --project dom tests/unit/components/workspace/input-box-new
 ```
 Expected: 全部 PASS。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/components/workspace/input-box.tsx frontend/tests/unit/components/workspace/input-box-new-thread-suggestions.dom.test.tsx
@@ -357,7 +357,7 @@ git commit -m "feat(agent): 支持新会话显式关闭旧建议区"
 - `MockAgent` 允许 `skills` / `suggestion_prompts`；`mockLangGraphAPI` 增加可选 skills fixture 并 mock `/api/skills`，默认 `{skills: []}`，其他默认响应不变。
 - E2E 用相对路径导入 `zhCN/enUS`，不复制 prompt；先以 `--list` 验证 Playwright 编译该依赖图。
 
-- [ ] **Step 1：在实现前写重 stub 页面 DOM 与完整行为级 E2E**
+- [x] **Step 1：在实现前写重 stub 页面 DOM 与完整行为级 E2E**
 
 页面 DOM 用 `vi.mock` 将 ChatBox、MessageList、AgentNewChatGuide、InputBox、AgentWelcome 等重组件 stub；在 mock 实现中把最新 props 记录到 `vi.hoisted` 创建的 `h` 对象，以 `h.inputBoxProps` / `h.guideProps` 等 spy 断言接线，而非渲染真实重组件。覆盖：目标新会话显示 guide、顶栏短名、`showNewThreadSuggestions=false`、`autoFocus=false`；已有目标线程不显示 guide；非目标仍用 AgentWelcome；loading/error props 与 retry/refetch；当前 handoff key 未完成时 `handoffReady=false`，effect 完成后才开放；搜索参数变化会重新关闭 gate 且同一个 InputBox stub 不发生 unmount/remount；静态 Demo 禁用。
 
@@ -371,7 +371,7 @@ git commit -m "feat(agent): 支持新会话显式关闭旧建议区"
 - Agent GET 在用户点击 Retry 前持续 500，错误态保持且不会自动恢复；点击后才返回 200 并显示 guide。loading 时无案例且不可提交。
 - 桌面和 390px 下以 `boundingBox()` 断言案例区.bottom ≤ InputBox.top、InputBox.bottom ≤ Tips.top，且无横向溢出；键盘可聚焦/激活案例；每个测试结束 `pageErrors=[]`。
 
-- [ ] **Step 2：先验证测试依赖图，再确认旧页面功能红灯**
+- [x] **Step 2：先验证测试依赖图，再确认旧页面功能红灯**
 
 Run:
 ```bash
@@ -383,13 +383,13 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts --workers=1
 
 Expected: `--list` 成功解析相对 locale import 并列出真实用例；目标 Hero/短名/gate/retry 与四路由案例 E2E FAIL；已有线程和非目标回归用例 PASS。若 alias/依赖图不能解析，改用已验证的相对导入并重新 list，不复制 prompt；不得把 harness 失败计作功能红灯。
 
-- [ ] **Step 3：实现最小页面分支与显式 handoff 状态**
+- [x] **Step 3：实现最小页面分支与显式 handoff 状态**
 
 从 `useAgent` 取 `isLoading/error/refetch`，目标新会话以正常文档流渲染 `AgentNewChatGuide` 和同一个 InputBox，传 `showNewThreadSuggestions=false`、`autoFocus=false`；加载/失败时禁用输入，失败 retry 只调用 `refetch`。目标新会话顶栏使用 `displayName`。
 
 保留 handoff 原 effect、prefillRunRef、原提交与原生 history 替换；在 effect 末尾同步 `handoffDoneKey`，并用当前 key 派生 ready。该 setState 只用于将外部 handoff 消费完成状态接入 React，以单点内联注释说明 lint 例外；不得使用 mounted 代替，不得 key-remount InputBox。非目标和已有会话保留原 absolute 布局、autoFocus 与 AgentWelcome。
 
-- [ ] **Step 4：确认 DOM、完整 E2E 与静态检查通过**
+- [x] **Step 4：确认 DOM、完整 E2E 与静态检查通过**
 
 Run:
 ```bash
@@ -401,7 +401,7 @@ pnpm exec tsc --noEmit
 ```
 Expected: 全部 PASS / exit 0；16 次案例点击、bounding-box、持续失败到手动 retry、发送计数和 pageerror 断言实际执行；不修改 `eslint-suppressions.json`。若失败，先区分选择器、mock 缺失与产品回归，不用固定延时、隐藏 DOM 或删除断言制造通过。
 
-- [ ] **Step 5：提交**
+- [x] **Step 5：提交**
 
 ```bash
 git add frontend/src/core/agents/hooks.ts 'frontend/src/app/workspace/agents/[agent_name]/chats/[thread_id]/page.tsx' frontend/tests/unit/app/workspace/agents/agent-chat-page.dom.test.tsx frontend/tests/e2e/utils/mock-api.ts frontend/tests/e2e/agent-new-chat-guide.spec.ts
@@ -420,7 +420,7 @@ git commit -m "feat(agent): 接入四个新会话任务引导页"
 **Interfaces:**
 - Consumes Task 6 已转绿的行为 spec；本任务是纯验证检查点，不新增实现，不伪造失败测试，不产生空提交。
 
-- [ ] **Step 1：运行新引导与相邻旧 E2E**
+- [x] **Step 1：运行新引导与相邻旧 E2E**
 
 Run:
 ```bash
@@ -429,7 +429,7 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts tests/e2e/agent
 ```
 Expected: 全部 PASS；输出无 skipped/failed，发送计数与 pageerror 断言实际执行。
 
-- [ ] **Step 2：核对回归结果与测试产物**
+- [x] **Step 2：核对回归结果与测试产物**
 
 检查原始输出和 `git status`，确认非目标 Agent、历史消息与别名路由均真实运行；若出现失败，返回拥有该行为的任务补红灯并修复，未完成前不得进入全量门禁。测试报告不提交。
 
@@ -446,7 +446,7 @@ Expected: 全部 PASS；输出无 skipped/failed，发送计数与 pageerror 断
 - Consumes Tasks 1–7 的本地提交和真实命令输出。
 - 不改变产品行为，不在收尾阶段顺手引入新功能。
 
-- [ ] **Step 1：先跑静态、单元与文档门禁**
+- [x] **Step 1：先跑静态、单元与文档门禁**
 
 Run:
 ```bash
@@ -457,7 +457,7 @@ cd .. && python3 scripts/check_docs_convention.py
 ```
 Expected: 全部 exit 0；记录实际测试文件/用例数，不写估计值。预计超过阈值的命令按全局约束后台执行。
 
-- [ ] **Step 2：跑完整 E2E 与既有性能门禁**
+- [x] **Step 2：跑完整 E2E 与既有性能门禁**
 
 Run:
 ```bash
@@ -466,17 +466,17 @@ cd frontend && pnpm perf:check
 ```
 Expected: 全部 exit 0；`perf:check` 仅确认五个既有路由无共享包体积回归，保留该完整门禁但不声称覆盖目标 Agent 页面，不改预算。
 
-- [ ] **Step 3：跑仓库根总门禁**
+- [x] **Step 3：跑仓库根总门禁**
 
 Run: `make check`
 
 Expected: exit 0，包含 backend 静态检查、frontend check/knip/i18n 与 docs convention；本批未改 backend，因此不新增 backend pytest 要求，但根门禁不得跳过。
 
-- [ ] **Step 4：核对交付与干净范围**
+- [x] **Step 4：核对交付与干净范围**
 
 运行 `git status --short --branch`、`git diff --check` 和基准以来的 `git log --oneline`。确认无 ban 路径、无测试产物/日志入库、无后台任务、无真实付费请求；逐项勾选 Tasks 1–7，只有实际完成的步骤才能勾选。
 
-- [ ] **Step 5：写 changelog 并提交文档收尾**
+- [x] **Step 5：写 changelog 并提交文档收尾**
 
 changelog 必须含「验收记录」，每行写真实命令与关键输出；行为级覆盖四入口/16 卡、草稿三选一、handoff 不重挂、阶段标记、历史/别名、非目标回退、手动错误重试、三区非重叠、移动端和零 pageerror。真实链路若未获授权，明确写“未执行，不作为本次通过项”。更新计划状态后运行文档检查，再提交：
 
