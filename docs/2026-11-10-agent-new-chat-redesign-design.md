@@ -1,6 +1,6 @@
 # Agent 新会话引导页重构设计
 
-> **状态**：待用户复审（已根据外部评审修订）；仅设计，未授权实现。
+> **状态**：已批准（2026-11-10）；实施任务与执行状态以 `plans/2026-11-10-agent-new-chat-redesign-plan.md` 为准。
 > **TL;DR**：为 course-video、ppt-master、creative-studio、co-writer 的 `chats/new` 建立页面级任务引导，以双语案例预填取代原始 Skill 名；本批只改前端，已有对话、提交链路、Agent 技能与后端种子均不变。
 
 ## 1. 背景与问题
