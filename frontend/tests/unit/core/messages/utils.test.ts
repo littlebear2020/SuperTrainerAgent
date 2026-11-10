@@ -177,6 +177,33 @@ describe("stripInternalMarkers — DEF-03 underscore variants", () => {
   it("leaves content without markers untouched", () => {
     expect(stripInternalMarkers("plain answer")).toBe("plain answer");
   });
+
+  it.each([
+    ["OUTLINE", "# 大纲"],
+    ["DRAFT", "正文"],
+  ])("strips a leading %s stage marker", (stage, expected) => {
+    expect(stripInternalMarkers(`[[STAGE:${stage}]]\n\n${expected}`)).toBe(
+      expected,
+    );
+  });
+
+  it("preserves a stage-like token embedded in body text", () => {
+    const content = "正文提到 [[STAGE:OUTLINE]] 作为示例，不应删除。";
+    expect(stripInternalMarkers(content)).toBe(content);
+  });
+
+  it("strips internal reminders and a stage marker together", () => {
+    expect(
+      stripInternalMarkers(
+        "<system_reminder>internal</system_reminder>\n[[STAGE:DRAFT]]\n正文",
+      ),
+    ).toBe("正文");
+  });
+
+  it("is idempotent when stripping internal markers", () => {
+    const once = stripInternalMarkers("[[STAGE:OUTLINE]]\n\n# 大纲");
+    expect(stripInternalMarkers(once)).toBe(once);
+  });
 });
 
 describe("stripInjectedReminderTags — human render path", () => {

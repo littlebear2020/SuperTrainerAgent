@@ -102,6 +102,15 @@ describe("formatThreadAsMarkdown", () => {
     ]);
     expect(md).not.toContain("confidential");
   });
+
+  it("strips Co-writer stage markers while preserving the content", () => {
+    const md = formatThreadAsMarkdown(makeThread(), [
+      ai("[[STAGE:OUTLINE]]\n\n# 课程大纲\n\n第一章"),
+    ]);
+    expect(md).toContain("# 课程大纲");
+    expect(md).toContain("第一章");
+    expect(md).not.toContain("[[STAGE:");
+  });
 });
 
 describe("formatThreadAsMarkdown opt-in flags", () => {

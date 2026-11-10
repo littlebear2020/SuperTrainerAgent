@@ -1,5 +1,7 @@
 import type { AIMessage, Message } from "@langchain/langgraph-sdk";
 
+import { parseStageSignal } from "@/core/writer/from-scratch-stage";
+
 interface GenericMessageGroup<T = string> {
   type: T;
   id: string | undefined;
@@ -579,11 +581,13 @@ const INTERNAL_MARKER_RE = new RegExp(
  * reminders. Human messages keep using the narrower
  * {@link stripUploadedFilesTag} + {@link stripInjectedReminderTags} so a
  * user legitimately typing ``<memory>`` into a meta-discussion is not
- * eaten. Render-path callers must memoize the result (message content
- * unchanged → same stripped string), per the DEF-06 hot-path rule.
+ * eaten. Co-writer stage signals are likewise internal metadata, not user copy.
+ * Render-path callers must memoize the result (message content unchanged →
+ * same stripped string), per the DEF-06 hot-path rule.
  */
 export function stripInternalMarkers(content: string): string {
-  return content.replace(INTERNAL_MARKER_RE, "").trim();
+  const stripped = content.replace(INTERNAL_MARKER_RE, "").trim();
+  return parseStageSignal(stripped).text.trim();
 }
 
 /**

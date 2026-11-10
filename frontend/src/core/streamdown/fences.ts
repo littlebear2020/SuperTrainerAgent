@@ -1,9 +1,9 @@
 /**
  * Fence and indented-code detection shared by the render path
  * (`core/streamdown/preprocess.ts`) and the export scrub
- * (`core/messages/utils.ts::stripInternalMarkers`). Kept dependency-free: both
- * consumers already depend on each other's module graph, so the regexes live
- * in a leaf module they can import without a cycle.
+ * (`core/messages/utils.ts::stripInternalMarkers`). This leaf module stays
+ * dependency-free; each consumer may have its own acyclic dependencies, so both
+ * can import these regexes without introducing a cycle.
  *
  * （PR-2 3.4：自上游 DeerFlow 同源移植，无本地改写。）
  */
