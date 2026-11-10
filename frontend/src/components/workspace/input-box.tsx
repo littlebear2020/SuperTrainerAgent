@@ -223,6 +223,7 @@ export function InputBox({
   initialValue,
   agentSkills,
   agentSuggestionPrompts,
+  showNewThreadSuggestions = true,
   onContextChange,
   onFollowupsVisibilityChange,
   onSubmit,
@@ -247,6 +248,7 @@ export function InputBox({
   initialValue?: string;
   agentSkills?: string[] | null;
   agentSuggestionPrompts?: { label: string; prompt: string }[] | null;
+  showNewThreadSuggestions?: boolean;
   onContextChange?: (
     context: Omit<
       AgentThreadContext,
@@ -1061,14 +1063,17 @@ export function InputBox({
         )}
       </PromptInput>
 
-      {isNewThread && mounted && searchParams.get("mode") !== "skill" && (
-        <div className="absolute top-full right-0 left-0 w-full pt-2">
-          <SuggestionList
-            agentSkills={agentSkills}
-            agentSuggestionPrompts={agentSuggestionPrompts}
-          />
-        </div>
-      )}
+      {isNewThread &&
+        showNewThreadSuggestions &&
+        mounted &&
+        searchParams.get("mode") !== "skill" && (
+          <div className="absolute top-full right-0 left-0 w-full pt-2">
+            <SuggestionList
+              agentSkills={agentSkills}
+              agentSuggestionPrompts={agentSuggestionPrompts}
+            />
+          </div>
+        )}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
