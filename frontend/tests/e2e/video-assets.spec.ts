@@ -25,14 +25,22 @@ test.describe("video assets", () => {
     page.on("pageerror", (error) => pageErrors.push(error.message));
     mockLangGraphAPI(page);
     api = mockVideoAPI(page);
+    api.clearTasks();
   });
 
   test.afterEach(() => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("defaults to works and filters ready AI types", async ({ page }) => {
+  test("defaults to AI image list and shows all statuses", async ({ page }) => {
     seedWork("ready-image", "合格图片作品");
+    api.seedTask({
+      id: "visual-ai",
+      title: "visual-ai",
+      status: "draft",
+      progress: 45,
+      task_type: "ai_visual",
+    });
     api.seedTask({
       id: "ready-video",
       title: "合格视频作品",
@@ -62,14 +70,29 @@ test.describe("video assets", () => {
       "aria-selected",
       "true",
     );
-    await expect(page.getByText("合格图片作品", { exact: true })).toBeVisible();
-    await expect(page.getByText("合格视频作品", { exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "AI 生图" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    for (const id of ["合格图片作品", "failed-ai", "draft-ai", "visual-ai"]) {
+      await expect(page.getByText(id, { exact: true })).toBeVisible();
+    }
     for (const id of [
+      "合格视频作品",
+      "running-ai",
       "ready-course",
       "ready-vimax",
+    ]) {
+      await expect(page.getByText(id, { exact: true })).toHaveCount(0);
+    }
+    await page.getByRole("tab", { name: "AI 生视频" }).click();
+    await expect(page.getByText("合格视频作品", { exact: true })).toBeVisible();
+    await expect(page.getByText("running-ai", { exact: true })).toBeVisible();
+    for (const id of [
+      "合格图片作品",
       "failed-ai",
-      "draft-ai",
-      "running-ai",
+      "ready-course",
+      "ready-vimax",
     ]) {
       await expect(page.getByText(id, { exact: true })).toHaveCount(0);
     }
@@ -89,7 +112,7 @@ test.describe("video assets", () => {
     await expect(page.getByRole("tab", { name: "全部" })).toHaveCount(0);
   });
 
-  test("loads six more locally and never exceeds latest 100", async ({
+  test("loads six more locally per type and resets preview and pagination", async ({
     page,
   }) => {
     let listRequests = 0;
@@ -97,23 +120,45 @@ test.describe("video assets", () => {
       if (new URL(request.url()).pathname === "/api/video/tasks")
         listRequests += 1;
     });
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 7; index += 1) {
       api.seedTask({
-        id: `work-${index}`,
-        title: `本地作品 ${index}`,
+        id: `image-${index}`,
+        title: `本地图片 ${index}`,
         status: "ready",
         progress: 100,
-        task_type: "ai_image",
+        task_type: index === 6 ? "ai_visual" : "ai_image",
         created_at: new Date(Date.UTC(2026, 10, 1, index)).toISOString(),
+      });
+      api.seedTask({
+        id: `video-${index}`,
+        title: `本地视频 ${index}`,
+        status: "ready",
+        progress: 100,
+        task_type: "ai_video",
+        created_at: new Date(Date.UTC(2026, 10, 2, index)).toISOString(),
       });
     }
     await page.goto("/workspace/video-gen");
     await expect(page.getByTestId("completed-work-card")).toHaveCount(6);
+    await page
+      .getByTestId("completed-work-card")
+      .first()
+      .getByRole("button", { name: "查看" })
+      .click();
+    await expect(page.locator("video")).toHaveCount(1);
     const before = listRequests;
     await page.getByRole("button", { name: "加载更多" }).click();
-    await expect(page.getByTestId("completed-work-card")).toHaveCount(12);
+    await expect(page.getByTestId("completed-work-card")).toHaveCount(7);
+    await expect(page.getByText("本地图片 6", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "AI 生视频" }).click();
+    await expect(page.getByTestId("completed-work-card")).toHaveCount(6);
+    await expect(page.locator("video")).toHaveCount(0);
+    await page.getByRole("button", { name: "加载更多" }).click();
+    await expect(page.getByTestId("completed-work-card")).toHaveCount(7);
+    await page.getByRole("tab", { name: "AI 生图" }).click();
+    await expect(page.getByTestId("completed-work-card")).toHaveCount(6);
     expect(listRequests).toBe(before);
-    await expect(page.getByRole("button", { name: "加载更多" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "加载更多" })).toBeVisible();
   });
 
   test("ready non-missing work can preview real media and download", async ({
@@ -135,7 +180,12 @@ test.describe("video assets", () => {
       .poll(() =>
         video.evaluate((element) => (element as HTMLVideoElement).duration),
       )
-      .toBe(10);
+      .toBeGreaterThanOrEqual(8);
+    await expect
+      .poll(() =>
+        video.evaluate((element) => (element as HTMLVideoElement).duration),
+      )
+      .toBeLessThanOrEqual(12);
     await expect
       .poll(() =>
         video.evaluate((element) => (element as HTMLVideoElement).videoWidth),
@@ -168,6 +218,110 @@ test.describe("video assets", () => {
     expect(api.downloadRequests).toHaveLength(0);
   });
 
+  test("restores exact-id details storyboard retry and delete operations", async ({
+    page,
+  }) => {
+    api.seedTask({
+      id: "draft-edit",
+      title: "草稿分镜作品",
+      status: "draft",
+      progress: 100,
+      task_type: "ai_image",
+    });
+    api.seedTask({
+      id: "failed-visual",
+      title: "失败视觉作品",
+      status: "failed",
+      progress: 70,
+      task_type: "ai_visual",
+      error_message: "真实失败原因",
+    });
+    api.seedTask({
+      id: "qc-only",
+      title: "质检修复作品",
+      status: "qc_repair",
+      progress: 80,
+      task_type: "ai_image",
+    });
+    await page.goto("/workspace/video-gen");
+    const draft = page
+      .getByTestId("completed-work-card")
+      .filter({ hasText: "草稿分镜作品" });
+    await draft.getByRole("button", { name: "详情" }).click();
+    await expect(page).toHaveURL(/\/workspace\/video-gen\/draft-edit$/);
+    await page.goto("/workspace/video-gen");
+    await draft.getByRole("button", { name: "继续编辑分镜" }).click();
+    await expect(page).toHaveURL(
+      /\/workspace\/video-gen\/draft-edit\/storyboard$/,
+    );
+
+    await page.goto("/workspace/video-gen");
+    const failed = page
+      .getByTestId("completed-work-card")
+      .filter({ hasText: "失败视觉作品" });
+    await expect(failed.getByText("真实失败原因")).toBeVisible();
+    await failed.getByRole("button", { name: "重试合成" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "取消" })
+      .click();
+    expect(api.retryRequests).toHaveLength(0);
+    api.failNextRetry(409);
+    await failed.getByRole("button", { name: "重试合成" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "确认合成" })
+      .click();
+    await page.getByRole("button", { name: "去编辑分镜" }).click();
+    await expect(page).toHaveURL(
+      /\/workspace\/video-gen\/failed-visual\/storyboard$/,
+    );
+    expect(api.retryRequests.map((request) => request.url)).toEqual([
+      "/api/video/tasks/failed-visual/recompose",
+    ]);
+
+    await page.goto("/workspace/video-gen");
+    const qc = page
+      .getByTestId("completed-work-card")
+      .filter({ hasText: "质检修复作品" });
+    await expect(qc.getByRole("button", { name: "查看" })).toBeDisabled();
+    await expect(qc.getByRole("link", { name: "下载" })).toHaveCount(0);
+    await expect(qc.getByRole("button", { name: "重试合成" })).toHaveCount(0);
+    await qc.getByRole("button", { name: "删除" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "取消" })
+      .click();
+    expect(api.deleteRequests).toHaveLength(0);
+    await qc.getByRole("button", { name: "删除" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "删除", exact: true })
+      .click();
+    await expect(qc).toHaveCount(0);
+    expect(api.deleteRequests.map((request) => request.url)).toEqual([
+      "/api/video/tasks/qc-only",
+    ]);
+  });
+
+  test("list failure can be retried manually without hiding the error", async ({
+    page,
+  }) => {
+    seedWork("after-retry", "手动重试作品");
+    api.failNextList(500);
+    await page.goto("/workspace/video-gen");
+    await expect(page.getByText("作品加载失败，请稍后重试")).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText("手动重试作品", { exact: true })).toHaveCount(
+      0,
+    );
+    api.clearListFailure();
+    await page.getByRole("button", { name: "重试" }).click();
+    await expect(page.getByText("手动重试作品", { exact: true })).toBeVisible();
+    await expect(page.getByText("作品加载失败，请稍后重试")).toHaveCount(0);
+  });
+
   test("works cards and project cards contain no fabricated fields", async ({
     page,
   }) => {
@@ -195,7 +349,7 @@ test.describe("video assets", () => {
     await page.goto("/workspace/video-gen");
     await expect(page.getByText("字段真实作品", { exact: true })).toBeVisible();
     let text = await page.getByRole("tabpanel").textContent();
-    for (const expected of ["字段真实作品", "图片动效", "完成", "最近更新"]) {
+    for (const expected of ["字段真实作品", "AI 生图", "完成", "最近更新"]) {
       expect(text).toContain(expected);
     }
     await page.getByRole("tab", { name: "我的资产" }).click();

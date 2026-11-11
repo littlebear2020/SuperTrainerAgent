@@ -2,25 +2,42 @@
 
 import { useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, parseTimestamp } from "@/core/utils/datetime";
 import { getVideoDownloadUrl } from "@/core/video-gen/api";
+import { useRecomposeTask } from "@/core/video-gen/hooks";
+import { recomposeActionFor } from "@/core/video-gen/resume-actions";
 import { getVideoTaskStatusLabel } from "@/core/video-gen/task-status-label";
+import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
+import { cn } from "@/lib/utils";
 
 import { TaskThumbnail } from "./task-thumbnail";
+import { RecomposeConfirmDialog } from "./video-gen-recompose-dialog";
 
 export const COMPLETED_WORK_PAGE_SIZE = 6;
 export const COMPLETED_WORK_LIMIT = 100;
+
+const WORK_TYPES = ["ai_image", "ai_video"] as const;
+type WorkType = (typeof WORK_TYPES)[number];
 
 export function selectCompletedWorks(
   tasks: readonly VideoTaskBrief[],
 ): VideoTaskBrief[] {
   return tasks
-    .filter(
-      (task) =>
-        task.status === "ready" &&
-        (task.task_type === "ai_image" || task.task_type === "ai_video"),
+    .filter((task) =>
+      ["ai_image", "ai_visual", "ai_video"].includes(task.task_type),
     )
     .sort((a, b) => {
       const aTime = a.created_at
@@ -44,10 +61,6 @@ export function canPreviewOrDownload(
   return task.status === "ready" && task.artifact_missing !== true;
 }
 
-function workTypeLabel(taskType: VideoTaskBrief["task_type"]): string {
-  return taskType === "ai_video" ? "AI视频" : "图片动效";
-}
-
 function workUpdatedAt(task: VideoTaskBrief): string {
   const value = task.updated_at ?? task.created_at;
   if (!value || !Number.isFinite(parseTimestamp(value).getTime())) {
@@ -56,25 +69,201 @@ function workUpdatedAt(task: VideoTaskBrief): string {
   return `最近更新 ${formatDateTime(value)}`;
 }
 
+function CompletedWorkCard({
+  task,
+  previewOpen,
+  previewFailed,
+  onPreview,
+  onPreviewError,
+  onDelete,
+  onNavigate,
+}: {
+  task: VideoTaskBrief;
+  previewOpen: boolean;
+  previewFailed: boolean;
+  onPreview: () => void;
+  onPreviewError: () => void;
+  onDelete: (id: string) => void;
+  onNavigate: (id: string, path?: "storyboard") => void;
+}) {
+  const recomposeMut = useRecomposeTask(task.id, {
+    onEditStoryboard: () => onNavigate(task.id, "storyboard"),
+  });
+  const retryAction = recomposeActionFor(task);
+  const [confirmRetry, setConfirmRetry] = useState(false);
+  const actionable = canPreviewOrDownload(task);
+
+  return (
+    <article
+      data-testid="completed-work-card"
+      data-task-id={task.id}
+      className="bg-background min-w-0 overflow-hidden rounded-2xl border shadow-sm"
+    >
+      <TaskThumbnail
+        url={task.thumbnail_url}
+        artifactMissing={task.artifact_missing}
+        className="aspect-video h-auto w-full rounded-none"
+      />
+      <div className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="min-w-0 truncate font-semibold">
+            {task.title?.trim() ? task.title : "未命名作品"}
+          </h3>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-1 text-xs",
+              task.status === "failed"
+                ? "bg-red-50 text-red-700"
+                : "bg-emerald-50 text-emerald-700",
+            )}
+          >
+            {getVideoTaskStatusLabel(task.status, task.progress)}
+          </span>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          {videoTaskTypeLabel(task.task_type)}
+        </p>
+        <p className="text-muted-foreground text-xs">{workUpdatedAt(task)}</p>
+        {task.error_message ? (
+          <p className="text-xs text-red-600">{task.error_message}</p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!actionable}
+            onClick={onPreview}
+          >
+            查看
+          </Button>
+          {actionable ? (
+            <Button variant="ghost" size="sm" asChild>
+              <a href={getVideoDownloadUrl(task.id)} download>
+                下载
+              </a>
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="sm" onClick={() => onNavigate(task.id)}>
+            详情
+          </Button>
+          {task.status === "draft" && task.progress >= 100 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate(task.id, "storyboard")}
+            >
+              继续编辑分镜
+            </Button>
+          ) : null}
+          {retryAction.visible && task.status === "failed" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={recomposeMut.isPending}
+              onClick={() => setConfirmRetry(true)}
+            >
+              {recomposeMut.isPending ? "重试中…" : retryAction.label}
+            </Button>
+          ) : null}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="删除"
+                className="text-muted-foreground hover:text-red-500"
+              >
+                删除
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>确认删除</AlertDialogTitle>
+                <AlertDialogDescription>
+                  确定要删除这个视频任务吗？此操作无法撤销。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDelete(task.id)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  删除
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+        {previewOpen && actionable ? (
+          previewFailed ? (
+            <div
+              role="status"
+              className="bg-muted rounded-lg p-4 text-center text-sm"
+            >
+              视频预览暂不可用
+            </div>
+          ) : (
+            <video
+              className="aspect-video w-full rounded-lg bg-black"
+              src={getVideoDownloadUrl(task.id)}
+              controls
+              preload="none"
+              onError={onPreviewError}
+            />
+          )
+        ) : null}
+        <RecomposeConfirmDialog
+          open={confirmRetry}
+          onOpenChange={setConfirmRetry}
+          isFailed
+          onConfirm={() => recomposeMut.mutate()}
+        />
+      </div>
+    </article>
+  );
+}
+
 export function CompletedVideoGrid({
   tasks,
   isLoading,
   isError,
   onRetry,
+  onDelete,
+  onNavigate,
 }: {
   tasks: VideoTaskBrief[];
   isLoading?: boolean;
   isError?: boolean;
   onRetry?: () => void;
+  onDelete: (id: string) => void;
+  onNavigate: (id: string, path?: "storyboard") => void;
 }) {
+  const [workType, setWorkType] = useState<WorkType>("ai_image");
   const [visibleCount, setVisibleCount] = useState(COMPLETED_WORK_PAGE_SIZE);
   const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
 
+  const allWorks = selectCompletedWorks(tasks);
+  const works = allWorks.filter((task) =>
+    workType === "ai_image"
+      ? task.task_type === "ai_image" || task.task_type === "ai_visual"
+      : task.task_type === "ai_video",
+  );
+
+  const selectWorkType = (next: WorkType) => {
+    if (next === workType) return;
+    setWorkType(next);
+    setVisibleCount(COMPLETED_WORK_PAGE_SIZE);
+    setPreviewTaskId(null);
+    setFailedPreviews(new Set());
+  };
+
+  let content;
   if (isLoading) {
-    return (
+    content = (
       <div
         role="status"
         className="rounded-2xl border border-dashed p-10 text-center"
@@ -82,9 +271,8 @@ export function CompletedVideoGrid({
         正在加载作品…
       </div>
     );
-  }
-  if (isError) {
-    return (
+  } else if (isError) {
+    content = (
       <div
         role="alert"
         className="rounded-2xl border border-dashed p-10 text-center"
@@ -97,120 +285,86 @@ export function CompletedVideoGrid({
         ) : null}
       </div>
     );
-  }
-
-  const works = selectCompletedWorks(tasks);
-  if (works.length === 0) {
-    return (
+  } else if (works.length === 0) {
+    content = (
       <div
         role="status"
         className="rounded-2xl border border-dashed p-10 text-center"
       >
-        暂无已完成作品
+        暂无{videoTaskTypeLabel(workType)}作品
       </div>
+    );
+  } else {
+    content = (
+      <>
+        <div
+          data-testid="completed-work-grid"
+          className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {works.slice(0, visibleCount).map((task) => (
+            <CompletedWorkCard
+              key={task.id}
+              task={task}
+              previewOpen={previewTaskId === task.id}
+              previewFailed={failedPreviews.has(task.id)}
+              onPreview={() =>
+                setPreviewTaskId(previewTaskId === task.id ? null : task.id)
+              }
+              onPreviewError={() =>
+                setFailedPreviews((current) => new Set(current).add(task.id))
+              }
+              onDelete={onDelete}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+        {visibleCount < works.length ? (
+          <div className="mt-6 text-center">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setVisibleCount((count) =>
+                  Math.min(
+                    count + COMPLETED_WORK_PAGE_SIZE,
+                    COMPLETED_WORK_LIMIT,
+                  ),
+                )
+              }
+            >
+              加载更多
+            </Button>
+          </div>
+        ) : null}
+      </>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <div
-        data-testid="completed-work-grid"
-        className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 xl:grid-cols-3"
+        role="tablist"
+        aria-label="作品类型"
+        className="border-border/50 bg-muted/30 flex w-fit gap-1 rounded-lg border p-1"
       >
-        {works.slice(0, visibleCount).map((task) => {
-          const actionable = canPreviewOrDownload(task);
-          const previewOpen = previewTaskId === task.id && actionable;
-          const previewFailed = failedPreviews.has(task.id);
-          return (
-            <article
-              key={task.id}
-              data-testid="completed-work-card"
-              data-task-id={task.id}
-              className="bg-background min-w-0 overflow-hidden rounded-2xl border shadow-sm"
-            >
-              <TaskThumbnail
-                url={task.thumbnail_url}
-                artifactMissing={task.artifact_missing}
-                className="aspect-video h-auto w-full rounded-none"
-              />
-              <div className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="min-w-0 truncate font-semibold">
-                    {task.title?.trim() ? task.title : "未命名作品"}
-                  </h3>
-                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-                    {getVideoTaskStatusLabel(task.status, task.progress)}
-                  </span>
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  {workTypeLabel(task.task_type)}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {workUpdatedAt(task)}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!actionable}
-                    onClick={() =>
-                      setPreviewTaskId(previewOpen ? null : task.id)
-                    }
-                  >
-                    查看
-                  </Button>
-                  {actionable ? (
-                    <Button variant="ghost" size="sm" asChild>
-                      <a href={getVideoDownloadUrl(task.id)} download>
-                        下载
-                      </a>
-                    </Button>
-                  ) : null}
-                </div>
-                {previewOpen ? (
-                  previewFailed ? (
-                    <div
-                      role="status"
-                      className="bg-muted rounded-lg p-4 text-center text-sm"
-                    >
-                      视频预览暂不可用
-                    </div>
-                  ) : (
-                    <video
-                      className="aspect-video w-full rounded-lg bg-black"
-                      src={getVideoDownloadUrl(task.id)}
-                      controls
-                      preload="none"
-                      onError={() =>
-                        setFailedPreviews((current) =>
-                          new Set(current).add(task.id),
-                        )
-                      }
-                    />
-                  )
-                ) : null}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {visibleCount < works.length ? (
-        <div className="mt-6 text-center">
-          <Button
-            variant="outline"
-            onClick={() =>
-              setVisibleCount((count) =>
-                Math.min(
-                  count + COMPLETED_WORK_PAGE_SIZE,
-                  COMPLETED_WORK_LIMIT,
-                ),
-              )
-            }
+        {WORK_TYPES.map((type) => (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={workType === type}
+            onClick={() => selectWorkType(type)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              workType === type
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            加载更多
-          </Button>
-        </div>
-      ) : null}
+            {videoTaskTypeLabel(type)}
+          </button>
+        ))}
+      </div>
+      {content}
     </div>
   );
 }

@@ -31,19 +31,32 @@ function task(
 }
 
 describe("selectCompletedWorks", () => {
-  it("filters only ready ai_image and ai_video", () => {
+  it("keeps every status for both display types and excludes other pipelines", () => {
     const tasks = [
       task("image"),
+      task("visual", { task_type: "ai_visual" }),
       task("video", { task_type: "ai_video" }),
       task("course", { task_type: "remotion_course" }),
       task("vimax", { task_type: "vimax" }),
       task("failed", { status: "failed" }),
       task("draft", { status: "draft" }),
+      task("pending", { status: "pending" }),
       task("running", { status: "running" }),
+      task("composing", { status: "composing" }),
+      task("qc", { status: "qc_repair" }),
+      task("cancelled", { status: "cancelled" }),
     ];
     expect(selectCompletedWorks(tasks).map((item) => item.id)).toEqual([
+      "cancelled",
+      "composing",
+      "draft",
+      "failed",
       "image",
+      "pending",
+      "qc",
+      "running",
       "video",
+      "visual",
     ]);
   });
 

@@ -29,6 +29,7 @@ import { RecomposeConfirmDialog } from "@/components/workspace/video-gen/video-g
 import { formatDateTime } from "@/core/utils/datetime";
 import { formatCost } from "@/core/utils/format";
 import {
+  useDeleteVideoTask,
   useRecomposeTask,
   useVideoTasks,
   getStallWarning,
@@ -281,6 +282,7 @@ export function VideoGenPage() {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("works");
   const tasksQuery = useVideoTasks();
+  const deleteTask = useDeleteVideoTask();
 
   const selectTab = (next: (typeof TABS)[number]["value"]) => {
     setTab(next);
@@ -333,6 +335,12 @@ export function VideoGenPage() {
               isLoading={tasksQuery.isLoading}
               isError={tasksQuery.isError}
               onRetry={() => void tasksQuery.refetch()}
+              onDelete={(id) => deleteTask.mutate(id)}
+              onNavigate={(id, path) =>
+                router.push(
+                  `/workspace/video-gen/${id}${path === "storyboard" ? "/storyboard" : ""}`,
+                )
+              }
             />
           ) : (
             <CourseProjectPage

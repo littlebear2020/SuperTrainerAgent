@@ -5,6 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompletedVideoGrid } from "@/components/workspace/video-gen/completed-video-grid";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 
+const recompose = vi.hoisted(() => ({
+  calls: [] as Array<{ id: string; mutate: ReturnType<typeof vi.fn> }>,
+}));
+
+vi.mock("@/core/video-gen/hooks", () => ({
+  useRecomposeTask: (id: string) => {
+    const mutate = vi.fn();
+    recompose.calls.push({ id, mutate });
+    return { mutate, isPending: false };
+  },
+}));
+
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 function task(
@@ -22,8 +34,8 @@ function task(
     error_message: null,
     retry_count: 0,
     dirty_frames: [],
-    created_at: `2026-11-${id.padStart(2, "0")}T08:00:00Z`,
-    updated_at: `2026-11-${id.padStart(2, "0")}T09:00:00Z`,
+    created_at: "2026-11-01T08:00:00Z",
+    updated_at: "2026-11-01T09:00:00Z",
     thumbnail_url: `/api/video/tasks/${id}/thumbnail`,
     cost: null,
     currency: null,
@@ -39,11 +51,21 @@ function button(text: string): HTMLButtonElement {
   return result;
 }
 
+function dialogButton(text: string): HTMLButtonElement {
+  const dialog = document.querySelector("[role='alertdialog']");
+  const result = Array.from(dialog?.querySelectorAll("button") ?? []).find(
+    (item) => item.textContent === text,
+  );
+  if (!result) throw new Error(`dialog button not found: ${text}`);
+  return result;
+}
+
 describe("CompletedVideoGrid", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
+    recompose.calls.length = 0;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -61,10 +83,19 @@ describe("CompletedVideoGrid", () => {
       isLoading?: boolean;
       isError?: boolean;
       onRetry?: () => void;
+      onDelete?: (id: string) => void;
+      onNavigate?: (id: string, path?: "storyboard") => void;
     } = {},
   ) {
     await act(async () => {
-      root.render(<CompletedVideoGrid tasks={tasks} {...props} />);
+      root.render(
+        <CompletedVideoGrid
+          tasks={tasks}
+          onDelete={props.onDelete ?? vi.fn()}
+          onNavigate={props.onNavigate ?? vi.fn()}
+          {...props}
+        />,
+      );
     });
   }
 
@@ -100,7 +131,7 @@ describe("CompletedVideoGrid", () => {
     expect(onRetry).not.toHaveBeenCalled();
   });
 
-  it("shows only honest title type ready update and cover", async () => {
+  it("shows only honest title type status update and cover", async () => {
     const fixture = {
       ...task("1", { title: "真实课程封面" }),
       total_duration: 99,
@@ -111,7 +142,7 @@ describe("CompletedVideoGrid", () => {
     } as VideoTaskBrief;
     await render([fixture]);
     const text = container.textContent ?? "";
-    for (const expected of ["真实课程封面", "图片动效", "完成", "最近更新"]) {
+    for (const expected of ["真实课程封面", "AI 生图", "完成", "最近更新"]) {
       expect(text).toContain(expected);
     }
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
@@ -184,12 +215,115 @@ describe("CompletedVideoGrid", () => {
     await render([], { isLoading: true });
     expect(container.textContent).toContain("正在加载作品");
     await render([]);
-    expect(container.textContent).toContain("暂无已完成作品");
+    expect(container.textContent).toContain("暂无AI 生图作品");
     const onRetry = vi.fn();
     await render([], { isError: true, onRetry });
     expect(container.textContent).toContain("作品加载失败");
-    expect(container.textContent).not.toContain("暂无已完成作品");
+    expect(container.textContent).not.toContain("暂无AI 生图作品");
     await act(async () => button("重试").click());
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults to images and switches type with preview unload and pagination reset", async () => {
+    const images = Array.from({ length: 7 }, (_, index) =>
+      task(String(index + 1), {
+        task_type: index === 6 ? "ai_visual" : "ai_image",
+      }),
+    );
+    const videos = Array.from({ length: 7 }, (_, index) =>
+      task(String(101 + index), { task_type: "ai_video" }),
+    );
+    await render([...images, ...videos]);
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(6);
+    expect(container.textContent).not.toContain("作品 101");
+    await act(async () => button("查看").click());
+    expect(container.querySelector("video")).not.toBeNull();
+    await act(async () => button("AI 生视频").click());
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.textContent).toContain("作品 101");
+    expect(container.textContent).not.toContain("作品 1 ");
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(6);
+    await act(async () => button("加载更多").click());
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(7);
+    await act(async () => button("AI 生图").click());
+    expect(
+      container.querySelectorAll("[data-testid='completed-work-card']"),
+    ).toHaveLength(6);
+  });
+
+  it("restores details storyboard retry confirmation and delete confirmation by exact id", async () => {
+    const onDelete = vi.fn();
+    const onNavigate = vi.fn();
+    await render(
+      [
+        task("draft", { status: "draft", progress: 100 }),
+        task("failed-visual", {
+          status: "failed",
+          task_type: "ai_visual",
+          error_message: "真实失败原因",
+        }),
+        task("qc", { status: "qc_repair", progress: 80 }),
+      ],
+      { onDelete, onNavigate },
+    );
+    const draft = container.querySelector("[data-task-id='draft']")!;
+    await act(async () => {
+      Array.from(draft.querySelectorAll("button"))
+        .find((item) => item.textContent === "详情")
+        ?.click();
+    });
+    expect(onNavigate).toHaveBeenCalledWith("draft");
+    await act(async () => button("继续编辑分镜").click());
+    expect(onNavigate).toHaveBeenCalledWith("draft", "storyboard");
+
+    const failed = container.querySelector("[data-task-id='failed-visual']")!;
+    expect(failed.textContent).toContain("真实失败原因");
+    await act(async () => {
+      Array.from(failed.querySelectorAll("button"))
+        .find((item) => item.textContent === "重试合成")
+        ?.click();
+    });
+    await act(async () => dialogButton("取消").click());
+    expect(
+      recompose.calls.filter((call) => call.id === "failed-visual").at(-1)
+        ?.mutate,
+    ).not.toHaveBeenCalled();
+    await act(async () => {
+      Array.from(failed.querySelectorAll("button"))
+        .find((item) => item.textContent === "重试合成")
+        ?.click();
+    });
+    await act(async () => dialogButton("确认合成").click());
+    expect(
+      recompose.calls
+        .filter((call) => call.id === "failed-visual")
+        .reduce((total, call) => total + call.mutate.mock.calls.length, 0),
+    ).toBe(1);
+
+    const qc = container.querySelector("[data-task-id='qc']")!;
+    expect(qc.textContent).toContain("质检修复");
+    expect(qc.textContent).not.toContain("重试合成");
+    expect(qc.querySelector("a[download]")).toBeNull();
+    expect(
+      Array.from(qc.querySelectorAll("button")).find(
+        (item) => item.textContent === "查看",
+      )?.disabled,
+    ).toBe(true);
+    await act(async () => {
+      qc.querySelector<HTMLButtonElement>("button[aria-label='删除']")?.click();
+    });
+    await act(async () => dialogButton("取消").click());
+    expect(onDelete).not.toHaveBeenCalled();
+    await act(async () => {
+      qc.querySelector<HTMLButtonElement>("button[aria-label='删除']")?.click();
+    });
+    await act(async () => dialogButton("删除").click());
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith("qc");
   });
 });

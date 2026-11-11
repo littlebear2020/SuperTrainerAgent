@@ -75,9 +75,15 @@ export interface MockVideoAPI {
   readonly uploadVisualRequests: RecordedRequest[];
   readonly renderRequests: RecordedRequest[];
   readonly downloadRequests: RecordedRequest[];
+  readonly retryRequests: RecordedRequest[];
+  readonly deleteRequests: RecordedRequest[];
   readonly projectRequests: RecordedRequest[];
   readonly createdTaskId: string | undefined;
   seedTask(task: Partial<MockVideoTask> & { id: string }): void;
+  clearTasks(): void;
+  failNextList(status?: number): void;
+  clearListFailure(): void;
+  failNextRetry(status: 409): void;
   seedProject(project: MockCourseProject): MockCourseProject;
   project(id: string): MockCourseProject | undefined;
   setTaskStatus(
@@ -191,8 +197,12 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
   const uploadVisualRequests: RecordedRequest[] = [];
   const renderRequests: RecordedRequest[] = [];
   const downloadRequests: RecordedRequest[] = [];
+  const retryRequests: RecordedRequest[] = [];
+  const deleteRequests: RecordedRequest[] = [];
   const projectRequests: RecordedRequest[] = [];
   let failCreate: { status: 422 | 503; detail: unknown } | undefined;
+  let failListStatus: number | undefined;
+  let failRetryStatus: 409 | undefined;
   let createdTaskId: string | undefined;
   let projectSequence = 0;
 
@@ -211,6 +221,12 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     tasks.set(task.id, task);
     if (!storyboards.has(task.id)) storyboards.set(task.id, undefined);
     return task;
+  }
+
+  function clearTasks() {
+    tasks.clear();
+    storyboards.clear();
+    createdTaskId = undefined;
   }
 
   function seedProject(input: MockCourseProject) {
@@ -341,6 +357,9 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     }
 
     if (method === "GET" && path === "/api/video/tasks") {
+      if (failListStatus !== undefined) {
+        return json(route, failListStatus, { detail: "Mock list failure" });
+      }
       return json(route, 200, [...tasks.values()].map(brief));
     }
 
@@ -385,6 +404,24 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
       if (!task) return json(route, 404, { detail: "Task not found" });
 
       if (!suffix && method === "GET") return json(route, 200, detail(task));
+
+      if (!suffix && method === "DELETE") {
+        deleteRequests.push({ method, url: path, body: undefined });
+        tasks.delete(taskId);
+        storyboards.delete(taskId);
+        return route.fulfill({ status: 204, body: "" });
+      }
+
+      if (suffix === "recompose" && method === "POST") {
+        retryRequests.push({ method, url: path, body: parseBody(route) });
+        if (failRetryStatus !== undefined) {
+          const status = failRetryStatus;
+          failRetryStatus = undefined;
+          return json(route, status, { detail: "Storyboard edit required" });
+        }
+        setTaskStatus(taskId, "composing", { progress: 35 });
+        return json(route, 200, { task_id: taskId, status: "composing" });
+      }
 
       if (suffix === "storyboard" && method === "GET") {
         const storyboard = storyboards.get(taskId);
@@ -536,11 +573,23 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     uploadVisualRequests,
     renderRequests,
     downloadRequests,
+    retryRequests,
+    deleteRequests,
     projectRequests,
     get createdTaskId() {
       return createdTaskId;
     },
     seedTask,
+    clearTasks,
+    failNextList(status = 500) {
+      failListStatus = status;
+    },
+    clearListFailure() {
+      failListStatus = undefined;
+    },
+    failNextRetry(status: 409) {
+      failRetryStatus = status;
+    },
     seedProject,
     project(projectId: string) {
       return projects.get(projectId);
