@@ -613,21 +613,21 @@ export const zhCN: Translations = {
       playbackUnavailable: "视频暂时无法播放",
       courseItems: {
         "course-video": {
-          title: "Remotion动效",
+          title: "文字动效",
           description: "把课程内容转为结构清晰、富有动效的课程视频",
-          badge: "课程视频",
-          mediaAlt: "Remotion 课程动效样例",
+          badge: "AI视频",
+          mediaAlt: "文字动效课程样例",
         },
         ai_image: {
           title: "图片动效",
           description: "由脚本生成画面，让静态图片自然流动",
-          badge: "AI 生图",
+          badge: "AI视频",
           mediaAlt: "图片动效样例",
         },
         ai_video: {
           title: "AI视频",
           description: "根据创意生成动态镜头，表达更丰富的场景",
-          badge: "AI 生视频",
+          badge: "AI视频",
           mediaAlt: "AI 视频样例",
         },
         "creative-studio": {

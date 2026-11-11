@@ -650,22 +650,22 @@ export const enUS: Translations = {
       playbackUnavailable: "Video is temporarily unavailable",
       courseItems: {
         "course-video": {
-          title: "Remotion motion",
+          title: "Text animation",
           description: "Turn course content into structured, animated videos",
-          badge: "Course video",
-          mediaAlt: "Remotion course motion sample",
+          badge: "AI Video",
+          mediaAlt: "Text animation course sample",
         },
         ai_image: {
           title: "Image motion",
           description:
             "Generate visuals from scripts and bring still images to life",
-          badge: "AI image",
+          badge: "AI Video",
           mediaAlt: "Image motion sample",
         },
         ai_video: {
           title: "AI video",
           description: "Generate dynamic shots to express richer scenes",
-          badge: "AI video",
+          badge: "AI Video",
           mediaAlt: "AI video sample",
         },
         "creative-studio": {

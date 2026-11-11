@@ -32,6 +32,11 @@ test.describe("home course entries", () => {
       }
       await page.locator(`[data-course-entry='${id}']`).click();
       await expect(page).toHaveURL(`/workspace/agents/${agent}/chats/new`);
+      if (id === "course-video") {
+        await expect(
+          page.getByText("课程视频", { exact: true }).first(),
+        ).toBeVisible();
+      }
     }
 
     await page.goto("/workspace");
@@ -48,6 +53,68 @@ test.describe("home course entries", () => {
     await expect(
       dialog.getByRole("heading", { name: "创建 AI 动态视频" }),
     ).toBeVisible();
+  });
+
+  test("three video cards use unified badges and keep existing media URLs", async ({
+    page,
+  }) => {
+    await page.goto("/workspace");
+    for (const [id, title, src] of [
+      ["course-video", "文字动效", "/course-samples/remotion.mp4"],
+      ["ai_image", "图片动效", "/course-samples/image-motion.mp4"],
+      ["ai_video", "AI视频", "/course-samples/ai-video.mp4"],
+    ] as const) {
+      const card = page.locator(`[data-course-entry='${id}']`);
+      await expect(card).toContainText("AI视频");
+      await expect(card).toContainText(title);
+      await expect(card.locator("video")).toHaveAttribute("src", src);
+    }
+  });
+
+  test("replacement samples decode and really play with advancing time", async ({
+    page,
+  }) => {
+    await page.goto("/workspace");
+    for (const id of ["course-video", "ai_image"] as const) {
+      const video = page.locator(`[data-course-entry='${id}'] video`);
+      await expect
+        .poll(() =>
+          video.evaluate((element) => (element as HTMLVideoElement).readyState),
+        )
+        .toBeGreaterThanOrEqual(1);
+      await expect
+        .poll(() =>
+          video.evaluate((element) => (element as HTMLVideoElement).videoWidth),
+        )
+        .toBe(960);
+      await expect
+        .poll(() =>
+          video.evaluate((element) => (element as HTMLVideoElement).duration),
+        )
+        .toBeGreaterThanOrEqual(8);
+      await expect
+        .poll(() =>
+          video.evaluate((element) => (element as HTMLVideoElement).duration),
+        )
+        .toBeLessThanOrEqual(12);
+      await video.evaluate(async (element) => {
+        const media = element as HTMLVideoElement;
+        media.pause();
+        media.currentTime = 0;
+        const playing = new Promise<void>((resolve) => {
+          media.addEventListener("playing", () => resolve(), { once: true });
+        });
+        await media.play();
+        await playing;
+      });
+      await expect
+        .poll(() =>
+          video.evaluate(
+            (element) => (element as HTMLVideoElement).currentTime,
+          ),
+        )
+        .toBeGreaterThan(0.05);
+    }
   });
 
   test("alternating AI entries starts clean after close", async ({ page }) => {

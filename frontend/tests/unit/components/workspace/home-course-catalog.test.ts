@@ -43,6 +43,11 @@ describe("HOME_COURSE_ITEMS", () => {
       "src" in item.media ? [item.media.src] : [],
     );
     expect(externalMedia).toHaveLength(6);
+    expect(externalMedia.slice(0, 3)).toEqual([
+      "/course-samples/remotion.mp4",
+      "/course-samples/image-motion.mp4",
+      "/course-samples/ai-video.mp4",
+    ]);
     expect(externalMedia).toEqual(
       expect.arrayContaining([
         "/course-samples/ppt-work.webp",

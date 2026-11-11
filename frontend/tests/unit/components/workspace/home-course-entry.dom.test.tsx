@@ -82,20 +82,38 @@ describe("HomeCourseEntry", () => {
     await render();
     expect(button("视频课").getAttribute("aria-expanded")).toBe("true");
     expect(button("图文课").getAttribute("aria-expanded")).toBe("false");
-    for (const title of ["Remotion动效", "图片动效", "AI视频"]) {
+    for (const title of ["文字动效", "图片动效", "AI视频"]) {
       expect(button(title)).toBeDefined();
     }
     expect(document.querySelector("#home-course-panel-video")).not.toBeNull();
     expect(document.querySelector("#home-course-panel-text")).toBeNull();
   });
 
+  it("uses unified AI video badges and text animation copy in both locales", () => {
+    for (const locale of ["zh-CN", "en-US"] as const) {
+      const items = translations[locale].workspace.home.courseItems;
+      const expectedBadge = locale === "zh-CN" ? "AI视频" : "AI Video";
+      expect(items["course-video"].badge).toBe(expectedBadge);
+      expect(items.ai_image.badge).toBe(expectedBadge);
+      expect(items.ai_video.badge).toBe(expectedBadge);
+      expect(items["course-video"].title).toBe(
+        locale === "zh-CN" ? "文字动效" : "Text animation",
+      );
+      expect(items["course-video"].mediaAlt).not.toContain("Remotion");
+    }
+    expect(
+      translations["zh-CN"].agents.newChatGuides["course-video"].displayName,
+    ).toBe("课程视频");
+    expect(
+      translations["en-US"].agents.newChatGuides["course-video"].displayName,
+    ).toBe("Course video");
+  });
+
   it("uses demo-style icons arrows and real artwork for text cards", async () => {
     await render();
     expect(button("视频课").querySelector("svg")).not.toBeNull();
     expect(
-      button("Remotion动效").querySelector(
-        "[data-testid='creation-arrow'] svg",
-      ),
+      button("文字动效").querySelector("[data-testid='creation-arrow'] svg"),
     ).not.toBeNull();
     await act(async () => button("图文课").click());
     for (const [title, src] of [
@@ -188,7 +206,7 @@ describe("HomeCourseEntry", () => {
     expect(video).not.toBeNull();
     await act(async () => video!.dispatchEvent(new Event("error")));
     expect(document.body.textContent).toContain("视频暂时无法播放");
-    await act(async () => button("Remotion动效").click());
+    await act(async () => button("文字动效").click());
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0]?.[0].id).toBe("course-video");
   });
