@@ -801,20 +801,22 @@ sandbox:
   bash_output_max_chars: 20000
   read_file_output_max_chars: 50000
   ls_output_max_chars: 20000
-  bash_command_timeout: 300     # T27 (2026-08-14)：单条 bash 命令输出静默超时（秒，映射 AIO no_change_timeout——零输出超 300s 击杀；不是挂钟上限，前台 sleep 300 同样会被杀）。旧实现硬编码 600，挂死命令最多拖 10 分钟
+  # 300 秒同时参与硬墙钟上限；主路径另有静默宽限。amd64 模拟可能更慢，
+  # 长渲染沿用技能的后台执行、退出码和日志轮询，不盲目提高超时。
+  bash_command_timeout: 300
 
 # Option 2: Container-based AIO Sandbox
 # Executes commands in isolated containers (Docker or Apple Container)
 # On macOS: Automatically prefers Apple Container if available, falls back to Docker
 # On other platforms: Uses Docker
+# Build the self-contained image from the repository root before enabling it.
+# Apple Silicon must enable Rosetta and build linux/amd64:
+# docker build --platform linux/amd64 -t deerflow-sandbox:local -f docker/sandbox/Dockerfile .
 # Uncomment to use:
 # sandbox:
 #   use: deerflow.community.aio_sandbox:AioSandboxProvider
-#
-#   # Optional: Container image to use (works with both Docker and Apple Container)
-#   # Default: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-#   # Recommended: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest (works on both x86_64 and arm64)
-#   # image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+#   image: deerflow-sandbox:local
+#   allow_host_bash: false
 #
 #   # Optional: Base port for sandbox containers (default: 8080)
 #   # port: 8080

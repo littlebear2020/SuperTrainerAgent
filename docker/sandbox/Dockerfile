@@ -331,6 +331,11 @@ RUN echo "=== npm library packages check ===" \
     && node -e "require('docx'); console.log('docx OK')" \
     && echo "=== All npm library packages verified ==="
 
+# Rosetta on Apple Silicon: eager shell/Jupyter pool warmup blocks the event loop.
+# Leave OTel, uvloop and MCP filtering intact; sessions are still created on demand.
+RUN sed -i 's/warmup_task = asyncio.create_task(_warmup_pools())/warmup_task = None/' /opt/python3.12/lib/python3.12/site-packages/app/server.py \
+    && grep -q 'warmup_task = None' /opt/python3.12/lib/python3.12/site-packages/app/server.py
+
 # C4（2026-10-12）：摘除基座继承的 HEALTHCHECK。基座 all-in-one-sandbox 的
 # 健康检查面向常驻服务形态，与按需任务沙箱（每任务起停）不符——实测 FDE 会话
 # 沙箱 FailingStreak 274（每 10s 误报一次），容器功能完全正常，纯监控噪音。
