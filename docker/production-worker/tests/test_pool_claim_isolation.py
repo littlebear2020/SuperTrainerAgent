@@ -222,14 +222,19 @@ class TestDualSlotPairing:
         self._remotion(monkeypatch)
         _insert(db, "t-course", "remotion_course", priority=10)
         _insert(db, "t-still", "remotion_still", priority=100)
-        task, slot = W._claim_one_task()
-        assert task["id"] == "t-course" and slot == "render"
-        assert _claimed_by(db, "t-still") is None, "渲染槽不得领走 still 任务"
+        try:
+            task, slot = W._claim_one_task()
+            assert task["id"] == "t-course" and slot == "render"
+            assert _claimed_by(db, "t-still") is None, "渲染槽不得领走 still 任务"
+        finally:
+            W._concurrency.release()
 
     def test_still_slot_claims_still_after_render_busy(self, db, monkeypatch):
         """(b) 反向：渲染槽占满（已领 course）时，still 槽独立认领 still。"""
         self._remotion(monkeypatch)
-        W._concurrency.acquire(blocking=False)  # 渲染槽占满
+        acquired = 0
+        while W._concurrency.acquire(blocking=False):
+            acquired += 1
         try:
             _insert(db, "t-course", "remotion_course", priority=10)
             _insert(db, "t-still", "remotion_still", priority=5)
@@ -237,20 +242,24 @@ class TestDualSlotPairing:
             assert task["id"] == "t-still" and slot == "still"
             assert _claimed_by(db, "t-course") is None
         finally:
-            W._concurrency.release()
+            for _ in range(acquired):
+                W._concurrency.release()
 
     def test_both_slots_full_no_claim(self, db, monkeypatch):
         """(c) 双槽同时占满 → 无第三认领（不超发）。"""
         self._remotion(monkeypatch)
         _insert(db, "t-course", "remotion_course")
-        W._concurrency.acquire(blocking=False)
+        acquired = 0
+        while W._concurrency.acquire(blocking=False):
+            acquired += 1
         W._still_concurrency.acquire(blocking=False)
         try:
             task, slot = W._claim_one_task()
             assert task is None and slot is None
             assert _claimed_by(db, "t-course") is None
         finally:
-            W._concurrency.release()
+            for _ in range(acquired):
+                W._concurrency.release()
             W._still_concurrency.release()
 
     def test_run_task_releases_reserved_slot_not_inferred(self, monkeypatch):
@@ -258,6 +267,7 @@ class TestDualSlotPairing:
         谓词已隔离，但若未来谓词再漂移，释放错槽不得静默）→ 必须释放渲染槽。"""
         self._remotion(monkeypatch)
         render_sem, still_sem = W._concurrency, W._still_concurrency
+        initial_render_slots = render_sem._value
         render_sem.acquire(blocking=False)  # 模拟主循环预占渲染槽
         monkeypatch.setattr(W, "process_task", lambda task: None)
         W._run_task(
@@ -265,7 +275,7 @@ class TestDualSlotPairing:
             slot_pre_acquired=True,
             slot="render",
         )
-        assert render_sem._value == 1 and still_sem._value == 1, "释放须按入口 slot，不按 task_type 推断"
+        assert render_sem._value == initial_render_slots and still_sem._value == 1, "释放须按入口 slot，不按 task_type 推断"
 
     def test_run_task_legacy_inference_still_compatible(self, monkeypatch):
         """slot=None 旧调用方兼容路径：按 task_type 推断仍释放 still 槽。"""
@@ -284,8 +294,11 @@ class TestDualSlotPairing:
         monkeypatch.setattr(W, "WORKER_POOL", "ffmpeg")
         assert W._render_slot_task_types() is None
         _insert(db, "t-img", "ai_image", priority=10)
-        task, slot = W._claim_one_task()
-        assert task["id"] == "t-img" and slot == "render"
+        try:
+            task, slot = W._claim_one_task()
+            assert task["id"] == "t-img" and slot == "render"
+        finally:
+            W._concurrency.release()
 
     def test_render_slot_types_narrowed_for_remotion_pool(self, monkeypatch):
         monkeypatch.setattr(W, "WORKER_POOL", "remotion")

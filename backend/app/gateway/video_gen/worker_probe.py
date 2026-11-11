@@ -97,6 +97,7 @@ async def probe_worker_capabilities(worker_url: str | None = None) -> list[str]:
                 caps = resp.json().get("capabilities", ["v1"])
                 _probe_cache = (caps, time.monotonic())
                 return caps
+            logger.warning("Worker probe at %s returned HTTP %s, assuming v1 only", url, resp.status_code)
     except Exception:
         logger.warning("Worker probe failed at %s, assuming v1 only", url)
     caps = ["v1"]
