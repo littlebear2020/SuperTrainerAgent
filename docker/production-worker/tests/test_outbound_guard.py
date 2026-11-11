@@ -95,6 +95,19 @@ class TestPublicUrlGuard:
         ):
             net_guard.assert_public_http_url("https://cdn.example.com/x")
 
+    def test_fake_ip_proxy_bypass_rejected(self):
+        with (
+            patch("pipelines.net_guard.socket.getaddrinfo", _ga("198.18.0.143")),
+            patch("pipelines.net_guard.urllib.request.getproxies", return_value={"https": "http://127.0.0.1:7897"}),
+            patch("pipelines.net_guard.urllib.request.proxy_bypass", return_value=True),
+        ):
+            try:
+                net_guard.assert_public_http_url("https://cdn.example.com/x")
+            except ValueError as e:
+                assert "proxy bypass" in str(e)
+            else:
+                raise AssertionError("fake-IP must not be reached directly through NO_PROXY bypass")
+
     def test_fake_ip_mixed_records_and_non_loopback_proxy_rejected(self):
         for records, proxies in (
             (("198.18.0.143", "8.8.8.8"), {"https": "http://127.0.0.1:7897"}),

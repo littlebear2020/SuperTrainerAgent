@@ -86,6 +86,8 @@ def assert_public_http_url(url: str) -> None:
     if not resolved:
         raise ValueError(f"blocked download host with no DNS records: {host}")
     if _all_fake_ip_records(resolved) and _loopback_proxy(parsed.scheme):
+        if urllib.request.proxy_bypass(host):
+            raise ValueError(f"blocked fake-IP download target with proxy bypass: {host}")
         return
     for raw in resolved:
         _assert_public_ip(ipaddress.ip_address(raw), f"{host} -> {raw}")
