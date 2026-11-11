@@ -219,11 +219,22 @@ def test_terra_keeps_internal_alias_and_updates_upstream(real_config: AppConfig)
     assert terra.model == "openai/gpt-6.1-terra"
     assert terra.display_name == "360·GPT 6.1 Terra"
     assert "gpt-6.1-terra" not in [m.name for m in real_config.models]
-    assert terra.supports_vision is False
+    assert terra.supports_vision is True
     assert terra.supports_thinking is False
     assert terra.supports_reasoning_effort is False
+    assert (terra.model_extra or {}).get("temperature") == 1
+    assert terra.reasoning_effort_none_with_tools is True
     assert terra.when_thinking_enabled is None
     assert terra.when_thinking_disabled is None
+
+
+def test_terra_vision_controls_view_image_tool(real_config: AppConfig) -> None:
+    from deerflow.tools.tools import get_available_tools
+
+    terra_tools = get_available_tools(groups=[], include_mcp=False, model_name="gpt-5.6-terra", app_config=real_config)
+    deepseek_tools = get_available_tools(groups=[], include_mcp=False, model_name="deepseek-v4.1-flash", app_config=real_config)
+    assert "view_image" in [tool.name for tool in terra_tools]
+    assert "view_image" not in [tool.name for tool in deepseek_tools]
 
 
 def test_deepseek_v41_flash_roster_contract(real_config: AppConfig) -> None:

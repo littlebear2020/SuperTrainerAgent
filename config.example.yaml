@@ -183,7 +183,7 @@ models:
   # tests/test_model_factory.py 有守护）。
   # 完整 entry 见本地 config.yaml (gitignored)。DeepSeek provider 吃 api_base, OpenAI 吃 base_url。
   # ── 2026-11-11 模型模板：Terra 的内部 name 是旧线程兼容别名，不是上游 ID；
-  #    两项能力先保守关闭，真实探针通过后才可开启并补 wire profile。──
+  #    红图视觉探针通过；360 通道拒绝顶层 thinking 字段，保持 thinking 关闭。──
   # - name: gpt-5.6-terra
   #   display_name: 360·GPT 6.1 Terra
   #   use: deerflow.models.patched_openai:PatchedChatOpenAI
@@ -193,10 +193,11 @@ models:
   #   request_timeout: 180.0
   #   max_retries: 2
   #   max_tokens: 32768
-  #   temperature: 0.7
-  #   supports_vision: false
+  #   temperature: 1                              # 上游只接受默认值
+  #   supports_vision: true
   #   supports_thinking: false
   #   supports_reasoning_effort: false
+  #   reasoning_effort_none_with_tools: true       # 360 chat/completions 工具调用要求 none
   # - name: deepseek-v4.1-flash
   #   display_name: 360·DeepSeek V4.1 Flash
   #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
