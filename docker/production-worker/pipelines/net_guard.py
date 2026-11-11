@@ -2,7 +2,8 @@
 
 worker 侧统一防线：
 - 私网/回环/链路本地/保留段 IP 拒绝（URL 字面量与 DNS 解析结果都查——防
-  rebinding 到内网与 metadata 端点）；
+  rebinding 到内网与 metadata 端点）；全部 DNS 为 198.18/15 且对应 scheme
+  存在回环 HTTP(S) 代理时，保留原域名并由 urllib 经该代理访问；
 - 可选域名白名单（REMOTION_ASSET_ALLOWED_DOMAINS，逗号分隔；缺省 = 放行
   任意公网主机——CDN 域名易变，宁宽勿断，见整改计划 D1-D4 裁决口径）；
 - 下载体积上限（REMOTION_ASSET_MAX_BYTES，默认 512MiB）。
@@ -17,6 +18,25 @@ import urllib.request
 from urllib.parse import urlparse
 
 _DEFAULT_MAX_ASSET_BYTES = 512 * 1024 * 1024
+_FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
+
+
+def _loopback_proxy(scheme: str) -> str | None:
+    proxy = urllib.request.getproxies().get(scheme)
+    if not proxy:
+        return None
+    try:
+        parsed = urlparse(proxy)
+        ip = ipaddress.ip_address(parsed.hostname or "")
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not ip.is_loopback:
+        return None
+    return proxy
+
+
+def _all_fake_ip_records(resolved: set[str]) -> bool:
+    return bool(resolved) and all(ipaddress.ip_address(raw) in _FAKE_IP_NETWORK for raw in resolved)
 
 
 def allowed_domains() -> set[str]:
@@ -65,6 +85,8 @@ def assert_public_http_url(url: str) -> None:
     resolved = {info[4][0] for info in infos}
     if not resolved:
         raise ValueError(f"blocked download host with no DNS records: {host}")
+    if _all_fake_ip_records(resolved) and _loopback_proxy(parsed.scheme):
+        return
     for raw in resolved:
         _assert_public_ip(ipaddress.ip_address(raw), f"{host} -> {raw}")
 

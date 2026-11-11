@@ -7,8 +7,9 @@ pipelines/net_guard.py``（stdlib 同口径实现）。
 安全语义：
 1. 目标校验：scheme 仅 http(s)；host 为 IP 字面量时直接查段，否则解析 DNS
    后对**全部**记录查段（任一私网/回环/链路本地/保留段记录即拒绝——防
-   rebinding 到内网与云 metadata 端点）。
-2. **钉 IP 连接**：校验通过的 IP 直接作为 TCP 目标（原域名保留在 Host 头
+   rebinding 到内网与云 metadata 端点）。唯一例外是全部记录属于 198.18/15
+   且对应 scheme 存在回环 HTTP(S) 代理：经代理访问原域名，不直连 fake-IP。
+2. **钉 IP 连接**：普通公网目标将校验通过的 IP 直接作为 TCP 目标（原域名保留在 Host 头
    与 TLS SNI/证书校验名），消除"校验与连接两次解析"之间的 TOCTOU 窗口。
 3. 30x 逐跳重复全套校验；跳数上限防环。
 4. 体积上限：Content-Length 预检 + 流式累计双保险。
@@ -19,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import socket
+import urllib.request
 from dataclasses import dataclass
 
 import httpx
@@ -26,6 +28,7 @@ import httpx
 DEFAULT_MAX_BYTES = 64 * 1024 * 1024
 DEFAULT_TIMEOUT = 60.0
 MAX_REDIRECTS = 5
+_FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
 
 
 class UnsafeDownloadError(ValueError):
@@ -37,6 +40,7 @@ class _Target:
     pinned_url: str
     host_header: str
     sni: str | None
+    proxy: str | None = None
 
 
 def _assert_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, label: str) -> None:
@@ -44,6 +48,24 @@ def _assert_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, label: str
     # 等 is_private=False 但不可公网路由的段。
     if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified or not ip.is_global:
         raise UnsafeDownloadError(f"blocked non-public download target: {label}")
+
+
+def _loopback_proxy(scheme: str) -> str | None:
+    proxy = urllib.request.getproxies().get(scheme)
+    if not proxy:
+        return None
+    try:
+        parsed = httpx.URL(proxy)
+        ip = ipaddress.ip_address(parsed.host)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not ip.is_loopback:
+        return None
+    return proxy
+
+
+def _all_fake_ip_records(resolved: set[str]) -> bool:
+    return bool(resolved) and all(ipaddress.ip_address(raw) in _FAKE_IP_NETWORK for raw in resolved)
 
 
 async def _pin_target(url: str) -> _Target:
@@ -55,6 +77,7 @@ async def _pin_target(url: str) -> _Target:
         raise UnsafeDownloadError("blocked download URL without host")
     port = u.port or (443 if u.scheme == "https" else 80)
 
+    proxy = None
     try:
         ipaddress.ip_address(host)
     except ValueError:
@@ -63,9 +86,13 @@ async def _pin_target(url: str) -> _Target:
         resolved = {info[4][0] for info in infos or []}
         if not resolved:
             raise UnsafeDownloadError(f"blocked download host with no DNS records: {host}")
-        for raw in resolved:
-            _assert_public(ipaddress.ip_address(raw), f"{host} -> {raw}")
-        pinned = sorted(resolved)[0]
+        proxy = _loopback_proxy(u.scheme) if _all_fake_ip_records(resolved) else None
+        if proxy is None:
+            for raw in resolved:
+                _assert_public(ipaddress.ip_address(raw), f"{host} -> {raw}")
+            pinned = sorted(resolved)[0]
+        else:
+            pinned = host
         sni = host
     else:
         _assert_public(ipaddress.ip_address(host), host)
@@ -74,7 +101,7 @@ async def _pin_target(url: str) -> _Target:
 
     pinned_url = str(u.copy_with(host=pinned))
     host_header = host if u.port is None else f"{host}:{u.port}"
-    return _Target(pinned_url=pinned_url, host_header=host_header, sni=sni if u.scheme == "https" else None)
+    return _Target(pinned_url=pinned_url, host_header=host_header, sni=sni if u.scheme == "https" else None, proxy=proxy)
 
 
 async def safe_download(
@@ -94,9 +121,10 @@ async def safe_download(
     """
     current = url
     extra_headers = dict(headers or {})
-    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout), follow_redirects=False, transport=transport) as client:
-        for _ in range(max_redirects + 1):
-            target = await _pin_target(current)
+    for _ in range(max_redirects + 1):
+        target = await _pin_target(current)
+        client_options = {"proxy": target.proxy, "trust_env": False} if target.proxy else {}
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout), follow_redirects=False, transport=transport, **client_options) as client:
             request = client.build_request(
                 "GET",
                 target.pinned_url,

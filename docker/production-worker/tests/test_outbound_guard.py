@@ -2,6 +2,7 @@
 
 覆盖：
 - 私网/回环/链路本地/保留段 IP 字面量与 DNS 解析结果拒绝（SSRF 面）
+- 全部 DNS 为 198.18/15 且存在回环 HTTP(S) 代理时的本地 fake-IP 兼容
 - REMOTION_ASSET_ALLOWED_DOMAINS 域名白名单（可选，宁宽勿断默认全放公网）
 - _download_asset 体积上限
 - _render_still 对 source_task_dir/still_output 的 storage 根包含断言
@@ -74,6 +75,50 @@ class TestPublicUrlGuard:
     def test_dns_public_allowed(self):
         with patch("pipelines.net_guard.socket.getaddrinfo", _ga("8.8.4.4")):
             net_guard.assert_public_http_url("https://cdn.example.com/x")
+
+    def test_fake_ip_dns_requires_loopback_proxy(self):
+        with (
+            patch("pipelines.net_guard.socket.getaddrinfo", _ga("198.18.0.143")),
+            patch("pipelines.net_guard.urllib.request.getproxies", return_value={}),
+        ):
+            try:
+                net_guard.assert_public_http_url("https://cdn.example.com/x")
+            except ValueError as e:
+                assert "non-public" in str(e)
+            else:
+                raise AssertionError("fake-IP DNS without a proxy must be blocked")
+
+    def test_fake_ip_dns_with_loopback_proxy_allowed(self):
+        with (
+            patch("pipelines.net_guard.socket.getaddrinfo", _ga("198.18.0.143", "198.19.255.254")),
+            patch("pipelines.net_guard.urllib.request.getproxies", return_value={"https": "http://127.0.0.1:7897"}),
+        ):
+            net_guard.assert_public_http_url("https://cdn.example.com/x")
+
+    def test_fake_ip_mixed_records_and_non_loopback_proxy_rejected(self):
+        for records, proxies in (
+            (("198.18.0.143", "8.8.8.8"), {"https": "http://127.0.0.1:7897"}),
+            (("198.18.0.143",), {"https": "http://192.0.2.10:8080"}),
+        ):
+            with (
+                patch("pipelines.net_guard.socket.getaddrinfo", _ga(*records)),
+                patch("pipelines.net_guard.urllib.request.getproxies", return_value=proxies),
+            ):
+                try:
+                    net_guard.assert_public_http_url("https://cdn.example.com/x")
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("mixed DNS or a non-loopback proxy must be blocked")
+
+    def test_fake_ip_literal_rejected(self):
+        with patch("pipelines.net_guard.urllib.request.getproxies", return_value={"https": "http://127.0.0.1:7897"}):
+            try:
+                net_guard.assert_public_http_url("https://198.18.0.143/x")
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("fake-IP literals must remain blocked")
 
     def test_domain_allowlist_env(self, monkeypatch):
         monkeypatch.setenv("REMOTION_ASSET_ALLOWED_DOMAINS", "cdn.example.com")

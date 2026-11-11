@@ -2,6 +2,7 @@
 
 核心语义：
 - 私网/回环/链路本地/保留段目标拒绝（URL 字面量与 DNS 解析结果都查）；
+- 全部 DNS 为 198.18/15 且存在回环 HTTP(S) 代理时，经代理访问原域名；
 - **钉 IP 连接**：解析→校验→连向校验过的 IP（保留 Host 头与 TLS SNI），
   消除解析/连接两次解析的 DNS-rebinding TOCTOU 窗口；
 - 30x 每跳同规则复核；
@@ -54,6 +55,97 @@ class TestTargetValidation:
         with patch("app.gateway._shared.safe_download.socket.getaddrinfo", _ga("8.8.8.8", "192.168.1.9")):
             with pytest.raises(UnsafeDownloadError):
                 await safe_download("https://mixed.example.com/x", transport=_transport(lambda r: None))
+
+
+class TestFakeIPProxy:
+    @pytest.mark.asyncio
+    async def test_fake_ip_dns_without_proxy_rejected(self):
+        with (
+            patch("app.gateway._shared.safe_download.socket.getaddrinfo", _ga("198.18.0.143")),
+            patch("urllib.request.getproxies", return_value={}),
+        ):
+            with pytest.raises(UnsafeDownloadError, match="non-public"):
+                await safe_download("https://cdn.example.com/a.png", transport=_transport(lambda r: None))
+
+    @pytest.mark.asyncio
+    async def test_fake_ip_dns_uses_original_host_and_loopback_proxy(self):
+        import socket
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        captured = {}
+
+        class ProxyHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                captured["request_target"] = self.path
+                captured["host_header"] = self.headers.get("Host")
+                self.send_response(200)
+                self.send_header("Content-Length", "7")
+                self.end_headers()
+                self.wfile.write(b"payload")
+
+            def log_message(self, format, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        proxy = f"http://127.0.0.1:{server.server_address[1]}"
+        real_getaddrinfo = socket.getaddrinfo
+
+        def resolve(host, port, **kwargs):
+            if host == "cdn.example.com":
+                return _ga("198.18.0.143", "198.19.255.254")(host, port, **kwargs)
+            return real_getaddrinfo(host, port, **kwargs)
+
+        try:
+            with (
+                patch("app.gateway._shared.safe_download.socket.getaddrinfo", side_effect=resolve),
+                patch("urllib.request.getproxies", return_value={"http": proxy}),
+            ):
+                body = await safe_download("http://cdn.example.com/a.png")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+        assert body == b"payload"
+        assert captured["request_target"] == "http://cdn.example.com/a.png"
+        assert captured["host_header"] == "cdn.example.com"
+
+    @pytest.mark.asyncio
+    async def test_fake_ip_https_target_preserves_host_and_sni(self):
+        from app.gateway._shared.safe_download import _pin_target
+
+        with (
+            patch("app.gateway._shared.safe_download.socket.getaddrinfo", _ga("198.18.0.143")),
+            patch("urllib.request.getproxies", return_value={"https": "http://127.0.0.1:7897"}),
+        ):
+            target = await _pin_target("https://cdn.example.com/a.png")
+
+        assert target.pinned_url == "https://cdn.example.com/a.png"
+        assert target.host_header == "cdn.example.com"
+        assert target.sni == "cdn.example.com"
+        assert target.proxy == "http://127.0.0.1:7897"
+
+    @pytest.mark.asyncio
+    async def test_fake_ip_mixed_records_and_non_loopback_proxy_rejected(self):
+        for records, proxies in (
+            (("198.18.0.143", "8.8.8.8"), {"https": "http://127.0.0.1:7897"}),
+            (("198.18.0.143",), {"https": "http://192.0.2.10:8080"}),
+        ):
+            with (
+                patch("app.gateway._shared.safe_download.socket.getaddrinfo", _ga(*records)),
+                patch("urllib.request.getproxies", return_value=proxies),
+            ):
+                with pytest.raises(UnsafeDownloadError, match="non-public"):
+                    await safe_download("https://cdn.example.com/a.png", transport=_transport(lambda r: None))
+
+    @pytest.mark.asyncio
+    async def test_fake_ip_literal_rejected(self):
+        with patch("urllib.request.getproxies", return_value={"https": "http://127.0.0.1:7897"}):
+            with pytest.raises(UnsafeDownloadError, match="non-public"):
+                await safe_download("https://198.18.0.143/a.png", transport=_transport(lambda r: None))
 
 
 class TestPinnedConnection:
