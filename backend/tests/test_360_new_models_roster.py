@@ -204,6 +204,66 @@ def test_create_chat_model_reasoning_effort_popped_for_claude(stubbed_factory) -
     assert "reasoning_effort" not in _RosterStubModel.captured
 
 
+# ── 2026-11-11 Terra 上游替换与 DeepSeek 新增 ─────────────────────────────
+
+TARGET_MODEL_IDS = {
+    "gpt-5.6-terra": "openai/gpt-6.1-terra",
+    "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+}
+
+
+def test_terra_keeps_internal_alias_and_updates_upstream(real_config: AppConfig) -> None:
+    matches = [m for m in real_config.models if m.name == "gpt-5.6-terra"]
+    assert len(matches) == 1
+    terra = matches[0]
+    assert terra.model == "openai/gpt-6.1-terra"
+    assert terra.display_name == "360·GPT 6.1 Terra"
+    assert "gpt-6.1-terra" not in [m.name for m in real_config.models]
+    assert terra.supports_vision is False
+    assert terra.supports_thinking is False
+    assert terra.supports_reasoning_effort is False
+    assert terra.when_thinking_enabled is None
+    assert terra.when_thinking_disabled is None
+
+
+def test_deepseek_v41_flash_roster_contract(real_config: AppConfig) -> None:
+    deepseek = real_config.get_model_config("deepseek-v4.1-flash")
+    assert deepseek.model == "deepseek/deepseek-v4.1-flash"
+    assert deepseek.display_name == "360·DeepSeek V4.1 Flash"
+    assert deepseek.use == "deerflow.models.patched_deepseek:PatchedChatDeepSeek"
+    assert (deepseek.model_extra or {}).get("api_base") == "https://api.360.cn/v1"
+    assert deepseek.supports_vision is False
+    assert deepseek.supports_thinking is False
+    assert deepseek.supports_reasoning_effort is False
+    assert deepseek.when_thinking_enabled is None
+    assert deepseek.when_thinking_disabled is None
+
+
+@pytest.mark.asyncio
+async def test_models_api_maps_new_roster_without_exposing_vision(real_config: AppConfig) -> None:
+    from app.gateway.routers.models import list_models
+
+    response = await list_models(config=real_config)
+    mapped = {m.name: m for m in response.models if m.name in TARGET_MODEL_IDS}
+    assert set(mapped) == set(TARGET_MODEL_IDS)
+    for name, upstream_id in TARGET_MODEL_IDS.items():
+        model = mapped[name]
+        assert model.model == upstream_id
+        assert model.supports_thinking is False
+        assert model.supports_reasoning_effort is False
+        assert not hasattr(model, "supports_vision")
+    assert mapped["gpt-5.6-terra"].display_name == "360·GPT 6.1 Terra"
+    assert mapped["deepseek-v4.1-flash"].display_name == "360·DeepSeek V4.1 Flash"
+
+
+@pytest.mark.parametrize("name,upstream_id", TARGET_MODEL_IDS.items())
+def test_new_models_factory_preserves_upstream_and_pops_reasoning(stubbed_factory, name: str, upstream_id: str) -> None:
+    factory_module.create_chat_model(name, thinking_enabled=False, attach_tracing=False, app_config=stubbed_factory, reasoning_effort="low")
+    kwargs = _RosterStubModel.captured
+    assert kwargs["model"] == upstream_id
+    assert "reasoning_effort" not in kwargs
+
+
 # ── config.example.yaml 同步 ─────────────────────────────────────────────
 # example 的 models 段是注释模板（真实条目在 gitignored config.yaml），按文本匹配。
 
@@ -212,18 +272,25 @@ def test_example_yaml_contains_new_models() -> None:
     text = (REPO_ROOT / "config.example.yaml").read_text(encoding="utf-8")
     for n in NEW_LLM_NAMES:
         assert f"# - name: {n}" in text, f"config.example.yaml 缺 {n} 模板"
+    assert "# - name: gpt-5.6-terra" in text
+    assert "#   model: openai/gpt-6.1-terra" in text
+    assert "# - name: deepseek-v4.1-flash" in text
+    assert "#   model: deepseek/deepseek-v4.1-flash" in text
+    assert "旧线程兼容别名" in text
     # 删册条目的模板不得残留
     for n in REMOVED_NAMES:
         assert f"# - name: {n}" not in text, f"config.example.yaml 应删 {n} 模板"
 
 
 def test_example_config_version_bumped(example_yaml: dict) -> None:
+    # 31=本地模型与 Aio 执行就绪批（2026-11-11）；30 保留给 pending W2
+    # （declarative-reasoning-profile），本批不占用该预留版本。
     # 29=vimax 遗留收口批（2026-10-16，删 vimax_longform_*×3 + remotion_agent_assistant 四死字段）；
     # 28=vimax 切 360 + 配音音色加固批（2026-10-12，vimax_image_backend 新字段 + vimax_video_backend 默认翻转）；
     # 27=花名册调整批（2026-10-12）；26=OPS-2 删全局 channels.feishu（D6，2026-10-07）；
     # 25=上传白名单（R2-1）；24=skill 机制优化批 A；23=审计整改批 C4；22=中断修复批 P1；
-    # 21=长任务稳定性批。pending W2（declarative-reasoning-profile）撞车再顺延为 30 基线。
-    assert example_yaml.get("config_version") == 29, "config_version 应为 29（2026-10-16 vimax 遗留收口批）"
+    # 21=长任务稳定性批。
+    assert example_yaml.get("config_version") == 31, "config_version 应为 31（2026-11-11 本地模型与 Aio 执行就绪批）"
 
 
 def test_user_config_version_bumped(example_yaml: dict) -> None:
@@ -238,4 +305,4 @@ def test_user_config_version_bumped(example_yaml: dict) -> None:
 
     with open(config_path, encoding="utf-8") as f:
         user_version = _yaml.safe_load(f).get("config_version")
-    assert user_version == example_yaml.get("config_version") == 29
+    assert user_version == example_yaml.get("config_version") == 31
