@@ -1,7 +1,7 @@
 # 本地模型、Agent 执行与首页/视频作品优化实施计划
 
-> **状态**：已执行（任务 1–8 及任务 9 的文档、隔离 E2E/性能/根门禁和服务恢复；任务 9 Step 2 保持未勾选，尚未整批完成：原始后端全量有一项本地代理环境失败）。经用户另行授权，范围增加 Rosetta 预热 Dockerfile 补丁与 fake-IP 下载最小修复；等待用户审查，不 push、不部署。
-> **TL;DR**：Terra 已切换至 `openai/gpt-6.1-terra`、新增 `deepseek/deepseek-v4.1-flash`；自建 Aio 恢复隔离执行，真实 PPT/课程视频/知识卡/海报/写作/独立生图生视频均有产物；首页三卡和作品全状态列表已更新，四组证据与门禁失败分别记录，不用一组通过掩盖另一组失败。
+> **状态**：已执行（任务 1–9 全部完成并勾选；指定门禁和四组真实验收通过；本地服务已恢复，等待用户审查，不 push、不部署）。经用户另行授权，范围增加 Rosetta 预热 Dockerfile 补丁、fake-IP 下载最小修复，以及 Worker 非 200 探测日志和旧测试信号量隔离修复；历次失败均保留在 changelog。
+> **TL;DR**：Terra 已切换至 `openai/gpt-6.1-terra`、新增 `deepseek/deepseek-v4.1-flash`；自建 Aio 恢复隔离执行，真实 PPT/课程视频/知识卡/海报/写作/独立生图生视频均有产物；首页三卡和作品全状态列表已更新，模型、沙箱、首页、作品四组证据独立记录。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 执行时使用 `executing-plans`，任务 1→9 单执行者串行，逐项勾选。本计划不适合并行修改共享配置；不得用 subagent 同时写 `config.yaml` 或 `config.example.yaml`。
 
@@ -480,7 +480,7 @@ Commit: `feat(workspace): 统一视频入口命名并更新示例`。只 stage �
 
 只在所有本批任务终态后进入门禁；停止真实 frontend 和测试 web server，避免 Next dev 共用 `.next`、Playwright 复用真实服务造成 mock 假绿。不得遗留渲染或真实生成后台任务。
 
-- [ ] **Step 2：运行后端与前端标准门禁**
+- [x] **Step 2：运行后端与前端标准门禁**
 
 ```bash
 cd backend && env -u RUN_LIVE uv run pytest tests/ -q

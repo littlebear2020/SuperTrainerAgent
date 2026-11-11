@@ -1,6 +1,6 @@
 # 本地模型、Agent 执行与首页/作品验收
 
-> **状态**：已执行，但未达到整批完成标准；任务 1–8 已完成，任务 9 的原始后端全量 Step 2 保持未勾选。当前代理环境下该命令有一项失败，不以无代理环境覆盖后的通过结果替代原始结果；其余门禁、真实验收与服务恢复记录如下，等待用户审查。
+> **状态**：已执行；任务 1–9 全部完成并勾选，指定门禁与四组真实验收通过。用户授权后修复 Worker 非 200 日志和旧测试信号量隔离，原始后端命令无环境覆盖最终 `9938 passed / 31 skipped`；历次失败保留在验收记录，本地服务已恢复，等待用户审查。
 > **TL;DR**：Terra 切换到 `openai/gpt-6.1-terra` 并新增 DeepSeek；本地 Aio 自建镜像恢复隔离 bash、PPT、Remotion 与知识卡执行；首页三卡和指定样例已更新，作品列表恢复全状态与两类入口；真实业务产物已验收，下载修复仅兼容“全 fake-IP DNS + 回环代理”。
 
 ## 变更摘要
@@ -75,10 +75,12 @@
 - Task 7 首页 node/dom/E2E（含作品真媒体） → node `3 passed`、dom `10 passed`、Playwright `18 passed`。
 - `cd backend && env -u RUN_LIVE PYTHONPATH=. uv run pytest tests/test_safe_download.py -q` → `17 passed`；ruff/format 通过。
 - `cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/test_outbound_guard.py tests/test_download_asset_hardened.py -q` → 初次 `26 passed`；自审补 NO_PROXY 防护后最终 `27 passed`，真实 CDN 守卫仍为 `REAL_FAKE_IP_GUARD_OK`。
-- Worker 独立全套 `../../backend/.venv/bin/python -m pytest tests/ -q` → 两次均未完成，不记为通过：首次 900s 超时，第二次在同一位置持续无 CPU 进展后停止。定位到既有 `test_pool_claim_isolation.py` 认领用例未释放共享渲染信号量，后续 `test_worker_ownership_lost.py` 阻塞；后者单独 `1 passed`，与 lease 文件组合 `21 passed`，而 pool + ownership 最小组合 30s 超时。该旧测试不在授权修改范围内，未修改。
+- Worker 独立全套 `../../backend/.venv/bin/python -m pytest tests/ -q` → 修复前两次分别 900s 超时/同位置无进展；定位为既有 `test_pool_claim_isolation.py` 未释放共享渲染信号量，后续所有权测试阻塞。用户授权后，以 `finally` 归还认领槽，并让 busy/full/释放断言不依赖前置泄漏；最小组合最终 `29 passed`，完整 Worker 套件 **`357 passed`（57.37s）**。
+- 用户授权的 Worker 探测最小修复：非 200 响应也记录实际地址与状态码，`['v1']` 回退不变；`tests/test_worker_probe_url.py` 在原代理环境下 `8 passed`，ruff/format 通过。
 - **原始后端门禁**：`cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → `2 failed, 9936 passed, 31 skipped`（785.59s）。`test_removed_keys_absent_from_repo_config` 因本批精简本地配置时丢失既有安全注释而失败，已只恢复注释并定向 `1 passed`；`test_probe_failure_logs_actionable_message` 因本地代理让不存在域名返回 HTTP 502、而非连接异常，原始定向复现失败。
 - 环境判别：`NO_PROXY=* no_proxy=* env -u RUN_LIVE uv run pytest tests/test_worker_probe_url.py::test_probe_failure_logs_actionable_message -q` → `1 passed`；不修改业务代码或旧测试。
-- 无代理后端全量回归：`NO_PROXY=* no_proxy=* env -u RUN_LIVE uv run pytest tests/ -q` → `9938 passed, 31 skipped`（537.11s）；不能替代上方原始命令结果。
+- 无代理后端全量回归：`NO_PROXY=* no_proxy=* env -u RUN_LIVE uv run pytest tests/ -q` → `9938 passed, 31 skipped`（537.11s）；这是修复前的环境对照，不替代原始命令。
+- **授权修复后的原始后端门禁**：`cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → **`9938 passed, 31 skipped`（755.15s）**，无任何代理环境覆盖。
 - `cd frontend && pnpm check` → 退出 0；ESLint `0 errors`（既有 123 warnings），TypeScript 与 Prettier 通过。
 - `cd frontend && pnpm test` → `249 test files / 1604 tests passed`（29.99s）。
 - `cd frontend && CI=1 E2E_PORT=3100 pnpm test:e2e`（真实 Gateway/Worker 仍在）→ `72 passed, 4 failed, 1 flaky`；失败均发生登录/首页跳转。停止真实 Gateway/Worker 后，同命令定向复核 5 个相关用例 → `5 passed`；确认是未 mock 请求碰到真实服务的环境污染，未改测试。
@@ -98,13 +100,12 @@
 - `0920cae4 feat(workspace): 统一视频入口命名并更新示例`
 - `83ceda3a fix(video-gen): 兼容本地代理的素材下载`
 - `7a242c08 fix(video-gen): 拒绝绕过代理的 fake-IP 下载`
+- `016a69de fix(video-gen): 修复探测日志与 Worker 测试隔离`
 - 文档提交主题：`docs: 记录本地模型、Agent 与首页作品验收`；只创建本地 commits，不 push、不建 PR、不部署。
 - 最终为同一执行者自审（用户要求单执行者，未派生子代理）；这种审查弱于 fresh reviewer。未发现新的模型/首页/作品 Critical 或 Important 问题；发现的 Worker NO_PROXY 边界已按 RED→GREEN 修复并提交。
 
 ## 未解决事项
 
-- 原始后端全量命令未全绿：上述 Worker 探测用例受本机回环代理影响。必须保留原始失败记录；无代理回归只证明代码在非代理环境下的结果。
-- Worker 独立全套受既有测试共享信号量污染而挂起，具体文件和复现见验收记录；本批未获授权修改该旧测试，不能把超时写成通过。
 - 真实页面 `pageerror` 未自动监听，需用户人工验收；不能声称“无 pageerror”。
 - 旧 `model_connectivity_check.py` 的 Terra 硬编码漂移已登记 `docs/findings-backlog.md`，本批未修改脚本。
 - 本地 Docker/Rosetta 结果不代表公司服务器 provisioner/Docker 已验证；本批不部署。
