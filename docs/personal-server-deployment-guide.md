@@ -1,7 +1,7 @@
 # 火山云个人服务器部署指南
 
 > 适用场景：无堡垒机、可 SSH 直连、有外网的火山云 ECS 实例
-> **最后更新**：2026-10-05（审计整改批 E5 整份刷新：五服务拓扑/.env 必填清单/模型示例换现行花名册/prune 红线接入）；2026-10-12 计数修正（六服务：remotion-worker 已入列）
+> **最后更新**：2026-10-05（审计整改批 E5 整份刷新：五服务拓扑/.env 必填清单/模型示例换现行花名册/prune 红线接入）；2026-10-12 计数修正（六服务：remotion-worker 已入列）；2026-11-11 补充 Aio 自建镜像与完整 Agent 执行前提
 > 部署文档选型见 `company-server-deployment-guide.md` 开头的对照表；离线/仅国内环境**不要用本文**。
 
 ---
@@ -188,7 +188,16 @@ models:
     # …完整字段见 config.example.yaml（勿手抄此缩略示例）
 ```
 
-数据库/沙箱默认即可（SQLite + 本地沙箱）；`sandbox.environment` 生产默认保持为空——密钥走技能 SKILL.md `required-secrets` 声明 + 请求级带外注入（口径见 config.example.yaml:888-895 注释块）；白名单仅为紧急回退杆。
+数据库默认 SQLite 即可。活跃默认 `LocalSandboxProvider + allow_host_bash: false` **不提供 bash**，不能据此宣称 PPT、Remotion、知识卡等完整 Agent 执行能力可用。需要这些能力时，显式切换现有 `deerflow.community.aio_sandbox:AioSandboxProvider`，保持 `allow_host_bash: false`，并使用仓库根上下文构建的自包含镜像：
+
+```bash
+# Apple Silicon 先在 Docker Desktop 启用 Rosetta；Linux amd64 不需要模拟。
+docker build --platform linux/amd64 -t deerflow-sandbox:local -f docker/sandbox/Dockerfile .
+```
+
+`sandbox.image` 指向该镜像，不得在容器启动后安装依赖。每个本地 Aio 容器按计划需要约 3 GiB 内存与 2 GiB shm，默认 replicas=3 时使用回环地址 8080–8082；先检查 `/v1/sandbox`，再分别实测 `/v1/shell/exec` 与 `/v1/bash/exec`，并预检 PPT/Remotion/知识卡依赖。amd64 经 Rosetta 模拟可能更慢，长任务沿用技能的后台执行与日志检查，不盲目提高超时。本地 Docker 验证不代表公司服务器 provisioner 或部署拓扑已验证。
+
+当前示例 `config_version` 为 **31**；升级时先运行 `make config-upgrade`，不要覆盖本地模型与密钥配置。`sandbox.environment` 保持 `{}`——密钥走技能 SKILL.md `required-secrets` 声明 + 请求级带外注入（见 `config.example.yaml` 的 Aio 注释块）；白名单仅为紧急回退杆。
 
 ### 3. 前端环境文件（可选）
 
