@@ -390,7 +390,7 @@ export interface Translations {
 
   // Workspace
   workspace: {
-    /** Home hero, expandable course entries, and their six creation cards. */
+    /** Home hero and the fixed six-capability creation grid. */
     home: {
       heroTitle: string;
       createHeading: string;

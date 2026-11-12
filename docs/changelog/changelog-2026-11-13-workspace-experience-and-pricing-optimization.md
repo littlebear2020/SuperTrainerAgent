@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化执行记录
 
 > **状态**：任务 0–8 本地部分已执行；push/PR/OCR/合入未执行，交由协调者。
-> **TL;DR**：完成 R1–R6/R8 与集中 Important 修复；隔离真实 API、frontend 全量、E2E/性能及 R2 容器/live 证据齐备；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config、未重建 Docker，远端步骤交协调者。
+> **TL;DR**：完成 R1–R6/R8 与集中 Important 修复；隔离真实 API、frontend 全量、E2E/性能及 R2 容器/live 证据齐备；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端步骤交协调者。
 
 ## 变更摘要
 
@@ -34,13 +34,13 @@
 
 ## 验收记录
 
-- `env -u RUN_LIVE uv run pytest tests/test_workspace_experience_isolation.py -q` → **1 passed**；真实 API 摘要如上，ruff check/format 通过。
+- `env -u RUN_LIVE uv run pytest tests/test_workspace_experience_isolation.py -q` → **1 passed**；真实 API 摘要如上，ruff check/format 通过。终审补测 dotenv 禁用为 RED→GREEN，最终同命令再次 **1 passed**，非空日志 `temp/workspace-experience-2026-11-12/task8-dotenv-disabled-red.txt`、`task8-dotenv-disabled-green.txt`。
 - `cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → **10035 passed, 31 skipped, 421 warnings in 530.14s**，退出码 0；日志 `temp/workspace-experience-2026-11-12/task8-backend-full.txt`。
 - `cd frontend && pnpm check && pnpm test` → 静态门禁退出码 0（121 个既有 warnings、0 errors），**261 files / 1687 tests passed**；日志 `temp/workspace-experience-2026-11-12/task8-frontend-check-and-unit.txt`。
-- `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check` → **90 passed**，五路由均在原预算内，`performance-budgets.json` 未修改；日志 `temp/workspace-experience-2026-11-12/task8-e2e-and-perf.txt`。
+- `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check` → **90 passed**，五路由均在原预算内，`performance-budgets.json` 未修改；日志 `temp/workspace-experience-2026-11-12/task8-e2e-perf-verified.txt`。
 - 性能实测：`/` JS 745503 B/CSS 241569 B；chats JS 3258770 B；thread JS 3564453 B；video-gen JS 3555661 B；writer JS 3760292 B，均低于既有预算。
 - 侧栏旧断言修复：`CI=1 E2E_PORT=3100 pnpm exec playwright test tests/e2e/sidebar.spec.ts --workers=1` → **1 passed**；随后完整 E2E 重新执行为上述 90/90，而非沿用失败批次。
-- `make check && python3 scripts/check_docs_convention.py && git diff --check` → 退出码 0；backend ruff 通过，frontend 0 errors/121 个既有 warnings，knip/i18n 601 叶子/Prettier/docs convention/diff check 全过；日志 `temp/workspace-experience-2026-11-12/task8-final-root-check-first.txt`。
+- `make check && python3 scripts/check_docs_convention.py && git diff --check` → 退出码 0；backend ruff 通过，frontend 0 errors/121 个既有 warnings，knip/i18n 601 叶子/Prettier/docs convention/diff check 全过；日志 `temp/workspace-experience-2026-11-12/task8-root-check-verified.txt`。
 
 ## Skip 与未执行项
 
@@ -48,7 +48,7 @@
 - 31 个既有条件 skip 清单：`test_client_live.py`（1）、`test_model_roster_live.py`（1）、`test_audio_decode_duration.py` 无 gapless 特征（2）、`test_client_e2e.py` live LLM opt-in（11）、`test_create_deerflow_agent_live.py` live LLM opt-in（3）、`test_e2e_vimax_render.py` 付费渲染 opt-in（1）、`test_orchestration_tts.py` needs network（1）、`test_user_scoped_skill_storage.py` 上游移植边界（11）。无新增意外 skip；remote 套件不在此命令范围内。
 - `frontend/tests/e2e-remote/` 未运行；本地 OCR、push、PR、GitHub checks、rebase merge 均未执行，状态为 **REMOTE_PENDING**，交协调者处理。
 - R7 定价、播客实时安全 URL 与次日人工验收为 OUT_OF_SCOPE；无新默认价、迁移、素材行或 doubao_tts 价格选择。
-- 未访问测试/公司服务器，未读取真实 `.env`/用户 DB/密钥，未修改价格/config，未调用付费 API，未重建 Docker，未启动子代理。
+- 未访问测试/公司服务器、用户 DB/密钥，未修改价格/config，未启动子代理。终审发现初版存在自动 dotenv 向上发现仓库真实 `.env` 的风险；最终验收在 spawn 子进程任何 `app.*`/`deerflow.*` 导入前显式设置 `PYTHON_DOTENV_DISABLED=1` 并重跑通过，结构化摘要记录 `dotenv_disabled=true`，未输出任何环境变量值。任务 1 一次授权最短 TTS probe、无人工重试，任务 8 未新增付费调用；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建。
 
 ## Commits 与证据
 
