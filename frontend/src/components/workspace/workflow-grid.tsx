@@ -6,8 +6,8 @@ import { agentAppearance } from "@/core/agents/appearance";
 import { useGlassStyle } from "@/core/theme/glass";
 import { cn } from "@/lib/utils";
 
-// 2026-09-22 工作台恢复：现役 6 agent（09-09 五壳合并进 creative-studio、
-// 09-11 course-ppt 退役后）。文案提炼自 backend/seed/agents/*/config.yaml 的
+// 2026-09-22 工作台恢复：现役 7 agent（09-09 五壳合并进 creative-studio、
+// 09-11 course-ppt 退役；2026-11-12 新增 podcast-studio）。文案提炼自 backend/seed/agents/*/config.yaml 的
 // description（卡片有 line-clamp-2 两行截断，不全文粘贴）；名称对齐产品内
 // 现有显示名（project-list TYPE_MAP / demo 页，creative-studio 统一叫「创意工作」）。
 export const WORKFLOWS = [
@@ -48,6 +48,12 @@ export const WORKFLOWS = [
     name: "课程助理",
     desc: "自由对话兜底：课程设计问答与任务编排",
     tags: ["自由对话", "课程设计", "任务编排"],
+  },
+  {
+    type: "podcast-studio",
+    name: "播客制作",
+    desc: "文档、链接与主题调研：单人口播、双人访谈和辩论，确认后生成 MP3",
+    tags: ["语音播客", "双人对话", "MP3"],
   },
 ] as const;
 
