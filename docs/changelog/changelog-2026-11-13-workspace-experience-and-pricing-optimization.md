@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化执行记录
 
-> **状态**：任务 0–8 全部已执行；[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 第三轮 7 checks 全部 SUCCESS、OCR high 清零，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。文档收口分支 `workspace-experience-docs-close` 自身 PR 随后由协调者创建。
-> **TL;DR**：完成 R1–R6/R8 与集中评审修复；隔离真实 API、backend/frontend 全量、E2E/性能及 R2 容器/live 证据齐备；实现 PR #3 已合入；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建；剩余仅文档分支自身 PR 的 checks/merge。
+> **状态**：任务 0–8 全部已执行；[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 第三轮 7 checks 全部 SUCCESS、OCR high 清零，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。文档收口通过独立纯文档 PR 执行。
+> **TL;DR**：完成 R1–R6/R8 与集中评审修复；隔离真实 API、backend/frontend 全量、E2E/性能及 R2 容器/live 证据齐备；实现 PR #3 已合入；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建；文档收口通过独立纯文档 PR 执行。
 
 ## 变更摘要
 
@@ -79,4 +79,4 @@
 1. 按普通账号与管理员复核角色、设置、console scope 与本人用量；检查六类作品真实数据、搜索、打开与视频操作。
 2. 检查首页中英/移动布局、静态图留白、coarse/reduced 装饰动画、播放失败与点击创建；本批截图不冒充人工审美结论。
 3. 以固定逐字稿完成最短 course-video，复核 TTS 音色、模板提示与 MP4 声画；补做播客实时安全 URL 和 R7 定价口径。
-4. 实现 PR #3 已合入；文档收口分支自身 PR 随后由协调者创建，创建后仅剩该文档 PR 的 checks/merge，不新增实现任务复选框。
+4. 实现 PR #3 已合入；文档收口通过独立纯文档 PR 执行，不新增实现任务复选框。
