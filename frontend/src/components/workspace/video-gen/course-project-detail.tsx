@@ -4,9 +4,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
-  ChevronDown,
   Crown,
-  Film,
   ImagePlus,
   Package,
   Pencil,
@@ -30,11 +28,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { SpeedSliderControl } from "@/components/workspace/video-gen/audio-sliders";
 import { styleAnchorImageUrl } from "@/core/video-gen/api";
 import {
@@ -65,9 +58,7 @@ import {
 } from "@/core/video-gen/style-presets";
 import { SUBTITLE_STYLES } from "@/core/video-gen/subtitle-styles";
 import type { CharacterSheetData, PropAssetData } from "@/core/video-gen/types";
-import { cn } from "@/lib/utils";
 
-import { BrandPackSection } from "./brand-pack-section";
 import {
   CharacterSheetLightbox,
   resolveCompositeImgUrl,
@@ -75,7 +66,7 @@ import {
   SHEET_LABEL,
   type SheetView,
 } from "./character-sheet-lightbox";
-import { ColorPaletteEditor, type ColorPalette } from "./color-palette-editor";
+import type { ColorPalette } from "./color-palette-editor";
 
 // Task 1（2026-08-01）：删本地副本，改引用单一来源（原与 course-project-dialog.tsx
 // 完全重复，且 value 是会被原样拼进生图 prompt 的英文字面量）。
@@ -1241,11 +1232,9 @@ function PropAssetsSection({
 export function CourseProjectDetailPage({
   projectId,
   onBack,
-  onOpenTask,
 }: {
   projectId: string;
   onBack: () => void;
-  onOpenTask?: (taskId: string) => void;
 }) {
   const projectsQ = useCourseProjects();
   const updateMut = useUpdateCourseProject();
@@ -1253,7 +1242,6 @@ export function CourseProjectDetailPage({
   const tasksQ = useVideoTasks();
 
   const project = projectsQ.data?.find((p) => p.id === projectId);
-  // 3.4 three-level IA: project → its video tasks → (task detail = frames)
   const projectTasks = (tasksQ.data ?? []).filter(
     (t) => t.course_project_id === projectId,
   );
@@ -1267,7 +1255,6 @@ export function CourseProjectDetailPage({
   const [projectSubtitle, setProjectSubtitle] = useState("");
   const voicesQuery = useVideoVoices("zh");
   const [palette, setPalette] = useState<ColorPalette>({});
-  const [paletteOpen, setPaletteOpen] = useState(false); // Task 8: 色板默认折叠进高级配置
   // X11（2026-08-27 方案 B）：characterReference state 退役——「角色参考」失实区块删除，
   // handleSave 不再提交 character_reference（PUT exclude_unset 语义下服务端存量值不变）。
 
@@ -1345,6 +1332,7 @@ export function CourseProjectDetailPage({
         tts_speed: projectTtsSpeed,
         subtitle_style: projectSubtitle,
         color_palette: {
+          ...(project.color_palette ?? {}),
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- intentional falsy→undefined (empty/0 color = unset)
           primary: palette.primary || undefined,
           saturation: palette.saturation,
@@ -1528,7 +1516,7 @@ export function CourseProjectDetailPage({
       {/* X11（2026-08-27 方案 B）：「角色参考」文本区块已删除——后端全链路把
           character_reference 当图片路径消费（_character_ref_paths_from_payload /
           vimax 桥），「注入 prompt 前缀」的宣称失实；后端字段与存量数据保留。
-          页面顺序：基本设置 → 角色参考图 → 风格锚图 → 道具资产 → 色彩微调。 */}
+          页面顺序：基本设置 → 角色参考图 → 风格锚图 → 道具资产。 */}
 
       {/* Task 15: 角色参考图（生成/上传双入口，跨视频角色一致） */}
       <CharacterSheetsSection
@@ -1552,76 +1540,11 @@ export function CourseProjectDetailPage({
         props={project.prop_assets ?? []}
       />
 
-      <BrandPackSection projectId={projectId} project={project} />
-      {/* P1（三期）：调色定位收窄——仅成片后期微调（worker _colorgrade_vf 的 eq 滤镜
-          消费），风格统一职责移交上方「风格锚图」。Task 8 原位在基础设置下方，
-          下移至资产区之后与「后期」定位一致（用户拍板 2026-08-26）。brightness
-          编辑/保存/回灌/脏检查四处一致——修前保存链路漏提交（能调不能存）。 */}
-      <Collapsible
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        className="space-y-4 rounded-lg border p-4"
-      >
-        <CollapsibleTrigger className="flex w-full items-center justify-between">
-          <div className="text-left">
-            <h2 className="text-sm font-semibold">色彩微调（后期）</h2>
-            <p className="text-muted-foreground text-xs">
-              仅对成片做亮度/对比度/饱和度微调，不配置则不生效。统一画面风格请使用上方「风格锚图」。
-            </p>
-          </div>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 transition-transform",
-              paletteOpen && "rotate-180",
-            )}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <ColorPaletteEditor value={palette} onChange={setPalette} />
-        </CollapsibleContent>
-      </Collapsible>
-
       {/* Task 20c: 重算策略文案——改角色/风格只影响新视频，已生成需手动重新生成 */}
       <div className="rounded-lg border border-blue-300/50 bg-blue-50 p-3 dark:bg-blue-950/30">
         <p className="text-xs text-blue-700 dark:text-blue-300">
           角色/风格修改仅影响之后新生成的视频。已生成的视频如需更新，请在视频详情页点「重新生成」。
         </p>
-      </div>
-
-      {/* Video tasks (3.4 three-level IA: project → tasks → frames) */}
-      <div className="space-y-4 rounded-lg border p-4">
-        <h2 className="text-sm font-semibold">关联视频</h2>
-        {projectTasks.length === 0 ? (
-          <p className="text-muted-foreground text-xs">
-            暂无关联视频。新建视频时选择本项目即可关联。
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {projectTasks.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                onClick={() => onOpenTask?.(task.id)}
-                className="hover:bg-muted flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors"
-              >
-                <Film className="text-muted-foreground size-5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {task.title ?? task.task_type}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {task.task_type} ·{" "}
-                    {task.status === "ready"
-                      ? "已完成"
-                      : task.status === "running"
-                        ? `${task.progress}%`
-                        : task.status}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

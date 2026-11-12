@@ -89,11 +89,6 @@
       "count": 2
     }
   },
-  "src/components/workspace/video-gen/brand-pack-section.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/workspace/video-gen/character-sheet-lightbox.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1

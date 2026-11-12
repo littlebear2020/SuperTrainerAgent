@@ -7,7 +7,7 @@
  *      修前帧级 visual_source 覆盖致门控永假、整体不可见）；
  *   2. LayoutSwitcher 点击切换（D14 写回 + 换版式重渲 still）；
  *   3. 详情页成片画面缩略图 + 点击 seek；
- *   4. LOGO 上传浏览器流通（R15 CSRF + m19 后缀）。
+ *   4. 项目详情精简（品牌包/色彩微调/关联视频不再挂载；本地 hermetic E2E 验收）。
  *
  * 账号、任务和项目均通过环境变量显式提供，不在公开仓库保存可用凭证或内部资源 ID：
  *   E2E_USER / E2E_PASS / E2E_DRAFT_TASK / E2E_READY_TASK / E2E_PROJECT_ID
@@ -116,8 +116,8 @@ test.describe("浏览器手测：详情页成片画面 + 点击 seek", () => {
   });
 });
 
-test.describe("浏览器手测：LOGO 上传（R15/m19）", () => {
-  test("项目页上传 LOGO 浏览器流通", async ({ page }) => {
+test.describe("浏览器手测：项目详情精简", () => {
+  test("项目页不再挂载品牌包、色彩微调与关联视频", async ({ page }) => {
     test.skip(!PROJECT, "需 E2E_PROJECT_ID");
     await page.goto("/login");
     await page.fill('input[type="email"]', EMAIL);
@@ -125,32 +125,16 @@ test.describe("浏览器手测：LOGO 上传（R15/m19）", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/workspace/, { timeout: 20_000 });
 
-    await page.goto("/workspace/video-gen");
-    await page.getByRole("button", { name: "项目" }).click();
-    // 打开测试项目详情（含品牌包区）
+    await page.goto("/workspace/video-gen?tab=assets");
     await page.locator("text=浏览器手测项目").first().click();
-    const brand = page.locator("text=品牌包（课程视频）").first();
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-
-    const before = await page.locator('img[alt="LOGO"]').count();
-    const chooser = page.waitForEvent("filechooser");
-    await page.locator("button", { hasText: "上传 LOGO" }).click();
-    const fc = await chooser;
-    await fc.setFiles({
-      name: "logo.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        // 8x8 红 PNG（合法魔数——M14 嗅探通过；m19 落盘后缀=嗅探结果 .png）
-        "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8Dwn4EIwESMolGFlCsEAE1+BhH8B0j2AAAAAElFTkSuQmCC",
-        "base64",
-      ),
+    await expect(page.getByText("基本设置", { exact: true })).toBeVisible({
+      timeout: 30_000,
     });
-    // 上传成功 → 预览 img[alt="LOGO"] 出现（带 logo-image URL）
-    await expect(page.locator('img[alt="LOGO"]').first()).toBeVisible({
-      timeout: 20_000,
-    });
-    expect(await page.locator('img[alt="LOGO"]').count()).toBeGreaterThan(
-      before,
+    for (const removed of ["品牌包", "色彩微调", "关联视频"]) {
+      await expect(page.getByText(removed, { exact: false })).toHaveCount(0);
+    }
+    await expect(page.getByRole("button", { name: "上传 LOGO" })).toHaveCount(
+      0,
     );
   });
 });

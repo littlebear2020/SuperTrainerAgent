@@ -111,3 +111,32 @@ describe("resolveSecondsPerFrameForPayload", () => {
     );
   });
 });
+
+describe("remotion course project payload preservation", () => {
+  it("keeps follow_project inheritance without injecting brand or palette overrides", () => {
+    const payload = buildCreatePayload(
+      base({
+        taskType: "remotion_course",
+        mode: "fixed",
+        script: "固定逐字稿",
+        courseProjectId: "cp_existing",
+        style: "follow_project",
+        voiceId: "follow_project",
+        subtitleStyle: "follow_project",
+      }),
+    );
+
+    expect(payload).toMatchObject({
+      video_type: "remotion_course",
+      aspect: "16:9",
+      course_project_id: "cp_existing",
+      style: "follow_project",
+      subtitle_style: "default",
+    });
+    expect(payload.voice_id).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty("voice_id");
+    expect(payload).not.toHaveProperty("tts_speed");
+    expect(payload).not.toHaveProperty("remotion_theme");
+    expect(payload).not.toHaveProperty("color_palette");
+  });
+});
