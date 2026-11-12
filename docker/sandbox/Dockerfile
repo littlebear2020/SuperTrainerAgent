@@ -111,7 +111,7 @@ COPY skills/public/auto-video-flow/templates/remotion-base/ /opt/remotion-templa
 # to detect a stale image-baked template before copying /opt/remotion-template
 # (template changes REQUIRE an image rebuild — see deployment guide K16).
 RUN cd /opt/remotion-template \
-    && find . -type f -not -path "./node_modules/*" -not -name ".DS_Store" -not -name "TEMPLATE_VERSION" | sort | xargs md5sum | md5sum | awk '{print $1}' > /opt/remotion-template/TEMPLATE_VERSION \
+    && find . -type f -not -path "./node_modules/*" -not -name ".DS_Store" -not -name "TEMPLATE_VERSION" -print0 | LC_ALL=C sort -z | xargs -0 md5sum | md5sum | awk '{print $1}' > /opt/remotion-template/TEMPLATE_VERSION \
     && echo "TEMPLATE_VERSION: $(cat /opt/remotion-template/TEMPLATE_VERSION)"
 RUN cd /opt/remotion-template \
     && npm install --no-audit --no-fund \

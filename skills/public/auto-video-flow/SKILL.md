@@ -42,9 +42,13 @@ ls /opt/remotion-template/package.json
 复制前比对模板版本（防镜像烤入的过期模板静默生效）：镜像构建时会把模板源 hash 写入 `/opt/remotion-template/TEMPLATE_VERSION`，与 skill 模板目录现算的同口径 hash 比对，不一致说明镜像模板过期——如实告知用户须重建 sandbox 镜像（部署手册 K16），不要默默用旧模板渲染：
 
 ```bash
-cat /opt/remotion-template/TEMPLATE_VERSION
-cd /mnt/skills/public/auto-video-flow/templates/remotion-base && find . -type f -not -path "./node_modules/*" -not -name ".DS_Store" -not -name "TEMPLATE_VERSION" | sort | xargs md5sum | md5sum | awk '{print $1}'
-# 两行输出不一致 → 镜像模板过期
+image_hash="$(cat /opt/remotion-template/TEMPLATE_VERSION)"
+source_hash="$(cd /mnt/skills/public/auto-video-flow/templates/remotion-base && find . -type f -not -path "./node_modules/*" -not -name ".DS_Store" -not -name "TEMPLATE_VERSION" -print0 | LC_ALL=C sort -z | xargs -0 md5sum | md5sum | awk '{print $1}')"
+printf 'expected=%s\nactual=%s\n' "$source_hash" "$image_hash"
+test "$image_hash" = "$source_hash" || {
+  echo "镜像模板过期：须重建 sandbox 镜像（部署手册 K16）" >&2
+  exit 1
+}
 ```
 
 ### 方案二：从 skill 模板安装（仅本地开发用，sandbox 环境请用方案一）
