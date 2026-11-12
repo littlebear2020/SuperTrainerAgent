@@ -375,6 +375,73 @@ const SCENARIO_CONTRACTS = [
   },
 ] as const;
 
+const PROMPT_CONTRACTS = [
+  {
+    agent: "creative-studio",
+    id: "course-poster",
+    locale: "zh-CN",
+    patterns: [/课程标题/, /分享日期/, /课程时长/],
+  },
+  {
+    agent: "creative-studio",
+    id: "course-poster",
+    locale: "en-US",
+    patterns: [/course title/i, /sharing date/i, /course duration/i],
+  },
+  {
+    agent: "course-video",
+    id: "product-tutorial",
+    locale: "zh-CN",
+    patterns: [/真实截图/],
+  },
+  {
+    agent: "course-video",
+    id: "product-tutorial",
+    locale: "en-US",
+    patterns: [/real screenshots/i],
+  },
+  {
+    agent: "course-video",
+    id: "concept-animation",
+    locale: "zh-CN",
+    patterns: [/数据文件\/表格数据/],
+  },
+  {
+    agent: "course-video",
+    id: "concept-animation",
+    locale: "en-US",
+    patterns: [/data file\/table data/i],
+  },
+  {
+    agent: "course-video",
+    id: "script-to-video",
+    locale: "zh-CN",
+    patterns: [/完整口播稿/],
+  },
+  {
+    agent: "course-video",
+    id: "script-to-video",
+    locale: "en-US",
+    patterns: [/complete narration script/i],
+  },
+  {
+    agent: "ppt-master",
+    id: "document-to-course",
+    locale: "zh-CN",
+    patterns: [/PDF、DOCX或Markdown/, /Default/, /确认课程结构和设计方案/],
+  },
+  {
+    agent: "ppt-master",
+    id: "document-to-course",
+    locale: "en-US",
+    patterns: [
+      /PDF, DOCX, or Markdown/i,
+      /Default/,
+      /confirm the course structure and design approach/i,
+    ],
+  },
+] as const;
+
 const FORBIDDEN_BY_CASE = {
   "knowledge-card": /任意风格|自定义品牌|any style|custom brand/i,
   "course-poster": /横版|多尺寸|landscape|multiple sizes/i,
@@ -449,6 +516,15 @@ describe("Agent new-chat guide content", () => {
       const copy = `${item?.title}\n${item?.description}\n${item?.prompt}`;
       for (const pattern of contract.required) {
         expect(copy).toMatch(pattern);
+      }
+      const promptContract = PROMPT_CONTRACTS.find(
+        (candidate) =>
+          candidate.locale === contract.locale &&
+          candidate.agent === contract.agent &&
+          candidate.id === contract.id,
+      );
+      for (const pattern of promptContract?.patterns ?? []) {
+        expect(item?.prompt).toMatch(pattern);
       }
       const forbidden = FORBIDDEN_BY_CASE[contract.id];
       expect(copy).not.toMatch(forbidden);
