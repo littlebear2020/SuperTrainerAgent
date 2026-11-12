@@ -10,6 +10,7 @@ export const WORK_CAPABILITY_IDS = [
 ] as const;
 
 export type WorkCapability = (typeof WORK_CAPABILITY_IDS)[number];
+export const DEFAULT_WORK_CAPABILITY = "course-video" satisfies WorkCapability;
 export type VideoAssetsTab = "works" | "assets";
 export type VideoAssetsRoute =
   | { tab: "works"; capability: WorkCapability }
@@ -35,20 +36,25 @@ export function parseVideoAssetsRoute(
   const capability = params.get("capability");
   return {
     tab: "works",
-    capability: isWorkCapability(capability) ? capability : "course-video",
+    capability: isWorkCapability(capability)
+      ? capability
+      : DEFAULT_WORK_CAPABILITY,
   };
 }
 
-export function buildVideoAssetsHref(route: VideoAssetsRoute): string {
+export function buildVideoAssetsHref(
+  route: VideoAssetsRoute,
+  currentSearch = "",
+): string {
+  const params = new URLSearchParams(currentSearch);
+  params.delete("tab");
+  params.delete("capability");
   if (route.tab === "assets") {
-    return `${VIDEO_ASSETS_PATH}?tab=assets`;
+    params.set("tab", "assets");
+  } else if (route.capability !== DEFAULT_WORK_CAPABILITY) {
+    params.set("tab", "works");
+    params.set("capability", route.capability);
   }
-  if (route.capability === "course-video") {
-    return VIDEO_ASSETS_PATH;
-  }
-  const params = new URLSearchParams({
-    tab: "works",
-    capability: route.capability,
-  });
-  return `${VIDEO_ASSETS_PATH}?${params.toString()}`;
+  const search = params.toString();
+  return search ? `${VIDEO_ASSETS_PATH}?${search}` : VIDEO_ASSETS_PATH;
 }

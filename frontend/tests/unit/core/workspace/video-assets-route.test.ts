@@ -57,4 +57,27 @@ describe("video-assets-route", () => {
       buildVideoAssetsHref({ tab: "works", capability: "ppt-master" }),
     ).toBe("/workspace/video-gen?tab=works&capability=ppt-master");
   });
+
+  it("preserves unrelated params while canonicalizing only tab and capability", () => {
+    expect(
+      buildVideoAssetsHref(
+        { tab: "assets" },
+        "foo=1&utm_source=review&capability=ai_video&tab=works",
+      ),
+    ).toBe("/workspace/video-gen?foo=1&utm_source=review&tab=assets");
+    expect(
+      buildVideoAssetsHref(
+        { tab: "works", capability: "course-video" },
+        "foo=1&tab=works&capability=invalid&utm_campaign=second",
+      ),
+    ).toBe("/workspace/video-gen?foo=1&utm_campaign=second");
+    expect(
+      buildVideoAssetsHref(
+        { tab: "works", capability: "ai_image" },
+        "foo=1&capability=invalid&utm_source=review",
+      ),
+    ).toBe(
+      "/workspace/video-gen?foo=1&utm_source=review&tab=works&capability=ai_image",
+    );
+  });
 });
