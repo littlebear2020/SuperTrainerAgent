@@ -674,6 +674,19 @@ export const zhCN: Translations = {
         },
       },
     },
+    works: {
+      tabsLabel: "作品类型",
+      history: "对话历史",
+      searchLabel: "搜索对话标题",
+      loading: "正在加载对话…",
+      loadError: "对话加载失败，请稍后重试",
+      retry: "重试",
+      empty: (capability: string) => `暂无${capability}对话`,
+      noResults: "没有匹配的对话",
+      open: "打开",
+      updated: "最近更新",
+      updatedUnknown: "更新时间未知",
+    },
   },
 
   // Conversation

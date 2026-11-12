@@ -409,6 +409,19 @@ export interface Translations {
         }
       >;
     };
+    works: {
+      tabsLabel: string;
+      history: string;
+      searchLabel: string;
+      loading: string;
+      loadError: string;
+      retry: string;
+      empty: (capability: string) => string;
+      noResults: string;
+      open: string;
+      updated: string;
+      updatedUnknown: string;
+    };
   };
 
   // Conversation

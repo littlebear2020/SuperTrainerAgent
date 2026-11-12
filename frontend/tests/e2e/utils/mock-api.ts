@@ -23,8 +23,10 @@ export const MOCK_RUN_ID = "00000000-0000-0000-0000-000000000099";
 export type MockThread = {
   thread_id: string;
   title?: string;
+  created_at?: string;
   updated_at?: string;
   agent_name?: string;
+  project_type?: string;
 };
 
 export type MockAgent = {
@@ -63,14 +65,24 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
 
   // Thread search — sidebar thread list & chats list page
   void page.route("**/api/langgraph/threads/search", (route) => {
-    const body = threads.map((t) => ({
+    const request = route.request().postDataJSON() as {
+      limit?: number;
+      offset?: number;
+    };
+    const offset = request.offset ?? 0;
+    const limit = request.limit ?? 50;
+    const allThreads = threads.map((t) => ({
       thread_id: t.thread_id,
-      created_at: "2025-01-01T00:00:00Z",
-      updated_at: t.updated_at ?? "2025-01-01T00:00:00Z",
-      metadata: t.agent_name ? { agent_name: t.agent_name } : {},
+      created_at: t.created_at ?? "2025-01-01T00:00:00Z",
+      updated_at: t.updated_at ?? t.created_at ?? "2025-01-01T00:00:00Z",
+      metadata: {
+        ...(t.agent_name ? { agent_name: t.agent_name } : {}),
+        ...(t.project_type ? { project_type: t.project_type } : {}),
+      },
       status: "idle",
       values: { title: t.title ?? "Untitled" },
     }));
+    const body = allThreads.slice(offset, offset + Math.max(0, limit));
     return route.fulfill({
       status: 200,
       contentType: "application/json",

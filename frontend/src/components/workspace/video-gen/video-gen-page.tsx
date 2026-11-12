@@ -24,8 +24,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { AgentConversationGrid } from "@/components/workspace/video-gen/agent-conversation-grid";
 import { CourseProjectPage } from "@/components/workspace/video-gen/course-project-page";
 import { RecomposeConfirmDialog } from "@/components/workspace/video-gen/video-gen-recompose-dialog";
+import { useI18n } from "@/core/i18n/hooks";
 import { formatDateTime } from "@/core/utils/datetime";
 import { formatCost } from "@/core/utils/format";
 import {
@@ -44,7 +46,9 @@ import type { VideoTaskBrief } from "@/core/video-gen/types";
 import {
   buildVideoAssetsHref,
   parseVideoAssetsRoute,
+  type WorkCapability,
 } from "@/core/workspace/video-assets-route";
+import { WORK_CAPABILITIES } from "@/core/workspace/work-capabilities";
 import { cn } from "@/lib/utils";
 
 import { CompletedVideoGrid } from "./completed-video-grid";
@@ -282,14 +286,39 @@ export function TaskCard({
 // 常量）移至 video-gen-create-dialog.tsx；本模块 re-export 保既有导入方（测试/e2e）。
 // ── Main page ───────────────────────────────────────────────────────────
 
+function VideoWorkPanel({ workType }: { workType: "ai_image" | "ai_video" }) {
+  const router = useRouter();
+  const tasksQuery = useVideoTasks();
+  const deleteTask = useDeleteVideoTask();
+  return (
+    <CompletedVideoGrid
+      workType={workType}
+      tasks={tasksQuery.data ?? []}
+      isLoading={tasksQuery.isLoading}
+      isError={tasksQuery.isError}
+      onRetry={() => void tasksQuery.refetch()}
+      onDelete={(id) => deleteTask.mutate(id)}
+      onNavigate={(id, path) =>
+        router.push(
+          `/workspace/video-gen/${id}${path === "storyboard" ? "/storyboard" : ""}`,
+        )
+      }
+    />
+  );
+}
+
 export function VideoGenPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
   const route = parseVideoAssetsRoute(searchParams);
   const tab = route.tab;
   const canonicalHref = buildVideoAssetsHref(route);
-  const tasksQuery = useVideoTasks();
-  const deleteTask = useDeleteVideoTask();
+  const selectedCapability =
+    route.tab === "works"
+      ? (WORK_CAPABILITIES.find((item) => item.id === route.capability) ??
+        WORK_CAPABILITIES[0]!)
+      : null;
 
   useEffect(() => {
     const currentHref = `${window.location.pathname}${window.location.search}`;
@@ -311,6 +340,11 @@ export function VideoGenPage() {
     document.getElementById(`video-assets-tab-${next}`)?.focus();
   };
 
+  const selectCapability = (next: WorkCapability) => {
+    router.push(buildVideoAssetsHref({ tab: "works", capability: next }));
+    document.getElementById(`work-capability-tab-${next}`)?.focus();
+  };
+
   return (
     <div className="scrollbar-none flex size-full flex-col overflow-y-auto p-4 sm:p-6">
       <div className="mx-auto w-full max-w-6xl space-y-6">
@@ -318,7 +352,7 @@ export function VideoGenPage() {
         <div
           role="tablist"
           aria-label="视频资产视图"
-          className="border-border/50 bg-muted/30 flex w-fit gap-1 rounded-lg border p-1"
+          className="border-border/50 bg-muted/30 flex w-fit max-w-full gap-1 rounded-lg border p-1"
         >
           {TABS.map((item) => (
             <button
@@ -330,10 +364,17 @@ export function VideoGenPage() {
               tabIndex={tab === item.value ? 0 : -1}
               onClick={() => selectTab(item.value)}
               onKeyDown={(event) => {
-                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                  event.preventDefault();
-                  selectTab(tab === "works" ? "assets" : "works");
-                }
+                let next: (typeof TABS)[number]["value"];
+                if (event.key === "Home") next = "works";
+                else if (event.key === "End") next = "assets";
+                else if (
+                  event.key === "ArrowLeft" ||
+                  event.key === "ArrowRight"
+                )
+                  next = tab === "works" ? "assets" : "works";
+                else return;
+                event.preventDefault();
+                selectTab(next);
               }}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -351,19 +392,70 @@ export function VideoGenPage() {
           role="tabpanel"
           aria-labelledby={`video-assets-tab-${tab}`}
         >
-          {tab === "works" ? (
-            <CompletedVideoGrid
-              tasks={tasksQuery.data ?? []}
-              isLoading={tasksQuery.isLoading}
-              isError={tasksQuery.isError}
-              onRetry={() => void tasksQuery.refetch()}
-              onDelete={(id) => deleteTask.mutate(id)}
-              onNavigate={(id, path) =>
-                router.push(
-                  `/workspace/video-gen/${id}${path === "storyboard" ? "/storyboard" : ""}`,
-                )
-              }
-            />
+          {tab === "works" && selectedCapability ? (
+            <div className="space-y-5">
+              <div
+                id="work-capability-tabs"
+                role="tablist"
+                aria-label={t.workspace.works.tabsLabel}
+                className="border-border/50 bg-muted/30 flex w-full gap-1 overflow-x-auto rounded-lg border p-1"
+              >
+                {WORK_CAPABILITIES.map((item, index) => (
+                  <button
+                    key={item.id}
+                    id={`work-capability-tab-${item.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedCapability.id === item.id}
+                    aria-controls={`work-capability-panel-${item.id}`}
+                    tabIndex={selectedCapability.id === item.id ? 0 : -1}
+                    onClick={() => selectCapability(item.id)}
+                    onKeyDown={(event) => {
+                      let nextIndex: number;
+                      if (event.key === "Home") nextIndex = 0;
+                      else if (event.key === "End")
+                        nextIndex = WORK_CAPABILITIES.length - 1;
+                      else if (event.key === "ArrowLeft")
+                        nextIndex =
+                          (index - 1 + WORK_CAPABILITIES.length) %
+                          WORK_CAPABILITIES.length;
+                      else if (event.key === "ArrowRight")
+                        nextIndex = (index + 1) % WORK_CAPABILITIES.length;
+                      else return;
+                      event.preventDefault();
+                      const next = WORK_CAPABILITIES[nextIndex];
+                      if (next) selectCapability(next.id);
+                    }}
+                    className={cn(
+                      "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                      selectedCapability.id === item.id
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t.workspace.home.courseItems[item.id].title}
+                  </button>
+                ))}
+              </div>
+              <div
+                id={`work-capability-panel-${selectedCapability.id}`}
+                role="tabpanel"
+                aria-labelledby={`work-capability-tab-${selectedCapability.id}`}
+              >
+                {selectedCapability.kind === "agent" ? (
+                  <AgentConversationGrid
+                    agentName={selectedCapability.agentName}
+                    label={
+                      t.workspace.home.courseItems[selectedCapability.id].title
+                    }
+                  />
+                ) : (
+                  <VideoWorkPanel
+                    workType={selectedCapability.initialTaskType}
+                  />
+                )}
+              </div>
+            </div>
           ) : (
             <CourseProjectPage
               onOpenTask={(taskId) =>

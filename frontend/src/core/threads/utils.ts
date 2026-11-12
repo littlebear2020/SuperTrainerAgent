@@ -17,28 +17,35 @@ type ThreadRouteTarget =
       metadata?: Record<string, unknown> | null;
     };
 
+export function agentNameOfThread(
+  thread: Exclude<ThreadRouteTarget, string>,
+): string | undefined {
+  const candidates = [
+    thread.context?.agent_name,
+    thread.metadata?.agent_name,
+    thread.metadata?.project_type,
+  ];
+  const agentName = candidates.find(
+    (candidate): candidate is string =>
+      typeof candidate === "string" && candidate.length > 0,
+  );
+  return agentName ? resolveAgentName(agentName) : undefined;
+}
+
 export function pathOfThread(
   thread: ThreadRouteTarget,
   context?: Pick<AgentThreadContext, "agent_name"> | null,
 ) {
   const threadId = typeof thread === "string" ? thread : thread.thread_id;
-  let agentName: string | undefined;
-  if (typeof thread === "string") {
-    agentName = context?.agent_name;
-  } else {
-    agentName = thread.context?.agent_name;
-    if (!agentName) {
-      const metaAgent = thread.metadata?.agent_name;
-      if (typeof metaAgent === "string") {
-        agentName = metaAgent;
-      }
-    }
-  }
+  const agentName =
+    typeof thread === "string"
+      ? agentNameOfThread({ thread_id: thread, context })
+      : agentNameOfThread(thread);
 
   // 2026-09-09 创意工作合并：历史线程 context/metadata 里的旧 5 壳名统一映射到
   // creative-studio，侧边栏/分享/列表链接直接生成新名 URL。
   return agentName
-    ? `/workspace/agents/${encodeURIComponent(resolveAgentName(agentName))}/chats/${threadId}`
+    ? `/workspace/agents/${encodeURIComponent(agentName)}/chats/${threadId}`
     : `/workspace/chats/${threadId}`;
 }
 
