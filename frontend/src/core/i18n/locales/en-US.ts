@@ -633,6 +633,49 @@ export const enUS: Translations = {
           "Long-form work confirms the outline before the full draft.",
         ],
       },
+      "podcast-studio": {
+        displayName: "Podcast production",
+        title: "Turn source material into real podcast audio",
+        description:
+          "Start with documents, safe public links, or topic research and deliver MP3 after the required confirmation.",
+        cases: [
+          {
+            id: "read_original",
+            title: "Read a document aloud as audio",
+            description:
+              "Preserve extracted text and order in a single-voice MP3",
+            prompt:
+              "[模式: read_original]\nRead the visible text from my PDF, DOCX, Markdown, HTML, or safe public link verbatim, without adding or summarizing, and generate a single-voice MP3 audio.",
+          },
+          {
+            id: "news_single",
+            title: "Single-host news podcast",
+            description:
+              "Confirm the researched script before single-host audio",
+            prompt:
+              "[模式: news_single]\nResearch [topic] and show the complete news script and sources, then after my confirmation, generate a single-host MP3 audio with the Yunzhou voice.",
+          },
+          {
+            id: "interview_two",
+            title: "Two-person interview podcast",
+            description: "At least four male/female turns before audio",
+            prompt:
+              "[模式: interview_two]\nCreate at least four interview turns between a male and a female host about [topic/source]. Show the complete script, sources, and voices, then after my confirmation, generate a two-person MP3 audio.",
+          },
+          {
+            id: "debate_two",
+            title: "Two-person debate podcast",
+            description: "Male/female pro-and-con debate before audio",
+            prompt:
+              "[模式: debate_two]\nCreate at least four debate turns between a male and a female host about [topic/source], with both positions and the complete script, sources, and voices. After my confirmation, generate a two-person MP3 audio.",
+          },
+        ],
+        tips: [
+          "Provide a document, a safe public link, or a research topic.",
+          "Rewritten modes show the complete script, sources, and voices first.",
+          "Audio is synthesized and delivered as a downloadable MP3 after confirmation.",
+        ],
+      },
     },
   },
 
@@ -651,8 +694,8 @@ export const enUS: Translations = {
       createHeading: "Choose a creation flow to start your next work",
       videoCourse: "Video course",
       videoCourseDescription: "Turn course scripts into engaging video content",
-      textCourse: "Text-based course",
-      textCourseDescription: "Explain ideas with posters, slides, and articles",
+      textCourse: "Visual & audio course",
+      textCourseDescription: "Explain ideas with posters, slides, and podcasts",
       playbackUnavailable: "Video is temporarily unavailable",
       courseItems: {
         "course-video": {
@@ -692,6 +735,13 @@ export const enUS: Translations = {
             "Collaborate on topics, structure, drafts, and revisions",
           badge: "Co-writing",
           mediaAlt: "Decorative article preview",
+        },
+        "podcast-studio": {
+          title: "Podcast production",
+          description:
+            "Generate real MP3 audio from documents, public links, or topic research",
+          badge: "Audio podcast",
+          mediaAlt: "Headphones and two-person audio waveform cover",
         },
       },
       recentProjects: "Recent Projects",

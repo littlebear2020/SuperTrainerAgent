@@ -10,7 +10,7 @@ describe("HOME_COURSE_ITEMS", () => {
       "ai_video",
       "creative-studio",
       "ppt-master",
-      "co-writer",
+      "podcast-studio",
     ]);
     expect(
       HOME_COURSE_ITEMS.slice(0, 3).every((item) => item.entry === "video"),
@@ -26,7 +26,7 @@ describe("HOME_COURSE_ITEMS", () => {
       "course-video",
       "creative-studio",
       "ppt-master",
-      "co-writer",
+      "podcast-studio",
     ]);
     const aiItems = HOME_COURSE_ITEMS.filter(
       (item) => item.kind === "video-task",
@@ -51,7 +51,7 @@ describe("HOME_COURSE_ITEMS", () => {
     expect(externalMedia).toEqual(
       expect.arrayContaining([
         "/course-samples/ppt-work.webp",
-        "/course-samples/article-work.webp",
+        "/course-samples/podcast-work.webp",
         "/course-samples/knowledge-card.webp",
       ]),
     );

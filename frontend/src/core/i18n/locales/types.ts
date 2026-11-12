@@ -412,7 +412,8 @@ export interface Translations {
         | "ai_video"
         | "creative-studio"
         | "ppt-master"
-        | "co-writer",
+        | "co-writer"
+        | "podcast-studio",
         {
           title: string;
           description: string;

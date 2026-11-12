@@ -590,6 +590,46 @@ export const zhCN: Translations = {
           "长文会先确认大纲，再完成全文。",
         ],
       },
+      "podcast-studio": {
+        displayName: "播客制作",
+        title: "把资料变成真实播客音频",
+        description: "从文档、公开链接或主题调研出发，经必要确认后生成 MP3。",
+        cases: [
+          {
+            id: "read_original",
+            title: "文档原文朗读成音频",
+            description: "保持提取正文和顺序，生成单音色 MP3",
+            prompt:
+              "[模式: read_original]\n请把我提供的PDF、DOCX、Markdown、HTML或安全链接中的可见正文逐字朗读，不增补、不总结，生成单音色MP3音频。",
+          },
+          {
+            id: "news_single",
+            title: "单人新闻播报",
+            description: "调研后先确认完整新闻稿，再生成云舟 MP3",
+            prompt:
+              "[模式: news_single]\n请围绕[主题]调研并展示完整新闻口播稿和来源，经我确认后生成云舟单主持人MP3音频。",
+          },
+          {
+            id: "interview_two",
+            title: "双人访谈播客",
+            description: "男女双人至少四轮访谈，确认后合成",
+            prompt:
+              "[模式: interview_two]\n请基于[主题/资料]设计男女双人至少4轮访谈，展示完整口播稿、来源和音色，经我确认后生成双人MP3音频。",
+          },
+          {
+            id: "debate_two",
+            title: "双人辩论播客",
+            description: "男女双人正反辩论，确认后合成",
+            prompt:
+              "[模式: debate_two]\n请基于[主题/资料]设计男女双人至少4轮正反辩论，呈现双方立场和完整口播稿、来源及音色，经我确认后生成双人MP3音频。",
+          },
+        ],
+        tips: [
+          "可以提供文档、公开安全链接或一个调研主题。",
+          "改写模式会先展示完整口播稿、来源和音色。",
+          "确认后才合成并交付可下载的 MP3。",
+        ],
+      },
     },
   },
 
@@ -608,8 +648,8 @@ export const zhCN: Translations = {
       createHeading: "选择一种创作方式，开始你的下一个作品",
       videoCourse: "视频课",
       videoCourseDescription: "从课程脚本到动态画面，快速制作视频内容",
-      textCourse: "图文课",
-      textCourseDescription: "用海报、演示文稿和文章讲清知识",
+      textCourse: "图文音频课",
+      textCourseDescription: "用海报、演示文稿和播客讲清知识",
       playbackUnavailable: "视频暂时无法播放",
       courseItems: {
         "course-video": {
@@ -647,6 +687,12 @@ export const zhCN: Translations = {
           description: "协同完成选题、结构、草稿与润色",
           badge: "协同写作",
           mediaAlt: "文章写作装饰预览",
+        },
+        "podcast-studio": {
+          title: "播客制作",
+          description: "从文档、公开链接或主题调研生成真实 MP3 音频",
+          badge: "语音播客",
+          mediaAlt: "双人耳机与音频波形封面",
         },
       },
       recentProjects: "近期项目",

@@ -81,7 +81,7 @@ describe("HomeCourseEntry", () => {
   it("defaults to video course and exposes three cards", async () => {
     await render();
     expect(button("视频课").getAttribute("aria-expanded")).toBe("true");
-    expect(button("图文课").getAttribute("aria-expanded")).toBe("false");
+    expect(button("图文音频课").getAttribute("aria-expanded")).toBe("false");
     for (const title of ["文字动效", "图片动效", "AI视频"]) {
       expect(button(title)).toBeDefined();
     }
@@ -115,10 +115,10 @@ describe("HomeCourseEntry", () => {
     expect(
       button("文字动效").querySelector("[data-testid='creation-arrow'] svg"),
     ).not.toBeNull();
-    await act(async () => button("图文课").click());
+    await act(async () => button("图文音频课").click());
     for (const [title, src] of [
       ["PPT制作", "/course-samples/ppt-work.webp"],
-      ["文章写作", "/course-samples/article-work.webp"],
+      ["播客制作", "/course-samples/podcast-work.webp"],
     ] as const) {
       const card = button(title);
       expect(card.querySelector("img")?.getAttribute("src")).toBe(src);
@@ -131,8 +131,8 @@ describe("HomeCourseEntry", () => {
   it("switches to text course and pauses hidden panel video", async () => {
     await render();
     expect(playSpy).toHaveBeenCalledTimes(3);
-    await act(async () => button("图文课").click());
-    for (const title of ["海报制作", "PPT制作", "文章写作"]) {
+    await act(async () => button("图文音频课").click());
+    for (const title of ["海报制作", "PPT制作", "播客制作"]) {
       expect(button(title)).toBeDefined();
     }
     expect(document.querySelector("#home-course-panel-video")).toBeNull();

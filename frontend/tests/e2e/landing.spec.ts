@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 const HOME_VIDEO_ENTRIES = ["course-video", "ai_image", "ai_video"];
-const HOME_TEXT_ENTRIES = ["creative-studio", "ppt-master", "co-writer"];
+const HOME_TEXT_ENTRIES = ["creative-studio", "ppt-master", "podcast-studio"];
 
 // DSN-003b（2026-09-14）：默认语言改中文——Playwright 全新 context 无
 // localStorage 语言偏好，走默认 zh-CN，CTA 显示「进入工作台」。正则取
@@ -52,7 +52,7 @@ test.describe("Landing page", () => {
     for (const id of HOME_VIDEO_ENTRIES) {
       await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
     }
-    await page.getByRole("button", { name: /图文课/ }).click();
+    await page.getByRole("button", { name: /图文音频课/ }).click();
     for (const id of HOME_TEXT_ENTRIES) {
       await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
     }

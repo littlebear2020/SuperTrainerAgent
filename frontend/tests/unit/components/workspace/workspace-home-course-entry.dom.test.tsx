@@ -112,7 +112,7 @@ describe("WorkspaceHome course entries", () => {
       "course-video",
       "creative-studio",
       "ppt-master",
-      "co-writer",
+      "podcast-studio",
     ]) {
       await act(async () => entryButton(agent).click());
       expect(h.push).toHaveBeenLastCalledWith(

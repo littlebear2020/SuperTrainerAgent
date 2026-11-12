@@ -3,6 +3,7 @@ export const AGENT_NEW_CHAT_GUIDE_IDS = [
   "ppt-master",
   "creative-studio",
   "co-writer",
+  "podcast-studio",
 ] as const;
 
 export type AgentNewChatGuideId = (typeof AGENT_NEW_CHAT_GUIDE_IDS)[number];

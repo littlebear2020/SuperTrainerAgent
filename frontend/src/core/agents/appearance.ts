@@ -13,6 +13,7 @@
  */
 
 import {
+  AudioLines,
   Clapperboard,
   Film,
   MessageSquare,
@@ -63,6 +64,11 @@ export const AGENT_APPEARANCE: Record<string, AgentAppearance> = {
     icon: PenLine,
     bg: "bg-violet-100 dark:bg-violet-500/10",
     text: "text-violet-600 dark:text-violet-400",
+  },
+  "podcast-studio": {
+    icon: AudioLines,
+    bg: "bg-cyan-100 dark:bg-cyan-500/10",
+    text: "text-cyan-700 dark:text-cyan-300",
   },
 };
 

@@ -24,11 +24,11 @@ test.describe("home course entries", () => {
       ["course-video", "course-video"],
       ["creative-studio", "creative-studio"],
       ["ppt-master", "ppt-master"],
-      ["co-writer", "co-writer"],
+      ["podcast-studio", "podcast-studio"],
     ] as const) {
       await page.goto("/workspace");
-      if (["creative-studio", "ppt-master", "co-writer"].includes(id)) {
-        await page.getByRole("button", { name: /图文课/ }).click();
+      if (["creative-studio", "ppt-master", "podcast-studio"].includes(id)) {
+        await page.getByRole("button", { name: /图文音频课/ }).click();
       }
       await page.locator(`[data-course-entry='${id}']`).click();
       await expect(page).toHaveURL(`/workspace/agents/${agent}/chats/new`);
@@ -69,6 +69,23 @@ test.describe("home course entries", () => {
       await expect(card).toContainText(title);
       await expect(card.locator("video")).toHaveAttribute("src", src);
     }
+  });
+
+  test("podcast card replaces only the final writing card", async ({
+    page,
+  }) => {
+    await page.goto("/workspace");
+    await page.getByRole("button", { name: /图文音频课/ }).click();
+    const card = page.locator("[data-course-entry='podcast-studio']");
+    await expect(card).toContainText("语音播客");
+    await expect(card).toContainText("播客制作");
+    await expect(card.locator("img")).toHaveAttribute(
+      "src",
+      "/course-samples/podcast-work.webp",
+    );
+    await expect(page.locator("[data-course-entry='co-writer']")).toHaveCount(
+      0,
+    );
   });
 
   test("replacement samples decode and really play with advancing time", async ({
@@ -206,7 +223,7 @@ test.describe("home course entries", () => {
         async () => (await calls()).filter((kind) => kind === "play").length,
       )
       .toBe(3);
-    await page.getByRole("button", { name: /图文课/ }).click();
+    await page.getByRole("button", { name: /图文音频课/ }).click();
     await expect
       .poll(
         async () => (await calls()).filter((kind) => kind === "pause").length,
@@ -263,8 +280,8 @@ test.describe("home course entries", () => {
         () => document.documentElement.scrollWidth <= window.innerWidth + 1,
       ),
     ).toBe(true);
-    await page.getByRole("button", { name: /图文课/ }).click();
-    for (const id of ["creative-studio", "ppt-master", "co-writer"]) {
+    await page.getByRole("button", { name: /图文音频课/ }).click();
+    for (const id of ["creative-studio", "ppt-master", "podcast-studio"]) {
       await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
     }
     await page.getByRole("button", { name: /视频课/ }).click();

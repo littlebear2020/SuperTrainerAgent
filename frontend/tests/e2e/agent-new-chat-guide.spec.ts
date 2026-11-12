@@ -30,6 +30,11 @@ const GUIDE_AGENTS = [
     skills: ["trainerai-imagine"],
   },
   { name: "co-writer", description: "Co-writer", skills: [] },
+  {
+    name: "podcast-studio",
+    description: "Podcast production",
+    skills: ["podcast-studio", "deep-research"],
+  },
 ];
 
 let pageErrors: string[];
@@ -123,6 +128,86 @@ test.describe("Agent new-chat task guides", () => {
       ).toHaveCount(0);
     });
   }
+
+  test("podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await page.route("**/api/langgraph/threads", (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const payload = JSON.parse(route.request().postData() ?? "{}");
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          thread_id: MOCK_THREAD_ID,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          metadata: { agent_name: payload.assistant_id ?? "podcast-studio" },
+          status: "idle",
+          values: {},
+        }),
+      });
+    });
+    const runPayloads: string[] = [];
+    const events = [
+      {
+        event: "metadata",
+        data: { run_id: "podcast-run", thread_id: MOCK_THREAD_ID },
+      },
+      {
+        event: "values",
+        data: {
+          messages: [
+            { type: "ai", id: "podcast-ai", content: "播客音频任务已接收" },
+          ],
+        },
+      },
+      { event: "end", data: {} },
+    ];
+    const body = events
+      .map(
+        (event) =>
+          `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+      )
+      .join("");
+    for (const pattern of [
+      "**/api/langgraph/runs/stream",
+      "**/api/langgraph/threads/*/runs/stream",
+    ]) {
+      await page.route(pattern, (route) => {
+        runPayloads.push(route.request().postData() ?? "");
+        return route.fulfill({
+          status: 200,
+          contentType: "text/event-stream",
+          headers: {
+            "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/podcast-run`,
+          },
+          body,
+        });
+      });
+    }
+    const calls = trackSending(page);
+    await openGuide(page, "podcast-studio");
+    const item = zhCN.agents.newChatGuides["podcast-studio"].cases[0];
+    await page.getByRole("button", { name: item.title, exact: true }).click();
+    const textarea = page.locator("textarea[name='message']");
+    await expect(textarea).toHaveValue(item.prompt);
+    expect(item.prompt).toContain("[模式: read_original]");
+    expect(item.prompt).toContain("MP3");
+    expect(calls).toEqual({ threads: 0, runs: 0 });
+
+    await textarea.press("Enter");
+    await expect.poll(() => calls.runs).toBe(1);
+    await expect(page).toHaveURL(
+      `/workspace/agents/podcast-studio/chats/${MOCK_THREAD_ID}`,
+    );
+    expect(calls).toEqual({ threads: 1, runs: 1 });
+    expect(runPayloads).toHaveLength(1);
+    expect(JSON.parse(runPayloads[0]!).context.agent_name).toBe(
+      "podcast-studio",
+    );
+  });
 
   test("Co-writer draft choices cancel and append without sending", async ({
     page,

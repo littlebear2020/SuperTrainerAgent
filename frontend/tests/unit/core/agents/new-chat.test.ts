@@ -22,6 +22,12 @@ const EXPECTED_CASE_IDS = {
     "series-card",
   ],
   "co-writer": ["article", "case", "script", "podcast"],
+  "podcast-studio": [
+    "read_original",
+    "news_single",
+    "interview_two",
+    "debate_two",
+  ],
 } as const;
 
 const EXPECTED_ZH_TITLES = {
@@ -29,6 +35,7 @@ const EXPECTED_ZH_TITLES = {
   "ppt-master": "从资料到可编辑的 PPT",
   "creative-studio": "让知识成为好看的图片",
   "co-writer": "把想法写成好内容",
+  "podcast-studio": "把资料变成真实播客音频",
 } as const;
 
 const EXPECTED_CO_WRITER_CASES = {
@@ -373,6 +380,94 @@ const SCENARIO_CONTRACTS = [
       /new editable PPTX/i,
     ],
   },
+  {
+    agent: "podcast-studio",
+    id: "read_original",
+    locale: "zh-CN",
+    title: "文档原文朗读成音频",
+    required: [/\[模式: read_original\]/, /不增补、不总结/, /单音色MP3音频/],
+  },
+  {
+    agent: "podcast-studio",
+    id: "read_original",
+    locale: "en-US",
+    title: "Read a document aloud as audio",
+    required: [
+      /\[模式: read_original\]/,
+      /without adding or summarizing/i,
+      /single-voice MP3 audio/i,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "news_single",
+    locale: "zh-CN",
+    title: "单人新闻播报",
+    required: [
+      /\[模式: news_single\]/,
+      /完整新闻口播稿和来源/,
+      /确认后生成云舟单主持人MP3音频/,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "news_single",
+    locale: "en-US",
+    title: "Single-host news podcast",
+    required: [
+      /\[模式: news_single\]/,
+      /complete news script and sources/i,
+      /confirmation.*single-host MP3 audio/i,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "interview_two",
+    locale: "zh-CN",
+    title: "双人访谈播客",
+    required: [
+      /\[模式: interview_two\]/,
+      /至少4轮访谈/,
+      /完整口播稿、来源和音色/,
+      /确认后生成双人MP3音频/,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "interview_two",
+    locale: "en-US",
+    title: "Two-person interview podcast",
+    required: [
+      /\[模式: interview_two\]/,
+      /at least four interview turns/i,
+      /complete script, sources, and voices/i,
+      /confirmation.*two-person MP3 audio/i,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "debate_two",
+    locale: "zh-CN",
+    title: "双人辩论播客",
+    required: [
+      /\[模式: debate_two\]/,
+      /至少4轮正反辩论/,
+      /双方立场和完整口播稿/,
+      /确认后生成双人MP3音频/,
+    ],
+  },
+  {
+    agent: "podcast-studio",
+    id: "debate_two",
+    locale: "en-US",
+    title: "Two-person debate podcast",
+    required: [
+      /\[模式: debate_two\]/,
+      /at least four debate turns/i,
+      /both positions and the complete script/i,
+      /confirmation.*two-person MP3 audio/i,
+    ],
+  },
 ] as const;
 
 const PROMPT_CONTRACTS = [
@@ -440,6 +535,54 @@ const PROMPT_CONTRACTS = [
       /confirm the course structure and design approach/i,
     ],
   },
+  {
+    agent: "podcast-studio",
+    id: "read_original",
+    locale: "zh-CN",
+    patterns: [/\[模式: read_original\]/, /MP3音频/],
+  },
+  {
+    agent: "podcast-studio",
+    id: "read_original",
+    locale: "en-US",
+    patterns: [/\[模式: read_original\]/, /MP3 audio/i],
+  },
+  {
+    agent: "podcast-studio",
+    id: "news_single",
+    locale: "zh-CN",
+    patterns: [/\[模式: news_single\]/, /MP3音频/],
+  },
+  {
+    agent: "podcast-studio",
+    id: "news_single",
+    locale: "en-US",
+    patterns: [/\[模式: news_single\]/, /MP3 audio/i],
+  },
+  {
+    agent: "podcast-studio",
+    id: "interview_two",
+    locale: "zh-CN",
+    patterns: [/\[模式: interview_two\]/, /MP3音频/],
+  },
+  {
+    agent: "podcast-studio",
+    id: "interview_two",
+    locale: "en-US",
+    patterns: [/\[模式: interview_two\]/, /MP3 audio/i],
+  },
+  {
+    agent: "podcast-studio",
+    id: "debate_two",
+    locale: "zh-CN",
+    patterns: [/\[模式: debate_two\]/, /MP3音频/],
+  },
+  {
+    agent: "podcast-studio",
+    id: "debate_two",
+    locale: "en-US",
+    patterns: [/\[模式: debate_two\]/, /MP3 audio/i],
+  },
 ] as const;
 
 const FORBIDDEN_BY_CASE = {
@@ -460,16 +603,27 @@ const FORBIDDEN_BY_CASE = {
     /重新组织结构|拆分拥挤页|逐字节|reorganize|split crowded|byte-for-byte/i,
   "document-to-course":
     /Quick|Beautify|Create Template|创建模板|快速生成|品牌模板/i,
+  read_original: /声音克隆|背景音乐|voice cloning|background music/i,
+  news_single: /声音克隆|背景音乐|voice cloning|background music/i,
+  interview_two:
+    /声音克隆|背景音乐|原生重叠|voice cloning|background music|overlapping voices/i,
+  debate_two:
+    /声音克隆|背景音乐|原生重叠|voice cloning|background music|overlapping voices/i,
 } as const;
 
 describe("Agent new-chat guide content", () => {
-  it("targets exactly the four approved agents and their retired aliases", () => {
+  it("targets exactly five approved agents and their retired aliases", () => {
     expect(AGENT_NEW_CHAT_GUIDE_IDS).toEqual([
       "course-video",
       "ppt-master",
       "creative-studio",
       "co-writer",
+      "podcast-studio",
     ]);
+    expect(AGENT_NEW_CHAT_GUIDE_IDS).toHaveLength(5);
+    expect(
+      Object.values(zhCN.agents.newChatGuides).flatMap((guide) => guide.cases),
+    ).toHaveLength(20);
     expect(isAgentNewChatGuideId(resolveAgentName("card-poster"))).toBe(true);
     expect(isAgentNewChatGuideId(resolveAgentName("course-ppt"))).toBe(true);
     expect(isAgentNewChatGuideId("test-agent")).toBe(false);

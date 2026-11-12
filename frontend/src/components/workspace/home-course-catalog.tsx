@@ -7,7 +7,7 @@ export type CourseItemId =
   | "ai_video"
   | "creative-studio"
   | "ppt-master"
-  | "co-writer";
+  | "podcast-studio";
 
 type HomeCourseMedia = { kind: "video" | "image"; src: string };
 
@@ -25,7 +25,7 @@ export type HomeCourseItem = HomeCourseItemBase &
           | "course-video"
           | "creative-studio"
           | "ppt-master"
-          | "co-writer";
+          | "podcast-studio";
       }
     | { kind: "video-task"; initialTaskType: InitialVideoTaskType }
   );
@@ -67,10 +67,10 @@ export const HOME_COURSE_ITEMS: readonly HomeCourseItem[] = [
     media: { kind: "image", src: "/course-samples/ppt-work.webp" },
   },
   {
-    id: "co-writer",
+    id: "podcast-studio",
     entry: "text",
     kind: "agent",
-    agentName: "co-writer",
-    media: { kind: "image", src: "/course-samples/article-work.webp" },
+    agentName: "podcast-studio",
+    media: { kind: "image", src: "/course-samples/podcast-work.webp" },
   },
 ];

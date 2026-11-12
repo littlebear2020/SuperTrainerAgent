@@ -69,7 +69,7 @@ describe("workspace-home course entry i18n", () => {
     for (const copy of [
       "What would you like to create?",
       "Video course",
-      "Text-based course",
+      "Visual & audio course",
       "Text animation",
       "Image motion",
       "AI video",
@@ -79,13 +79,18 @@ describe("workspace-home course entry i18n", () => {
     }
     await act(async () => {
       Array.from(container.querySelectorAll("button"))
-        .find((item) => item.textContent?.includes("Text-based course"))
+        .find((item) => item.textContent?.includes("Visual & audio course"))
         ?.click();
     });
     const expandedText = container.textContent ?? "";
-    for (const copy of ["Poster design", "PPT creation", "Article writing"]) {
+    for (const copy of [
+      "Poster design",
+      "PPT creation",
+      "Podcast production",
+    ]) {
       expect(expandedText).toContain(copy);
     }
+    expect(expandedText).not.toContain("articles");
     expect(CJK.test(expandedText), `en-US contains CJK: ${expandedText}`).toBe(
       false,
     );
@@ -99,7 +104,7 @@ describe("workspace-home course entry i18n", () => {
     for (const copy of [
       "想创造什么？",
       "视频课",
-      "图文课",
+      "图文音频课",
       "文字动效",
       "图片动效",
       "AI视频",
@@ -109,11 +114,12 @@ describe("workspace-home course entry i18n", () => {
     }
     await act(async () => {
       Array.from(container.querySelectorAll("button"))
-        .find((item) => item.textContent?.includes("图文课"))
+        .find((item) => item.textContent?.includes("图文音频课"))
         ?.click();
     });
-    for (const copy of ["海报制作", "PPT制作", "文章写作"]) {
+    for (const copy of ["海报制作", "PPT制作", "语音播客", "播客制作"]) {
       expect(container.textContent).toContain(copy);
     }
+    expect(container.textContent).not.toContain("文章");
   });
 });
