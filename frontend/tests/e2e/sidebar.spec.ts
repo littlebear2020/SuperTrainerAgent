@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
-  test("shows only home, video assets, console, recent chats, and settings", async ({
+  test("shows only home, works, console, recent chats, and settings", async ({
     page,
   }) => {
     mockLangGraphAPI(page, {
@@ -17,7 +17,7 @@ test.describe("Sidebar navigation", () => {
     await expect(home).toHaveText("首页");
     await expect(
       sidebar.locator("a[href='/workspace/video-gen']"),
-    ).toContainText("视频资产");
+    ).toContainText("我的作品");
     await expect(sidebar.locator("a[href='/workspace/console']")).toBeVisible();
 
     for (const href of [
@@ -34,7 +34,8 @@ test.describe("Sidebar navigation", () => {
       sidebar.getByText("最近的对话", { exact: true }),
     ).toBeVisible();
     await expect(
-      sidebar.getByText("设置和更多", { exact: true }),
+      sidebar.getByRole("button", { name: "设置", exact: true }),
     ).toBeVisible();
+    await expect(sidebar.getByText("设置和更多", { exact: true })).toHaveCount(0);
   });
 });
