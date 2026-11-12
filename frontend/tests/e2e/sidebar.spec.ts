@@ -36,6 +36,8 @@ test.describe("Sidebar navigation", () => {
     await expect(
       sidebar.getByRole("button", { name: "设置", exact: true }),
     ).toBeVisible();
-    await expect(sidebar.getByText("设置和更多", { exact: true })).toHaveCount(0);
+    await expect(sidebar.getByText("设置和更多", { exact: true })).toHaveCount(
+      0,
+    );
   });
 });

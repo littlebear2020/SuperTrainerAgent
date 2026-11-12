@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–7；任务 8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12；任务 6 六类筛选、Agent 完整历史、URL/键盘导航与 offset 50 验收完成，作品 Playwright 13/13；任务 7 精简项目详情且保全品牌/palette/关联计数，hermetic Playwright 15/15，证据见 `temp/workspace-experience-2026-11-12/`）。
-> **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
+> **状态**：已执行（任务 0–8 本地部分；push/PR/OCR/合入未执行，交由协调者。任务 8 隔离真实 API 1/1、backend 10035 passed/31 个既有条件 skip、frontend 261 files/1687 tests、E2E 90/90 与五路由性能门禁均通过；执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **TL;DR**：R1–R6/R8 与集中 Important 修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config、未重建 Docker，远端评审与合入由协调者决定。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
 
@@ -247,11 +247,11 @@
 
 ### 任务 8：本地全量门禁、隔离 API 行为验收、PR/OCR 与证据交付
 
-- [ ] 定向测试全部转绿后冻结代码，后台串行运行 `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`，再运行 `cd frontend && pnpm check && pnpm test`。
-- [ ] 后台运行 `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check`；不得共享 `.next`/E2E 端口或修改被测输入，必要用例零意外 skip。
-- [ ] 使用**隔离的本地测试 DB 与测试身份**，经真实后端 API 播种/读取：六类历史、offset 50 后记录、旧别名、本人/他人权限、非默认 palette 保存；不得触碰开发或用户 DB，不用纯 mock 冒充此层。
-- [ ] 汇总 R1–R6/R8 行为证据、R2 本地镜像/live 证据及 R7/播客实时 URL 的 OUT_OF_SCOPE 说明；更新本计划勾选/状态头和执行 changelog，TL;DR 与「验收记录」写真实命令关键输出和本地证据路径。
-- [ ] 最终文档修改后，从根目录运行 `make check && python3 scripts/check_docs_convention.py && git diff --check`；性能预算变化必须归因评审，不得无声抬线。
+- [x] 定向测试全部转绿后冻结代码，后台串行运行 `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`，再运行 `cd frontend && pnpm check && pnpm test`。
+- [x] 后台运行 `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check`；不得共享 `.next`/E2E 端口或修改被测输入，必要用例零意外 skip。
+- [x] 使用**隔离的本地测试 DB 与测试身份**，经真实后端 API 播种/读取：六类历史、offset 50 后记录、旧别名、本人/他人权限、非默认 palette 保存；不得触碰开发或用户 DB，不用纯 mock 冒充此层。
+- [x] 汇总 R1–R6/R8 行为证据、R2 本地镜像/live 证据及 R7/播客实时 URL 的 OUT_OF_SCOPE 说明；更新本计划勾选/状态头和执行 changelog，TL;DR 与「验收记录」写真实命令关键输出和本地证据路径。
+- [x] 最终文档修改后，从根目录运行 `make check && python3 scripts/check_docs_convention.py && git diff --check`；性能预算变化必须归因评审，不得无声抬线。
 - [ ] 按预授权 push 当前功能分支，并用 `GH_REPO=littlebear2020/SuperTrainerAgent gh pr create --base main` **新建 PR**（标题为本批摘要，正文链接本计划与执行 changelog；PR #2 已合并，不得更新或复用）。等待新 PR 当前 HEAD 的 checks/OCR；Critical/Important/high 清零或以代码/复现证据正式驳回。CI/OCR 不可用记 `REMOTE_PENDING`，不直推 main。
 - [ ] checks 全绿且评审处置完成后按仓库约定 rebase merge；若仅远端未决，保留本地 commits 并报告 `PARTIAL_REMOTE_PENDING`，不重复推送、不伪造合并。
 - [ ] 清理本批不需要的测试输出与登记容器，恢复 AUTOBIND/本地服务到约定状态；最终报告逐项 PASS/FAIL/SKIPPED/BLOCKED、commit/PR/check/OCR ID、付费调用是否发生及原因、次日人工清单。
@@ -278,7 +278,7 @@
 5. R7 价格完全由用户后续配置；三条 Claude TBD 保持，doubao_tts 0.12/0.3 由用户后续决定，不是夜间阻塞。
 6. 不实施定价后端、计价用量、空库播种、迁移、默认价或素材行改造；findings backlog 的独立缺口留后续。
 7. 不顺手处理 vimax-video 空技能建议、旧模型探针名册和 useDeleteThread 双 DELETE，不代勾播客前序计划。
-8. 任务 0–2 已按勾选完成代码修改、本地验收与一次付费 TTS；未修改价格、未部署，任务 3–8 未执行；整体 goal 的最终状态仍以任务 8 的真实证据为准。
+8. 任务 0–8 本地部分已按勾选完成实现、隔离真实 API、全量测试与文档验收；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。push/PR/OCR/CI/合入未执行，最终远端状态由协调者评审决定。
 
 ## 七、次日人工验收与后续公司部署（不在夜间 goal 范围）
 

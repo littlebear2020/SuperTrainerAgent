@@ -635,7 +635,7 @@ export const zhCN: Translations = {
 
   // Workspace
   workspace: {
-    // 首页 hero、双入口与六张创作卡统一走 i18n。
+    // 首页 hero 与六张创作卡统一走 i18n。
     home: {
       heroTitle: "让好内容，从一个想法开始",
       createHeading:
