@@ -128,11 +128,6 @@ export interface Translations {
     searchModels: string;
     surpriseMe: string;
     surpriseMePrompt: string;
-    followupLoading: string;
-    followupConfirmTitle: string;
-    followupConfirmDescription: string;
-    followupConfirmAppend: string;
-    followupConfirmReplace: string;
     polish: string;
     polishing: string;
     polishEmpty: string;

@@ -137,12 +137,6 @@ export const enUS: Translations = {
     searchModels: "Search models...",
     surpriseMe: "Surprise",
     surpriseMePrompt: "Surprise me",
-    followupLoading: "Generating follow-up questions...",
-    followupConfirmTitle: "Send suggestion?",
-    followupConfirmDescription:
-      "You already have text in the input. Choose how to send it.",
-    followupConfirmAppend: "Append & send",
-    followupConfirmReplace: "Replace & send",
     polish: "Polish",
     polishing: "Polishing...",
     polishEmpty: "Polish returned nothing; your text was kept",

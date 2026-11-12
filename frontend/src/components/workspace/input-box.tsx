@@ -1,6 +1,5 @@
 "use client";
 
-import type { Message } from "@langchain/langgraph-sdk";
 import type { ChatStatus } from "ai";
 import {
   CheckIcon,
@@ -16,7 +15,6 @@ import {
   RocketIcon,
   VideoIcon,
   WandSparklesIcon,
-  XIcon,
   ZapIcon,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -48,30 +46,17 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import { Button } from "@/components/ui/button";
 import { ConfettiButton } from "@/components/ui/confetti-button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { fetch } from "@/core/api/fetcher";
-import { getBackendBaseURL } from "@/core/config";
 import { useI18n } from "@/core/i18n/hooks";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
 import { useModels } from "@/core/models/hooks";
 import { useSkills } from "@/core/skills/hooks";
 import { useGlassStyle } from "@/core/theme/glass";
 import type { AgentThreadContext } from "@/core/threads";
-import { textOfMessage } from "@/core/threads/utils";
 import { streamAssist } from "@/core/writer/api";
 import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
@@ -98,7 +83,6 @@ import {
   reasoningEffortForMode,
   resolveMode,
 } from "./input-mode";
-import { useThread } from "./messages/context";
 import { ModeHoverGuide } from "./mode-hover-guide";
 import { Tooltip } from "./tooltip";
 
@@ -157,34 +141,6 @@ for (const [group, names] of Object.entries(SKILL_GROUPS)) {
   }
 }
 
-/**
- * 追问建议取数（D-3 #8）：从原始消息数组选末 6 条非空 human/ai 消息。
- *
- * 必须过滤 hidden 消息——显示层的 hide_from_ui 过滤不影响这里读的原始
- * `messagesRef` 数组，而注入的动态上下文（记忆全文）、todo reminder 等
- * 都以 human 身份躺在里面。POST body 只有 role+content，后端无法再区分，
- * 前端过滤是唯一有效拦截点。
- */
-export function selectRecentForSuggestions(
-  messages: Message[],
-): { role: "user" | "assistant"; content: string }[] {
-  return messages
-    .filter(
-      (m) =>
-        (m.type === "human" || m.type === "ai") && !isHiddenFromUIMessage(m),
-    )
-    .map((m) => {
-      // 显式字面量联合注解：tsc 5.8 在该链式 map 中将三元结果推宽为 string，
-      // 与返回签名 {role: "user"|"assistant"} 冲突（2026-08-27 部署构建阻塞修复）。
-      const role: "user" | "assistant" =
-        m.type === "human" ? "user" : "assistant";
-      const content = textOfMessage(m) ?? "";
-      return { role, content };
-    })
-    .filter((m) => m.content.trim().length > 0)
-    .slice(-6);
-}
-
 /** agent 建议 chip 形状（AgentConfig.suggestion_prompts 透传）。 */
 export type AgentSuggestionChip = { label: string; prompt: string };
 
@@ -225,7 +181,6 @@ export function InputBox({
   agentSuggestionPrompts,
   showNewThreadSuggestions = true,
   onContextChange,
-  onFollowupsVisibilityChange,
   onSubmit,
   onStop,
   ...props
@@ -258,7 +213,6 @@ export function InputBox({
       reasoning_effort?: "minimal" | "low" | "medium" | "high";
     },
   ) => void;
-  onFollowupsVisibilityChange?: (visible: boolean) => void;
   onSubmit?: (message: PromptInputMessage) => void;
   onStop?: () => void;
 }) {
@@ -272,7 +226,6 @@ export function InputBox({
     refetch: refetchModels,
   } = useModels();
   const models = allModels;
-  const { thread } = useThread();
   const { textInput } = usePromptInputController();
   // P2-8 草稿持久化：按线程把输入框文本存进 localStorage，切线程/刷新后恢复。controller
   // 是全局单例，切线程时显式把目标线程的草稿 setInput 进去（无草稿则清空，避免上一个
@@ -358,18 +311,6 @@ export function InputBox({
   const promptRootRef = useRef<HTMLDivElement | null>(null);
   const { glassStyle, isDark } = useGlassStyle();
   const mounted = useMounted();
-
-  const [followups, setFollowups] = useState<string[]>([]);
-  const [followupsHidden, setFollowupsHidden] = useState(false);
-  const [followupsLoading, setFollowupsLoading] = useState(false);
-  const lastGeneratedForAiIdRef = useRef<string | null>(null);
-  const wasStreamingRef = useRef(false);
-  const messagesRef = useRef(thread.messages);
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingSuggestion, setPendingSuggestion] = useState<string | null>(
-    null,
-  );
 
   // ── 缺陷 2 路径 A（2026-08-27）：/api/models 失败必须可见且可重试 ──
   // loadModels 现在对非 2xx 抛错 → react-query 进 error 态。这里用 ref 保证
@@ -503,10 +444,6 @@ export function InputBox({
       if (!message.text) {
         return;
       }
-      setFollowups([]);
-      setFollowupsHidden(false);
-      setFollowupsLoading(false);
-
       // Guard against submitting before the initial model auto-selection
       // effect has flushed thread settings to storage/state.
       if (resolvedModelName && context.model_name !== resolvedModelName) {
@@ -535,179 +472,8 @@ export function InputBox({
     ],
   );
 
-  const requestFormSubmit = useCallback(() => {
-    const form = promptRootRef.current?.querySelector("form");
-    form?.requestSubmit();
-  }, []);
-
-  const handleFollowupClick = useCallback(
-    (suggestion: string) => {
-      if (status === "streaming") {
-        return;
-      }
-      const current = (textInput.value ?? "").trim();
-      if (current) {
-        setPendingSuggestion(suggestion);
-        setConfirmOpen(true);
-        return;
-      }
-      textInput.setInput(suggestion);
-      setFollowupsHidden(true);
-      setTimeout(() => requestFormSubmit(), 0);
-    },
-    [requestFormSubmit, status, textInput],
-  );
-
-  const confirmReplaceAndSend = useCallback(() => {
-    if (!pendingSuggestion) {
-      setConfirmOpen(false);
-      return;
-    }
-    textInput.setInput(pendingSuggestion);
-    setFollowupsHidden(true);
-    setConfirmOpen(false);
-    setPendingSuggestion(null);
-    setTimeout(() => requestFormSubmit(), 0);
-  }, [pendingSuggestion, requestFormSubmit, textInput]);
-
-  const confirmAppendAndSend = useCallback(() => {
-    if (!pendingSuggestion) {
-      setConfirmOpen(false);
-      return;
-    }
-    const current = (textInput.value ?? "").trim();
-    const next = current
-      ? `${current}\n${pendingSuggestion}`
-      : pendingSuggestion;
-    textInput.setInput(next);
-    setFollowupsHidden(true);
-    setConfirmOpen(false);
-    setPendingSuggestion(null);
-    setTimeout(() => requestFormSubmit(), 0);
-  }, [pendingSuggestion, requestFormSubmit, textInput]);
-
-  const showFollowups =
-    !disabled &&
-    !isNewThread &&
-    !followupsHidden &&
-    (followupsLoading || followups.length > 0);
-
-  const followupsVisibilityChangeRef = useRef(onFollowupsVisibilityChange);
-
-  useEffect(() => {
-    followupsVisibilityChangeRef.current = onFollowupsVisibilityChange;
-  }, [onFollowupsVisibilityChange]);
-
-  useEffect(() => {
-    followupsVisibilityChangeRef.current?.(showFollowups);
-  }, [showFollowups]);
-
-  useEffect(() => {
-    messagesRef.current = thread.messages;
-  }, [thread.messages]);
-
-  useEffect(() => {
-    return () => followupsVisibilityChangeRef.current?.(false);
-  }, []);
-
-  useEffect(() => {
-    const streaming = status === "streaming";
-    const wasStreaming = wasStreamingRef.current;
-    wasStreamingRef.current = streaming;
-    if (!wasStreaming || streaming) {
-      return;
-    }
-
-    if (disabled) {
-      return;
-    }
-
-    const lastAi = [...messagesRef.current]
-      .reverse()
-      .find((m) => m.type === "ai");
-    const lastAiId = lastAi?.id ?? null;
-    if (!lastAiId || lastAiId === lastGeneratedForAiIdRef.current) {
-      return;
-    }
-    lastGeneratedForAiIdRef.current = lastAiId;
-
-    const recent = selectRecentForSuggestions(messagesRef.current);
-
-    if (recent.length === 0) {
-      return;
-    }
-
-    const controller = new AbortController();
-    setFollowupsHidden(false);
-    setFollowupsLoading(true);
-    setFollowups([]);
-
-    fetch(`${getBackendBaseURL()}/api/threads/${threadId}/suggestions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: recent,
-        n: 3,
-        model_name: context.model_name ?? undefined,
-      }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          return { suggestions: [] as string[] };
-        }
-        return (await res.json()) as { suggestions?: string[] };
-      })
-      .then((data) => {
-        const suggestions = (data.suggestions ?? [])
-          .map((s) => (typeof s === "string" ? s.trim() : ""))
-          .filter((s) => s.length > 0)
-          .slice(0, 5);
-        setFollowups(suggestions);
-      })
-      .catch(() => {
-        setFollowups([]);
-      })
-      .finally(() => {
-        setFollowupsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [context.model_name, disabled, status, threadId]);
-
   return (
     <div ref={promptRootRef} className="relative flex flex-col gap-4">
-      {showFollowups && (
-        <div className="flex items-center justify-center pb-2">
-          <div className="flex items-center gap-2">
-            {followupsLoading ? (
-              <div className="text-muted-foreground bg-background/80 rounded-full border px-4 py-2 text-xs backdrop-blur-sm">
-                {t.inputBox.followupLoading}
-              </div>
-            ) : (
-              <Suggestions className="min-h-16 w-fit items-start">
-                {followups.map((s) => (
-                  <Suggestion
-                    key={s}
-                    suggestion={s}
-                    onClick={() => handleFollowupClick(s)}
-                  />
-                ))}
-                <Button
-                  aria-label={t.common.close}
-                  className="text-muted-foreground cursor-pointer rounded-full px-3 text-xs font-normal"
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  onClick={() => setFollowupsHidden(true)}
-                >
-                  <XIcon className="size-4" />
-                </Button>
-              </Suggestions>
-            )}
-          </div>
-        </div>
-      )}
       <PromptInput
         className={cn(
           "glass-input-box overflow-visible! rounded-2xl transition-all duration-300 ease-out *:data-[slot='input-group']:rounded-2xl *:data-[slot='input-group']:border-0 *:data-[slot='input-group']:bg-transparent *:data-[slot='input-group']:shadow-none",
@@ -1078,28 +844,6 @@ export function InputBox({
             />
           </div>
         )}
-
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t.inputBox.followupConfirmTitle}</DialogTitle>
-            <DialogDescription>
-              {t.inputBox.followupConfirmDescription}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              {t.common.cancel}
-            </Button>
-            <Button variant="secondary" onClick={confirmAppendAndSend}>
-              {t.inputBox.followupConfirmAppend}
-            </Button>
-            <Button onClick={confirmReplaceAndSend}>
-              {t.inputBox.followupConfirmReplace}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

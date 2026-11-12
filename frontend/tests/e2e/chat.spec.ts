@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { pinEnglishLocale } from "./utils/locale";
-import { handleRunStream, mockLangGraphAPI } from "./utils/mock-api";
+import {
+  handleRunStream,
+  MOCK_THREAD_ID,
+  mockLangGraphAPI,
+} from "./utils/mock-api";
 
 test.describe("Chat workspace", () => {
   test.beforeEach(async ({ page }) => {
@@ -49,5 +53,37 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
+  });
+
+  test("first reply reaches ready without requesting follow-up suggestions", async ({
+    page,
+  }) => {
+    const suggestionPosts: string[] = [];
+    await page.route("**/api/threads/*/suggestions", (route) => {
+      if (route.request().method() === "POST") {
+        suggestionPosts.push(route.request().url());
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ suggestions: ["Hidden follow-up"] }),
+      });
+    });
+
+    await page.goto("/workspace/chats/new");
+    const textarea = page.getByPlaceholder(/how can i assist you/i);
+    await expect(textarea).toBeVisible({ timeout: 15_000 });
+    await textarea.fill("Hello");
+    await textarea.press("Enter");
+
+    await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page).toHaveURL(new RegExp(`${MOCK_THREAD_ID}$`));
+    await expect(
+      page.locator("button[aria-label='Submit'] svg").first(),
+    ).toHaveClass(/lucide-arrow-up/, { timeout: 10_000 });
+    expect(suggestionPosts).toEqual([]);
+    await expect(page.getByText("Hidden follow-up")).toHaveCount(0);
   });
 });
