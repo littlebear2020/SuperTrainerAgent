@@ -19,6 +19,8 @@ function seedWork(id: string, title = id) {
   });
 }
 
+test.use({ timezoneId: "Asia/Shanghai" });
+
 test.describe("video assets", () => {
   test.beforeEach(async ({ page }) => {
     pageErrors = [];

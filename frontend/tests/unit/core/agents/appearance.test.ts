@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { AudioLines, MessageSquare } from "lucide-react";
@@ -27,28 +26,20 @@ describe("podcast agent appearance", () => {
     expect(AGENT_APPEARANCE_FALLBACK.icon).toBe(MessageSquare);
   });
 
-  it("ships a decodable 960×540 podcast cover", () => {
+  it("ships a VP8 960×540 podcast cover", () => {
     const path = resolve(
       process.cwd(),
       "public/course-samples/podcast-work.webp",
     );
     expect(existsSync(path)).toBe(true);
     if (!existsSync(path)) return;
-    const probe = JSON.parse(
-      execFileSync(
-        "ffprobe",
-        [
-          "-v",
-          "error",
-          "-show_entries",
-          "stream=width,height",
-          "-of",
-          "json",
-          path,
-        ],
-        { encoding: "utf8" },
-      ),
-    );
-    expect(probe.streams[0]).toMatchObject({ width: 960, height: 540 });
+    const data = readFileSync(path);
+    expect(data.toString("ascii", 0, 4)).toBe("RIFF");
+    expect(data.toString("ascii", 8, 16)).toBe("WEBPVP8 ");
+    expect(data.readUIntBE(23, 3)).toBe(0x9d012a);
+    expect({
+      width: data.readUInt16LE(26) & 0x3fff,
+      height: data.readUInt16LE(28) & 0x3fff,
+    }).toEqual({ width: 960, height: 540 });
   });
 });
