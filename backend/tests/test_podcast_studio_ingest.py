@@ -5,6 +5,7 @@ import json
 import socket
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -69,20 +70,23 @@ def draft(profile, text="口播正文。"):
     source = full_source()
     if profile in {"read_original", "news_single"}:
         voices = {"host": "doubao:zh_male_m191_uranus_bigtts"}
-        role = "host"
+        turns = [{"turn_id": "t0001", "role": "host", "text": text, "source_ids": ["s1"]}]
     else:
         voices = {
             "male": "doubao:zh_male_m191_uranus_bigtts",
             "female": "doubao:zh_female_vv_uranus_bigtts",
         }
-        role = "male"
+        turns = [
+            {"turn_id": "t0001", "role": "male", "text": text, "source_ids": ["s1"]},
+            {"turn_id": "t0002", "role": "female", "text": "女方回应。", "source_ids": ["s1"]},
+        ]
     return {
         "schema_version": "podcast-studio.v1",
         "profile": profile,
         "title": "测试播客",
         "sources": [{key: source[key] for key in ("source_id", "raw_sha256", "extracted_text_sha256")}],
         "voices": voices,
-        "turns": [{"turn_id": "t0001", "role": role, "text": text, "source_ids": ["s1"]}],
+        "turns": turns,
     }
 
 
@@ -423,16 +427,13 @@ def test_remote_html_intake_sanitizes_without_resource_calls(tmp_path, monkeypat
     assert "127.0.0.1" not in source["text"] and "file://" not in source["text"]
 
 
-def test_all_profiles_pending_confirm_validate(tmp_path):
-    for profile in ["read_original", "news_single", "interview_two", "debate_two"]:
+def test_rewritten_profiles_pending_confirm_validate(tmp_path):
+    for profile in ["news_single", "interview_two", "debate_two"]:
         script = normalize(tmp_path, profile)
-        if profile == "read_original":
-            assert script["approval"]["status"] == "not_required"
-        else:
-            assert script["approval"]["status"] == "pending"
-            assert ps.validate_script(tmp_path / "script.json", tmp_path / "sources.json")["valid"] is True
-            ps.confirm_script(tmp_path / "script.json")
-            assert ps.validate_script(tmp_path / "script.json", tmp_path / "sources.json")["valid"] is True
+        assert script["approval"]["status"] == "pending"
+        assert ps.validate_script(tmp_path / "script.json", tmp_path / "sources.json")["valid"] is True
+        ps.confirm_script(tmp_path / "script.json")
+        assert ps.validate_script(tmp_path / "script.json", tmp_path / "sources.json")["valid"] is True
 
 
 def test_canonical_json_is_stable(tmp_path):
@@ -496,3 +497,120 @@ def test_cli_intake_and_validate(tmp_path):
     ps.main(["intake", "--input", str(path), "--output-dir", str(tmp_path / "out")])
     ps.main(["prepare-verbatim", "--sources", str(tmp_path / "out" / "sources.json"), "--output-dir", str(tmp_path / "out")])
     ps.main(["validate", "--script", str(tmp_path / "out" / "script.json"), "--sources", str(tmp_path / "out" / "sources.json")])
+
+
+def test_read_original_normalize_and_tampered_script_rejected(tmp_path):
+    sources_path = write_sources(tmp_path)
+    with pytest.raises(ps.PodcastError, match="prepare-verbatim|原文"):
+        ps.normalize_script(draft("read_original", "原文内容。"), sources_path)
+    script = ps.prepare_verbatim(sources_path, tmp_path)
+    script["turns"][0]["text"] = "被改写的不同内容。"
+    script["integrity_sha256"] = ps._integrity(script)
+    (tmp_path / "script.json").write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ps.PodcastError, match="verbatim|原文"):
+        ps.validate_script(tmp_path / "script.json", sources_path)
+
+
+@pytest.mark.parametrize("profile", ["interview_two", "debate_two"])
+@pytest.mark.parametrize("role", ["male", "female"])
+def test_two_person_profiles_require_both_roles(tmp_path, profile, role):
+    candidate = draft(profile)
+    candidate["turns"] = [{"turn_id": "t0001", "role": role, "text": "只有一个角色的口播。", "source_ids": ["s1"]}]
+    with pytest.raises(ps.PodcastError, match="male.*female|female.*male|双人|角色"):
+        ps.normalize_script(candidate, write_sources(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("final_url", "html", "error"),
+    [
+        (
+            "https://mp.weixin.qq.com/mp/wappoc_appmsgcaptcha?target_url=article",
+            "<h1>环境异常</h1><p>当前环境异常，完成验证后即可继续访问。</p>",
+            "verification|验证",
+        ),
+        (
+            "https://example.com/dynamic",
+            "<h1>{{title}}</h1><p>{{author}}</p><p>{{summary}}</p><p>此文章不存在或已下线</p>",
+            "template|动态|unavailable|下线",
+        ),
+    ],
+)
+def test_remote_verification_and_dynamic_templates_fail_closed(tmp_path, monkeypatch, final_url, html, error):
+    monkeypatch.setattr(
+        ps,
+        "fetch_url",
+        lambda url: ps.FetchedURL(html.encode("utf-8"), url, final_url, "text/html", "utf-8"),
+    )
+    with pytest.raises(ps.PodcastError, match=error):
+        ps.intake("https://example.com/article", tmp_path / "out")
+    assert not (tmp_path / "out" / "sources.json").exists()
+
+
+def test_remote_article_with_isolated_template_example_is_allowed(tmp_path, monkeypatch):
+    html = "<h1>模板语法说明</h1><p>示例中的 <code>{{title}}</code> 是占位符语法，正文用于解释模板概念。</p>"
+    monkeypatch.setattr(
+        ps,
+        "fetch_url",
+        lambda url: ps.FetchedURL(html.encode("utf-8"), url, url, "text/html", "utf-8"),
+    )
+    source = ps.intake("https://example.com/article", tmp_path / "out")
+    assert "模板语法说明" in source["text"]
+
+
+@pytest.mark.parametrize(
+    "converted_text",
+    [
+        "额外前缀。Visible paragraph one with enough text.\nVisible paragraph two with enough text.\n",
+        "Visible paragraph one with enough text!\nVisible paragraph two with enough text.\n",
+        "Visible paragraph one with enough text.\n额外插入的一段。\nVisible paragraph two with enough text.\n",
+    ],
+)
+def test_pdf_fidelity_rejects_added_or_changed_visible_text(tmp_path, monkeypatch, converted_text):
+    path = tmp_path / "source.pdf"
+    minimal_pdf(path, ["Visible paragraph one with enough text.", "Visible paragraph two with enough text."])
+
+    def converted(input_path, output_path):
+        Path(output_path).write_text(converted_text, encoding="utf-8")
+
+    monkeypatch.setattr(ps, "_run_conversion", converted)
+    with pytest.raises(ps.PodcastError, match="fidelity|保真|order|顺序"):
+        ps.intake(str(path), tmp_path / "out")
+
+
+def test_dns_resolution_is_bounded_by_total_url_deadline(monkeypatch):
+    monkeypatch.setattr(ps, "URL_TIMEOUT_SECONDS", 0.05)
+
+    def slow_resolve(host, port):
+        time.sleep(0.2)
+        return "93.184.216.34"
+
+    monkeypatch.setattr(ps, "_resolve_public", slow_resolve)
+    monkeypatch.setattr(ps, "HTTPConnection", FakeConnection)
+    started = time.monotonic()
+    with pytest.raises(ps.PodcastError, match="timeout|超时"):
+        ps.fetch_url("http://example.com/slow-dns")
+    assert time.monotonic() - started < 1
+    assert not FakeConnection.instances
+
+
+def test_response_socket_timeout_shrinks_with_remaining_budget(monkeypatch):
+    class RecordingSocket:
+        def __init__(self):
+            self.timeouts = []
+
+        def settimeout(self, value):
+            self.timeouts.append(value)
+
+    class TimeoutConnection(FakeConnection):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.sock = RecordingSocket()
+
+    monkeypatch.setattr(ps.socket, "getaddrinfo", public_dns)
+    monkeypatch.setattr(ps, "HTTPConnection", TimeoutConnection)
+    FakeConnection.responses = [FakeResponse(b"x" * 200_000)]
+    result = ps.fetch_url("http://example.com/chunked")
+    assert len(result.raw) == 200_000
+    timeouts = TimeoutConnection.instances[-1].sock.timeouts
+    assert len(timeouts) >= 3
+    assert 0 < timeouts[-1] < timeouts[0]

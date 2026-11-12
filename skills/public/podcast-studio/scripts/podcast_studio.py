@@ -9,11 +9,13 @@ import http.client
 import importlib.util
 import ipaddress
 import json
+import queue
 import re
 import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 import zipfile
@@ -104,6 +106,16 @@ def _check_text(text: str) -> None:
         raise PodcastError("Extracted text is empty / 提取文本为空")
     if len(text) > MAX_TEXT_CHARS:
         raise PodcastError(f"Extracted text has {len(text)} characters; the limit is {MAX_TEXT_CHARS:,}; split the input")
+
+
+def _check_web_text(text: str, final_url: str) -> None:
+    path = urllib.parse.urlsplit(final_url).path
+    if "wappoc_appmsgcaptcha" in path or ("环境异常" in text and "完成验证" in text):
+        raise PodcastError("URL requires interactive verification / URL 需要人机验证")
+    if "此文章不存在或已下线" in text:
+        raise PodcastError("URL article is unavailable or has been removed / 文章不存在或已下线")
+    if len(re.findall(r"\{\{[A-Za-z_][A-Za-z0-9_]*\}\}", text)) >= 3:
+        raise PodcastError("URL contains an unresolved dynamic template / URL 动态模板未解析")
 
 
 def _sanitize_html(html: str) -> tuple[str, list[str]]:
@@ -228,7 +240,10 @@ def _normalized_visible(text: str) -> str:
     text = re.sub(r"<!--[\s\S]*?-->", "", text)
     text = re.sub(r"!\[[^]]*\]\([^)]*\)", "", text)
     text = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", text)
-    return re.sub(r"[^\w\u4e00-\u9fff]+", "", text, flags=re.UNICODE)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}[ \t]+", "", text)
+    text = re.sub(r"(?m)^\s*[-*+][ \t]+", "", text)
+    text = re.sub(r"\*\*|__|`", "", text)
+    return re.sub(r"\s+", "", text)
 
 
 def _check_pdf_fidelity(input_path: str, converted: str) -> None:
@@ -236,15 +251,9 @@ def _check_pdf_fidelity(input_path: str, converted: str) -> None:
     if not pages or sum(len(re.sub(r"\s", "", page)) for page in pages) < 40:
         raise PodcastError("Sparse/scanned PDF text is unsupported / PDF 文本稀疏")
     normalized = _normalized_visible(converted)
-    cursor = 0
-    for page in pages:
-        expected = _normalized_visible(page)
-        if not expected:
-            continue
-        position = normalized.find(expected, cursor)
-        if position < 0:
-            raise PodcastError("PDF conversion fidelity/order check failed / PDF 转换保真或顺序校验失败")
-        cursor = position + len(expected)
+    expected = "".join(_normalized_visible(page) for page in pages)
+    if normalized != expected:
+        raise PodcastError("PDF conversion fidelity/order check failed / PDF 转换保真或顺序校验失败")
 
 
 def validate_public_ip(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
@@ -267,6 +276,45 @@ def _resolve_public(host: str, port: int) -> str:
         validate_public_ip(address)
         addresses.append(raw)
     return addresses[0]
+
+
+def _remaining(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise PodcastError("URL fetch exceeded total timeout / URL 获取超时")
+    return remaining
+
+
+def _resolve_public_with_deadline(host: str, port: int, deadline: float) -> str:
+    result = queue.Queue(maxsize=1)
+
+    def resolve():
+        try:
+            result.put((True, _resolve_public(host, port)))
+        except Exception as exc:
+            result.put((False, exc))
+
+    thread = threading.Thread(target=resolve, daemon=True)
+    thread.start()
+    thread.join(_remaining(deadline))
+    if thread.is_alive():
+        raise PodcastError("URL DNS resolution exceeded total timeout / DNS 解析超时")
+    succeeded, value = result.get_nowait()
+    if succeeded:
+        return value
+    raise value
+
+
+def _set_socket_timeout(connection, response, deadline: float) -> None:
+    timeout = _remaining(deadline)
+    sock = getattr(connection, "sock", None)
+    if sock is not None:
+        sock.settimeout(timeout)
+        return
+    fp = getattr(response, "fp", None)
+    raw = getattr(fp, "raw", None)
+    if raw is not None:
+        raw.settimeout(timeout)
 
 
 class PinnedHTTPSConnection(HTTPSConnection):
@@ -308,18 +356,16 @@ def _parse_http_url(url: str) -> tuple[urllib.parse.SplitResult, str, int]:
 def fetch_url(url: str) -> FetchedURL:
     requested = url
     current = url
-    started = time.monotonic()
+    deadline = time.monotonic() + URL_TIMEOUT_SECONDS
     for redirect_count in range(MAX_REDIRECTS + 1):
         parts, host, port = _parse_http_url(current)
-        pinned_ip = _resolve_public(host, port)
-        timeout = max(0.1, URL_TIMEOUT_SECONDS - (time.monotonic() - started))
-        if timeout <= 0:
-            raise PodcastError("URL fetch exceeded total timeout / URL 获取超时")
-        connection = _connection_for(parts, host, port, pinned_ip, timeout)
+        pinned_ip = _resolve_public_with_deadline(host, port, deadline)
+        connection = _connection_for(parts, host, port, pinned_ip, _remaining(deadline))
         target = urllib.parse.urlunsplit(("", "", parts.path or "/", parts.query, ""))
         host_header = host if port in {80, 443} else f"{host}:{port}"
         try:
             connection.request("GET", target, headers={"Host": host_header, "User-Agent": "podcast-studio/1.0", "Accept": "text/html,text/markdown,text/plain", "Connection": "close"})
+            _set_socket_timeout(connection, None, deadline)
             response = connection.getresponse()
             status = response.status
             if status in {301, 302, 303, 307, 308}:
@@ -346,8 +392,7 @@ def fetch_url(url: str) -> FetchedURL:
             chunks = []
             total = 0
             while True:
-                if time.monotonic() - started > URL_TIMEOUT_SECONDS:
-                    raise PodcastError("URL fetch exceeded total timeout / URL 获取超时")
+                _set_socket_timeout(connection, response, deadline)
                 chunk = response.read(65536)
                 if not chunk:
                     break
@@ -443,6 +488,8 @@ def intake(input_value: str, output_dir: str | Path, source_id: str = "s1") -> d
             _check_pdf_fidelity(str(path), text)
             warnings.append("PDF images are not spoken")
     _check_text(text)
+    if requested_url is not None:
+        _check_web_text(text, final_url or requested_url)
     source = {
         "source_id": source_id,
         "kind": kind,
@@ -497,6 +544,14 @@ def _chunk_text(text: str, source_id: str) -> list[dict]:
     return chunks
 
 
+def _verbatim_turns(sources: list[dict]) -> list[dict]:
+    turns = []
+    for source in sources:
+        for chunk in _chunk_text(source["text"], source["source_id"]):
+            turns.append({"turn_id": f"t{len(turns) + 1:04d}", "role": "host", "text": chunk["text"], "source_ids": [source["source_id"]]})
+    return turns
+
+
 def _approval_for(profile: str) -> dict:
     if profile == "read_original":
         return {"required": False, "status": "not_required", "approved_sha256": None}
@@ -549,6 +604,8 @@ def prepare_verbatim(sources_path: str | Path, output_dir: str | Path) -> dict:
 
 
 def normalize_script(draft: dict, sources_path: str | Path) -> dict:
+    if draft.get("profile") == "read_original":
+        raise PodcastError("read_original must use prepare-verbatim / 原文朗读只能使用 prepare-verbatim")
     sources = _load_sources(sources_path)
     script = _finalize_script(draft, sources)
     _validate_script(script, sources, require_current_approval=False)
@@ -611,6 +668,12 @@ def _validate_script(script: dict, sources: list[dict], require_current_approval
         refs = turn.get("source_ids")
         if not isinstance(refs, list) or not refs or any(ref not in seen for ref in refs):
             raise PodcastError("Turn references an unread source / turn 来源引用错误")
+    if profile in {"interview_two", "debate_two"} and {turn["role"] for turn in turns} != {"male", "female"}:
+        raise PodcastError("Two-person profiles require both male and female turns / 双人模式必须同时包含 male 和 female 角色")
+    if profile == "read_original":
+        verbatim_sources = [source_map[summary["source_id"]] for summary in summaries]
+        if turns != _verbatim_turns(verbatim_sources):
+            raise PodcastError("read_original turns must exactly match prepare-verbatim / 原文稿必须逐字匹配 prepare-verbatim")
     if script.get("integrity_sha256") != _integrity(script):
         raise PodcastError("Script integrity hash mismatch / 完整性哈希错误或过期")
     approval = script.get("approval")

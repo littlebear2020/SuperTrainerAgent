@@ -312,6 +312,7 @@ def test_role_and_turn_order_invalidation(tmp_path, tone_bytes):
     ps.render_script(script_path, sources_path, output, synth=synth, timestamp="20261112T000003")
     assert len(calls) == 2
     script["turns"][0]["role"] = "female"
+    script["turns"][1]["role"] = "male"
     script["approval"]["status"] = "pending"
     script["approval"]["approved_sha256"] = None
     script["integrity_sha256"] = ps._integrity(script)
@@ -350,3 +351,23 @@ def test_probe_skip_is_cli_guard_without_network():
     result = subprocess.run([sys.executable, str(probe)], check=False, capture_output=True, text=True, env={key: value for key, value in os.environ.items() if key != "RUN_LIVE"})
     assert result.returncode == 0
     assert "SKIP" in result.stdout
+
+
+def test_read_original_tampered_turn_rejected_before_transport(tmp_path):
+    source = full_source()
+    sources_path = tmp_path / "sources.json"
+    sources_path.write_text(json.dumps({"schema_version": "podcast-studio.v1", "sources": [source]}), encoding="utf-8")
+    ps.prepare_verbatim(sources_path, tmp_path)
+    script_path = tmp_path / "script.json"
+    script = json.loads(script_path.read_text(encoding="utf-8"))
+    script["turns"][0]["text"] = "被改写的不同内容。"
+    script["integrity_sha256"] = ps._integrity(script)
+    script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ps.PodcastError, match="verbatim|原文"):
+        ps.render_script(
+            script_path,
+            sources_path,
+            tmp_path / "outputs",
+            synth=lambda text, speaker: pytest.fail("transport must not run"),
+        )
+    assert not list((tmp_path / "outputs" / "segments").glob("*.mp3"))
