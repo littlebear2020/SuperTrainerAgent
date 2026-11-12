@@ -368,6 +368,7 @@ async def _run_isolated(root: Path) -> dict:
                     },
                     "isolation": {
                         "process": "spawn",
+                        "dotenv_disabled": os.environ.get("PYTHON_DOTENV_DISABLED") == "1",
                         "database": "temporary SQLite + real checkpointer",
                         "deer_flow_home": "temporary",
                         "video_storage": "temporary course_projects JSON",
@@ -378,6 +379,7 @@ async def _run_isolated(root: Path) -> dict:
 
 
 def _worker(root: str, queue) -> None:
+    os.environ["PYTHON_DOTENV_DISABLED"] = "1"
     try:
         summary = asyncio.run(_run_isolated(Path(root)))
     except Exception:
@@ -402,6 +404,7 @@ def test_workspace_experience_isolated_real_api(tmp_path):
     assert result["ok"], result.get("error")
     assert process.exitcode == 0
     summary = result["summary"]
+    assert summary["isolation"]["dotenv_disabled"] is True
     assert summary["threads"]["second_page"] == 1
     assert summary["console"]["/api/console/runs"] == {"own": 200, "forged_other": 403}
 
