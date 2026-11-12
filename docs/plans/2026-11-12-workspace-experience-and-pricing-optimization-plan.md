@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：执行中（2026-11-12 起；任务 0–1 已完成，任务 2–8 待执行；任务 0 提交 `1e5face7`，任务 1 真实显式 speaker TTS 与离线回归通过，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–2；任务 3–8 未执行。2026-11-12 起；任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS；任务 2 本地 linux/amd64 sandbox、三 locale、静帧、负向副本与带音频 MP4 均通过，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -161,15 +161,15 @@
 - Create: `backend/tests/test_remotion_template_version.py`
 - Do not modify: `docker/production-worker/**`、worker 运行代码与模板内容
 
-- [ ] 新建静态契约测试：两处必须包含 `-print0`、`LC_ALL=C sort -z`、`xargs -0 md5sum`、最终 `md5sum | awk '{print $1}'`；禁止裸 `| sort | xargs md5sum`。
-- [ ] 新建临时目录行为测试：C/C.UTF-8/en_US 下结果一致；改一字节变化；node_modules/.DS_Store/TEMPLATE_VERSION 不影响；空格/换行文件名不拆分；目录外 symlink 不计入。缺 locale 明确 skip 原因，本地 Linux 容器验收不得跳过。
-- [ ] 固化 Ubuntu 参考夹具：remotion-base C=`18cc3712bf06ffc6041cfa94f4704722`、en_US=`0cef2d5c42209807e71b1618735a3468`；course-standard C=`93ad6d326092fc0fd57c3bc6b50f0072`、en_US=`540a05a2154ba8bc873d7587fb0e0219`。macOS en_US 值不同，不作为跨平台常量。
-- [ ] 将两处命令统一为 `find … -print0 | LC_ALL=C sort -z | xargs -0 md5sum | md5sum | awk '{print $1}'`；不改排除规则、MD5 或 `find -type f` 的 symlink 语义。
-- [ ] SKILL 分别计算 image_hash/source_hash，并用 `test "$image_hash" = "$source_hash"` 失败非零、输出 expected/actual；只比较 pristine 源与 `/opt/remotion-template`。
-- [ ] 跑 `tests/test_remotion_template_version.py tests/test_auto_video_flow_skill.py tests/test_sandbox_offline_readiness.py tests/test_aio_sandbox.py tests/test_remotion_template_deploy.py`；断言 worker 文件无 diff。
-- [ ] 后台构建**仅 Mac 本地** linux/amd64 sandbox，tag 为 `deerflow-sandbox:workspace-experience-<shortsha>`，不推 registry；记录本地 image ID 到 temp。
-- [ ] 用该镜像独立容器验证 `/opt/remotion-template` 戳=18cc…、C/C.UTF-8/en_US 重算一致、compositions 非空、模板现有示例静帧 PNG 非空且可解码。负向测试必须在本批 temp 中复制模板副本并挂载进容器，只修改副本的一个字节，运行同一指纹/相等性校验并断言非零失败；随后重算宿主原模板指纹仍为 18cc…，证明 `/opt/remotion-template` 与 skill 源均未被修改。只清理本批登记的容器。
-- [ ] 若任务 1 live TTS 成功，复用其音频和固定逐字稿在独立新容器中渲染一个最简 MP4，ffprobe 有时长与音频流；若 live 不可用则保留静帧证据并标 MP4 `LIVE_NOT_VERIFIED`，不伪造结果。
+- [x] 新建静态契约测试：两处必须包含 `-print0`、`LC_ALL=C sort -z`、`xargs -0 md5sum`、最终 `md5sum | awk '{print $1}'`；禁止裸 `| sort | xargs md5sum`。
+- [x] 新建临时目录行为测试：C/C.UTF-8/en_US 下结果一致；改一字节变化；node_modules/.DS_Store/TEMPLATE_VERSION 不影响；空格/换行文件名不拆分；目录外 symlink 不计入。缺 locale 明确 skip 原因，本地 Linux 容器验收不得跳过。
+- [x] 固化 Ubuntu 参考夹具：remotion-base C=`18cc3712bf06ffc6041cfa94f4704722`、en_US=`0cef2d5c42209807e71b1618735a3468`；course-standard C=`93ad6d326092fc0fd57c3bc6b50f0072`、en_US=`540a05a2154ba8bc873d7587fb0e0219`。macOS en_US 值不同，不作为跨平台常量。
+- [x] 将两处命令统一为 `find … -print0 | LC_ALL=C sort -z | xargs -0 md5sum | md5sum | awk '{print $1}'`；不改排除规则、MD5 或 `find -type f` 的 symlink 语义。
+- [x] SKILL 分别计算 image_hash/source_hash，并用 `test "$image_hash" = "$source_hash"` 失败非零、输出 expected/actual；只比较 pristine 源与 `/opt/remotion-template`。
+- [x] 跑 `tests/test_remotion_template_version.py tests/test_auto_video_flow_skill.py tests/test_sandbox_offline_readiness.py tests/test_aio_sandbox.py tests/test_remotion_template_deploy.py`；断言 worker 文件无 diff。
+- [x] 后台构建**仅 Mac 本地** linux/amd64 sandbox，tag 为 `deerflow-sandbox:workspace-experience-<shortsha>`，不推 registry；记录本地 image ID 到 temp。
+- [x] 用该镜像独立容器验证 `/opt/remotion-template` 戳=18cc…、C/C.UTF-8/en_US 重算一致、compositions 非空、模板现有示例静帧 PNG 非空且可解码。负向测试必须在本批 temp 中复制模板副本并挂载进容器，只修改副本的一个字节，运行同一指纹/相等性校验并断言非零失败；随后重算宿主原模板指纹仍为 18cc…，证明 `/opt/remotion-template` 与 skill 源均未被修改。只清理本批登记的容器。
+- [x] 若任务 1 live TTS 成功，复用其音频和固定逐字稿在独立新容器中渲染一个最简 MP4，ffprobe 有时长与音频流；若 live 不可用则保留静帧证据并标 MP4 `LIVE_NOT_VERIFIED`，不伪造结果。
 
 **本地回滚**：用 `git revert` 回滚本批提交（含 SKILL、generate 脚本、Dockerfile、测试），不是只 revert 两个文件；删除本批本地镜像/容器由用户预授权且必须按登记 ID 精确执行。worker 不在回滚面；不得直接对 worker `/opt/course-standard` 重算并要求等于戳，因为构建后还会改 lock registry。
 
