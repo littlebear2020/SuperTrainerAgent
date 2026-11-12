@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–8 本地部分；push/PR/OCR/合入未执行，交由协调者。任务 8 隔离真实 API 1/1、backend 10035 passed/31 个既有条件 skip、frontend 261 files/1687 tests、E2E 90/90 与五路由性能门禁均通过；执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：任务 0–8 本地部分已执行；任务 8 隔离真实 API 1/1、backend **10036 passed / 31 skipped / 421 warnings**、frontend **262 files / 1693 tests passed**、E2E **90/90** 与五路由性能门禁均通过；执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`。PR #3 已创建并 push 到 `1f30a186`；首轮 backend `43311243812` 因 5 个 pdftotext 缺失失败，其余 6 项 pass，AI review `43311243667` pass 并提出 27 项；high `4556653345`、poster/SSR/null user、Poppler 与 StrictMode scoped Important 修复已提交。第二轮 backend `43320325154`、E2E `43320325143`、frontend `43320325089`、lint `43320325077`、quick `43320325127`、review `43320325183` 结果未知，后续 OCR 回复因 GitHub 网络待续，merge 未执行；**REMOTE_PENDING**，交协调者。
 > **TL;DR**：R1–R6/R8 与集中 Important 修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端评审与合入由协调者决定。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -278,7 +278,7 @@
 5. R7 价格完全由用户后续配置；三条 Claude TBD 保持，doubao_tts 0.12/0.3 由用户后续决定，不是夜间阻塞。
 6. 不实施定价后端、计价用量、空库播种、迁移、默认价或素材行改造；findings backlog 的独立缺口留后续。
 7. 不顺手处理 vimax-video 空技能建议、旧模型探针名册和 useDeleteThread 双 DELETE，不代勾播客前序计划。
-8. 任务 0–8 本地部分已按勾选完成实现、隔离真实 API、全量测试与文档验收；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。push/PR/OCR/CI/合入未执行，最终远端状态由协调者评审决定。
+8. 任务 0–8 本地部分已按勾选完成实现、隔离真实 API、全量测试与文档验收；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。PR #3 已创建并 push 到 `1f30a186`，首轮结果与修复已记录；第二轮 checks/OCR 结果未知，watch 因本地 TLS handshake timeout 中断，6 条 OCR 回复已 post、其余因 GitHub 网络待续，merge 未执行。远端保持 **REMOTE_PENDING**，由协调者接续。
 
 ## 七、次日人工验收与后续公司部署（不在夜间 goal 范围）
 

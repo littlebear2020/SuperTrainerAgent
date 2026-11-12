@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化执行记录
 
-> **状态**：任务 0–8 本地部分已执行；push/PR/OCR/合入未执行，交由协调者。
-> **TL;DR**：完成 R1–R6/R8 与集中 Important 修复；隔离真实 API、frontend 全量、E2E/性能及 R2 容器/live 证据齐备；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端步骤交协调者。
+> **状态**：任务 0–8 本地部分已执行；PR #3 已创建并 push 到 `1f30a186`；第二轮 checks/OCR 结果未知，后续回复为 **REMOTE_PENDING**，merge 未执行。
+> **TL;DR**：完成 R1–R6/R8 与集中 Important 修复；隔离真实 API、backend/frontend 全量、E2E/性能及 R2 容器/live 证据齐备；R7 与播客实时 URL 保持 OUT_OF_SCOPE；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端第二轮与后续评审交协调者接续。
 
 ## 变更摘要
 
@@ -35,18 +35,27 @@
 ## 验收记录
 
 - `env -u RUN_LIVE uv run pytest tests/test_workspace_experience_isolation.py -q` → **1 passed**；真实 API 摘要如上，ruff check/format 通过。终审补测 dotenv 禁用为 RED→GREEN，最终同命令再次 **1 passed**，非空日志 `temp/workspace-experience-2026-11-12/task8-dotenv-disabled-red.txt`、`task8-dotenv-disabled-green.txt`。
-- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → **10035 passed, 31 skipped, 421 warnings in 530.14s**，退出码 0；日志 `temp/workspace-experience-2026-11-12/task8-backend-full.txt`。
-- `cd frontend && pnpm check && pnpm test` → 静态门禁退出码 0（121 个既有 warnings、0 errors），**261 files / 1687 tests passed**；日志 `temp/workspace-experience-2026-11-12/task8-frontend-check-and-unit.txt`。
-- `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check` → **90 passed**，五路由均在原预算内，`performance-budgets.json` 未修改；日志 `temp/workspace-experience-2026-11-12/task8-e2e-perf-verified.txt`。
+- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → **10036 passed, 31 skipped, 421 warnings in 560.75s**，退出码 0；非空日志 `temp/workspace-experience-2026-11-12/pr3-backend-full.txt`。
+- `cd frontend && pnpm check && pnpm test` → 静态门禁退出码 0（121 个既有 warnings、0 errors），**262 files / 1693 tests passed**；非空日志 `temp/workspace-experience-2026-11-12/pr3-strict-fix-frontend-check-and-unit.txt`。
+- `CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check` → **90 passed (2.1m)**，五路由性能输出齐全且均在原预算内，`performance-budgets.json` 未修改；非空日志 `temp/workspace-experience-2026-11-12/pr3-e2e-perf-verified.txt`。
 - 性能实测：`/` JS 745503 B/CSS 241569 B；chats JS 3258770 B；thread JS 3564453 B；video-gen JS 3555661 B；writer JS 3760292 B，均低于既有预算。
 - 侧栏旧断言修复：`CI=1 E2E_PORT=3100 pnpm exec playwright test tests/e2e/sidebar.spec.ts --workers=1` → **1 passed**；随后完整 E2E 重新执行为上述 90/90，而非沿用失败批次。
-- `make check && python3 scripts/check_docs_convention.py && git diff --check` → 退出码 0；backend ruff 通过，frontend 0 errors/121 个既有 warnings，knip/i18n 601 叶子/Prettier/docs convention/diff check 全过；日志 `temp/workspace-experience-2026-11-12/task8-root-check-verified.txt`。
+- StrictMode 定向证据：`pr3-strict-mode-red.txt` 记录修复前最终 `paused=true`；`pr3-strict-mode-green.txt` 记录修复后 **5 files / 20 tests passed**。直接 `CourseMedia` 测试证明 play=2/pause=1 且最终 `paused=false`，普通 rerender 不额外 play，blur 暂停、focus 恢复；两份日志均位于 `temp/workspace-experience-2026-11-12/`。
+- `{ make check && python3 scripts/check_docs_convention.py && git diff --check && echo ROOT_CHECK_OK; }` → 退出码 0；backend ruff 通过，frontend 0 errors/121 个既有 warnings，knip/i18n 601 叶子/Prettier/docs convention/diff check 全过；非空日志共 214 行且末行 `ROOT_CHECK_OK`：`temp/workspace-experience-2026-11-12/pr3-root-check-verified.txt`。
+
+## 远端 PR 与评审状态
+
+- PR #3 已创建并 push 到 `1f30a186`。
+- 首轮 backend `43311243812` 因 5 个 pdftotext 缺失失败，其余 6 项 pass；AI review `43311243667` pass 并提出 27 项。
+- 已修复：high `4556653345` → `92b0df21` + `1f30a186`；poster / SSR / null user → `92b0df21`；Poppler → `d413d9f9`。StrictMode scoped Important 由 `1f30a186` 修复，并有上述直接组件回归证据。
+- 第二轮 backend `43320325154`、E2E `43320325143`、frontend `43320325089`、lint `43320325077`、quick `43320325127`、review `43320325183` 的结果均未知，不得记为通过。watch 因本地 TLS handshake timeout 中断。
+- 6 条 OCR 回复已 post，其余因 GitHub 网络待续；第二轮 checks/OCR 与后续回复保持 **REMOTE_PENDING**，merge 未执行，交协调者接续。
 
 ## Skip 与未执行项
 
-- 最终 `env -u RUN_LIVE uv run pytest tests/ -q -rs` → **10035 passed, 31 skipped, 421 warnings in 530.35s**，退出码 0；逐项原因日志 `temp/workspace-experience-2026-11-12/task8-backend-full-with-skips.txt`。
+- 此前 `env -u RUN_LIVE uv run pytest tests/ -q -rs` 验收记录为 **10035 passed, 31 skipped, 421 warnings in 530.35s**，退出码 0；逐项原因日志 `temp/workspace-experience-2026-11-12/task8-backend-full-with-skips.txt`。最新主记录为上述 **10036 passed / 31 skipped / 421 warnings in 560.75s**。
 - 31 个既有条件 skip 清单：`test_client_live.py`（1）、`test_model_roster_live.py`（1）、`test_audio_decode_duration.py` 无 gapless 特征（2）、`test_client_e2e.py` live LLM opt-in（11）、`test_create_deerflow_agent_live.py` live LLM opt-in（3）、`test_e2e_vimax_render.py` 付费渲染 opt-in（1）、`test_orchestration_tts.py` needs network（1）、`test_user_scoped_skill_storage.py` 上游移植边界（11）。无新增意外 skip；remote 套件不在此命令范围内。
-- `frontend/tests/e2e-remote/` 未运行；本地 OCR、push、PR、GitHub checks、rebase merge 均未执行，状态为 **REMOTE_PENDING**，交协调者处理。
+- `frontend/tests/e2e-remote/` 未运行；plan 任务 8 的 PR/评审与 merge 两个复选框继续保持未勾，远端状态为 **REMOTE_PENDING**，交协调者处理。
 - R7 定价、播客实时安全 URL 与次日人工验收为 OUT_OF_SCOPE；无新默认价、迁移、素材行或 doubao_tts 价格选择。
 - 未访问测试/公司服务器、用户 DB/密钥，未修改价格/config，未启动子代理。终审发现初版存在自动 dotenv 向上发现仓库真实 `.env` 的风险；最终验收在 spawn 子进程任何 `app.*`/`deerflow.*` 导入前显式设置 `PYTHON_DOTENV_DISABLED=1` 并重跑通过，结构化摘要记录 `dotenv_disabled=true`，未输出任何环境变量值。任务 1 一次授权最短 TTS probe、无人工重试，任务 8 未新增付费调用；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建。
 
@@ -54,7 +63,8 @@
 
 - 实现：`1e5face7`、`0ee573a8`、`ce029260`、`d928cba2`、`72d61eb5`、`f63f0fe7`、`32d38103`、`24642b96`、`00a0b335`、`5099fcbb`。
 - Important 修复：`38db9d7c`、`69c4b1fc`。
-- 隔离验收：`ee07c209`；全量侧栏断言修正：`3d977862`；本文与最终评审包由协调者接续处理。
+- 隔离验收：`ee07c209`；全量侧栏断言修正：`3d977862`。
+- 远端评审修复：`d413d9f9`（Poppler）、`92b0df21`（首页媒体与 SSR）、`1f30a186`（StrictMode 播放 cleanup）。
 - 证据根：`temp/workspace-experience-2026-11-12/`；计划：`.superpowers/sdd/2026-11-12-workspace-experience-and-pricing-optimization-plan/progress.md`。
 - 首页截图：`task5-desktop-zh.png`、`task5-mobile-zh.png`、`task5-desktop-en.png`，仅证明功能/布局状态，不替代次日审美验收。
 
@@ -63,4 +73,4 @@
 1. 按普通账号与管理员复核角色、设置、console scope 与本人用量；检查六类作品真实数据、搜索、打开与视频操作。
 2. 检查首页中英/移动布局、静态图留白、coarse/reduced 装饰动画、播放失败与点击创建；本批截图不冒充人工审美结论。
 3. 以固定逐字稿完成最短 course-video，复核 TTS 音色、模板提示与 MP4 声画；补做播客实时安全 URL 和 R7 定价口径。
-4. 协调者执行最后评审及 push/PR/OCR/CI/合入；本记录不伪造远端 check、评审或合并状态。
+4. 协调者接续第二轮 checks/OCR、剩余回复与 rebase merge；本记录不将未知远端结果写作成功。
