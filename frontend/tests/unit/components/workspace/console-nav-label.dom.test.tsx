@@ -28,6 +28,7 @@ import { enUS } from "@/core/i18n/locales/en-US";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/workspace/chats",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 describe("D1 sidebar: console entry label follows the caller's role", () => {

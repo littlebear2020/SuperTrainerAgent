@@ -22,6 +22,7 @@ export type { User };
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -49,6 +50,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const pathname = usePathname();
 
   const isAuthenticated = user !== null;
+  const isAdmin = user?.system_role === "admin";
 
   /**
    * Fetch current user from FastAPI
@@ -134,6 +136,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const value: AuthContextType = {
     user,
     isAuthenticated,
+    isAdmin,
     isLoading,
     logout,
     refreshUser,

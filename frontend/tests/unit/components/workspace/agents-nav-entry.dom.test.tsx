@@ -18,6 +18,7 @@ import {
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/workspace/agents/course-assistant/chats/new",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 describe("侧边栏可见入口收敛", () => {
@@ -69,13 +70,18 @@ describe("侧边栏可见入口收敛", () => {
     });
   }
 
-  it("only video assets and console remain in route navigation", async () => {
+  it("exposes works, assets and console in route navigation", async () => {
     await renderNav();
     expect(WORKSPACE_NAV_ITEMS.map((item) => item.href)).toEqual([
       "/workspace/video-gen",
+      "/workspace/video-gen?tab=assets",
       "/workspace/console",
     ]);
-    for (const href of ["/workspace/video-gen", "/workspace/console"]) {
+    for (const href of [
+      "/workspace/video-gen",
+      "/workspace/video-gen?tab=assets",
+      "/workspace/console",
+    ]) {
       expect(container.querySelector(`a[href="${href}"]`)).not.toBeNull();
     }
     for (const href of [
@@ -100,6 +106,7 @@ describe("侧边栏可见入口收敛", () => {
   it("palette follows the same visible page set", () => {
     expect(PALETTE_NAV_ITEMS.map((item) => item.href)).toEqual([
       "/workspace/video-gen",
+      "/workspace/video-gen?tab=assets",
       "/workspace/console",
     ]);
   });

@@ -98,20 +98,58 @@ test.describe("video assets", () => {
     ]) {
       await expect(page.getByText(id, { exact: true })).toHaveCount(0);
     }
-    const url = page.url();
     await page.getByRole("tab", { name: "我的资产" }).click();
     await expect(
       page.getByRole("tabpanel", { name: "我的资产" }),
     ).toBeVisible();
-    expect(page.url()).toBe(url);
+    await expect(page).toHaveURL(/tab=assets/);
     await page.reload();
-    await expect(page.getByRole("tab", { name: "我的作品" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "我的资产" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(page.url()).toBe(url);
+    await expect(page).toHaveURL(/tab=assets/);
     await expect(page.getByRole("button", { name: "新建任务" })).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "全部" })).toHaveCount(0);
+  });
+
+  test("URL tabs and task details drive scoped navigation active state", async ({
+    page,
+  }) => {
+    seedWork("ready-image", "合格图片作品");
+    await page.goto("/workspace/video-gen");
+    await expect(page.getByRole("link", { name: "我的作品" })).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+    await expect(page.getByRole("link", { name: "我的资产" })).toHaveAttribute(
+      "data-active",
+      "false",
+    );
+
+    await page.getByRole("tab", { name: "我的资产" }).click();
+    await expect(page).toHaveURL(/tab=assets/);
+    await expect(page.getByRole("link", { name: "我的作品" })).toHaveAttribute(
+      "data-active",
+      "false",
+    );
+    await expect(page.getByRole("link", { name: "我的资产" })).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+
+    await page.getByRole("tab", { name: "我的作品" }).click();
+    await expect(page.getByText("合格图片作品", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "详情" }).click();
+    await expect(page).toHaveURL(/\/workspace\/video-gen\/ready-image$/);
+    await expect(page.getByRole("link", { name: "我的作品" })).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+    await expect(page.getByRole("link", { name: "我的资产" })).toHaveAttribute(
+      "data-active",
+      "false",
+    );
   });
 
   test("loads six more locally per type and resets preview and pagination", async ({

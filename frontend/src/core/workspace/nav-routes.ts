@@ -1,5 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { GaugeIcon, Video } from "lucide-react";
+import { FolderIcon, GaugeIcon, Video } from "lucide-react";
+
+import {
+  parseVideoAssetsRoute,
+  VIDEO_ASSETS_PATH,
+  type VideoAssetsTab,
+} from "./video-assets-route";
 
 /**
  * 工作台可见页面路由表——侧栏与 ⌘K 页面组的单一事实源。
@@ -15,6 +21,8 @@ export interface WorkspaceNavItem {
     | "writer"
     | "videoGen"
     | "assets"
+    | "myWorks"
+    | "myAssets"
     | "consoleAdmin";
   href: string;
   icon: LucideIcon;
@@ -22,6 +30,8 @@ export interface WorkspaceNavItem {
   match: "exact" | "prefix";
   /** prefix 匹配前缀（缺省用 href） */
   matchPrefix?: string;
+  /** 视频作品/资产需要同时匹配规范化 tab。 */
+  tab?: VideoAssetsTab;
   /** 侧栏 Beta 徽标（⌘K 不需要徽标） */
   badge?: "beta";
   /** console 标签随角色变化（regular: consoleSelf / admin: consoleAdmin） */
@@ -32,11 +42,20 @@ export interface WorkspaceNavItem {
 
 export const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   {
-    labelKey: "videoGen",
-    href: "/workspace/video-gen",
+    labelKey: "myWorks",
+    href: VIDEO_ASSETS_PATH,
     icon: Video,
     match: "prefix",
+    tab: "works",
     badge: "beta",
+    includeInPalette: true,
+  },
+  {
+    labelKey: "myAssets",
+    href: `${VIDEO_ASSETS_PATH}?tab=assets`,
+    icon: FolderIcon,
+    match: "prefix",
+    tab: "assets",
     includeInPalette: true,
   },
   {
@@ -52,7 +71,17 @@ export const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
 export function isNavItemActive(
   item: WorkspaceNavItem,
   pathname: string,
+  search: string | { get(name: string): string | null } = "",
 ): boolean {
+  if (item.tab) {
+    if (pathname === VIDEO_ASSETS_PATH) {
+      return parseVideoAssetsRoute(search).tab === item.tab;
+    }
+    if (pathname.startsWith(`${VIDEO_ASSETS_PATH}/`)) {
+      return item.tab === "works";
+    }
+    return false;
+  }
   if (item.match === "exact") return pathname === item.href;
   return pathname.startsWith(item.matchPrefix ?? item.href);
 }

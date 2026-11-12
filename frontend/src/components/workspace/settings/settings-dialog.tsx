@@ -27,6 +27,7 @@ import { MemorySettingsPage } from "@/components/workspace/settings/memory-setti
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
 import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
 import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
+import { useAuth } from "@/core/auth/AuthProvider";
 import { useI18n } from "@/core/i18n/hooks";
 import { useGlassStyle } from "@/core/theme/glass";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
 export function SettingsDialog(props: SettingsDialogProps) {
   const { defaultSection = "appearance", ...dialogProps } = props;
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(defaultSection);
 
@@ -59,8 +61,8 @@ export function SettingsDialog(props: SettingsDialogProps) {
     }
   }, [defaultSection, dialogProps.open]);
 
-  const sections = useMemo(
-    () => [
+  const sections = useMemo(() => {
+    const allSections = [
       {
         id: "account",
         label: t.settings.sections.account,
@@ -89,18 +91,28 @@ export function SettingsDialog(props: SettingsDialogProps) {
         icon: MessageSquareIcon,
       },
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
-    ],
-    [
-      t.settings.sections.account,
-      t.settings.sections.appearance,
-      t.settings.sections.memory,
-      t.settings.sections.tools,
-      t.settings.sections.skills,
-      t.settings.sections.channels,
-      t.settings.sections.notification,
-      t.settings.sections.about,
-    ],
-  );
+    ];
+    return isAdmin
+      ? allSections
+      : allSections.filter(
+          (section) => section.id === "account" || section.id === "appearance",
+        );
+  }, [
+    isAdmin,
+    t.settings.sections.account,
+    t.settings.sections.appearance,
+    t.settings.sections.memory,
+    t.settings.sections.tools,
+    t.settings.sections.skills,
+    t.settings.sections.channels,
+    t.settings.sections.notification,
+    t.settings.sections.about,
+  ]);
+  const effectiveActiveSection = sections.some(
+    (section) => section.id === activeSection,
+  )
+    ? activeSection
+    : "account";
   const { glassStyle, isDark } = useGlassStyle();
 
   return (
@@ -160,7 +172,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
             >
               <ul className="space-y-1 pr-1">
                 {sections.map(({ id, label, icon: Icon }) => {
-                  const active = activeSection === id;
+                  const active = effectiveActiveSection === id;
                   return (
                     <li key={id}>
                       <button
@@ -192,20 +204,26 @@ export function SettingsDialog(props: SettingsDialogProps) {
               )}
             >
               <div className="space-y-8 p-6">
-                {activeSection === "account" && <AccountSettingsPage />}
-                {activeSection === "appearance" && <AppearanceSettingsPage />}
-                {activeSection === "memory" && <MemorySettingsPage />}
-                {activeSection === "tools" && <ToolSettingsPage />}
-                {activeSection === "skills" && (
+                {effectiveActiveSection === "account" && (
+                  <AccountSettingsPage />
+                )}
+                {effectiveActiveSection === "appearance" && (
+                  <AppearanceSettingsPage />
+                )}
+                {effectiveActiveSection === "memory" && <MemorySettingsPage />}
+                {effectiveActiveSection === "tools" && <ToolSettingsPage />}
+                {effectiveActiveSection === "skills" && (
                   <SkillSettingsPage
                     onClose={() => props.onOpenChange?.(false)}
                   />
                 )}
-                {activeSection === "notification" && (
+                {effectiveActiveSection === "notification" && (
                   <NotificationSettingsPage />
                 )}
-                {activeSection === "channels" && <ChannelSettingsPage />}
-                {activeSection === "about" && <AboutSettingsPage />}
+                {effectiveActiveSection === "channels" && (
+                  <ChannelSettingsPage />
+                )}
+                {effectiveActiveSection === "about" && <AboutSettingsPage />}
               </div>
             </ScrollArea>
           </div>

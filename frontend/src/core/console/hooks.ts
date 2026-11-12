@@ -35,8 +35,7 @@ const STALE_TIME_MS = 30_000;
 
 /** True when the signed-in user may query across users. */
 export function useIsConsoleAdmin(): boolean {
-  const { user } = useAuth();
-  return user?.system_role === "admin";
+  return useAuth().isAdmin;
 }
 
 export function useConsoleStats(userId?: string, days?: number) {

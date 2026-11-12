@@ -177,7 +177,13 @@ async def test_non_admin_requesting_other_user_is_forbidden(db, no_threshold):
     cross-user probe indistinguishable from a successful read.
     """
     with _make_app(user_id=USER_A) as client:
-        for path in ("/api/console/stats", "/api/console/runs", "/api/console/usage"):
+        for path in (
+            "/api/console/stats",
+            "/api/console/runs",
+            "/api/console/usage",
+            "/api/console/llm-usage",
+            "/api/console/external-calls",
+        ):
             response = client.get(path, params={"user_id": USER_B})
             assert response.status_code == 403, path
             # And crucially: no data leaked in the error body.
@@ -188,9 +194,16 @@ async def test_non_admin_requesting_other_user_is_forbidden(db, no_threshold):
 async def test_non_admin_may_pass_own_user_id(db, no_threshold):
     """Explicitly naming yourself is allowed — it is a no-op filter."""
     with _make_app(user_id=USER_A) as client:
-        response = client.get("/api/console/stats", params={"user_id": USER_A})
-    assert response.status_code == 200
-    assert response.json()["scope"] == {"is_admin": False, "all_users": False, "user_id": USER_A}
+        for path in (
+            "/api/console/stats",
+            "/api/console/runs",
+            "/api/console/usage",
+            "/api/console/llm-usage",
+            "/api/console/external-calls",
+        ):
+            response = client.get(path, params={"user_id": USER_A})
+            assert response.status_code == 200, path
+            assert response.json()["scope"] == {"is_admin": False, "all_users": False, "user_id": USER_A}
 
 
 @pytest.mark.anyio
