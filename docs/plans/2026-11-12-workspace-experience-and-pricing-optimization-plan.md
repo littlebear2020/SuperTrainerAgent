@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–3；任务 4–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 动态追问链已移除，普通/Agent/案例 Playwright 12/12 通过，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–4；任务 5–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 URL 导航、真实用户底部与角色设置完成，video-assets Playwright 11/11、console 后端 69/69，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -188,13 +188,13 @@
 
 **Files**：新增 `core/workspace/video-assets-route.ts`；修改 nav-routes、workspace-nav-chat-list/menu、command-palette、AuthProvider、console hooks/page、settings-dialog、video-gen-page、三份 locale/type；对应 unit/E2E 与 `backend/tests/test_console_router.py`。
 
-- [ ] 纯函数覆盖 tab=works|assets、六类 capability、非法值回退；裸 `/workspace/video-gen`=works+course-video，`?tab=assets`=项目资产，assets 不携带 capability。
-- [ ] 侧栏拆“我的作品/我的资产”，组名改“我的空间”；普通 console=我的用量，管理员=运营后台；⌘K 复用同一导航 SoT。
-- [ ] active 同时考虑 pathname 与规范化 tab：绝不双高亮，任务详情仅我的作品高亮，`/workspace/assets` 模板中心不变。
-- [ ] AuthProvider 派生 isAdmin；底部显示邮箱 local-part、首字符头像、角色与独立齿轮，完整邮箱放 title，移除 Pro Plan/设置和更多，不嵌套按钮。
-- [ ] Settings 普通仅 account/appearance，管理员八项；effectiveActiveSection 同时约束菜单/内容，普通 defaultSection=about 回退 account，隐藏组件不挂载、不发请求。
-- [ ] console 角色 admin→user 时定价 tab 回 analysis；保持普通用户无用户选择器/owner 列/定价请求，不新增生产后端管理员限制。
-- [ ] 后端仅扩测试：五个普通读接口伪造他人 user_id 均 403，本人正常；管理员工具/定价仍由 require_admin 保护。
+- [x] 纯函数覆盖 tab=works|assets、六类 capability、非法值回退；裸 `/workspace/video-gen`=works+course-video，`?tab=assets`=项目资产，assets 不携带 capability。
+- [x] 侧栏拆“我的作品/我的资产”，组名改“我的空间”；普通 console=我的用量，管理员=运营后台；⌘K 复用同一导航 SoT。
+- [x] active 同时考虑 pathname 与规范化 tab：绝不双高亮，任务详情仅我的作品高亮，`/workspace/assets` 模板中心不变。
+- [x] AuthProvider 派生 isAdmin；底部显示邮箱 local-part、首字符头像、角色与独立齿轮，完整邮箱放 title，移除 Pro Plan/设置和更多，不嵌套按钮。
+- [x] Settings 普通仅 account/appearance，管理员八项；effectiveActiveSection 同时约束菜单/内容，普通 defaultSection=about 回退 account，隐藏组件不挂载、不发请求。
+- [x] console 角色 admin→user 时定价 tab 回 analysis；保持普通用户无用户选择器/owner 列/定价请求，不新增生产后端管理员限制。
+- [x] 后端仅扩测试：五个普通读接口伪造他人 user_id 均 403，本人正常；管理员工具/定价仍由 require_admin 保护。
 
 ### 任务 5：完成首页六能力网格、按需媒体与完整静态图（R8）
 

@@ -178,11 +178,6 @@
       "count": 1
     }
   },
-  "src/components/workspace/workspace-nav-menu.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/components/workspace/writer/extensions-panel.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 2

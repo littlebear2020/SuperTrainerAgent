@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import {
   SidebarGroup,
@@ -21,13 +21,14 @@ import {
 export function WorkspaceNavChatList() {
   const { t } = useI18n();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   // Same role source the console itself uses, so the label can never disagree
   // with the scope of the data behind it.
   const isConsoleAdmin = useIsConsoleAdmin();
   return (
     <SidebarGroup className="pt-1">
       <SidebarGroupLabel className="text-muted-foreground text-[10px] font-semibold tracking-[1.2px] uppercase">
-        {t.breadcrumb.workspace}
+        {t.sidebar.mySpace}
       </SidebarGroupLabel>
       <SidebarMenu>
         {/* DSN-002（2026-09-14）：从 nav-routes 单一事实源 map 渲染（⌘K 同源）。 */}
@@ -42,7 +43,7 @@ export function WorkspaceNavChatList() {
           return (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
-                isActive={isNavItemActive(item, pathname)}
+                isActive={isNavItemActive(item, pathname, searchParams)}
                 asChild
               >
                 <Link className="text-muted-foreground" href={item.href}>

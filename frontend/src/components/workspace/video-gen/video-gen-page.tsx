@@ -9,8 +9,8 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import {
   AlertDialog,
@@ -41,6 +41,10 @@ import {
 } from "@/core/video-gen/task-status-label";
 import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
+import {
+  buildVideoAssetsHref,
+  parseVideoAssetsRoute,
+} from "@/core/workspace/video-assets-route";
 import { cn } from "@/lib/utils";
 
 import { CompletedVideoGrid } from "./completed-video-grid";
@@ -280,12 +284,30 @@ export function TaskCard({
 
 export function VideoGenPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("works");
+  const searchParams = useSearchParams();
+  const route = parseVideoAssetsRoute(searchParams);
+  const tab = route.tab;
+  const canonicalHref = buildVideoAssetsHref(route);
   const tasksQuery = useVideoTasks();
   const deleteTask = useDeleteVideoTask();
 
+  useEffect(() => {
+    const currentHref = `${window.location.pathname}${window.location.search}`;
+    if (currentHref !== canonicalHref) {
+      router.replace(canonicalHref);
+    }
+  }, [canonicalHref, router, searchParams]);
+
   const selectTab = (next: (typeof TABS)[number]["value"]) => {
-    setTab(next);
+    const nextRoute =
+      next === "assets"
+        ? { tab: next }
+        : {
+            tab: next,
+            capability:
+              route.tab === "works" ? route.capability : "course-video",
+          };
+    router.push(buildVideoAssetsHref(nextRoute));
     document.getElementById(`video-assets-tab-${next}`)?.focus();
   };
 
@@ -306,7 +328,7 @@ export function VideoGenPage() {
               aria-selected={tab === item.value}
               aria-controls={`video-assets-panel-${item.value}`}
               tabIndex={tab === item.value ? 0 : -1}
-              onClick={() => setTab(item.value)}
+              onClick={() => selectTab(item.value)}
               onKeyDown={(event) => {
                 if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                   event.preventDefault();

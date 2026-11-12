@@ -194,6 +194,11 @@ export const zhCN: Translations = {
     writer: "写作",
     videoGen: "视频资产",
     assets: "资产中心",
+    mySpace: "我的空间",
+    myWorks: "我的作品",
+    myAssets: "我的资产",
+    roleAdmin: "管理员",
+    roleUser: "普通用户",
     consoleSelf: "我的用量",
     consoleAdmin: "运营后台",
   },
@@ -628,15 +633,8 @@ export const zhCN: Translations = {
     },
   },
 
-  // Breadcrumb
-  breadcrumb: {
-    workspace: "工作区",
-  },
-
   // Workspace
   workspace: {
-    settingsAndMore: "设置和更多",
-    about: "关于 Trainer AI",
     // 首页 hero、双入口与六张创作卡统一走 i18n。
     home: {
       heroTitle: "想创造什么？",

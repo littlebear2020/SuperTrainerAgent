@@ -78,6 +78,7 @@ export function ConsolePage() {
   const isAdmin = useIsConsoleAdmin();
 
   const [topTab, setTopTab] = useState<TopTab>("analysis");
+  const effectiveTopTab = isAdmin ? topTab : "analysis";
   const [chartTab, setChartTab] = useState<ChartTab>("usage");
   const [selectedUser, setSelectedUser] = useState(ALL_USERS_VALUE);
   const [days, setDays] = useState(7);
@@ -201,7 +202,7 @@ export function ConsolePage() {
           data-testid="top-tab-analysis"
           onClick={() => setTopTab("analysis")}
           className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-            topTab === "analysis"
+            effectiveTopTab === "analysis"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted"
           }`}
@@ -213,7 +214,7 @@ export function ConsolePage() {
             data-testid="top-tab-pricing"
             onClick={() => setTopTab("pricing")}
             className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-              topTab === "pricing"
+              effectiveTopTab === "pricing"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted"
             }`}
@@ -223,7 +224,7 @@ export function ConsolePage() {
         )}
       </div>
 
-      {topTab === "pricing" ? (
+      {effectiveTopTab === "pricing" ? (
         isAdmin && <ConsolePricingPanel enabled={isAdmin} />
       ) : (
         <>

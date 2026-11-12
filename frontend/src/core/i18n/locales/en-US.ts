@@ -209,6 +209,11 @@ export const enUS: Translations = {
     writer: "Writing",
     videoGen: "Video assets",
     assets: "Assets",
+    mySpace: "My space",
+    myWorks: "My works",
+    myAssets: "My assets",
+    roleAdmin: "Admin",
+    roleUser: "User",
     consoleSelf: "My usage",
     consoleAdmin: "Operations console",
   },
@@ -673,15 +678,8 @@ export const enUS: Translations = {
     },
   },
 
-  // Breadcrumb
-  breadcrumb: {
-    workspace: "Workspace",
-  },
-
   // Workspace
   workspace: {
-    settingsAndMore: "Settings and more",
-    about: "About Trainer AI",
     // Home hero and all visible creation-entry copy stay locale-aware.
     home: {
       heroTitle: "What would you like to create?",

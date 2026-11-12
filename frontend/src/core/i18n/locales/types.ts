@@ -166,6 +166,11 @@ export interface Translations {
     videoGen: string;
     /** Asset center (/workspace/assets, Phase 3.5 2026-09-11). */
     assets: string;
+    mySpace: string;
+    myWorks: string;
+    myAssets: string;
+    roleAdmin: string;
+    roleUser: string;
     /** Regular user: their own usage. Admin: the platform-wide console. */
     consoleSelf: string;
     consoleAdmin: string;
@@ -383,15 +388,8 @@ export interface Translations {
     newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };
 
-  // Breadcrumb
-  breadcrumb: {
-    workspace: string;
-  };
-
   // Workspace
   workspace: {
-    settingsAndMore: string;
-    about: string;
     /** Home hero, expandable course entries, and their six creation cards. */
     home: {
       heroTitle: string;
