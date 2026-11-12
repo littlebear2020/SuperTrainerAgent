@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化实施计划
 
 > **状态**：已执行（任务 0–8 本地部分；push/PR/OCR/合入未执行，交由协调者。任务 8 隔离真实 API 1/1、backend 10035 passed/31 个既有条件 skip、frontend 261 files/1687 tests、E2E 90/90 与五路由性能门禁均通过；执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`）。
-> **TL;DR**：R1–R6/R8 与集中 Important 修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config、未重建 Docker，远端评审与合入由协调者决定。
+> **TL;DR**：R1–R6/R8 与集中 Important 修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端评审与合入由协调者决定。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
 
