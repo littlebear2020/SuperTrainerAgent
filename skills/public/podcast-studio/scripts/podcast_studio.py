@@ -803,9 +803,9 @@ def render_script(
                 raise PodcastError(f"Completed render is missing segment / 已完成分片缺失: {old['path']}")
 
     if timestamp is None:
-        from datetime import UTC, datetime
+        from datetime import datetime, timezone
 
-        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")  # noqa: UP017  # Sandbox Python 3.10 compatibility.
     final_path = output / f"{_safe_title(script['title'])}_{timestamp}.mp3"
     synthesize = synth or _synthesize
     entries = []

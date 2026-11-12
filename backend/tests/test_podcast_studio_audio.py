@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -111,6 +112,15 @@ def test_single_voice_render_probe_and_duration(tmp_path, tone_bytes):
     assert probe["streams"][0]["codec_name"] == "mp3"
     assert probe["streams"][0]["sample_rate"] == "24000"
     subprocess.run(["ffmpeg", "-v", "error", "-i", manifest["output_path"], "-f", "null", "-"], check=True)
+
+
+def test_default_timestamp_generates_mp3_and_success_manifest(tmp_path, tone_bytes):
+    script_path, sources_path, _ = write_script(tmp_path)
+    manifest = ps.render_script(script_path, sources_path, tmp_path / "outputs", synth=lambda text, speaker: tone_bytes)
+    assert re.fullmatch(r"测试_播客_\d{8}T\d{12}Z\.mp3", Path(manifest["output_path"]).name)
+    assert manifest["status"] == "success"
+    assert Path(manifest["output_path"]).is_file()
+    assert (tmp_path / "outputs" / "render_manifest.json").is_file()
 
 
 def test_two_voice_order_and_inter_turn_pause_only(tmp_path, tone_bytes):
