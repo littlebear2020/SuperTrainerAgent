@@ -724,6 +724,19 @@ export const enUS: Translations = {
         },
       },
     },
+    works: {
+      tabsLabel: "Work type",
+      history: " conversation history",
+      searchLabel: "Search conversation titles",
+      loading: "Loading conversations…",
+      loadError: "Could not load conversations. Please try again.",
+      retry: "Retry",
+      empty: (capability: string) => `No ${capability} conversations yet`,
+      noResults: "No matching conversations",
+      open: "Open",
+      updated: "Updated",
+      updatedUnknown: "Update time unknown",
+    },
   },
 
   // Conversation

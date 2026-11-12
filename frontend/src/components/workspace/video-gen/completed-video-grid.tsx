@@ -29,8 +29,7 @@ import { RecomposeConfirmDialog } from "./video-gen-recompose-dialog";
 export const COMPLETED_WORK_PAGE_SIZE = 6;
 export const COMPLETED_WORK_LIMIT = 100;
 
-const WORK_TYPES = ["ai_image", "ai_video"] as const;
-type WorkType = (typeof WORK_TYPES)[number];
+type WorkType = "ai_image" | "ai_video";
 
 export function selectCompletedWorks(
   tasks: readonly VideoTaskBrief[],
@@ -224,7 +223,8 @@ function CompletedWorkCard({
   );
 }
 
-export function CompletedVideoGrid({
+function CompletedVideoGridContent({
+  workType,
   tasks,
   isLoading,
   isError,
@@ -232,6 +232,7 @@ export function CompletedVideoGrid({
   onDelete,
   onNavigate,
 }: {
+  workType: WorkType;
   tasks: VideoTaskBrief[];
   isLoading?: boolean;
   isError?: boolean;
@@ -239,7 +240,6 @@ export function CompletedVideoGrid({
   onDelete: (id: string) => void;
   onNavigate: (id: string, path?: "storyboard") => void;
 }) {
-  const [workType, setWorkType] = useState<WorkType>("ai_image");
   const [visibleCount, setVisibleCount] = useState(COMPLETED_WORK_PAGE_SIZE);
   const [previewTaskId, setPreviewTaskId] = useState<string | null>(null);
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(
@@ -252,14 +252,6 @@ export function CompletedVideoGrid({
       ? task.task_type === "ai_image" || task.task_type === "ai_visual"
       : task.task_type === "ai_video",
   );
-
-  const selectWorkType = (next: WorkType) => {
-    if (next === workType) return;
-    setWorkType(next);
-    setVisibleCount(COMPLETED_WORK_PAGE_SIZE);
-    setPreviewTaskId(null);
-    setFailedPreviews(new Set());
-  };
 
   let content;
   if (isLoading) {
@@ -339,32 +331,17 @@ export function CompletedVideoGrid({
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <div
-        role="tablist"
-        aria-label="作品类型"
-        className="border-border/50 bg-muted/30 flex w-fit gap-1 rounded-lg border p-1"
-      >
-        {WORK_TYPES.map((type) => (
-          <button
-            key={type}
-            type="button"
-            role="tab"
-            aria-selected={workType === type}
-            onClick={() => selectWorkType(type)}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              workType === type
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {videoTaskTypeLabel(type)}
-          </button>
-        ))}
-      </div>
-      {content}
-    </div>
-  );
+  return <div>{content}</div>;
+}
+
+export function CompletedVideoGrid(props: {
+  workType: WorkType;
+  tasks: VideoTaskBrief[];
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  onDelete: (id: string) => void;
+  onNavigate: (id: string, path?: "storyboard") => void;
+}) {
+  return <CompletedVideoGridContent key={props.workType} {...props} />;
 }

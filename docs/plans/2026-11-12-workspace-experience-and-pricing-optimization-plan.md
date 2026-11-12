@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–5；任务 6–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–6；任务 7–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12；任务 6 六类筛选、Agent 完整历史、URL/键盘导航与 offset 50 验收完成，作品 Playwright 13/13，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -220,16 +220,16 @@
 
 **Files**：新增 `work-capabilities.ts`、`agent-conversation-grid.tsx`；修改 `core/threads/utils.ts`、video-gen-page、completed-video-grid、三份 locale/type、E2E mock；对应 unit/DOM/E2E。
 
-- [ ] 建立六能力单一目录，映射严格保持 course-video、ai_image、ai_video、creative-studio、ppt-master、podcast-studio；标签取 i18n，不复制路由映射。
-- [ ] 新增 agentNameOfThread：依次读取 context.agent_name、metadata.agent_name、旧 metadata.project_type，再经 resolveAgentName；pathOfThread 复用。缺 metadata、lead_agent、co-writer、未知名不猜分类。
-- [ ] 测试 course-ppt→ppt-master 与五个 creative 旧别名；旧线程统一打开 `/workspace/agents/<canonical>/chats/<thread_id>`。
-- [ ] 四类 Agent 使用 useThreads 不传 limit 的完整分页（请求仍 50/页），按 thread_id 去重、updated_at ?? created_at 与 ID 稳定排序；offset 50 后目标也必须出现。
-- [ ] 卡片只显示真实 titleOfThread、能力类型、更新时间与“打开”；每类提供标题 includes 搜索（trim+大小写归一），首屏 6、每次 +6，不虚构封面、ready、下载或成品统计。
-- [ ] loading、error+retry、真空、搜索无结果分离；切能力清空搜索并复位 visibleCount。首版不提供 thread 删除。
-- [ ] 六类二级 tab 与外层 tab 从 URL 派生，点击 push、非法值 replace；刷新/前进后退恢复，方向键/Home/End 与 ARIA 完整。
-- [ ] CompletedVideoGrid 的 workType 改由父层 URL capability 驱动，移除内部重复 tab/local workType；切能力复位预览与 visibleCount。
-- [ ] 视频两类保留原卡和全局最近 100：ai_visual 归图片动效；draft/running/failed/ready 全保留，仅 ready 且非 missing 可预览/下载，原详情/重试/删除不变。
-- [ ] 仅在当前面板需要时挂载 threads/video 查询；E2E 六类逐一实际点击，覆盖搜索、分页、打开、错误重试、移动无溢出和播客 404 的诚实不可用态。
+- [x] 建立六能力单一目录，映射严格保持 course-video、ai_image、ai_video、creative-studio、ppt-master、podcast-studio；标签取 i18n，不复制路由映射。
+- [x] 新增 agentNameOfThread：依次读取 context.agent_name、metadata.agent_name、旧 metadata.project_type，再经 resolveAgentName；pathOfThread 复用。缺 metadata、lead_agent、co-writer、未知名不猜分类。
+- [x] 测试 course-ppt→ppt-master 与五个 creative 旧别名；旧线程统一打开 `/workspace/agents/<canonical>/chats/<thread_id>`。
+- [x] 四类 Agent 使用 useThreads 不传 limit 的完整分页（请求仍 50/页），按 thread_id 去重、updated_at ?? created_at 与 ID 稳定排序；offset 50 后目标也必须出现。
+- [x] 卡片只显示真实 titleOfThread、能力类型、更新时间与“打开”；每类提供标题 includes 搜索（trim+大小写归一），首屏 6、每次 +6，不虚构封面、ready、下载或成品统计。
+- [x] loading、error+retry、真空、搜索无结果分离；切能力清空搜索并复位 visibleCount。首版不提供 thread 删除。
+- [x] 六类二级 tab 与外层 tab 从 URL 派生，点击 push、非法值 replace；刷新/前进后退恢复，方向键/Home/End 与 ARIA 完整。
+- [x] CompletedVideoGrid 的 workType 改由父层 URL capability 驱动，移除内部重复 tab/local workType；切能力复位预览与 visibleCount。
+- [x] 视频两类保留原卡和全局最近 100：ai_visual 归图片动效；draft/running/failed/ready 全保留，仅 ready 且非 missing 可预览/下载，原详情/重试/删除不变。
+- [x] 仅在当前面板需要时挂载 threads/video 查询；E2E 六类逐一实际点击，覆盖搜索、分页、打开、错误重试、移动无溢出和播客 404 的诚实不可用态。
 
 ### 任务 7：精简我的资产项目详情且保全存量配置（R6）
 

@@ -80,6 +80,7 @@ describe("CompletedVideoGrid", () => {
   async function render(
     tasks: VideoTaskBrief[],
     props: {
+      workType?: "ai_image" | "ai_video";
       isLoading?: boolean;
       isError?: boolean;
       onRetry?: () => void;
@@ -90,6 +91,7 @@ describe("CompletedVideoGrid", () => {
     await act(async () => {
       root.render(
         <CompletedVideoGrid
+          workType={props.workType ?? "ai_image"}
           tasks={tasks}
           onDelete={props.onDelete ?? vi.fn()}
           onNavigate={props.onNavigate ?? vi.fn()}
@@ -224,23 +226,26 @@ describe("CompletedVideoGrid", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it("defaults to images and switches type with preview unload and pagination reset", async () => {
-    const images = Array.from({ length: 7 }, (_, index) =>
-      task(String(index + 1), {
-        task_type: index === 6 ? "ai_visual" : "ai_image",
-      }),
-    );
-    const videos = Array.from({ length: 7 }, (_, index) =>
-      task(String(101 + index), { task_type: "ai_video" }),
-    );
-    await render([...images, ...videos]);
+  it("follows controlled work type and resets preview and pagination without internal tabs", async () => {
+    const tasks = [
+      ...Array.from({ length: 7 }, (_, index) =>
+        task(String(index + 1), {
+          task_type: index === 6 ? "ai_visual" : "ai_image",
+        }),
+      ),
+      ...Array.from({ length: 7 }, (_, index) =>
+        task(String(101 + index), { task_type: "ai_video" }),
+      ),
+    ];
+    await render(tasks, { workType: "ai_image" });
     expect(
       container.querySelectorAll("[data-testid='completed-work-card']"),
     ).toHaveLength(6);
     expect(container.textContent).not.toContain("作品 101");
     await act(async () => button("查看").click());
     expect(container.querySelector("video")).not.toBeNull();
-    await act(async () => button("AI 生视频").click());
+
+    await render(tasks, { workType: "ai_video" });
     expect(container.querySelector("video")).toBeNull();
     expect(container.textContent).toContain("作品 101");
     expect(container.textContent).not.toContain("作品 1 ");
@@ -251,10 +256,12 @@ describe("CompletedVideoGrid", () => {
     expect(
       container.querySelectorAll("[data-testid='completed-work-card']"),
     ).toHaveLength(7);
-    await act(async () => button("AI 生图").click());
+
+    await render(tasks, { workType: "ai_image" });
     expect(
       container.querySelectorAll("[data-testid='completed-work-card']"),
     ).toHaveLength(6);
+    expect(container.querySelector("[role='tablist']")).toBeNull();
   });
 
   it("restores details storyboard retry confirmation and delete confirmation by exact id", async () => {
