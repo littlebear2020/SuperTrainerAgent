@@ -111,6 +111,28 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).toContain("第一章");
     expect(md).not.toContain("[[STAGE:");
   });
+
+  it("cleans incomplete stage markers from AI and human exports without dropping bodies", () => {
+    const md = formatThreadAsMarkdown(makeThread(), [
+      ai("[[STAGE:OUT\n\n# 已完成大纲"),
+      human("[[STAGE:DR\n请保留这段人工修改"),
+    ]);
+    expect(md).toContain("# 已完成大纲");
+    expect(md).toContain("请保留这段人工修改");
+    expect(md).not.toContain("[[STAGE:");
+  });
+
+  it("preserves isolated human bracket text in JSON export", () => {
+    const raw = formatThreadAsJSON(makeThread(), [
+      human("[["),
+      human("[[1, 2]"),
+    ]);
+    const parsed = JSON.parse(raw) as { messages: { content: string }[] };
+    expect(parsed.messages.map((message) => message.content)).toEqual([
+      "[[",
+      "[[1, 2]",
+    ]);
+  });
 });
 
 describe("formatThreadAsMarkdown opt-in flags", () => {

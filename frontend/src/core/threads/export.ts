@@ -51,7 +51,7 @@ function formatMessageContent(message: Message): string {
   // Defence-in-depth: even if a middleware-injected marker slipped through
   // the `hide_from_ui` filter, scrub every known internal tag before the
   // content lands in a user-visible export file.
-  return stripInternalMarkers(text);
+  return stripInternalMarkers(text, "final");
 }
 
 function formatToolCalls(message: Message): string {
