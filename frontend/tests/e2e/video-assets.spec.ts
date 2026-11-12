@@ -479,4 +479,163 @@ test.describe("video assets", () => {
       page.getByRole("button", { name: "返回项目列表" }),
     ).toBeVisible();
   });
+
+  test("new project detail stays simplified and create posts only title and optional style", async ({
+    page,
+  }) => {
+    await page.goto("/workspace/video-gen?tab=assets");
+    await page.getByRole("button", { name: "新建项目" }).click();
+    await page.locator("#cp-title").fill("新建精简项目");
+    await page.getByRole("button", { name: "创建项目" }).click();
+    await expect(
+      page.getByRole("button", { name: "返回项目列表" }),
+    ).toBeVisible();
+
+    const create = api.projectRequests.find(
+      (request) => request.method === "POST",
+    );
+    expect(create?.body).toEqual({ title: "新建精简项目" });
+    const text = await page
+      .getByRole("tabpanel", { name: "我的资产", exact: true })
+      .textContent();
+    for (const expected of [
+      "基本设置",
+      "角色参考图",
+      "风格锚图",
+      "道具资产",
+      "保存",
+    ]) {
+      expect(text).toContain(expected);
+    }
+    for (const removed of ["品牌包", "色彩微调", "关联视频"]) {
+      expect(text).not.toContain(removed);
+    }
+  });
+
+  test("existing project save preserves brand palette extensions and related count", async ({
+    page,
+  }) => {
+    const palette = {
+      primary: "#112233",
+      saturation: 1.25,
+      contrast: 0.85,
+      brightness: 0.15,
+      grade: "legacy-grade",
+      old_extension: 42,
+    };
+    const brandRequests: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (
+        path.includes("/brand/logo-image") ||
+        path.startsWith("/remotion-layouts/")
+      ) {
+        brandRequests.push(path);
+      }
+    });
+    api.seedProject({
+      id: "stored-project",
+      title: "存量品牌项目",
+      visual_style_preset: "flat",
+      color_palette: palette,
+      style_anchor_image: "anchor.png",
+      remotion_theme: "warm",
+      font_family: "Georgia,serif",
+      logo_path: "brand/existing-logo.png",
+      intro_outro: {
+        intro: { headline: "保留片头", subtitle: "保留副标题" },
+        outro: { headline: "保留片尾", follow: "保留关注语" },
+      },
+    });
+    api.seedTask({
+      id: "linked-course",
+      title: "关联课程",
+      status: "draft",
+      progress: 100,
+      task_type: "remotion_course",
+      course_project_id: "stored-project",
+    });
+    api.upsertStoryboard("linked-course", {
+      title: "课程分镜",
+      config: { video_type: "remotion_course" },
+      status: "draft",
+      frames: [{ index: 0, narration: "固定旁白", duration: 4 }],
+      audio_ready: true,
+    });
+
+    await page.goto("/workspace/video-gen?tab=assets");
+    await page.getByRole("button", { name: /存量品牌项目/ }).click();
+    await expect(
+      page.getByRole("button", { name: "返回项目列表" }),
+    ).toBeVisible();
+    const text = await page
+      .getByRole("tabpanel", { name: "我的资产", exact: true })
+      .textContent();
+    for (const removed of ["品牌包", "色彩微调", "关联视频"]) {
+      expect(text).not.toContain(removed);
+    }
+
+    const anchorSection = page
+      .getByRole("heading", { name: "风格锚图", exact: true })
+      .locator("..");
+    await anchorSection
+      .getByRole("button", { name: "替换", exact: true })
+      .click();
+    await anchorSection.locator("input[type='file']").setInputFiles({
+      name: "replacement.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "89504e470d0a1a0a0000000d4948445200000001000000010806000000",
+        "hex",
+      ),
+    });
+    await anchorSection
+      .getByRole("button", { name: "替换风格锚图", exact: true })
+      .click();
+    const replaceAnchorDialog = page.getByRole("alertdialog");
+    await expect(replaceAnchorDialog).toContainText("本项目的 1 个关联任务");
+    await replaceAnchorDialog.getByRole("button", { name: "取消" }).click();
+
+    await page.getByPlaceholder("如：AI 入门课程").fill("仅修改项目标题");
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await expect
+      .poll(
+        () =>
+          api.projectRequests.filter((request) => request.method === "PUT")
+            .length,
+      )
+      .toBe(1);
+    const update = api.projectRequests.find(
+      (request) => request.method === "PUT",
+    );
+    const body = update?.body as Record<string, unknown>;
+    expect(body.title).toBe("仅修改项目标题");
+    expect(body.color_palette).toEqual(palette);
+    for (const brandField of [
+      "remotion_theme",
+      "font_family",
+      "logo_path",
+      "intro_outro",
+    ]) {
+      expect(body).not.toHaveProperty(brandField);
+    }
+    expect(JSON.stringify(body)).not.toContain("dark-blue");
+    expect(api.project("stored-project")).toMatchObject({
+      remotion_theme: "warm",
+      font_family: "Georgia,serif",
+      logo_path: "brand/existing-logo.png",
+      color_palette: palette,
+      intro_outro: {
+        intro: { headline: "保留片头", subtitle: "保留副标题" },
+        outro: { headline: "保留片尾", follow: "保留关注语" },
+      },
+    });
+    expect(brandRequests).toEqual([]);
+
+    await page.goto("/workspace/video-gen/linked-course/storyboard");
+    await expect(
+      page.getByRole("heading", { name: "关联课程", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("文字动效 · 1 帧")).toBeVisible();
+  });
 });

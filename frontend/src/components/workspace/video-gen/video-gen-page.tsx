@@ -457,11 +457,7 @@ export function VideoGenPage() {
               </div>
             </div>
           ) : (
-            <CourseProjectPage
-              onOpenTask={(taskId) =>
-                router.push(`/workspace/video-gen/${taskId}`)
-              }
-            />
+            <CourseProjectPage />
           )}
         </div>
       </div>

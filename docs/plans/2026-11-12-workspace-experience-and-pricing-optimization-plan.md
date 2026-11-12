@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–6；任务 7–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12；任务 6 六类筛选、Agent 完整历史、URL/键盘导航与 offset 50 验收完成，作品 Playwright 13/13，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–7；任务 8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12；任务 6 六类筛选、Agent 完整历史、URL/键盘导航与 offset 50 验收完成，作品 Playwright 13/13；任务 7 精简项目详情且保全品牌/palette/关联计数，hermetic Playwright 15/15，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -235,13 +235,13 @@
 
 **Files**：`course-project-detail.tsx`；新增 `course-project-simplified-detail.dom.test.tsx`，扩 create-payload、mock-video-api、video-assets E2E 与 remote 手测文档。
 
-- [ ] 先写失败测试：新建和编辑详情均不出现“品牌包/色彩微调/关联视频”，基本设置、角色、风格锚图、道具与保存仍存在。
-- [ ] 仅卸载 BrandPackSection、调色 Collapsible 和关联视频 JSX，清理闲置 import/state；不用 display:none 保留挂载。
-- [ ] 保留 palette state、服务端回灌、PUT color_palette、dirty guard；保留 tasksQ/projectTasks/relatedTaskCount。
-- [ ] 播种非默认品牌与 palette，修改标题保存后断言品牌不覆写、palette 逐字段不变；不再发品牌 LOGO/主题预览请求。
-- [ ] 新建 POST 仍只含 title/可选风格，不强写 dark-blue；remotion_course+courseProjectId+follow_project payload 与默认品牌/中性后期不变。
-- [ ] 任务详情和 remotion_course 分镜深链仍正确；只更新 e2e-remote 的旧品牌 UI 断言，夜间不执行 remote，改由本地 hermetic E2E 证明。
-- [ ] 运行 knip；若 BrandPackSection 失去全部消费者，只清理无消费者的前端导出/死代码，不删后端品牌字段、资产中心写入能力或项目数据。
+- [x] 先写失败测试：新建和编辑详情均不出现“品牌包/色彩微调/关联视频”，基本设置、角色、风格锚图、道具与保存仍存在。
+- [x] 仅卸载 BrandPackSection、调色 Collapsible 和关联视频 JSX，清理闲置 import/state；不用 display:none 保留挂载。
+- [x] 保留 palette state、服务端回灌、PUT color_palette、dirty guard；保留 tasksQ/projectTasks/relatedTaskCount。
+- [x] 播种非默认品牌与 palette，修改标题保存后断言品牌不覆写、palette 逐字段不变；不再发品牌 LOGO/主题预览请求。
+- [x] 新建 POST 仍只含 title/可选风格，不强写 dark-blue；remotion_course+courseProjectId+follow_project payload 与默认品牌/中性后期不变。
+- [x] 任务详情和 remotion_course 分镜深链仍正确；只更新 e2e-remote 的旧品牌 UI 断言，夜间不执行 remote，改由本地 hermetic E2E 证明。
+- [x] 运行 knip；若 BrandPackSection 失去全部消费者，只清理无消费者的前端导出/死代码，不删后端品牌字段、资产中心写入能力或项目数据。
 
 ### 批次 C：本地集成收口
 

@@ -34,6 +34,13 @@ export interface MockCourseProject {
   visual_style_preset?: string | null;
   color_palette?: Record<string, string | number | undefined> | null;
   style_anchor_image?: string | null;
+  remotion_theme?: string | null;
+  font_family?: string | null;
+  logo_path?: string | null;
+  intro_outro?: {
+    intro?: { headline?: string; subtitle?: string };
+    outro?: { headline?: string; follow?: string };
+  } | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -75,11 +75,7 @@ function projectUpdatedAt(project: CourseProject): string {
   return `最近更新 ${formatDateTime(value)}`;
 }
 
-export function CourseProjectPage({
-  onOpenTask,
-}: {
-  onOpenTask?: (taskId: string) => void;
-} = {}) {
+export function CourseProjectPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const projectsQ = useCourseProjects();
   const projects = [...(projectsQ.data ?? [])].sort((a, b) => {
@@ -99,7 +95,6 @@ export function CourseProjectPage({
       <CourseProjectDetailPage
         projectId={selectedId}
         onBack={() => setSelectedId(null)}
-        onOpenTask={onOpenTask}
       />
     );
   }
