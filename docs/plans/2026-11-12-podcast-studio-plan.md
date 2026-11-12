@@ -1,6 +1,6 @@
 # 播客 Agent 与音频创作实施计划
 
-> **状态**：部分已执行（2026-11-12 开始执行；阶段 A 已完成并保留，Task 1 的四个密钥变量名已获用户明确授权；Task 7 四份真实 MP3 已于 2026-11-12 获用户人工试听通过，实时安全 URL 验收仍未成功，Task 7 Step 5 完成前不执行 Task 8 的完成交付）。执行记录将写入 `docs/changelog/changelog-2026-11-12-podcast-studio.md`。
+> **状态**：部分已执行（2026-11-12；Task 1–6、Task 7 Step 1–4/6、Task 8 Step 1–3 已完成。Task 7 Step 5 实时安全 URL 未验收，按用户决定后续自行验收；Task 8 Step 4–5 收尾中。执行记录：`docs/changelog/changelog-2026-11-12-podcast-studio.md`）。
 > **TL;DR**：新增 `podcast-studio` Agent 和一个四模式共享技能，以文档/链接/调研为来源，经必要确认后用字节 TTS 交付 MP3；首页仅以播客卡替换 co-writer，旧 Agent、Writer 与历史路由全部保留。AUTOBIND 默认关闭，不改 Docker、`.env.example` 或部署文档；真实密钥名集合未获用户当场授权时不得开启或宣称完成。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`，单执行者、单工作区按 Task 1→8 串行，逐项勾选。Task 1 未获用户当场授权时立即停止，不得自行扩权。共享 locale、seed、技能和测试不得并行修改。
@@ -266,6 +266,7 @@
   用真实 PDF 或 HTML 形成至少 4 轮男女访谈；真实确认前零 TTS，确认后角色/段序/裸 speaker 正确，无串声/异常停顿，合并一个 MP3并 present/download。
 - [ ] **Step 5：经真实 Agent 验收 debate_two 与安全 URL**
   输入一个真实公开、安全 URL，成功读取正文后形成至少 4 轮正反辩论；双方立场均存在、无人身攻击。真实确认后才合成，男女音色和顺序正确，最终一个 MP3并 present/download。URL 核心能力不能用 fail-closed 代替成功。
+  **2026-11-12 用户决定**：不再由本批执行实时 URL 验收，后续由用户自行验收；本项保持未勾选，明确记为“未验证、用户后验”，不计为通过。此前的 fake-IP、HTTP 404、人机验证和动态模板结果均未取得合格实时正文。
 - [x] **Step 6：核验四个真实 MP3 的下载与音频质量**
   四个 MP3 均绑定各自真实 thread/assistant_id、present/download 200、非空、ffprobe codec=mp3/24kHz、FFmpeg 全解码无错；最终解码时长与分片及 300ms 轮间停顿对账在 0.1s 内，段序/hash 正确。人工试听角色、可懂度与原文/确认稿一致性；失败如实记录，不补静音或换引擎。四个真实模式未全部通过时，不得勾选本计划完成。
 
@@ -275,11 +276,11 @@
 - Modify: 本计划
 - Create: `docs/changelog/changelog-2026-11-12-podcast-studio.md`
 
-- [ ] **Step 1：运行后端与前端标准门禁**
+- [x] **Step 1：运行后端与前端标准门禁**
   按长命令规范后台运行 `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`；`cd frontend && pnpm check && pnpm test`，全部通过。
-- [ ] **Step 2：运行 E2E 与性能门禁**
+- [x] **Step 2：运行 E2E 与性能门禁**
   `cd frontend && CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check`，全部通过；mock 不替代 Task 7 真实证据。
-- [ ] **Step 3：更新计划与 changelog**
+- [x] **Step 3：更新计划与 changelog**
   逐项勾选并更新唯一状态头，记录实际执行范围及 changelog 链接。changelog 必须含 ≤5 行 TL;DR 和「验收记录」节，逐行写真实命令与关键输出，分别记录密钥授权名集合（只名字）、离线、真实音色、四模式真实 thread/MP3、URL/调研成功、旧能力兼容、人工试听和未解决事项，不包含密钥或用户内容。
 - [ ] **Step 4：对最终文档重跑根门禁**
   在 Step 3 完成后运行仓库根 `make check && python3 scripts/check_docs_convention.py && git diff --check`，全部通过；不得只在 changelog 创建前运行文档门禁。
@@ -300,7 +301,7 @@
 
 1. **密钥授权真实有效**：Task 1 记录用户批准的具体变量名集合、开启 PRESENT/关闭 MISSING/恢复后 PRESENT，实际集合无漂移；只检查配置文件不算证据。
 2. 首页仅有播客替换 co-writer 的变化；分类描述不再宣传文章，podcast 新会话四卡含明确模式指令，提交、旧 co-writer/Writer/历史路由均正确，受影响测试同步而非删除。
-3. PDF/DOCX/MD/HTML 在真实沙箱均有成功证据；真实安全 URL 和主题调研在 Task 7 各有至少一个成功案例。空、稀疏、恶意、私网、超限等负例 fail-closed，不能用负例代替核心能力成功。
+3. PDF/DOCX/MD/HTML 在真实沙箱均有成功证据；主题调研在 Task 7 至少一个成功案例。实时安全 URL 按用户 2026-11-12 的最新决定由用户后续自验，本批不标记成功。空、稀疏、恶意、私网、超限等负例 fail-closed，不能用负例代替核心能力成功。
 4. 原文保真、来源、完整性/确认行为和固定 CLI 提示注入防线成立；确认哈希未被宣传为强审批凭证，Python 3.10 沙箱兼容经过实测。
 5. 四模式各有一个绑定真实 podcast Agent thread 的可下载 MP3，音色、角色、顺序、稿件、编码、精确时长与人工试听均通过；任何部分失败不伪装成功。
 6. 全局 reseed 的实际备份/memory 证据、真实 Agent 发现 API、第二次 0、全部标准门禁和 changelog 验收记录完成；最终文档修改后已重跑根门禁。
