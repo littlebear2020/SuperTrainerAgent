@@ -51,10 +51,27 @@ _DAOBAO_HELPER = os.path.join(_SCRIPTS_DIR, "_doubao_tts.py")
 SPEAKER = "zh_male_m191_uranus_bigtts"
 
 
-def _doubao_available():
-    """True when doubao env vars are set (preferred TTS engine)."""
-    return bool(os.getenv("DOUBAO_TTS_DEFAULT_SPEAKER", "").strip()
-                and os.getenv("VOLCENGINE_VOICE_ACCESS_KEY", "").strip())
+def _doubao_missing_env(speaker=None):
+    missing = []
+    if not os.getenv("VOLCENGINE_VOICE_ACCESS_KEY", "").strip():
+        missing.append("VOLCENGINE_VOICE_ACCESS_KEY")
+    if speaker is None and not os.getenv("DOUBAO_TTS_DEFAULT_SPEAKER", "").strip():
+        missing.append("DOUBAO_TTS_DEFAULT_SPEAKER")
+    return missing
+
+
+def _doubao_available(speaker=None):
+    """True when the access key and any fallback speaker are available."""
+    return not _doubao_missing_env(speaker)
+
+
+def _require_doubao(speaker):
+    if _doubao_available(speaker=speaker):
+        return
+    missing = " / ".join(_doubao_missing_env(speaker))
+    raise RuntimeError(
+        f"doubao TTS env not set ({missing}); edge-tts is blocked in sandbox — not falling back"
+    )
 
 
 def _load_doubao_module():
@@ -169,11 +186,7 @@ def generate_tts(text, output_path, speaker=SPEAKER):
     a doubao failure (env unset or synthesis error) raises RuntimeError so the
     agent reports honestly and stops, per SKILL.md ("不要回退 edge-tts").
     """
-    if not _doubao_available():
-        raise RuntimeError(
-            "doubao TTS env not set (VOLCENGINE_VOICE_ACCESS_KEY / "
-            "DOUBAO_TTS_DEFAULT_SPEAKER); edge-tts is blocked in sandbox — not falling back"
-        )
+    _require_doubao(speaker)
     if not _doubao_tts_generate(text, output_path, speaker=speaker):
         raise RuntimeError(
             "doubao TTS synthesis failed; edge-tts is blocked in sandbox — "
@@ -190,11 +203,7 @@ def generate_tts_timestamped(text, output_path, speaker=SPEAKER):
     failure still raises RuntimeError via generate_tts → 现状 abort semantics
     unchanged (edge-tts remains blocked, no engine fallback).
     """
-    if not _doubao_available():
-        raise RuntimeError(
-            "doubao TTS env not set (VOLCENGINE_VOICE_ACCESS_KEY / "
-            "DOUBAO_TTS_DEFAULT_SPEAKER); edge-tts is blocked in sandbox — not falling back"
-        )
+    _require_doubao(speaker)
     try:
         return _doubao_tts_generate_timestamped(text, output_path, speaker=speaker)
     except Exception as e:

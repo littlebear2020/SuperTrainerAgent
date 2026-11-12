@@ -197,7 +197,7 @@ docker build --platform linux/amd64 -t deerflow-sandbox:local -f docker/sandbox/
 
 `sandbox.image` 指向该镜像，不得在容器启动后安装依赖。每个本地 Aio 容器按计划需要约 3 GiB 内存与 2 GiB shm，默认 replicas=3 时使用回环地址 8080–8082；先检查 `/v1/sandbox`，再分别实测 `/v1/shell/exec` 与 `/v1/bash/exec`，并预检 PPT/Remotion/知识卡依赖。amd64 经 Rosetta 模拟可能更慢，长任务沿用技能的后台执行与日志检查，不盲目提高超时。本地 Docker 验证不代表公司服务器 provisioner 或部署拓扑已验证。
 
-当前示例 `config_version` 为 **31**；升级时先运行 `make config-upgrade`，不要覆盖本地模型与密钥配置。`sandbox.environment` 保持 `{}`——密钥走技能 SKILL.md `required-secrets` 声明 + 请求级带外注入（见 `config.example.yaml` 的 Aio 注释块）；白名单仅为紧急回退杆。
+当前示例 `config_version` 为 **31**；升级时先运行 `make config-upgrade`，不要覆盖本地模型与密钥配置。`sandbox.environment` 保持 `{}`——密钥走技能 SKILL.md `required-secrets` 声明 + 请求级带外注入（见 `config.example.yaml` 的 Aio 注释块）；白名单仅为紧急回退杆。`DEER_FLOW_SKILL_SECRET_AUTOBIND` 默认关闭；开启后注入范围是「启用技能声明并集 ∩ Gateway 进程 env」，required/optional 均计入并集，删除单个技能的声明不等于全局删除同名变量。开启前必须审计全部启用技能与 Gateway env，避免把同名密钥注入不需要它的沙箱。
 
 ### 3. 前端环境文件（可选）
 
