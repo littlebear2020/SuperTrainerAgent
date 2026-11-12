@@ -138,11 +138,13 @@ describe("AgentNewChatGuide", () => {
     await renderGuide();
 
     expect(container.querySelector("h1")?.textContent).toBe(
-      "把知识讲成一堂视频课",
+      "把知识与素材做成视频课",
     );
     expect(container.textContent).toContain("课程视频");
     expect(caseButtons()).toHaveLength(4);
-    expect(caseButtons()[0]?.getAttribute("aria-label")).toBe("讲清一个知识点");
+    expect(caseButtons()[0]?.getAttribute("aria-label")).toBe(
+      "调研主题做知识科普",
+    );
     expect(container.querySelector("svg.lucide-clapperboard")).not.toBeNull();
     expect(container.querySelector("svg.lucide-bot")).toBeNull();
 
@@ -161,7 +163,9 @@ describe("AgentNewChatGuide", () => {
     expect(input?.compareDocumentPosition(tips!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(tips?.textContent).toContain("告诉我主题、目标学员和期望时长。");
+    expect(tips?.textContent).toContain(
+      "告诉我主题、目标学员和期望时长，或提供真实截图、数据与完整讲稿。",
+    );
   });
 
   it("disables cases until handoff is ready and when the page is disabled", async () => {

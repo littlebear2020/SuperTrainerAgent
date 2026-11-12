@@ -465,41 +465,43 @@ export const enUS: Translations = {
     newChatGuides: {
       "course-video": {
         displayName: "Course video",
-        title: "Turn knowledge into a video lesson",
+        title: "Turn knowledge and real assets into video lessons",
         description:
-          "Start with a topic or an existing script and create a lesson built for learning.",
+          "Start with researched topics, real assets, or a complete script and deliver one explainer MP4.",
         cases: [
           {
             id: "knowledge-explainer",
-            title: "Explain one concept",
-            description: "Teach with concrete examples and motion visuals",
+            title: "Research a topic into an explainer",
+            description: "From topic research to script, storyboard, and MP4",
             prompt:
-              "Create a [duration] explainer video about [topic] for [audience]. Confirm the script and storyboard with me first, focusing on the core concept and one concrete example.",
+              "Research [topic] and create a [duration] explainer video for [audience]. Show me the research sources, script, and storyboard for confirmation, then use TTS narration and custom Remotion motion graphics to deliver one MP4.",
           },
           {
             id: "product-tutorial",
-            title: "Create a product tutorial",
-            description: "Turn feature steps into a clear learning path",
+            title: "Turn my screenshots into a product walkthrough",
+            description: "Use real screenshots in image-and-text layouts",
             prompt:
-              "Create a product tutorial for [product/feature] aimed at first-time users. Organize it as problem → action → result, and confirm the script and storyboard with me first.",
+              "I will provide real screenshots of [product/feature]. Use only these assets to create a [duration] product walkthrough with image-and-text layouts. Confirm the script and storyboard first, then use TTS and custom Remotion to deliver one MP4. Ask me for missing screenshots instead of inventing UI.",
           },
           {
             id: "concept-animation",
-            title: "Animate a concept",
-            description: "Break down an abstract process step by step",
+            title: "Turn my data into animated charts",
+            description:
+              "Create charts and motion video strictly from user data",
             prompt:
-              "Explain [concept/process] with motion visuals in a [duration] lesson for [audience]. Use clear steps and visual metaphors, and confirm the script and storyboard first.",
+              "I will provide [a data file/table data]. Use only this data to select suitable charts and design animated charts and a narration storyboard for my confirmation, then use TTS and custom Remotion to deliver one MP4. Ask me for missing data instead of inventing values.",
           },
           {
             id: "script-to-video",
-            title: "Turn a script into video",
-            description: "Preserve meaning while shaping pacing and scenes",
+            title: "Turn my full script into video faithfully",
+            description:
+              "Preserve every word and only design scenes and visuals",
             prompt:
-              "I have an existing script to turn into a course video. Preserve its meaning and knowledge points, review the pacing, and draft the storyboard first:\n[Paste script]",
+              "I will provide a complete narration script. Preserve it word for word, do not rewrite or expand it, and derive the storyboard directly from it. Use TTS and custom Remotion motion graphics to deliver one MP4:\n[Paste complete script]",
           },
         ],
         tips: [
-          "Share the topic, target learners, and desired duration.",
+          "Share the topic, learners, and duration, or provide real screenshots, data, and a complete script.",
           "Paste an existing script directly if you have one.",
           "Confirm the script and storyboard before video generation.",
         ],
@@ -512,31 +514,33 @@ export const enUS: Translations = {
         cases: [
           {
             id: "from-scratch",
-            title: "Quickly create a course deck",
-            description: "Go straight from a topic to editable slides",
+            title: "Quickly generate a deck from a topic",
+            description: "Quick delivery of an editable PPTX without Stage 1/2",
             prompt:
-              "Quickly create a course deck about [topic]: skip strategy confirmation and go straight to the draft, while keeping every slide hand-crafted and editable.",
+              "Quickly generate an editable deck about [topic] for [audience], with [slide count] slides. Use the Quick workflow, skip Stage 1/2 strategy and solution confirmations, author the deck directly, run quality checks, and deliver a PPTX.",
           },
           {
             id: "roundtrip",
-            title: "Edit an existing PPT",
-            description: "Keep the original design and change only the content",
+            title: "Edit selected content in an existing PPT",
+            description: "Edit Native preserves the design and unedited slides",
             prompt:
-              "I want to edit an existing PPT: keep its original design unchanged and only replace or revise the content. I will upload the PPT file first.",
+              "I will upload an existing PPTX. Use Edit Native, preserve the original design, and change only the slides or content I specify: [requested edits]. Do not rebuild unedited slides. Deliver an editable PPTX.",
           },
           {
             id: "beautify",
-            title: "Beautify an existing deck",
-            description: "Improve layout and visuals without rewriting text",
+            title: "Beautify an existing PPT 1:1",
+            description:
+              "Keep text, count, and order unchanged; improve within pages",
             prompt:
-              "I will upload an existing PPT. Keep all text unchanged and improve only the layout, spacing, colors, and visual hierarchy. Deliver an editable PPTX.",
+              "I will upload an existing PPTX. Use Beautify and keep all text, slide count, and slide order 1:1 unchanged. Improve only layout, spacing, colors, and visual hierarchy within each page. Improve crowded slides only within the original slide, and rebuild charts and tables from extracted data. Deliver an editable PPTX.",
           },
           {
-            id: "brand-template",
-            title: "Reuse a brand template",
-            description: "Give a new deck a consistent visual identity",
+            id: "document-to-course",
+            title: "Turn documents into a course deck",
+            description:
+              "Refine PDF, DOCX, or Markdown into a new deck via Default",
             prompt:
-              "Extract visual guidelines from the brand materials or existing PPT I provide, then create an editable deck about [topic] with consistent typography, colors, and layouts.",
+              "I will provide PDF, DOCX, or Markdown source material. Use the Default workflow and stay faithful to the source material while refining its structure and content. Confirm the course structure and design approach with me, then generate a new editable PPTX.",
           },
         ],
         tips: [
@@ -553,31 +557,33 @@ export const enUS: Translations = {
         cases: [
           {
             id: "knowledge-card",
-            title: "Create a knowledge card",
-            description: "Distill complex ideas into one readable card",
+            title: "Create glassmorphism knowledge cards",
+            description:
+              "Three themes, with SVG static cards and MP4 animation",
             prompt:
-              "Create a knowledge card about [topic] for [audience], highlighting three key takeaways. Use a clear, modern course-visual style and suggest an appropriate size.",
+              "Distill [topic] into three key takeaways and create a glassmorphism knowledge card. Choose one of three themes: tech blue, neon purple, or emerald green. Deliver an SVG static image and an MP4 animation.",
           },
           {
             id: "course-poster",
-            title: "Design a course poster",
-            description: "Highlight the topic and learning benefits",
+            title: "Design a tech-style course poster",
+            description: "A 1080×1920 portrait poster delivered as PNG",
             prompt:
-              "Design a poster for the course [course name] aimed at [audience]. Highlight the topic, three learning benefits, and [brand style]. Make it suitable for course promotion.",
+              "Design a tech-style portrait poster for [course title], with [sharing date] and [course duration]. Use the default 1080×1920 canvas and deliver a PNG. Optionally include the instructor name and 2-4 content highlights.",
           },
           {
             id: "infographic",
-            title: "Create an infographic",
-            description: "Explain steps and relationships visually",
+            title: "Create one Chinese infographic",
+            description: "21 layouts × 22 styles, delivered as one PNG",
             prompt:
-              "Turn [content/process] into an infographic that helps [audience] understand the steps and relationships. Use a clear hierarchy, icons, concise text, and a size of [size].",
+              "Turn [content/process] into one Chinese infographic for [audience]. Recommend a suitable combination from 21 layouts and 22 styles, then deliver a single infographic.png after my confirmation.",
           },
           {
             id: "series-card",
-            title: "Build a card series",
-            description: "Present related ideas with one visual system",
+            title: "Turn knowledge into a continuous comic",
+            description:
+              "Four pages by default, adjustable, with consistent characters",
             prompt:
-              "Design a series of four visual cards about [topic] for [audience], with consistent colors, typography, and layout. Explain one key idea per card at [size].",
+              "Create a continuous knowledge comic about [topic], using four pages by default and letting me adjust the page count. Confirm the art style, character sheet, and storyboard first. Keep recurring characters and the art style consistent, then generate the page images and merge them into a PDF.",
           },
         ],
         tips: [
