@@ -13,6 +13,8 @@ conftest hermetic_tts 约定）。
 import importlib.util
 import inspect
 import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -253,6 +255,30 @@ def test_explicit_speaker_probe_uses_registered_speaker_with_default_missing(tmp
     assert probe.main() == 0
     assert calls == [("文字动效验收。", "zh_male_m191_uranus_bigtts")]
     assert (tmp_path / "explicit-speaker.mp3").read_bytes() == b"fake-mp3"
+
+
+def test_explicit_speaker_probe_retryable_error_has_only_one_transport_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    probe = _load_live_probe("avf_probe_single_attempt")
+    template = _load(AVF_TEMPLATE, "avf_probe_single_attempt_template")
+    helper = template._load_doubao_module()
+    monkeypatch.setattr(template, "_load_doubao_module", lambda: helper)
+    monkeypatch.setattr(probe, "_load_doubao_module", lambda: helper, raising=False)
+    _set_doubao_env(monkeypatch)
+    assert helper._MAX_ATTEMPTS == 2
+    calls = []
+
+    def retryable_failure(request, timeout):
+        calls.append((request.full_url, timeout))
+        raise urllib.error.URLError("offline retryable failure")
+
+    monkeypatch.setattr(urllib.request, "urlopen", retryable_failure)
+    monkeypatch.setattr(helper.time, "sleep", lambda _delay: None)
+
+    with pytest.raises(RuntimeError):
+        probe.generate_tts("离线重试验证", str(tmp_path / "single.mp3"), speaker=probe.SPEAKER)
+
+    assert len(calls) == 1
+    assert helper._MAX_ATTEMPTS == 1
 
 
 def test_explicit_speaker_probe_refuses_ambient_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
