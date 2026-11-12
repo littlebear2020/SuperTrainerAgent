@@ -216,6 +216,27 @@ describe("stripInternalMarkers — DEF-03 underscore variants", () => {
     const once = stripInternalMarkers("[[STAGE:OUTLINE]]\n\n# 大纲");
     expect(stripInternalMarkers(once)).toBe(once);
   });
+
+  it("preserves isolated bracket text in final mode", () => {
+    expect(stripInternalMarkers("[[", "final")).toBe("[[");
+    expect(stripInternalMarkers("[[1, 2]", "final")).toBe("[[1, 2]");
+  });
+
+  it.each([
+    ["[[STAGE:OUT\n\n正文", "正文"],
+    ["[[STAGE:DR\n最终稿", "最终稿"],
+    ["[[STAGE:OUTLINE", ""],
+  ])(
+    "cleans only the incomplete stage marker in final mode: %s",
+    (content, expected) => {
+      expect(stripInternalMarkers(content, "final")).toBe(expected);
+    },
+  );
+
+  it("keeps streaming partial-marker withholding as the default", () => {
+    expect(stripInternalMarkers("[[")).toBe("");
+    expect(stripInternalMarkers("[[STAGE:OUT")).toBe("");
+  });
 });
 
 describe("stripInjectedReminderTags — human render path", () => {

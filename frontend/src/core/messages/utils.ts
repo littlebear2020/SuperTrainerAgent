@@ -584,15 +584,34 @@ const STAGE_SIGNAL_PREFIXES = ["[[STAGE:OUTLINE]]", "[[STAGE:DRAFT]]"];
  * {@link stripUploadedFilesTag} + {@link stripInjectedReminderTags} so a
  * user legitimately typing ``<memory>`` into a meta-discussion is not
  * eaten. Co-writer stage signals are likewise internal metadata, not user copy.
+ * The default streaming mode withholds an isolated partial stage signal;
+ * final mode instead preserves isolated bracket text and removes only a
+ * recognizable incomplete stage signal before any following body.
  * Render-path callers must memoize the result (message content unchanged →
  * same stripped string), per the DEF-06 hot-path rule.
  */
-export function stripInternalMarkers(content: string): string {
+export function stripInternalMarkers(
+  content: string,
+  mode: "streaming" | "final" = "streaming",
+): string {
   const stripped = content.replace(INTERNAL_MARKER_RE, "").trim();
-  if (STAGE_SIGNAL_PREFIXES.some((prefix) => prefix.startsWith(stripped))) {
+  const parsed = parseStageSignal(stripped);
+  if (parsed.stage !== null) {
+    return parsed.text.trim();
+  }
+  if (
+    mode === "streaming" &&
+    STAGE_SIGNAL_PREFIXES.some((prefix) => prefix.startsWith(stripped))
+  ) {
     return "";
   }
-  return parseStageSignal(stripped).text.trim();
+  if (mode === "final" && stripped.startsWith("[[STAGE:")) {
+    const firstLine = stripped.split(/\r?\n/, 1)[0] ?? "";
+    if (STAGE_SIGNAL_PREFIXES.some((prefix) => prefix.startsWith(firstLine))) {
+      return stripped.slice(firstLine.length).trim();
+    }
+  }
+  return stripped;
 }
 
 /**
