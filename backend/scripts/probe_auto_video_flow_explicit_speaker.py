@@ -10,7 +10,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skills" / "public" / "auto-video-flow" / "scripts"))
 
-from generate_audio_template import SPEAKER, generate_tts
+from generate_audio_template import SPEAKER, _load_doubao_module, _require_doubao
+
+
+def generate_tts(text: str, output_path: str, speaker: str = SPEAKER) -> None:
+    _require_doubao(speaker)
+    helper = _load_doubao_module()
+    helper._MAX_ATTEMPTS = 1
+    Path(output_path).write_bytes(helper.synthesize(text, speaker=speaker))
 
 
 def _audio_duration(path: Path) -> float:
