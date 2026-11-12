@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   reduced: false,
   onSelect: vi.fn(),
   play: vi.fn(),
+  pause: vi.fn(),
 }));
 
 vi.mock("@/core/i18n/hooks", async () => {
@@ -22,6 +23,10 @@ import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
 const originalPlayDescriptor = Object.getOwnPropertyDescriptor(
   HTMLMediaElement.prototype,
   "play",
+);
+const originalPauseDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "pause",
 );
 
 describe("HomeCourseEntry six-card media behavior", () => {
@@ -53,6 +58,11 @@ describe("HomeCourseEntry six-card media behavior", () => {
       writable: true,
       value: h.play,
     });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      writable: true,
+      value: h.pause,
+    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -66,6 +76,13 @@ describe("HomeCourseEntry six-card media behavior", () => {
         HTMLMediaElement.prototype,
         "play",
         originalPlayDescriptor,
+      );
+    }
+    if (originalPauseDescriptor) {
+      Object.defineProperty(
+        HTMLMediaElement.prototype,
+        "pause",
+        originalPauseDescriptor,
       );
     }
     container.remove();
@@ -169,6 +186,68 @@ describe("HomeCourseEntry six-card media behavior", () => {
     expect(h.play).toHaveBeenCalled();
     expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
     expect(videos()).toHaveLength(1);
+  });
+
+  it("deduplicates play across StrictMode and repeated renders", async () => {
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <HomeCourseEntry onSelect={h.onSelect} />
+        </StrictMode>,
+      );
+    });
+    const button = entry("course-video");
+    await act(async () => button.focus());
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <HomeCourseEntry onSelect={h.onSelect} />
+        </StrictMode>,
+      );
+    });
+
+    expect(h.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries and clears the failure after a new hover cycle", async () => {
+    h.play
+      .mockRejectedValueOnce(
+        new DOMException("First failure", "NotAllowedError"),
+      )
+      .mockResolvedValue(undefined);
+    await renderEntry();
+    const button = entry("course-video");
+    await act(async () => button.focus());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+
+    await act(async () => button.blur());
+    await act(async () => button.focus());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(h.play).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
+    expect(videos()).toHaveLength(1);
+  });
+
+  it("keeps video preview available when only the poster fails", async () => {
+    await renderEntry();
+    const button = entry("course-video");
+    await act(async () => {
+      button
+        .querySelector("img")!
+        .dispatchEvent(new Event("error", { bubbles: true }));
+    });
+    expect(button.querySelector("img")).toBeNull();
+
+    await act(async () => button.focus());
+    expect(videos()).toHaveLength(1);
+    expect(h.play).toHaveBeenCalled();
+    expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
   });
 
   it("keeps creation available after video failure and falls back to a neutral image block", async () => {

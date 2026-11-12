@@ -91,6 +91,24 @@ describe("WorkspaceNavMenu real user footer", () => {
     });
   });
 
+  it("shows a non-empty fallback and avatar initial for a null user", async () => {
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="en-US">
+          <AuthProvider initialUser={null}>
+            <SidebarProvider>
+              <WorkspaceNavMenu />
+            </SidebarProvider>
+          </AuthProvider>
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("guest");
+    expect(container.querySelector("[title='guest']")).not.toBeNull();
+    expect(container.textContent).toContain("?");
+  });
+
   it("shows the administrator role without changing the identity", async () => {
     await renderFooter("admin");
 

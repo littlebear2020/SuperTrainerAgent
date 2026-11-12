@@ -25,8 +25,11 @@ function NavUserContent({
   isSidebarOpen: boolean;
   t: ReturnType<typeof useI18n>["t"];
 }) {
-  const displayName = email.split("@").at(0) ?? t.sidebar.roleUser;
-  const initial = displayName.charAt(0).toUpperCase();
+  const normalizedEmail = email.trim();
+  const displayName =
+    normalizedEmail.split("@").find((part) => part.length > 0) ?? "guest";
+  const initial =
+    displayName === "guest" ? "?" : displayName.charAt(0).toUpperCase();
   const avatar = (
     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#ec4899] text-[11px] font-bold text-white">
       {initial}
@@ -41,7 +44,7 @@ function NavUserContent({
 
   return (
     <div
-      title={email}
+      title={displayName === "guest" ? "guest" : email}
       className="flex min-w-0 flex-1 items-center gap-2.5 text-left text-sm"
     >
       {avatar}

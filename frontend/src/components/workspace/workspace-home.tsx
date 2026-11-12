@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
 
 import type { HomeCourseItem } from "./home-course-catalog";
 import { HomeCourseEntry } from "./home-course-entry";
+import { useMediaQuery } from "./use-media-query";
 import {
   CreateTaskDialog,
   type InitialVideoTaskType,
@@ -103,24 +104,9 @@ export default function WorkspaceHome() {
   const { t } = useI18n();
   const [createTaskType, setCreateTaskType] =
     useState<InitialVideoTaskType | null>(null);
-  const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(
-    () =>
-      !window.matchMedia("(pointer: coarse)").matches &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-
-  useEffect(() => {
-    const coarse = window.matchMedia("(pointer: coarse)");
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () =>
-      setAmbientMotionEnabled(!coarse.matches && !reduced.matches);
-    coarse.addEventListener("change", update);
-    reduced.addEventListener("change", update);
-    return () => {
-      coarse.removeEventListener("change", update);
-      reduced.removeEventListener("change", update);
-    };
-  }, []);
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const ambientMotionEnabled = !coarsePointer && !reducedMotion;
 
   const handleSelect = (item: HomeCourseItem) => {
     if (item.kind === "agent") {
