@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   onSelect: vi.fn(),
   play: vi.fn(),
   pause: vi.fn(),
+  paused: false,
 }));
 
 vi.mock("@/core/i18n/hooks", async () => {
@@ -16,7 +17,10 @@ vi.mock("@/core/i18n/hooks", async () => {
 });
 
 import { HOME_COURSE_ITEMS } from "@/components/workspace/home-course-catalog";
-import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
+import {
+  CourseMedia,
+  HomeCourseEntry,
+} from "@/components/workspace/home-course-entry";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -38,7 +42,15 @@ describe("HomeCourseEntry six-card media behavior", () => {
     h.reduced = false;
     h.onSelect.mockReset();
     h.play.mockReset();
-    h.play.mockImplementation(() => Promise.resolve());
+    h.pause.mockReset();
+    h.paused = false;
+    h.play.mockImplementation(() => {
+      h.paused = false;
+      return Promise.resolve();
+    });
+    h.pause.mockImplementation(() => {
+      h.paused = true;
+    });
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: vi.fn((query: string) => ({
@@ -189,24 +201,42 @@ describe("HomeCourseEntry six-card media behavior", () => {
   });
 
   it("deduplicates play across StrictMode and repeated renders", async () => {
+    const item = HOME_COURSE_ITEMS[0]!;
+    const onError = vi.fn();
+    const onPlaying = vi.fn();
+    const onPosterError = vi.fn();
+    const media = (preview: boolean) => (
+      <CourseMedia
+        item={item}
+        preview={preview}
+        failed={false}
+        posterFailed={false}
+        onError={onError}
+        onPlaying={onPlaying}
+        onPosterError={onPosterError}
+      />
+    );
     await act(async () => {
-      root.render(
-        <StrictMode>
-          <HomeCourseEntry onSelect={h.onSelect} />
-        </StrictMode>,
-      );
-    });
-    const button = entry("course-video");
-    await act(async () => button.focus());
-    await act(async () => {
-      root.render(
-        <StrictMode>
-          <HomeCourseEntry onSelect={h.onSelect} />
-        </StrictMode>,
-      );
+      root.render(<StrictMode>{media(true)}</StrictMode>);
     });
 
-    expect(h.play).toHaveBeenCalledTimes(1);
+    expect(h.paused).toBe(false);
+    expect(h.play).toHaveBeenCalledTimes(2);
+    expect(h.pause).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      root.render(<StrictMode>{media(true)}</StrictMode>);
+    });
+    expect(h.play).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      root.render(<StrictMode>{media(false)}</StrictMode>);
+    });
+    expect(h.paused).toBe(true);
+    await act(async () => {
+      root.render(<StrictMode>{media(true)}</StrictMode>);
+    });
+    expect(h.paused).toBe(false);
+    expect(h.play).toHaveBeenCalledTimes(3);
   });
 
   it("retries and clears the failure after a new hover cycle", async () => {

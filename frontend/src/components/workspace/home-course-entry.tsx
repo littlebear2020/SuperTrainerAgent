@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { HOME_COURSE_ITEMS, type HomeCourseItem } from "./home-course-catalog";
 import { useMediaQuery } from "./use-media-query";
 
-function CourseMedia({
+export function CourseMedia({
   item,
   preview,
   failed,
@@ -60,6 +60,7 @@ function CourseMedia({
       });
     return () => {
       cancelled = true;
+      playRequestedRef.current = false;
       video.pause();
     };
   }, [showVideo, item.media.src, onError, onPlaying]);
