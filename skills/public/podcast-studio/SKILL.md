@@ -50,7 +50,7 @@ python3 /mnt/skills/public/podcast-studio/scripts/podcast_studio.py validate --s
 - `prepare-verbatim` 只用于 `read_original`，写 `chunks.jsonl` 和免确认 `script.json`。chunks 的 start/end 偏移必须逐字重建最终提取文本。
 - 其他三模式由 Agent 生成 draft JSON，`normalize-script` 校验并建立 pending script；CLI 不调用撰稿 LLM。
 - 只有用户真实确认后才执行 `confirm`。`validate` 重算来源与 integrity hash。
-- 正式音频只能经 `podcast_studio.py render`（后续音频实现）消费同一份已验证 script/sources；不得直接调用 `_doubao_tts.py` 代替正式工作流。
+- 正式音频只能经 `podcast_studio.py render --script <workdir>/script.json --sources <workdir>/sources.json --output-dir /mnt/user-data/outputs` 消费同一份已验证 script/sources；不得直接调用 `_doubao_tts.py` 代替正式工作流。
 
 ## 音频边界
 

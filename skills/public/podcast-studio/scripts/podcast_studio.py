@@ -638,6 +638,211 @@ def validate_script(script_path: str | Path, sources_path: str | Path) -> dict:
     return {"valid": True, "profile": script["profile"], "integrity_sha256": script["integrity_sha256"]}
 
 
+def split_turn(text: str, max_chars: int = MAX_SEGMENT_CHARS) -> list[str]:
+    sentences = [piece for piece in re.findall(r".*?(?:[。！？!?；;\n]+|$)", text) if piece]
+    segments = []
+    current = ""
+    for sentence in sentences:
+        if len(sentence) > max_chars:
+            raise PodcastError(f"A single sentence exceeds {max_chars} characters; split it before rendering")
+        if current and len(current) + len(sentence) > max_chars:
+            segments.append(current)
+            current = ""
+        current += sentence
+    if current:
+        segments.append(current)
+    if not segments or "".join(segments) != text:
+        raise PodcastError("Unable to split turn without changing text")
+    return segments
+
+
+def _bare_speaker(full_id: str) -> str:
+    allowed = {MALE_STOCK, FEMALE_STOCK}
+    if full_id not in allowed:
+        raise PodcastError("Unknown voice / 未验收音色")
+    return full_id.removeprefix("doubao:")
+
+
+def _safe_title(title: str) -> str:
+    safe = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", title, flags=re.UNICODE).strip("_")
+    return (safe or "podcast")[:60]
+
+
+def _synthesize(text: str, speaker: str) -> bytes:
+    path = Path(__file__).resolve().parent / "_doubao_tts.py"
+    spec = importlib.util.spec_from_file_location("podcast_doubao_tts_runtime", path)
+    if spec is None or spec.loader is None:
+        raise PodcastError("Cannot load doubao helper")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.synthesize(text, speaker=speaker, speed_ratio=1.0)
+
+
+def _probe_audio(path: str | Path) -> dict:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_name,sample_rate:format=duration", "-of", "json", str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise PodcastError(f"ffprobe failed for {path}: {result.stderr[:500]}")
+    payload = json.loads(result.stdout)
+    stream = payload["streams"][0]
+    return {
+        "codec": stream["codec_name"],
+        "sample_rate": int(stream["sample_rate"]),
+        "duration": float(payload["format"]["duration"]),
+    }
+
+
+def _make_pause(path: Path, seconds: float) -> None:
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", str(seconds), "-c:a", "libmp3lame", str(path)],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise PodcastError(f"Unable to create inter-turn pause: {result.stderr[:500]}")
+
+
+def concat_audio(segments: list[dict], output_path: str | Path, pause_seconds: float = 0.3) -> int:
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    concat_entries = []
+    pauses = 0
+    previous_turn = None
+    for segment in segments:
+        turn_id = segment["turn_id"]
+        if previous_turn is not None and turn_id != previous_turn:
+            pause_path = output.parent / f"pause_{pauses:04d}.mp3"
+            _make_pause(pause_path, pause_seconds)
+            concat_entries.append(pause_path)
+            pauses += 1
+        concat_entries.append(Path(segment["path"]))
+        previous_turn = turn_id
+    concat_file = output.parent / "concat.txt"
+    concat_file.write_text("".join(f"file '{path.resolve()}'\n" for path in concat_entries), encoding="utf-8")
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(concat_file), "-c:a", "libmp3lame", "-ar", "24000", str(output)],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise PodcastError(f"FFmpeg concat failed: {result.stderr[:1000]}")
+    return pauses
+
+
+def _segment_key(script: dict, turn: dict, speaker: str, segment_text: str) -> str:
+    payload = {
+        "integrity_sha256": script["integrity_sha256"],
+        "turn_id": turn["turn_id"],
+        "role": turn["role"],
+        "bare_speaker": speaker,
+        "model": "seed-tts-2.0",
+        "speed_ratio": 1.0,
+        "segment_text_sha256": _sha_text(segment_text),
+    }
+    return _sha_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+
+
+def render_script(
+    script_path: str | Path,
+    sources_path: str | Path,
+    output_dir: str | Path,
+    *,
+    synth=None,
+    timestamp: str | None = None,
+) -> dict:
+    script = _read_json(script_path)
+    sources = _load_sources(sources_path)
+    _validate_script(script, sources)
+    if script["profile"] != "read_original" and script["approval"]["status"] != "approved":
+        raise PodcastError("Script approval is required before rendering / 确认后才能合成")
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    segments_dir = output / "segments"
+    segments_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = output / "render_manifest.json"
+    previous_manifest = _read_json(manifest_path) if manifest_path.is_file() else None
+    if previous_manifest and previous_manifest.get("status") == "success" and previous_manifest.get("integrity_sha256") == script["integrity_sha256"]:
+        for old in previous_manifest.get("segments", []):
+            if not Path(old["path"]).is_file():
+                raise PodcastError(f"Completed render is missing segment / 已完成分片缺失: {old['path']}")
+
+    if timestamp is None:
+        from datetime import UTC, datetime
+
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    final_path = output / f"{_safe_title(script['title'])}_{timestamp}.mp3"
+    synthesize = synth or _synthesize
+    entries = []
+    try:
+        order = 0
+        for turn in script["turns"]:
+            speaker = _bare_speaker(script["voices"][turn["role"]])
+            for segment_index, segment_text in enumerate(split_turn(turn["text"]), 1):
+                key = _segment_key(script, turn, speaker, segment_text)
+                segment_path = segments_dir / f"{turn['turn_id']}_{segment_index:03d}_{key[:20]}.mp3"
+                if not segment_path.is_file():
+                    audio = synthesize(segment_text, speaker)
+                    if not audio:
+                        raise PodcastError("TTS returned empty audio / TTS 空音频")
+                    temporary = segment_path.with_suffix(".tmp")
+                    temporary.write_bytes(audio)
+                    temporary.replace(segment_path)
+                probe = _probe_audio(segment_path)
+                if probe["codec"] != "mp3" or probe["sample_rate"] != 24000 or probe["duration"] <= 0:
+                    raise PodcastError(f"Invalid segment encoding: {probe}")
+                order += 1
+                entries.append(
+                    {
+                        "order": order,
+                        "turn_id": turn["turn_id"],
+                        "role": turn["role"],
+                        "speaker": speaker,
+                        "model": "seed-tts-2.0",
+                        "speed_ratio": 1.0,
+                        "segment_text_sha256": _sha_text(segment_text),
+                        "cache_key": key,
+                        "path": str(segment_path),
+                        "sha256": _sha_bytes(segment_path.read_bytes()),
+                        "duration_seconds": probe["duration"],
+                    }
+                )
+        pauses = concat_audio(entries, final_path)
+        final_probe = _probe_audio(final_path)
+        decoded = subprocess.run(["ffmpeg", "-v", "error", "-i", str(final_path), "-f", "null", "-"], check=False, capture_output=True)
+        if decoded.returncode != 0:
+            raise PodcastError(f"Final MP3 full decode failed: {decoded.stderr[:1000]}")
+        segment_sum = sum(entry["duration_seconds"] for entry in entries)
+        expected = segment_sum + pauses * 0.3
+        delta = abs(final_probe["duration"] - expected)
+        if delta >= 0.1:
+            raise PodcastError(f"Final duration accounting drift: {delta:.3f}s")
+        manifest = {
+            "schema_version": "podcast-studio.render.v1",
+            "status": "success",
+            "profile": script["profile"],
+            "integrity_sha256": script["integrity_sha256"],
+            "output_path": str(final_path),
+            "codec": final_probe["codec"],
+            "sample_rate": final_probe["sample_rate"],
+            "final_duration_seconds": final_probe["duration"],
+            "segment_duration_sum_seconds": segment_sum,
+            "inter_turn_pauses": pauses,
+            "pause_seconds_each": 0.3,
+            "expected_duration_seconds": expected,
+            "duration_delta_seconds": delta,
+            "segments": entries,
+        }
+        _write_json(manifest_path, manifest)
+        return manifest
+    except Exception:
+        final_path.unlink(missing_ok=True)
+        raise
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -656,6 +861,11 @@ def _parser() -> argparse.ArgumentParser:
     validate = commands.add_parser("validate")
     validate.add_argument("--script", required=True)
     validate.add_argument("--sources", required=True)
+    render = commands.add_parser("render")
+    render.add_argument("--script", required=True)
+    render.add_argument("--sources", required=True)
+    render.add_argument("--output-dir", required=True)
+    render.add_argument("--timestamp")
     return parser
 
 
@@ -676,6 +886,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"approved": True, "integrity_sha256": script["integrity_sha256"]}, ensure_ascii=False))
         elif args.command == "validate":
             print(json.dumps(validate_script(args.script, args.sources), ensure_ascii=False))
+        elif args.command == "render":
+            manifest = render_script(args.script, args.sources, args.output_dir, timestamp=args.timestamp)
+            print(json.dumps({"output_path": manifest["output_path"], "render_manifest": str(Path(args.output_dir) / "render_manifest.json")}, ensure_ascii=False))
         return 0
     except (PodcastError, OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
