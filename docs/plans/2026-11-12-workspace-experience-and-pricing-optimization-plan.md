@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：任务 0–8 本地部分已执行；任务 8 隔离真实 API 1/1、backend **10036 passed / 31 skipped / 421 warnings**、frontend **262 files / 1693 tests passed**、E2E **90/90** 与五路由性能门禁均通过；执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`。PR #3 已创建并 push 到 `1f30a186`；首轮 backend `43311243812` 因 5 个 pdftotext 缺失失败，其余 6 项 pass，AI review `43311243667` pass 并提出 27 项；high `4556653345`、poster/SSR/null user、Poppler 与 StrictMode scoped Important 修复已提交。第二轮 backend `43320325154`、E2E `43320325143`、frontend `43320325089`、lint `43320325077`、quick `43320325127`、review `43320325183` 结果未知，后续 OCR 回复因 GitHub 网络待续，merge 未执行；**REMOTE_PENDING**，交协调者。
-> **TL;DR**：R1–R6/R8 与集中 Important 修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建，远端评审与合入由协调者决定。
+> **状态**：任务 0–8 全部已执行。隔离真实 API 1/1、backend **10036 passed / 31 skipped / 421 warnings**、frontend **263 files / 1698 tests passed**、E2E **90/90** 与五路由性能门禁均通过；[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`。文档收口分支 `workspace-experience-docs-close` 自身 PR 随后由协调者创建，不新增任务复选框。
+> **TL;DR**：R1–R6/R8 与集中评审修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；实现 PR #3 第三轮 7 checks 全绿、OCR high 清零并已 rebase merge；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建；文档分支自身 PR 随后创建，剩余仅其 checks/merge。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
 
@@ -9,7 +9,7 @@
 
 **Goal 完成/退出状态**：
 - `PASS`：R1–R6/R8 全部实现；本地全量门禁、隔离 API 行为验收、linux/amd64 sandbox 镜像与容器级指纹/静帧通过；一次最小显式 speaker TTS 通过；当前 PR checks/OCR 通过并按约定合入；文档与证据齐全。
-- `PARTIAL`：实现与可离线验收已完成，但凭证、供应商、GitHub/OCR/CI 等外部条件导致 live 或远端门未通过。执行者不询问用户、不伪造成功，完成其余任务后以 `PARTIAL_LIVE_NOT_VERIFIED` 或 `PARTIAL_REMOTE_PENDING` 报告具体缺口。
+- `PARTIAL`：实现与可离线验收已完成，但凭证、供应商、GitHub/OCR/CI 等外部条件导致 live 或远端门未通过。执行者不询问用户、不伪造成功，完成其余任务后报告具体 live/remote 缺口。
 - `BLOCKED_PRECONDITION`：启动时另一 session 仍在写入，或未提交文件与本批 allow 路径重叠。不得等待、stash、reset、覆盖或替陌生改动提交，未改业务文件即退出并报告。
 
 **Architecture**：保留 Next.js 工作区、通用 Agent chat、threads/video API 和课程项目 CRUD，通过 URL 驱动视图、共享能力目录与角色派生状态重构前端。文字动效继续区分 course-video 沙箱链和 `remotion_course` worker 链；只修 TTS 前置/声明与 sandbox 指纹，不合并管线、不改 worker。定价继续使用现有“真实 amount 优先、管理后台 DB 覆盖 config.yaml”的机制，本批不新增价格来源。
@@ -252,8 +252,8 @@
 - [x] 使用**隔离的本地测试 DB 与测试身份**，经真实后端 API 播种/读取：六类历史、offset 50 后记录、旧别名、本人/他人权限、非默认 palette 保存；不得触碰开发或用户 DB，不用纯 mock 冒充此层。
 - [x] 汇总 R1–R6/R8 行为证据、R2 本地镜像/live 证据及 R7/播客实时 URL 的 OUT_OF_SCOPE 说明；更新本计划勾选/状态头和执行 changelog，TL;DR 与「验收记录」写真实命令关键输出和本地证据路径。
 - [x] 最终文档修改后，从根目录运行 `make check && python3 scripts/check_docs_convention.py && git diff --check`；性能预算变化必须归因评审，不得无声抬线。
-- [ ] 按预授权 push 当前功能分支，并用 `GH_REPO=littlebear2020/SuperTrainerAgent gh pr create --base main` **新建 PR**（标题为本批摘要，正文链接本计划与执行 changelog；PR #2 已合并，不得更新或复用）。等待新 PR 当前 HEAD 的 checks/OCR；Critical/Important/high 清零或以代码/复现证据正式驳回。CI/OCR 不可用记 `REMOTE_PENDING`，不直推 main。
-- [ ] checks 全绿且评审处置完成后按仓库约定 rebase merge；若仅远端未决，保留本地 commits 并报告 `PARTIAL_REMOTE_PENDING`，不重复推送、不伪造合并。
+- [x] 已按预授权 push 功能分支并用 `GH_REPO=littlebear2020/SuperTrainerAgent gh pr create --base main` 新建 [PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3)（未复用 PR #2）。最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS，OCR high 清零；一个 MQL 性能 medium 和 low 建议记录为 non-blocking 后续优化，16+2 条线程回复及 summary disposition 已发。
+- [x] 第三轮 mergeState=`CLEAN`，PR #3 已于 **2026-11-12T23:09:49Z** 按仓库约定 rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。文档收口分支 `workspace-experience-docs-close` 自身 PR 随后由协调者创建，不为其增加任务复选框。
 - [x] 清理本批不需要的测试输出与登记容器，恢复 AUTOBIND/本地服务到约定状态；最终报告逐项 PASS/FAIL/SKIPPED/BLOCKED、commit/PR/check/OCR ID、付费调用是否发生及原因、次日人工清单。
 
 ## 五、最终验收追踪表
@@ -278,7 +278,7 @@
 5. R7 价格完全由用户后续配置；三条 Claude TBD 保持，doubao_tts 0.12/0.3 由用户后续决定，不是夜间阻塞。
 6. 不实施定价后端、计价用量、空库播种、迁移、默认价或素材行改造；findings backlog 的独立缺口留后续。
 7. 不顺手处理 vimax-video 空技能建议、旧模型探针名册和 useDeleteThread 双 DELETE，不代勾播客前序计划。
-8. 任务 0–8 本地部分已按勾选完成实现、隔离真实 API、全量测试与文档验收；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。PR #3 已创建并 push 到 `1f30a186`，首轮结果与修复已记录；第二轮 checks/OCR 结果未知，watch 因本地 TLS handshake timeout 中断，6 条 OCR 回复已 post、其余因 GitHub 网络待续，merge 未执行。远端保持 **REMOTE_PENDING**，由协调者接续。
+8. 任务 0–8 全部已按勾选完成实现、隔离真实 API、全量测试、文档验收与远端合入；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，16+2 条线程回复及 summary disposition 已发，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`；MQL 性能 medium 与 low 建议保留为 non-blocking 后续优化。文档收口分支自身 PR 随后由协调者创建，剩余仅其 checks/merge。
 
 ## 七、次日人工验收与后续公司部署（不在夜间 goal 范围）
 
