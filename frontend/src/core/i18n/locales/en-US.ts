@@ -682,62 +682,47 @@ export const enUS: Translations = {
   workspace: {
     // Home hero and all visible creation-entry copy stay locale-aware.
     home: {
-      heroTitle: "What would you like to create?",
-      createHeading: "Choose a creation flow to start your next work",
-      videoCourse: "Video course",
-      videoCourseDescription: "Turn course scripts into engaging video content",
-      textCourse: "Visual & audio course",
-      textCourseDescription: "Explain ideas with posters, slides, and podcasts",
-      playbackUnavailable: "Video is temporarily unavailable",
+      heroTitle: "Great content starts with one idea.",
+      createHeading:
+        "Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.",
+      playbackUnavailable: "Preview unavailable. You can still start creating.",
       courseItems: {
         "course-video": {
           title: "Text animation",
-          description: "Turn course content into structured, animated videos",
-          badge: "AI Video",
+          description:
+            "Turn scripts and key ideas into clear, easy-to-follow animated explainer videos",
           mediaAlt: "Text animation course sample",
         },
         ai_image: {
           title: "Image motion",
           description:
-            "Generate visuals from scripts and bring still images to life",
-          badge: "AI Video",
+            "Generate scenes from your script and bring static content to life",
           mediaAlt: "Image motion sample",
         },
         ai_video: {
           title: "AI video",
-          description: "Generate dynamic shots to express richer scenes",
-          badge: "AI Video",
+          description: "Turn one idea into freer, richer dynamic shots",
           mediaAlt: "AI video sample",
         },
         "creative-studio": {
           title: "Poster design",
-          description: "Turn knowledge and key ideas into clear visual cards",
-          badge: "Visual design",
+          description:
+            "Turn a topic and key points into clear, striking visual posters",
           mediaAlt: "Knowledge card poster sample",
         },
         "ppt-master": {
           title: "PPT creation",
-          description: "Create editable presentations from structured content",
-          badge: "Presentation",
-          mediaAlt: "Decorative presentation preview",
-        },
-        "co-writer": {
-          title: "Article writing",
           description:
-            "Collaborate on topics, structure, drafts, and revisions",
-          badge: "Co-writing",
-          mediaAlt: "Decorative article preview",
+            "Turn a topic or source material into structured, editable presentations",
+          mediaAlt: "Presentation preview",
         },
         "podcast-studio": {
           title: "Podcast production",
           description:
-            "Generate real MP3 audio from documents, public links, or topic research",
-          badge: "Audio podcast",
-          mediaAlt: "Headphones and two-person audio waveform cover",
+            "Turn documents, public links, or topic research into a downloadable MP3 podcast",
+          mediaAlt: "Headphones and audio waveform cover",
         },
       },
-      recentProjects: "Recent Projects",
-      viewAll: "View all →",
     },
   },
 

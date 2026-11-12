@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { pinEnglishLocale } from "./utils/locale";
 import { mockLangGraphAPI } from "./utils/mock-api";
 import { mockVideoAPI } from "./utils/mock-video-api";
 
@@ -20,26 +21,20 @@ test.describe("home course entries", () => {
   test("six confirmed entries open the right agent or AI dialog", async ({
     page,
   }) => {
+    await page.goto("/workspace");
+    await expect(page.locator("[data-course-entry]")).toHaveCount(6);
+    await expect(page.getByText("近期项目")).toHaveCount(0);
     for (const [id, agent] of [
       ["course-video", "course-video"],
       ["creative-studio", "creative-studio"],
       ["ppt-master", "ppt-master"],
       ["podcast-studio", "podcast-studio"],
     ] as const) {
-      await page.goto("/workspace");
-      if (["creative-studio", "ppt-master", "podcast-studio"].includes(id)) {
-        await page.getByRole("button", { name: /图文音频课/ }).click();
-      }
       await page.locator(`[data-course-entry='${id}']`).click();
       await expect(page).toHaveURL(`/workspace/agents/${agent}/chats/new`);
-      if (id === "course-video") {
-        await expect(
-          page.getByText("课程视频", { exact: true }).first(),
-        ).toBeVisible();
-      }
+      await page.goto("/workspace");
     }
 
-    await page.goto("/workspace");
     await page.locator("[data-course-entry='ai_image']").click();
     let dialog = page.getByRole("dialog");
     await expect(
@@ -55,83 +50,89 @@ test.describe("home course entries", () => {
     ).toBeVisible();
   });
 
-  test("three video cards use unified badges and keep existing media URLs", async ({
+  test("initial media uses posters and every static image is contained", async ({
     page,
   }) => {
     await page.goto("/workspace");
-    for (const [id, title, src] of [
-      ["course-video", "文字动效", "/course-samples/remotion.mp4"],
-      ["ai_image", "图片动效", "/course-samples/image-motion.mp4"],
-      ["ai_video", "AI视频", "/course-samples/ai-video.mp4"],
+    await expect(page.locator("video")).toHaveCount(0);
+    for (const [id, poster] of [
+      ["course-video", "/course-samples/text-motion-poster.webp"],
+      ["ai_image", "/course-samples/image-motion-poster.webp"],
+      ["ai_video", "/course-samples/ai-video-poster.webp"],
     ] as const) {
-      const card = page.locator(`[data-course-entry='${id}']`);
-      await expect(card).toContainText("AI视频");
-      await expect(card).toContainText(title);
-      await expect(card.locator("video")).toHaveAttribute("src", src);
+      const image = page.locator(`[data-course-entry='${id}'] img`);
+      await expect(image).toHaveAttribute("src", poster);
+    }
+    for (const [id, src] of [
+      ["creative-studio", "/course-samples/knowledge-card.webp"],
+      ["ppt-master", "/course-samples/ppt-work.webp"],
+      ["podcast-studio", "/course-samples/podcast-work.webp"],
+    ] as const) {
+      const image = page.locator(`[data-course-entry='${id}'] img`);
+      await expect(image).toHaveAttribute("src", src);
+      expect(
+        await image.evaluate((element) => getComputedStyle(element).objectFit),
+      ).toBe("contain");
     }
   });
 
-  test("podcast card replaces only the final writing card", async ({
+  test("desktop grid has three columns and equal-height rows", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/workspace");
-    await page.getByRole("button", { name: /图文音频课/ }).click();
-    const card = page.locator("[data-course-entry='podcast-studio']");
-    await expect(card).toContainText("语音播客");
-    await expect(card).toContainText("播客制作");
-    await expect(card.locator("img")).toHaveAttribute(
-      "src",
-      "/course-samples/podcast-work.webp",
+    const cards = page.locator("[data-course-entry]");
+    await expect(cards).toHaveCount(6);
+    const heights = await cards.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().height),
     );
-    await expect(page.locator("[data-course-entry='co-writer']")).toHaveCount(
-      0,
-    );
+    expect(
+      Math.max(...heights.slice(0, 3)) - Math.min(...heights.slice(0, 3)),
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.max(...heights.slice(3)) - Math.min(...heights.slice(3)),
+    ).toBeLessThanOrEqual(2);
+    const columns = await cards
+      .first()
+      .evaluate(
+        (element) =>
+          getComputedStyle(element.parentElement!).gridTemplateColumns,
+      );
+    expect(columns.split(" ")).toHaveLength(3);
   });
 
-  test("replacement samples decode and really play with advancing time", async ({
+  test("hover and focus mount only one preview and leaving unmounts it", async ({
     page,
   }) => {
     await page.goto("/workspace");
-    for (const id of ["course-video", "ai_image"] as const) {
-      const video = page.locator(`[data-course-entry='${id}'] video`);
-      await expect
-        .poll(() =>
-          video.evaluate((element) => (element as HTMLVideoElement).readyState),
-        )
-        .toBeGreaterThanOrEqual(1);
-      await expect
-        .poll(() =>
-          video.evaluate((element) => (element as HTMLVideoElement).videoWidth),
-        )
-        .toBe(960);
-      await expect
-        .poll(() =>
-          video.evaluate((element) => (element as HTMLVideoElement).duration),
-        )
-        .toBeGreaterThanOrEqual(8);
-      await expect
-        .poll(() =>
-          video.evaluate((element) => (element as HTMLVideoElement).duration),
-        )
-        .toBeLessThanOrEqual(12);
-      await video.evaluate(async (element) => {
-        const media = element as HTMLVideoElement;
-        media.pause();
-        media.currentTime = 0;
-        const playing = new Promise<void>((resolve) => {
-          media.addEventListener("playing", () => resolve(), { once: true });
-        });
-        await media.play();
-        await playing;
-      });
-      await expect
-        .poll(() =>
-          video.evaluate(
-            (element) => (element as HTMLVideoElement).currentTime,
-          ),
-        )
-        .toBeGreaterThan(0.05);
-    }
+    const card = page.locator("[data-course-entry='course-video']");
+    await expect(page.locator("video")).toHaveCount(0);
+    await card.hover();
+    await expect(page.locator("video")).toHaveCount(0);
+    await expect
+      .poll(() => page.locator("video").count(), { timeout: 2_000 })
+      .toBe(1);
+    await expect
+      .poll(() =>
+        page
+          .locator("video")
+          .evaluate((element) => (element as HTMLVideoElement).currentTime),
+      )
+      .toBeGreaterThan(0.05);
+    await page.locator("body").click({ position: { x: 0, y: 0 } });
+    await expect(page.locator("video")).toHaveCount(0);
+
+    await card.focus();
+    await expect(page.locator("video")).toHaveCount(1);
+    await page.locator("body").click({ position: { x: 0, y: 0 } });
+    await expect(page.locator("video")).toHaveCount(0);
+  });
+
+  test("reduced motion keeps poster and disables preview", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/workspace");
+    await page.locator("[data-course-entry='ai_image']").focus();
+    await expect(page.locator("video")).toHaveCount(0);
   });
 
   test("alternating AI entries starts clean after close", async ({ page }) => {
@@ -177,121 +178,44 @@ test.describe("home course entries", () => {
       "",
     );
     await expect(
-      dialog.getByPlaceholder(/每一句对应一个画面或镜头/),
-    ).toHaveValue("");
-    await expect(
       dialog.getByRole("checkbox", { name: "跟随默认" }),
     ).toHaveCount(0);
   });
 
-  test("only expanded panel plays and reduced motion stops playback", async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      const target = window as unknown as {
-        __mediaCalls: { kind: string; src: string }[];
-      };
-      target.__mediaCalls = [];
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const play = HTMLMediaElement.prototype.play;
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const pause = HTMLMediaElement.prototype.pause;
-      HTMLMediaElement.prototype.play = function () {
-        target.__mediaCalls.push({
-          kind: "play",
-          src: this.currentSrc || this.src,
-        });
-        return play.call(this);
-      };
-      HTMLMediaElement.prototype.pause = function () {
-        target.__mediaCalls.push({
-          kind: "pause",
-          src: this.currentSrc || this.src,
-        });
-        return pause.call(this);
-      };
-    });
-    await page.goto("/workspace");
-    const calls = () =>
-      page.evaluate(() =>
-        (
-          window as unknown as { __mediaCalls: { kind: string }[] }
-        ).__mediaCalls.map((call) => call.kind),
-      );
-    await expect
-      .poll(
-        async () => (await calls()).filter((kind) => kind === "play").length,
-      )
-      .toBe(3);
-    await page.getByRole("button", { name: /图文音频课/ }).click();
-    await expect
-      .poll(
-        async () => (await calls()).filter((kind) => kind === "pause").length,
-      )
-      .toBeGreaterThanOrEqual(3);
-    expect(await page.locator("video").count()).toBe(0);
-    await page.getByRole("button", { name: /视频课/ }).click();
-    await expect
-      .poll(
-        async () => (await calls()).filter((kind) => kind === "play").length,
-      )
-      .toBe(6);
-
-    const playCount = (await calls()).filter((kind) => kind === "play").length;
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect
-      .poll(
-        async () => (await calls()).filter((kind) => kind === "pause").length,
-      )
-      .toBeGreaterThanOrEqual(6);
-    expect((await calls()).filter((kind) => kind === "play")).toHaveLength(
-      playCount,
-    );
-    expect(
-      await page
-        .locator("video")
-        .evaluateAll((videos) =>
-          videos.every((video) => (video as HTMLVideoElement).paused),
-        ),
-    ).toBe(true);
-  });
-
-  test("sample playback failure keeps the creation action usable", async ({
+  test("media failures preserve creation and neutral fallbacks", async ({
     page,
   }) => {
     await page.route("**/course-samples/remotion.mp4", (route) =>
       route.abort(),
     );
+    await page.route("**/course-samples/knowledge-card.webp", (route) =>
+      route.abort(),
+    );
     await page.goto("/workspace");
-    await expect(page.getByText("视频暂时无法播放")).toBeVisible();
-    await page.locator("[data-course-entry='course-video']").click();
-    await expect(page).toHaveURL("/workspace/agents/course-video/chats/new");
+    await page.locator("[data-course-entry='course-video']").focus();
+    await expect(page.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
+    await expect(
+      page.locator("[data-course-entry='creative-studio'] img"),
+    ).toHaveCount(0);
+    await page.locator("[data-course-entry='creative-studio']").click();
+    await expect(page).toHaveURL("/workspace/agents/creative-studio/chats/new");
   });
 
-  test("mobile home has no horizontal overflow and keeps both entries operable", async ({
+  test("390px and 320px mobile have no horizontal overflow", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/workspace");
-    await expect(page.locator("[data-course-entry]")).toHaveCount(3);
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
-    ).toBe(true);
-    await page.getByRole("button", { name: /图文音频课/ }).click();
-    for (const id of ["creative-studio", "ppt-master", "podcast-studio"]) {
-      await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto("/workspace");
+      await expect(page.locator("[data-course-entry]")).toHaveCount(6);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+      ).toBe(true);
     }
-    await page.getByRole("button", { name: /视频课/ }).click();
     await page.locator("[data-course-entry='ai_image']").click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-      ),
-    ).toBe(true);
   });
 
   test("focused AI dialog uses an opaque surface", async ({ page }) => {
@@ -314,5 +238,36 @@ test.describe("home course entries", () => {
         dialog.evaluate((element) => getComputedStyle(element).opacity),
       )
       .toBe("1");
+  });
+
+  test("desktop and mobile Chinese screenshots and English copy", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/workspace");
+    await expect(page.locator("[data-course-entry]")).toHaveCount(6);
+    await page.waitForFunction(() =>
+      Array.from(document.images).every((image) => image.complete),
+    );
+    await page.screenshot({
+      path: "../temp/workspace-experience-2026-11-12/task5-desktop-zh.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: "../temp/workspace-experience-2026-11-12/task5-mobile-zh.png",
+      fullPage: true,
+    });
+
+    await pinEnglishLocale(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/workspace");
+    await expect(
+      page.getByText("Great content starts with one idea."),
+    ).toBeVisible();
+    await page.screenshot({
+      path: "../temp/workspace-experience-2026-11-12/task5-desktop-en.png",
+      fullPage: true,
+    });
   });
 });

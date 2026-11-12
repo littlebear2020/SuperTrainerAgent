@@ -44,16 +44,12 @@ test.describe("Landing page", () => {
       enterWorkspace.click(),
     ]);
 
-    // /workspace 直接渲染双入口首页；URL 必须精确，防止把登录跳转误判为成功。
+    // /workspace 直接渲染六能力首页；URL 必须精确，防止把登录跳转误判为成功。
     await page.waitForURL("**/workspace");
     await expect(page).toHaveURL("/workspace");
-    await expect(page.getByText("想创造什么？")).toBeVisible();
+    await expect(page.getByText("让好内容，从一个想法开始")).toBeVisible();
 
-    for (const id of HOME_VIDEO_ENTRIES) {
-      await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
-    }
-    await page.getByRole("button", { name: /图文音频课/ }).click();
-    for (const id of HOME_TEXT_ENTRIES) {
+    for (const id of [...HOME_VIDEO_ENTRIES, ...HOME_TEXT_ENTRIES]) {
       await expect(page.locator(`[data-course-entry='${id}']`)).toBeVisible();
     }
   });

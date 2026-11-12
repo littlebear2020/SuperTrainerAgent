@@ -4,11 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
-import { useThreads } from "@/core/threads/hooks";
 
 import type { HomeCourseItem } from "./home-course-catalog";
 import { HomeCourseEntry } from "./home-course-entry";
-import { ProjectList } from "./project-list";
 import {
   CreateTaskDialog,
   type InitialVideoTaskType,
@@ -102,7 +100,6 @@ export function matchAgent(input: string): string | null {
 
 export default function WorkspaceHome() {
   const router = useRouter();
-  const { data: threads } = useThreads();
   const { t } = useI18n();
   const [createTaskType, setCreateTaskType] =
     useState<InitialVideoTaskType | null>(null);
@@ -119,7 +116,7 @@ export default function WorkspaceHome() {
     <div className="relative flex h-full flex-col overflow-y-auto">
       <div className="ws-ambient" aria-hidden="true" />
       <div className="ws-ambient-orb-cyan" aria-hidden="true" />
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <header className="mb-8 text-center">
           <h1 className="text-foreground text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
             {t.workspace.home.heroTitle}
@@ -129,22 +126,6 @@ export default function WorkspaceHome() {
           </p>
         </header>
         <HomeCourseEntry onSelect={handleSelect} />
-        <section className="mt-10">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2.5 text-[17px] font-bold">
-              <span className="ws-section-bar" />
-              {t.workspace.home.recentProjects}
-            </h2>
-            <button
-              type="button"
-              onClick={() => router.push("/workspace/chats")}
-              className="text-muted-foreground hover:text-primary text-xs transition-colors"
-            >
-              {t.workspace.home.viewAll}
-            </button>
-          </div>
-          <ProjectList threads={threads ?? []} />
-        </section>
       </div>
       {createTaskType ? (
         <CreateTaskDialog

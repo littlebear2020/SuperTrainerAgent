@@ -11,7 +11,7 @@ import type { Page } from "@playwright/test";
 // Playwright 1.59 的 BrowserContext 不暴露 baseURL() getter，无法从 page
 // 派生，已核实类型定义）。改端口/换 host 跑 e2e 时必须两处同步，否则
 // cookie 静默失效、断言批量红。
-const E2E_BASE_URL = "http://localhost:3000";
+const E2E_BASE_URL = `http://localhost:${process.env.E2E_PORT ?? 3000}`;
 
 export async function pinEnglishLocale(page: Page): Promise<void> {
   await page

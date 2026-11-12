@@ -394,10 +394,6 @@ export interface Translations {
     home: {
       heroTitle: string;
       createHeading: string;
-      videoCourse: string;
-      videoCourseDescription: string;
-      textCourse: string;
-      textCourseDescription: string;
       playbackUnavailable: string;
       courseItems: Record<
         | "course-video"
@@ -405,17 +401,13 @@ export interface Translations {
         | "ai_video"
         | "creative-studio"
         | "ppt-master"
-        | "co-writer"
         | "podcast-studio",
         {
           title: string;
           description: string;
-          badge: string;
           mediaAlt: string;
         }
       >;
-      recentProjects: string;
-      viewAll: string;
     };
   };
 
