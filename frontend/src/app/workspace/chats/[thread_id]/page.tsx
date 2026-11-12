@@ -12,11 +12,7 @@ import {
 } from "@/components/workspace/chats";
 import { ExportTrigger } from "@/components/workspace/export-trigger";
 import { InputBox } from "@/components/workspace/input-box";
-import {
-  MessageList,
-  MESSAGE_LIST_DEFAULT_PADDING_BOTTOM,
-  MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM,
-} from "@/components/workspace/messages";
+import { MessageList } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
 import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
@@ -36,7 +32,6 @@ import { cn } from "@/lib/utils";
 
 export default function ChatPage() {
   const { t } = useI18n();
-  const [showFollowups, setShowFollowups] = useState(false);
   const { threadId, setThreadId, isNewThread, setIsNewThread } =
     useThreadChat();
   const [settings, setSettings] = useThreadSettings(threadId);
@@ -171,11 +166,6 @@ export default function ChatPage() {
     await thread.stop();
   }, [thread]);
 
-  const messageListPaddingBottom = showFollowups
-    ? MESSAGE_LIST_DEFAULT_PADDING_BOTTOM +
-      MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM
-    : undefined;
-
   return (
     <ThreadContext.Provider value={{ thread }}>
       <ChatBox threadId={threadId}>
@@ -207,7 +197,6 @@ export default function ChatPage() {
                 className={cn("size-full", !isNewThread && "pt-10")}
                 threadId={threadId}
                 thread={thread}
-                paddingBottom={messageListPaddingBottom}
                 tokenUsageEnabled={tokenUsageEnabled}
                 hasMoreHistory={hasMoreHistory}
                 loadMoreHistory={loadMoreHistory}
@@ -257,7 +246,6 @@ export default function ChatPage() {
                     onContextChange={(context) =>
                       setSettings("context", context)
                     }
-                    onFollowupsVisibilityChange={setShowFollowups}
                     onSubmit={handleSubmit}
                     onStop={handleStop}
                   />

@@ -38,7 +38,6 @@ import { SubtaskCard } from "./subtask-card";
 import { VirtualMessageList } from "./virtual-message-list";
 
 export const MESSAGE_LIST_DEFAULT_PADDING_BOTTOM = 160;
-export const MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM = 80;
 
 const LOAD_MORE_HISTORY_THROTTLE_MS = 1200;
 

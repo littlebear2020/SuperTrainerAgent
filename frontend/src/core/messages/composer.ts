@@ -25,7 +25,7 @@ export function submitThroughComposer(text: string): boolean {
   // the controlled and the uncontrolled composer pick the value up.
   Reflect.set(HTMLTextAreaElement.prototype, "value", text, textarea);
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
-  // Same timing as the followup-suggestion click path: submit on the next tick
+  // Submit on the next tick so the controlled input flushes before form submission.
   // so React has flushed the value into state first.
   setTimeout(() => textarea.form?.requestSubmit(), 0);
   return true;

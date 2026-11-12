@@ -235,7 +235,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Follow-up suggestions — input box auto-suggest after AI response
+  // Backend suggestions API remains available for compatibility; chat never calls it automatically.
   void page.route("**/api/threads/*/suggestions", (route) => {
     if (route.request().method() === "POST") {
       return route.fulfill({
@@ -321,6 +321,9 @@ export function handleRunStream(route: Route) {
   return route.fulfill({
     status: 200,
     contentType: "text/event-stream",
+    headers: {
+      "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/${MOCK_RUN_ID}`,
+    },
     body,
   });
 }

@@ -95,7 +95,6 @@ vi.mock("@/components/workspace/chats", () => ({
 vi.mock("@/components/workspace/messages", () => ({
   MessageList: () => <div data-testid="message-list" />,
   MESSAGE_LIST_DEFAULT_PADDING_BOTTOM: 0,
-  MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM: 0,
 }));
 
 vi.mock("@/components/workspace/agent-welcome", () => ({

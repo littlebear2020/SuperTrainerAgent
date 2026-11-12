@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–2；任务 3–8 未执行。2026-11-12 起；任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS；任务 2 本地 linux/amd64 sandbox、三 locale、静帧、负向副本与带音频 MP4 均通过，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–3；任务 4–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 动态追问链已移除，普通/Agent/案例 Playwright 12/12 通过，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -179,10 +179,10 @@
 
 **Files**：`input-box.tsx`、普通/Agent 两个聊天页、三份 locale/type、相关 unit/E2E 与 `tests/e2e/utils/mock-api.ts`；新增 `input-box-no-followups.dom.test.tsx`。
 
-- [ ] 先写 streaming→ready 后 suggestions 请求为 0 的失败 DOM 测试，并在普通/Agent E2E 注册 Network 计数路由。
-- [ ] 删除动态追问 effect、fetch、chips/确认弹窗、关联 state/ref、onFollowupsVisibilityChange 和额外 80px 布局联动；清理五个专用 i18n key 与失效测试。
-- [ ] 保留新会话 SuggestionList、agent 自有 prompts、技能/静态建议、案例卡和后端 suggestions API/历史记账；不改 registry suggestion。
-- [ ] 验证普通与 Agent 回复结束、首轮新会话转已有线程后均零 POST；案例仍只预填、不自动发送。
+- [x] 先写 streaming→ready 后 suggestions 请求为 0 的失败 DOM 测试，并在普通/Agent E2E 注册 Network 计数路由。
+- [x] 删除动态追问 effect、fetch、chips/确认弹窗、关联 state/ref、onFollowupsVisibilityChange 和额外 80px 布局联动；清理五个专用 i18n key 与失效测试。
+- [x] 保留新会话 SuggestionList、agent 自有 prompts、技能/静态建议、案例卡和后端 suggestions API/历史记账；不改 registry suggestion。
+- [x] 验证普通与 Agent 回复结束、首轮新会话转已有线程后均零 POST；案例仍只预填、不自动发送。
 
 ### 任务 4：建立 URL 导航、真实用户底部与角色设置（R3/R4）
 
