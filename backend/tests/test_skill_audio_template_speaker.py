@@ -12,6 +12,7 @@ conftest hermetic_tts 约定）。
 
 import importlib.util
 import inspect
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -141,29 +142,54 @@ def test_avf_missing_key_fails_before_transport_without_blaming_default_speaker(
     assert calls == []
 
 
-def test_avf_none_speaker_requires_only_missing_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    mod = _load(AVF_TEMPLATE, "avf_none_speaker_preflight")
+@pytest.mark.parametrize("entrypoint", ["generate_tts", "generate_tts_timestamped"])
+def test_avf_none_speaker_requires_only_missing_default(entrypoint, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, f"avf_none_speaker_preflight_{entrypoint}")
     _set_doubao_env(monkeypatch)
     calls = []
     monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
 
     with pytest.raises(RuntimeError) as caught:
-        mod.generate_tts("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
+        getattr(mod, entrypoint)("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
 
     assert "DOUBAO_TTS_DEFAULT_SPEAKER" in str(caught.value)
     assert "VOLCENGINE_VOICE_ACCESS_KEY" not in str(caught.value)
     assert calls == []
 
 
-def test_avf_none_speaker_and_missing_key_list_both_actual_missing_items(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    mod = _load(AVF_TEMPLATE, "avf_both_missing_preflight")
+@pytest.mark.parametrize("entrypoint", ["generate_tts", "generate_tts_timestamped"])
+def test_avf_none_speaker_and_missing_key_list_both_actual_missing_items(entrypoint, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, f"avf_both_missing_preflight_{entrypoint}")
     _set_doubao_env(monkeypatch, access_key=None)
+    calls = []
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
 
     with pytest.raises(RuntimeError) as caught:
-        mod.generate_tts("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
+        getattr(mod, entrypoint)("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
 
     assert "VOLCENGINE_VOICE_ACCESS_KEY" in str(caught.value)
     assert "DOUBAO_TTS_DEFAULT_SPEAKER" in str(caught.value)
+    assert calls == []
+
+
+@pytest.mark.parametrize("entrypoint", ["generate_tts", "generate_tts_timestamped"])
+def test_avf_none_speaker_preserves_helper_env_fallback(entrypoint, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, f"avf_none_speaker_env_fallback_{entrypoint}")
+    helper = _load(AVF_TEMPLATE.with_name("_doubao_tts.py"), f"avf_helper_env_fallback_{entrypoint}")
+    _set_doubao_env(monkeypatch, default_speaker="env-default")
+    calls = []
+
+    def fake_request(request, words=None):
+        payload = json.loads(request.data)
+        calls.append((entrypoint, payload["req_params"]["speaker"]))
+        return b"fake-mp3"
+
+    monkeypatch.setattr(helper, "_request_with_retry", fake_request)
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: helper)
+
+    getattr(mod, entrypoint)("保留默认音色", str(tmp_path / "fallback.mp3"), speaker=None)
+
+    assert calls == [(entrypoint, "env-default")]
 
 
 def test_avf_explicit_speaker_differs_from_env_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
