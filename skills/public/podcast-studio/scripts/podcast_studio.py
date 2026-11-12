@@ -696,9 +696,26 @@ def _probe_audio(path: str | Path) -> dict:
     }
 
 
+def _decoded_duration(path: str | Path) -> float:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=start_time:packet=pts_time,duration_time", "-of", "csv=p=0", str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise PodcastError(f"Final MP3 full decode failed: {result.stderr[:1000]}")
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise PodcastError(f"Unable to measure decoded duration for {path}")
+    pts, packet_duration = lines[-2].split(",")[:2]
+    start_time = float(lines[-1])
+    return float(pts) + float(packet_duration) - start_time
+
+
 def _make_pause(path: Path, seconds: float) -> None:
     result = subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", str(seconds), "-c:a", "libmp3lame", str(path)],
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", str(seconds), "-c:a", "pcm_s16le", str(path)],
         check=False,
         capture_output=True,
     )
@@ -715,16 +732,31 @@ def concat_audio(segments: list[dict], output_path: str | Path, pause_seconds: f
     for segment in segments:
         turn_id = segment["turn_id"]
         if previous_turn is not None and turn_id != previous_turn:
-            pause_path = output.parent / f"pause_{pauses:04d}.mp3"
+            pause_path = output.parent / f"pause_{pauses:04d}.wav"
             _make_pause(pause_path, pause_seconds)
             concat_entries.append(pause_path)
             pauses += 1
         concat_entries.append(Path(segment["path"]))
         previous_turn = turn_id
-    concat_file = output.parent / "concat.txt"
-    concat_file.write_text("".join(f"file '{path.resolve()}'\n" for path in concat_entries), encoding="utf-8")
+    command = ["ffmpeg", "-y", "-v", "error"]
+    for path in concat_entries:
+        command.extend(["-i", str(path)])
+    inputs = "".join(f"[{index}:a]" for index in range(len(concat_entries)))
+    command.extend(
+        [
+            "-filter_complex",
+            f"{inputs}concat=n={len(concat_entries)}:v=0:a=1[out]",
+            "-map",
+            "[out]",
+            "-c:a",
+            "libmp3lame",
+            "-ar",
+            "24000",
+            str(output),
+        ]
+    )
     result = subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(concat_file), "-c:a", "libmp3lame", "-ar", "24000", str(output)],
+        command,
         check=False,
         capture_output=True,
     )
@@ -792,7 +824,7 @@ def render_script(
                     temporary.write_bytes(audio)
                     temporary.replace(segment_path)
                 probe = _probe_audio(segment_path)
-                if probe["codec"] != "mp3" or probe["sample_rate"] != 24000 or probe["duration"] <= 0:
+                if probe["codec"] != "mp3" or probe["sample_rate"] != 24000 or _decoded_duration(segment_path) <= 0:
                     raise PodcastError(f"Invalid segment encoding: {probe}")
                 order += 1
                 entries.append(
@@ -807,7 +839,7 @@ def render_script(
                         "cache_key": key,
                         "path": str(segment_path),
                         "sha256": _sha_bytes(segment_path.read_bytes()),
-                        "duration_seconds": probe["duration"],
+                        "duration_seconds": _decoded_duration(segment_path),
                     }
                 )
         pauses = concat_audio(entries, final_path)
@@ -817,7 +849,8 @@ def render_script(
             raise PodcastError(f"Final MP3 full decode failed: {decoded.stderr[:1000]}")
         segment_sum = sum(entry["duration_seconds"] for entry in entries)
         expected = segment_sum + pauses * 0.3
-        delta = abs(final_probe["duration"] - expected)
+        final_duration = _decoded_duration(final_path)
+        delta = abs(final_duration - expected)
         if delta >= 0.1:
             raise PodcastError(f"Final duration accounting drift: {delta:.3f}s")
         manifest = {
@@ -828,7 +861,7 @@ def render_script(
             "output_path": str(final_path),
             "codec": final_probe["codec"],
             "sample_rate": final_probe["sample_rate"],
-            "final_duration_seconds": final_probe["duration"],
+            "final_duration_seconds": final_duration,
             "segment_duration_sum_seconds": segment_sum,
             "inter_turn_pauses": pauses,
             "pause_seconds_each": 0.3,

@@ -134,6 +134,25 @@ def test_two_voice_order_and_inter_turn_pause_only(tmp_path, tone_bytes):
     assert abs(manifest["final_duration_seconds"] - (manifest["segment_duration_sum_seconds"] + 0.6)) < 0.1
 
 
+def test_three_inter_turn_pauses_stay_within_duration_tolerance(tmp_path, tone_bytes):
+    turns = [
+        {"turn_id": "t0001", "role": "male", "text": "甲一", "source_ids": ["s1"]},
+        {"turn_id": "t0002", "role": "female", "text": "乙一", "source_ids": ["s1"]},
+        {"turn_id": "t0003", "role": "male", "text": "甲二", "source_ids": ["s1"]},
+        {"turn_id": "t0004", "role": "female", "text": "乙二", "source_ids": ["s1"]},
+    ]
+    script_path, sources_path, _ = write_script(tmp_path, "interview_two", turns)
+    manifest = ps.render_script(
+        script_path,
+        sources_path,
+        tmp_path / "outputs",
+        synth=lambda text, speaker: tone_bytes,
+        timestamp="20261112T000004",
+    )
+    assert manifest["inter_turn_pauses"] == 3
+    assert manifest["duration_delta_seconds"] < 0.1
+
+
 def test_pending_and_stale_approval_zero_transport(tmp_path):
     script_path, sources_path, script = write_script(tmp_path, confirm=False)
 
