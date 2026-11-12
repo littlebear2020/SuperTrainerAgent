@@ -4,7 +4,6 @@ description: |
   AI 协作视频制作全流程：从内容稿到视频产出。使用当用户要求制作视频、生成科普视频、创建讲解视频时触发。流程包括：(1) AI 撰写视频内容稿和分镜表，(2) TTS 生成配音，(3) 生成 Remotion 代码，(4) 静帧预览自检，(5) 渲染输出视频。触发词："制作视频"、"生成视频"、"remotion视频"、"科普视频"、"讲解视频"。
 required-secrets:
   - name: VOLCENGINE_VOICE_ACCESS_KEY
-  - name: DOUBAO_TTS_DEFAULT_SPEAKER
 
 ---
 
@@ -113,7 +112,7 @@ cd /mnt/user-data/workspace/<video-name> && npm install && npx remotion browser 
 > ⚠️ **TTS 红线**：沙箱内只用豆包 TTS（`scripts/_doubao_tts.py`），edge-tts 必失败，任何技能不得回退。
 
 1. 为每个场景/帧准备旁白文本（来自第一步的内容稿）。
-2. 直接使用 `scripts/generate_audio_template.py`（复制改写为 `generate_[video]_audio.py`）逐句合成——它会自动加载同目录的 `_doubao_tts.py`（需 `VOLCENGINE_VOICE_ACCESS_KEY` + `DOUBAO_TTS_DEFAULT_SPEAKER` env）：
+2. 直接使用 `scripts/generate_audio_template.py`（复制改写为 `generate_[video]_audio.py`）逐句合成——它会自动加载同目录的 `_doubao_tts.py`（需 `VOLCENGINE_VOICE_ACCESS_KEY`；正式路径显式传 speaker，只有 `speaker=None` 时才要求 `DOUBAO_TTS_DEFAULT_SPEAKER` env 兜底）：
    ```bash
    cp /mnt/skills/public/auto-video-flow/scripts/generate_audio_template.py /mnt/user-data/workspace/scripts/generate_[video]_audio.py
    cp /mnt/skills/public/auto-video-flow/scripts/_doubao_tts.py /mnt/user-data/workspace/scripts/_doubao_tts.py

@@ -74,6 +74,30 @@ class TestResolveInjectedSecrets:
         assert injected == {"DATABASE_URL": "postgres://user:pw@host/db"}
         assert any("DATABASE_URL" in r.getMessage() and ("封锁" in r.getMessage() or "blocked" in r.getMessage().lower()) for r in caplog.records)
 
+    def test_autobind_union_includes_optional_and_other_skill_declarations(self, monkeypatch):
+        """optional 仍入并集；auto 缩小声明不会删除其他技能的同名声明。"""
+        from deerflow.skills.types import SecretRequirement
+
+        skills = [
+            SimpleNamespace(required_secrets=(SecretRequirement("VOLCENGINE_VOICE_ACCESS_KEY"),)),
+            SimpleNamespace(
+                required_secrets=(
+                    SecretRequirement("DOUBAO_TTS_DEFAULT_SPEAKER", optional=True),
+                    SecretRequirement("OTHER_REQUIRED_KEY"),
+                )
+            ),
+        ]
+        monkeypatch.setattr("deerflow.skills.load_skills", lambda enabled_only: skills)
+        tools._declared_names_cache = None
+        try:
+            assert tools._declared_skill_secret_names() == {
+                "VOLCENGINE_VOICE_ACCESS_KEY",
+                "DOUBAO_TTS_DEFAULT_SPEAKER",
+                "OTHER_REQUIRED_KEY",
+            }
+        finally:
+            tools._declared_names_cache = None
+
     def test_declared_names_cached(self, monkeypatch):
         """声明并集按 TTL 缓存——同一进程窗内 compute 只跑一次。"""
         calls = {"n": 0}

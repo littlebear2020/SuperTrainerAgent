@@ -5,13 +5,17 @@
 男声 → 成片女声 + 假注释谎称男声。修复 = 模板恢复显式 ``SPEAKER`` 常量 +
 ``speaker`` 形参全链透传（不设 None 兜底——None = 静默落 env，正是事故形态）。
 
-本测试 importlib 按路径加载两个模板模块，只断言签名/常量形态，**不发起任何
-真实 TTS 调用**（离线可跑，CI 假绿口径同 conftest hermetic_tts 约定）。
+本测试 importlib 按路径加载两个模板模块，断言签名/常量及共享前置行为；
+传输层使用假实现，**不发起任何真实 TTS 调用**（离线可跑，CI 假绿口径同
+conftest hermetic_tts 约定）。
 """
 
 import importlib.util
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AVF_TEMPLATE = REPO_ROOT / "skills" / "public" / "auto-video-flow" / "scripts" / "generate_audio_template.py"
@@ -71,6 +75,168 @@ def test_avf_tts_functions_carry_speaker():
         "_doubao_tts_generate",
         "_doubao_tts_generate_timestamped",
     )
+
+
+def _set_doubao_env(monkeypatch: pytest.MonkeyPatch, access_key="test-access-key", default_speaker=None) -> None:
+    monkeypatch.delenv("VOLCENGINE_VOICE_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("DOUBAO_TTS_DEFAULT_SPEAKER", raising=False)
+    if access_key is not None:
+        monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", access_key)
+    if default_speaker is not None:
+        monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", default_speaker)
+
+
+def _fake_transport(calls: list[tuple[str, str]], words=None):
+    def synthesize(text, speaker):
+        calls.append(("plain", speaker))
+        return b"fake-mp3"
+
+    def synthesize_with_timestamps(text, speaker):
+        calls.append(("timestamped", speaker))
+        return b"fake-mp3", list(words or [])
+
+    return SimpleNamespace(synthesize=synthesize, synthesize_with_timestamps=synthesize_with_timestamps)
+
+
+def test_avf_plain_explicit_speaker_only_needs_access_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_plain_explicit_preflight")
+    _set_doubao_env(monkeypatch)
+    calls = []
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
+    output = tmp_path / "plain.mp3"
+
+    mod.generate_tts("最短一句", str(output), speaker="explicit-speaker")
+
+    assert calls == [("plain", "explicit-speaker")]
+    assert output.read_bytes() == b"fake-mp3"
+
+
+def test_avf_timestamped_explicit_speaker_only_needs_access_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_timestamped_explicit_preflight")
+    _set_doubao_env(monkeypatch)
+    calls = []
+    words = [{"word": "好", "startTime": 0.0, "endTime": 0.2}]
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls, words))
+    output = tmp_path / "timestamped.mp3"
+
+    result = mod.generate_tts_timestamped("好", str(output), speaker="explicit-speaker")
+
+    assert result == words
+    assert calls == [("timestamped", "explicit-speaker")]
+    assert output.read_bytes() == b"fake-mp3"
+
+
+@pytest.mark.parametrize("entrypoint", ["generate_tts", "generate_tts_timestamped"])
+def test_avf_missing_key_fails_before_transport_without_blaming_default_speaker(entrypoint, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, f"avf_missing_key_{entrypoint}")
+    _set_doubao_env(monkeypatch, access_key=None, default_speaker="env-default")
+    calls = []
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
+
+    with pytest.raises(RuntimeError) as caught:
+        getattr(mod, entrypoint)("不得合成", str(tmp_path / "missing.mp3"), speaker="explicit-speaker")
+
+    assert "VOLCENGINE_VOICE_ACCESS_KEY" in str(caught.value)
+    assert "DOUBAO_TTS_DEFAULT_SPEAKER" not in str(caught.value)
+    assert calls == []
+
+
+def test_avf_none_speaker_requires_only_missing_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_none_speaker_preflight")
+    _set_doubao_env(monkeypatch)
+    calls = []
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
+
+    with pytest.raises(RuntimeError) as caught:
+        mod.generate_tts("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
+
+    assert "DOUBAO_TTS_DEFAULT_SPEAKER" in str(caught.value)
+    assert "VOLCENGINE_VOICE_ACCESS_KEY" not in str(caught.value)
+    assert calls == []
+
+
+def test_avf_none_speaker_and_missing_key_list_both_actual_missing_items(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_both_missing_preflight")
+    _set_doubao_env(monkeypatch, access_key=None)
+
+    with pytest.raises(RuntimeError) as caught:
+        mod.generate_tts("不得合成", str(tmp_path / "missing.mp3"), speaker=None)
+
+    assert "VOLCENGINE_VOICE_ACCESS_KEY" in str(caught.value)
+    assert "DOUBAO_TTS_DEFAULT_SPEAKER" in str(caught.value)
+
+
+def test_avf_explicit_speaker_differs_from_env_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_explicit_overrides_default")
+    _set_doubao_env(monkeypatch, default_speaker="env-default")
+    calls = []
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: _fake_transport(calls))
+
+    mod.generate_tts("显式音色", str(tmp_path / "explicit.mp3"), speaker="different-explicit-speaker")
+
+    assert calls == [("plain", "different-explicit-speaker")]
+
+
+def test_avf_word_level_degrade_reuses_explicit_speaker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = _load(AVF_TEMPLATE, "avf_degrade_explicit_speaker")
+    _set_doubao_env(monkeypatch)
+    calls = []
+    transport = _fake_transport(calls)
+
+    def fail_timestamps(text, speaker):
+        calls.append(("timestamped", speaker))
+        raise RuntimeError("mock timestamp failure")
+
+    transport.synthesize_with_timestamps = fail_timestamps
+    monkeypatch.setattr(mod, "_load_doubao_module", lambda: transport)
+
+    result = mod.generate_tts_timestamped("降级一句", str(tmp_path / "degrade.mp3"), speaker="explicit-speaker")
+
+    assert result is None
+    assert calls == [("timestamped", "explicit-speaker"), ("plain", "explicit-speaker")]
+
+
+def _load_live_probe(name: str):
+    return _load(REPO_ROOT / "backend" / "scripts" / "probe_auto_video_flow_explicit_speaker.py", name)
+
+
+def test_explicit_speaker_probe_requires_live_opt_in(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+    probe = _load_live_probe("avf_probe_opt_in")
+    monkeypatch.delenv("RUN_LIVE", raising=False)
+    monkeypatch.setattr(probe, "generate_tts", lambda *args, **kwargs: pytest.fail("unexpected paid call"))
+
+    assert probe.main() == 0
+    assert "SKIP" in capsys.readouterr().out
+
+
+def test_explicit_speaker_probe_uses_registered_speaker_with_default_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    probe = _load_live_probe("avf_probe_explicit")
+    monkeypatch.setenv("RUN_LIVE", "1")
+    monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "test-only-key")
+    monkeypatch.delenv("DOUBAO_TTS_DEFAULT_SPEAKER", raising=False)
+    monkeypatch.setenv("PROBE_OUTPUT_DIR", str(tmp_path))
+    calls = []
+
+    def fake_generate(text, output_path, speaker):
+        calls.append((text, speaker))
+        Path(output_path).write_bytes(b"fake-mp3")
+
+    monkeypatch.setattr(probe, "generate_tts", fake_generate)
+    monkeypatch.setattr(probe, "_audio_duration", lambda path: 1.25)
+
+    assert probe.main() == 0
+    assert calls == [("文字动效验收。", "zh_male_m191_uranus_bigtts")]
+    assert (tmp_path / "explicit-speaker.mp3").read_bytes() == b"fake-mp3"
+
+
+def test_explicit_speaker_probe_refuses_ambient_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    probe = _load_live_probe("avf_probe_refuses_default")
+    monkeypatch.setenv("RUN_LIVE", "1")
+    monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "test-only-key")
+    monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", "ambient-default")
+    monkeypatch.setattr(probe, "generate_tts", lambda *args, **kwargs: pytest.fail("unexpected paid call"))
+
+    assert probe.main() == 2
 
 
 # ── C3: corporate-video/generate_tts.py（同构缺陷，同法修复）────────────────

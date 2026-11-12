@@ -85,6 +85,15 @@ def test_tts_redline_sentence_untouched():
     assert "edge-tts 必失败" in content
 
 
+def test_auto_skill_frontmatter_declares_only_access_key():
+    from deerflow.skills.parser import parse_skill_file
+
+    skill = parse_skill_file(SKILL_MD, category="public")
+
+    assert skill is not None
+    assert [requirement.name for requirement in skill.required_secrets] == ["VOLCENGINE_VOICE_ACCESS_KEY"]
+
+
 # ---------------------------------------------------------------------------
 # 视觉质量批锚点（2026-09-29 auto-video-flow 视觉质量计划 Batch A，计划 §6）
 # 与上方 F5 锚点互相独立；锚点措辞与 SKILL.md / VideoTemplate.tsx 同源维护
@@ -214,7 +223,7 @@ def test_main_emits_global_ms_captions_and_keeps_segments(tmp_path: Path, monkey
     def fake_concat(mp3_files, output_path) -> None:
         Path(output_path).write_bytes(b"".join(Path(p).read_bytes() for p in mp3_files))
 
-    monkeypatch.setattr(mod, "_doubao_available", lambda: True)
+    monkeypatch.setattr(mod, "_doubao_available", lambda speaker=None: True)
     monkeypatch.setattr(mod, "_doubao_tts_generate_timestamped", fake_timestamped)
     monkeypatch.setattr(mod, "get_mp3_duration", fake_get_mp3_duration)
     monkeypatch.setattr(mod, "concat_mp3s", fake_concat)
@@ -253,7 +262,7 @@ def test_main_emits_global_ms_captions_and_keeps_segments(tmp_path: Path, monkey
 def test_word_level_failure_degrades_and_keeps_segments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """词级合成失败 → 该句降级普通合成，整体不发 captions 字段；segments 照常输出。"""
 
-    def failing_timestamped(text: str, output_path) -> list:
+    def failing_timestamped(text: str, output_path, speaker=None) -> list:
         raise RuntimeError("doubao TTS session failed (code=1): mock")
 
     def fake_plain(text: str, output_path, speaker=None) -> bool:
@@ -266,7 +275,7 @@ def test_word_level_failure_degrades_and_keeps_segments(tmp_path: Path, monkeypa
 
     mod = _load_audio_template()
     _configure_template(mod, tmp_path, [["甲句。"]])
-    monkeypatch.setattr(mod, "_doubao_available", lambda: True)
+    monkeypatch.setattr(mod, "_doubao_available", lambda speaker=None: True)
     monkeypatch.setattr(mod, "_doubao_tts_generate_timestamped", failing_timestamped)
     monkeypatch.setattr(mod, "_doubao_tts_generate", fake_plain)
     monkeypatch.setattr(mod, "get_mp3_duration", lambda path: 1.0)
@@ -296,7 +305,7 @@ def test_empty_words_degrades_without_captions(tmp_path: Path, monkeypatch: pyte
 
     mod = _load_audio_template()
     _configure_template(mod, tmp_path, [["甲句。"]])
-    monkeypatch.setattr(mod, "_doubao_available", lambda: True)
+    monkeypatch.setattr(mod, "_doubao_available", lambda speaker=None: True)
     monkeypatch.setattr(mod, "_doubao_tts_generate_timestamped", fake_timestamped_no_subtitle)
     monkeypatch.setattr(mod, "get_mp3_duration", lambda path: 1.0)
     monkeypatch.setattr(mod, "concat_mp3s", fake_concat)
@@ -327,7 +336,7 @@ def test_malformed_words_degrade_instead_of_crashing(tmp_path: Path, monkeypatch
 
     mod = _load_audio_template()
     _configure_template(mod, tmp_path, [["甲句。"]])
-    monkeypatch.setattr(mod, "_doubao_available", lambda: True)
+    monkeypatch.setattr(mod, "_doubao_available", lambda speaker=None: True)
     monkeypatch.setattr(mod, "_doubao_tts_generate_timestamped", fake_timestamped_malformed)
     monkeypatch.setattr(mod, "get_mp3_duration", lambda path: 1.0)
     monkeypatch.setattr(mod, "concat_mp3s", fake_concat)
