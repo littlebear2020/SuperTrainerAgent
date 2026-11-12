@@ -254,7 +254,7 @@
 - [x] 最终文档修改后，从根目录运行 `make check && python3 scripts/check_docs_convention.py && git diff --check`；性能预算变化必须归因评审，不得无声抬线。
 - [ ] 按预授权 push 当前功能分支，并用 `GH_REPO=littlebear2020/SuperTrainerAgent gh pr create --base main` **新建 PR**（标题为本批摘要，正文链接本计划与执行 changelog；PR #2 已合并，不得更新或复用）。等待新 PR 当前 HEAD 的 checks/OCR；Critical/Important/high 清零或以代码/复现证据正式驳回。CI/OCR 不可用记 `REMOTE_PENDING`，不直推 main。
 - [ ] checks 全绿且评审处置完成后按仓库约定 rebase merge；若仅远端未决，保留本地 commits 并报告 `PARTIAL_REMOTE_PENDING`，不重复推送、不伪造合并。
-- [ ] 清理本批不需要的测试输出与登记容器，恢复 AUTOBIND/本地服务到约定状态；最终报告逐项 PASS/FAIL/SKIPPED/BLOCKED、commit/PR/check/OCR ID、付费调用是否发生及原因、次日人工清单。
+- [x] 清理本批不需要的测试输出与登记容器，恢复 AUTOBIND/本地服务到约定状态；最终报告逐项 PASS/FAIL/SKIPPED/BLOCKED、commit/PR/check/OCR ID、付费调用是否发生及原因、次日人工清单。
 
 ## 五、最终验收追踪表
 
