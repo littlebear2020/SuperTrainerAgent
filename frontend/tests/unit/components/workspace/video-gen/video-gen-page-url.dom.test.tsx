@@ -92,6 +92,11 @@ describe("VideoGenPage URL routing", () => {
   });
 
   async function renderPage() {
+    window.history.replaceState(
+      null,
+      "",
+      `/workspace/video-gen${h.search ? `?${h.search}` : ""}`,
+    );
     await act(async () => root.render(<VideoGenPage />));
   }
 
@@ -146,6 +151,46 @@ describe("VideoGenPage URL routing", () => {
     expect(container.querySelector("[data-testid='works-panel']")).toBeNull();
     expect(h.agentName).toBe("course-video");
     expect(h.tasksCalls).toBe(beforeAssets);
+  });
+
+  it("preserves tracking params while replacing invalid values without a loop", async () => {
+    h.search = "foo=1&utm_source=review&tab=invalid&capability=invalid";
+    await renderPage();
+
+    expect(h.replace).toHaveBeenCalledExactlyOnceWith(
+      "/workspace/video-gen?foo=1&utm_source=review",
+    );
+    expect(h.agentName).toBe("course-video");
+
+    h.replace.mockClear();
+    h.search = "foo=1&utm_source=review";
+    await renderPage();
+    expect(h.replace).not.toHaveBeenCalled();
+  });
+
+  it("preserves unrelated params when selecting tabs and capabilities", async () => {
+    h.search = "foo=1&utm_source=review";
+    await renderPage();
+    await act(async () => tab("assets").click());
+    expect(h.push).toHaveBeenCalledWith(
+      "/workspace/video-gen?foo=1&utm_source=review&tab=assets",
+    );
+
+    h.search = "foo=1&utm_source=review&tab=assets&capability=ai_video";
+    h.push.mockClear();
+    await renderPage();
+    await act(async () => tab("works").click());
+    expect(h.push).toHaveBeenCalledWith(
+      "/workspace/video-gen?foo=1&utm_source=review",
+    );
+
+    h.search = "foo=1&utm_source=review";
+    h.push.mockClear();
+    await renderPage();
+    await act(async () => capabilityTab("ai_image").click());
+    expect(h.push).toHaveBeenCalledWith(
+      "/workspace/video-gen?foo=1&utm_source=review&tab=works&capability=ai_image",
+    );
   });
 
   it("replaces invalid route values with the canonical bare works URL", async () => {

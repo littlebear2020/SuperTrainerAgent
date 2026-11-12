@@ -229,6 +229,11 @@ export function HomeCourseEntry({
   );
   const previewAllowed = !coarsePointer && !reducedMotion && pageVisible;
   const activePreviewId = previewAllowed ? previewId : null;
+  const activePreviewRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activePreviewRef.current = activePreviewId;
+  }, [activePreviewId]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -286,7 +291,7 @@ export function HomeCourseEntry({
     clearHoverTimer();
     hoverTimer.current = setTimeout(() => {
       hoverTimer.current = null;
-      if (activePreviewId !== id) resetFailure(id);
+      if (activePreviewRef.current !== id) resetFailure(id);
       setPreviewId(id);
     }, 200);
   };

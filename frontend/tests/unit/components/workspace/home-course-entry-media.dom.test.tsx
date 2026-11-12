@@ -200,6 +200,32 @@ describe("HomeCourseEntry six-card media behavior", () => {
     expect(videos()).toHaveLength(1);
   });
 
+  it("does not clear a fresh failure when queued hover follows a fast focus switch", async () => {
+    await renderEntry();
+    await act(async () => entry("course-video").focus());
+    expect(h.play).toHaveBeenCalledTimes(1);
+
+    h.play.mockRejectedValue(
+      new DOMException("Playback blocked", "NotAllowedError"),
+    );
+    const next = entry("ai_image");
+    await act(async () => {
+      next.focus();
+      next.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+    const callsBeforeTimer = h.play.mock.calls.length;
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+    });
+
+    expect(h.play).toHaveBeenCalledTimes(callsBeforeTimer);
+    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+  });
+
   it("deduplicates play across StrictMode and repeated renders", async () => {
     const item = HOME_COURSE_ITEMS[0]!;
     const onError = vi.fn();

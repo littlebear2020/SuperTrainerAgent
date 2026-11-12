@@ -45,6 +45,7 @@ import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import {
   buildVideoAssetsHref,
+  DEFAULT_WORK_CAPABILITY,
   parseVideoAssetsRoute,
   type WorkCapability,
 } from "@/core/workspace/video-assets-route";
@@ -313,11 +314,12 @@ export function VideoGenPage() {
   const { t } = useI18n();
   const route = parseVideoAssetsRoute(searchParams);
   const tab = route.tab;
-  const canonicalHref = buildVideoAssetsHref(route);
+  const currentSearch = searchParams.toString();
+  const canonicalHref = buildVideoAssetsHref(route, currentSearch);
   const selectedCapability =
     route.tab === "works"
       ? (WORK_CAPABILITIES.find((item) => item.id === route.capability) ??
-        WORK_CAPABILITIES[0]!)
+        WORK_CAPABILITIES.find((item) => item.id === DEFAULT_WORK_CAPABILITY))
       : null;
 
   useEffect(() => {
@@ -325,7 +327,7 @@ export function VideoGenPage() {
     if (currentHref !== canonicalHref) {
       router.replace(canonicalHref);
     }
-  }, [canonicalHref, router, searchParams]);
+  }, [canonicalHref, router]);
 
   const selectTab = (next: (typeof TABS)[number]["value"]) => {
     const nextRoute =
@@ -334,14 +336,18 @@ export function VideoGenPage() {
         : {
             tab: next,
             capability:
-              route.tab === "works" ? route.capability : "course-video",
+              route.tab === "works"
+                ? route.capability
+                : DEFAULT_WORK_CAPABILITY,
           };
-    router.push(buildVideoAssetsHref(nextRoute));
+    router.push(buildVideoAssetsHref(nextRoute, currentSearch));
     document.getElementById(`video-assets-tab-${next}`)?.focus();
   };
 
   const selectCapability = (next: WorkCapability) => {
-    router.push(buildVideoAssetsHref({ tab: "works", capability: next }));
+    router.push(
+      buildVideoAssetsHref({ tab: "works", capability: next }, currentSearch),
+    );
     document.getElementById(`work-capability-tab-${next}`)?.focus();
   };
 
