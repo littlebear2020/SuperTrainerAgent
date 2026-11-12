@@ -1,0 +1,14 @@
+name: podcast-studio
+description: "播客制作：文档原文朗读、单人新闻、双人访谈与双人辩论，以来源和确认稿生成真实 MP3"
+model: null
+tool_groups:
+  - web
+  - file:read
+  - file:write
+  - bash
+skills:
+  - podcast-studio
+  - deep-research
+category: public
+created_by: admin
+created_at: "2026-11-12T00:00:00+00:00"

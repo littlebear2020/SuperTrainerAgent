@@ -340,3 +340,17 @@ def test_reseed_preserves_runtime_memory_json(tmp_path: Path, monkeypatch):
     assert seeded == 1
     assert (agents_target / "config.yaml").read_text(encoding="utf-8") == "name: mem-agent\ndescription: test\n"
     assert (agents_target / "memory.json").read_text(encoding="utf-8") == '{"facts": ["learned"]}'
+
+
+def test_seed_version_and_exact_agent_roster():
+    assert SEED_VERSION == "2026-11-12"
+    agent_names = {path.name for path in SEED_DIR.iterdir() if path.is_dir() and (path / "config.yaml").exists()}
+    assert agent_names == {
+        "co-writer",
+        "course-assistant",
+        "course-video",
+        "creative-studio",
+        "ppt-master",
+        "vimax-video",
+        "podcast-studio",
+    }

@@ -41,7 +41,9 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # （自定义子代理 researcher/video-processor/slide-builder 退役：技能白名单被
 # 父级交集截断半坏 + researcher 工具白名单缺检索；SOUL 新副本须 reseed 生效，
 # memory.json 由 _RUNTIME_PRESERVED_FILES 保护）。
-SEED_VERSION = "2026-09-23"
+# 2026-11-12: 新增 podcast-studio（四模式来源/确认/固定音色 MP3）；标准全量
+# reseed 保留六个旧 Agent 备份与既有 memory.json，旧 Agent seed 内容不变。
+SEED_VERSION = "2026-11-12"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 
