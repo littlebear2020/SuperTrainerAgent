@@ -11,6 +11,7 @@
 - 新会话 guide 为 5 个 Agent、20 个案例；首页仍为六卡，仅以播客卡替换末位 co-writer。co-writer 的 guide 四卡、Writer 与历史路由保留；新增 960×540 本地 WebP 封面。
 - 同步旧 `WORKFLOWS` 的 `podcast-studio` 映射及既有数量注释，以满足现役 Agent 集合同步守卫。该组件在当前 `src` 无引用，不改变实际首页六卡；旧同步测试原样保留。
 - 修复默认时间戳对 Python 3.11+ `datetime.UTC` 的依赖，改用 Python 3.10 可用的 `timezone.utc`；真实 Aio Python 3.10 默认 render 已验证。
+- 整支审查后加固五个真实契约：`read_original` 只能使用确定性 `prepare-verbatim` 且最终逐字匹配；双人稿必须实际包含男女角色；验证页/未解析动态模板拒绝成为来源；PDF 可见标点及代码符号纳入完整等价检查；URL 总 deadline 覆盖 DNS、连接、重定向和每次读取。既有四份稿件在新校验下全部有效且 manifest hash 一致。
 
 ## 密钥与运行时证据
 
@@ -44,7 +45,8 @@
 - Task 6 backend seed/skill/ingest/audio/secret/sandbox 定向回归 → `224 passed`；frontend 首页/guide/Writer 相关回归 → `97 passed`。真实 Aio 中 PDF/DOCX/MD/HTML intake/prepare/validate 与离线确认门通过，第二次 seed 为 0。
 - Python 3.10 时间戳 RED → 真实 Aio 默认 render `ImportError: cannot import name 'UTC'`；GREEN → `python=3.10.12 default_timestamp_render=PASS status=success`。宿主 `pytest tests/test_podcast_studio_audio.py tests/test_podcast_studio_ingest.py -q` → `47 passed`，Ruff 与格式检查通过。
 - `cd frontend && pnpm exec vitest run --project node tests/unit/workspace/active-agents-sync.test.ts` → 修复前 `1 failed`，缺 `podcast-studio`；最小同步后 `2 passed`，未修改测试。
-- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → `9990 passed, 31 skipped, 421 warnings in 468.29s`，退出 0。
+- 审查修复后 `cd backend && PYTHONPATH=. uv run pytest tests/test_podcast_studio_audio.py tests/test_podcast_studio_ingest.py -q` → `61 passed`；Ruff 与格式检查通过。真实 Aio PDF intake/prepare/validate 通过，离线验证页/模板拒绝与 DNS 总 deadline 均通过。
+- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q` → 初轮 `9990 passed, 31 skipped`；五项 Important 修复后 `10004 passed, 31 skipped, 421 warnings in 602.59s`，退出 0。
 - `cd frontend && pnpm check && pnpm test` → 静态检查通过；`250 test files / 1640 tests passed`。
 - `cd frontend && CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check` → `80 passed (1.7m)`；Next.js 生产构建、TypeScript、五路由资产测量及预算检查退出 0。
 - `make check && python3 scripts/check_docs_convention.py && git diff --check` → backend ruff 通过；frontend ESLint `0 errors`（123 条既有 warnings）、TypeScript、Prettier、knip、599 个 i18n 叶子检查通过；docs convention `OK 仓库治理约定全过`，`git diff --check` 无输出，退出 0。
@@ -55,3 +57,14 @@
 - 用户于 2026-11-12 明确决定不再由本批执行实时 URL 验收，后续自行验收，并要求完成代码与交付收尾。Task 7 Step 5 因此保持未勾选，记录为“未验证、用户后验”，不是通过项。
 - 实时 URL 安全实现仍保持 fail-closed；本批交付的是代码、离线契约、真实音色与四份技术合格且已试听的 MP3，不宣称实时网页来源能力已通过端到端验收。
 - 全文只含本地提交，不 push、不建 PR、不部署，不修改 Docker、`.env*`、部署文档、数据库/迁移或锁文件。
+
+## Deferred minors
+
+- 同一 outputs 目录后续 render 失败时，固定路径的旧 success manifest 可能保留；旧 integrity/timestamp 可区分历史产物，后续可增强逐次失败状态，不在本批扩大修复。
+- 字节一致的 `_doubao_tts.py` 副本注释仍写四个副本；本批新增第五个后注释过期，需另批同步所有副本的注释，不能只改一份而破坏 hash 守护。
+
+## 最终运行状态
+
+- 最终整支审查无 Critical；5 项 Important 均有 RED→GREEN 与后端全量 `10004 passed` 证据，2 项 Minor deferred 如上。
+- 本地 Gateway/前端健康检查均为 HTTP 200，Gateway 仅进程级 `DEER_FLOW_SKILL_SECRET_AUTOBIND=1`，未修改 compose、`.env` 或部署配置；两个开发服务保留供用户本地复核。
+- 前端首次恢复时 Turbopack 报缓存 Meta restore panic；仅将生成的 `.next/cache` 移入本计划备份目录后重启成功，未改源码、配置或依赖。无本批测试容器残留。

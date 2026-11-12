@@ -1,6 +1,6 @@
 # 播客 Agent 与音频创作实施计划
 
-> **状态**：部分已执行（2026-11-12；Task 1–6、Task 7 Step 1–4/6、Task 8 Step 1–3 已完成。Task 7 Step 5 实时安全 URL 未验收，按用户决定后续自行验收；Task 8 Step 4–5 收尾中。执行记录：`docs/changelog/changelog-2026-11-12-podcast-studio.md`）。
+> **状态**：已执行（2026-11-12；代码、Task 1–6、Task 7 Step 1–4/6、Task 8 Step 1–5 完成。Task 7 Step 5 实时安全 URL 未验收，按用户决定后续自行验收，不宣称四模式全部验收通过。执行记录：`docs/changelog/changelog-2026-11-12-podcast-studio.md`）。
 > **TL;DR**：新增 `podcast-studio` Agent 和一个四模式共享技能，以文档/链接/调研为来源，经必要确认后用字节 TTS 交付 MP3；首页仅以播客卡替换 co-writer，旧 Agent、Writer 与历史路由全部保留。AUTOBIND 默认关闭，不改 Docker、`.env.example` 或部署文档；真实密钥名集合未获用户当场授权时不得开启或宣称完成。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`，单执行者、单工作区按 Task 1→8 串行，逐项勾选。Task 1 未获用户当场授权时立即停止，不得自行扩权。共享 locale、seed、技能和测试不得并行修改。
@@ -282,10 +282,11 @@
   `cd frontend && CI=1 E2E_PORT=3100 pnpm test:e2e && pnpm perf:check`，全部通过；mock 不替代 Task 7 真实证据。
 - [x] **Step 3：更新计划与 changelog**
   逐项勾选并更新唯一状态头，记录实际执行范围及 changelog 链接。changelog 必须含 ≤5 行 TL;DR 和「验收记录」节，逐行写真实命令与关键输出，分别记录密钥授权名集合（只名字）、离线、真实音色、四模式真实 thread/MP3、URL/调研成功、旧能力兼容、人工试听和未解决事项，不包含密钥或用户内容。
-- [ ] **Step 4：对最终文档重跑根门禁**
+- [x] **Step 4：对最终文档重跑根门禁**
   在 Step 3 完成后运行仓库根 `make check && python3 scripts/check_docs_convention.py && git diff --check`，全部通过；不得只在 changelog 创建前运行文档门禁。
-- [ ] **Step 5：恢复本地测试入口并交付审查**
+- [x] **Step 5：恢复本地测试入口并交付审查**
   确认无在途任务/测试容器残留，清理本批不需要的测试输出，服务健康，明确记录 Gateway 最终 AUTOBIND 状态。汇总修改文件、commit、真实证据、遗留项和审查重点；只提交本地文档，不 push、不建 PR、不部署。
+  整支审查发现 5 项 Important 均已完成 RED→GREEN 修复，后端全量 `10004 passed, 31 skipped`；两项 Minor deferred 记录于 changelog。最终 Gateway/前端均为 HTTP 200，AUTOBIND 仅进程级 `=1`，无本批测试容器残留。
 
 ## 回滚与停止规则
 
