@@ -1,62 +1,62 @@
 "use client";
 
-import { ArrowRight, BookOpenText, Video } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
-import {
-  type CourseEntryId,
-  HOME_COURSE_ITEMS,
-  type HomeCourseItem,
-} from "./home-course-catalog";
+import { HOME_COURSE_ITEMS, type HomeCourseItem } from "./home-course-catalog";
 
 function CourseMedia({
   item,
+  preview,
   failed,
-  videoRef,
   onError,
-  onPlaying,
 }: {
   item: HomeCourseItem;
+  preview: boolean;
   failed: boolean;
-  videoRef?: (element: HTMLVideoElement | null) => void;
   onError: () => void;
-  onPlaying?: () => void;
 }) {
   const { t } = useI18n();
   const copy = t.workspace.home.courseItems[item.id];
+  const poster = item.media.poster;
+
+  if (failed && item.media.kind === "image") {
+    return <div className="aspect-video bg-slate-100 dark:bg-slate-900" />;
+  }
+
+  const showVideo = item.media.kind === "video" && preview && !failed;
+
   return (
-    <div className="bg-muted relative aspect-video overflow-hidden">
-      {item.media.kind === "video" ? (
+    <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-900">
+      <img
+        src={poster ?? item.media.src}
+        alt={copy.mediaAlt}
+        className={cn("h-full w-full object-contain", showVideo && "invisible")}
+        loading="lazy"
+        onError={onError}
+      />
+      {showVideo ? (
         <video
-          ref={videoRef}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.018]"
+          autoPlay
+          className="absolute inset-0 h-full w-full object-contain"
           src={item.media.src}
+          poster={poster}
+          data-course-item={item.id}
           muted
           loop
           playsInline
           preload="metadata"
           aria-label={copy.mediaAlt}
           onError={onError}
-          onPlaying={onPlaying}
         />
-      ) : (
-        <img
-          src={item.media.src}
-          alt={copy.mediaAlt}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.018]"
-          loading="lazy"
-        />
-      )}
-      <span className="absolute top-3 left-3 rounded-full border border-white/25 bg-slate-950/35 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap text-white backdrop-blur-sm">
-        {copy.badge}
-      </span>
-      {failed ? (
+      ) : null}
+      {failed && item.media.kind === "video" ? (
         <div
           role="status"
-          className="bg-background/90 pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-sm"
+          className="bg-background/90 pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-center text-sm"
         >
           {t.workspace.home.playbackUnavailable}
         </div>
@@ -71,171 +71,130 @@ export function HomeCourseEntry({
   onSelect: (item: HomeCourseItem) => void;
 }) {
   const { t } = useI18n();
-  const [activeEntry, setActiveEntry] = useState<CourseEntryId>("video");
+  const [coarsePointer, setCoarsePointer] = useState(
+    () => window.matchMedia("(pointer: coarse)").matches,
+  );
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [failedMedia, setFailedMedia] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
-  const videoRefs = useRef(new Map<string, HTMLVideoElement>());
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewAllowed = !coarsePointer && !reducedMotion && pageVisible;
+  const activePreviewId = previewAllowed ? previewId : null;
 
   useEffect(() => {
-    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handlePreference = () => setReducedMotion(preference.matches);
-    const handleVisibility = () => setPageVisible(!document.hidden);
-    preference.addEventListener("change", handlePreference);
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleCoarse = () => {
+      setCoarsePointer(coarse.matches);
+      setPreviewId(null);
+    };
+    const handleReduced = () => {
+      setReducedMotion(reduced.matches);
+      setPreviewId(null);
+    };
+    const handleVisibility = () => {
+      setPageVisible(!document.hidden);
+      setPreviewId(null);
+    };
+    coarse.addEventListener("change", handleCoarse);
+    reduced.addEventListener("change", handleReduced);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      preference.removeEventListener("change", handlePreference);
+      coarse.removeEventListener("change", handleCoarse);
+      reduced.removeEventListener("change", handleReduced);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
   useEffect(() => {
-    const videos = [...videoRefs.current.values()];
-    if (reducedMotion || !pageVisible) {
-      videos.forEach((video) => video.pause());
-      return;
+    if (!previewAllowed && hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
     }
-    for (const video of videos) {
-      video.play().catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        const id = video.dataset.courseItem;
-        if (id) setFailedMedia((current) => new Set(current).add(id));
-      });
-    }
-    return () => videos.forEach((video) => video.pause());
-  }, [activeEntry, reducedMotion, pageVisible]);
+  }, [previewAllowed]);
 
-  const entries = [
-    {
-      id: "video" as const,
-      label: t.workspace.home.videoCourse,
-      description: t.workspace.home.videoCourseDescription,
-      icon: Video,
-    },
-    {
-      id: "text" as const,
-      label: t.workspace.home.textCourse,
-      description: t.workspace.home.textCourseDescription,
-      icon: BookOpenText,
-    },
-  ];
-  const items = HOME_COURSE_ITEMS.filter((item) => item.entry === activeEntry);
+  useEffect(() => {
+    return () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    };
+  }, []);
+
+  const clearHoverTimer = () => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  const showPreview = (id: string) => {
+    if (!previewAllowed) return;
+    clearHoverTimer();
+    setPreviewId(id);
+  };
+
+  const hidePreview = () => {
+    clearHoverTimer();
+    setPreviewId(null);
+  };
+
+  const queuePreview = (id: string) => {
+    if (!previewAllowed) return;
+    clearHoverTimer();
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null;
+      setPreviewId(id);
+    }, 200);
+  };
 
   return (
     <section aria-label={t.workspace.home.createHeading}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {entries.map((entry) => {
-          const active = entry.id === activeEntry;
-          const Icon = entry.icon;
-          return (
-            <button
-              key={entry.id}
-              id={`home-course-tab-${entry.id}`}
-              type="button"
-              aria-expanded={active}
-              aria-controls={`home-course-panel-${entry.id}`}
-              onClick={() => setActiveEntry(entry.id)}
-              className={cn(
-                "group relative min-h-32 overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg sm:p-6",
-                active
-                  ? "border-indigo-300 bg-gradient-to-br from-white to-indigo-50/80"
-                  : "border-border/70 bg-white/80",
-              )}
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-8 -bottom-16 h-36 w-36 rounded-full bg-indigo-400/10 blur-2xl"
-              />
-              <span className="relative flex items-center justify-between gap-4">
-                <span className="flex min-w-0 items-center gap-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100/80 text-indigo-600">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-lg font-semibold whitespace-nowrap">
-                      {entry.label}
-                    </span>
-                    <span className="text-muted-foreground mt-1 block text-sm leading-5">
-                      {entry.description}
-                    </span>
-                  </span>
-                </span>
-                <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-600" />
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div
-        id={`home-course-panel-${activeEntry}`}
-        role="region"
-        aria-labelledby={`home-course-tab-${activeEntry}`}
-        className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3"
-      >
-        {items.map((item) => {
+      <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {HOME_COURSE_ITEMS.map((item) => {
           const copy = t.workspace.home.courseItems[item.id];
-          const targetLabel =
-            item.kind === "agent"
-              ? `${item.agentName} Agent`
-              : `video-gen · ${item.initialTaskType}`;
           return (
             <button
               key={item.id}
               type="button"
               data-course-entry={item.id}
+              aria-label={`${copy.title}：${copy.description}`}
               onClick={() => onSelect(item)}
-              className="group bg-background min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
+              onMouseEnter={() => queuePreview(item.id)}
+              onMouseLeave={hidePreview}
+              onFocus={() => showPreview(item.id)}
+              onBlur={hidePreview}
+              className={cn(
+                "group bg-background flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 text-left shadow-sm",
+                previewAllowed &&
+                  "transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl",
+              )}
             >
               <CourseMedia
                 item={item}
+                preview={activePreviewId === item.id}
                 failed={failedMedia.has(item.id)}
-                videoRef={
-                  item.media.kind === "video"
-                    ? (element) => {
-                        if (element) {
-                          element.dataset.courseItem = item.id;
-                          videoRefs.current.set(item.id, element);
-                        } else {
-                          videoRefs.current.delete(item.id);
-                        }
-                      }
-                    : undefined
-                }
                 onError={() =>
                   setFailedMedia((current) => new Set(current).add(item.id))
                 }
-                onPlaying={() =>
-                  setFailedMedia((current) => {
-                    if (!current.has(item.id)) return current;
-                    const next = new Set(current);
-                    next.delete(item.id);
-                    return next;
-                  })
-                }
               />
-              <span className="block p-4 sm:p-5">
+              <span className="flex flex-1 flex-col p-4 sm:p-5">
                 <span className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 text-base font-semibold whitespace-nowrap">
+                  <span className="min-w-0 text-base font-semibold">
                     {copy.title}
                   </span>
                   <span
-                    data-testid="creation-arrow"
+                    aria-hidden="true"
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors group-hover:bg-indigo-600 group-hover:text-white"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
                   </span>
                 </span>
-                <span className="text-muted-foreground mt-2 block min-h-10 text-xs leading-5">
+                <span className="text-muted-foreground mt-2 flex-1 text-sm leading-6">
                   {copy.description}
-                </span>
-                <span className="text-muted-foreground mt-3 block truncate text-[11px]">
-                  {targetLabel}
                 </span>
               </span>
             </button>

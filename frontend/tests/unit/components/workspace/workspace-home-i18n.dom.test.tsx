@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import WorkspaceHome from "@/components/workspace/workspace-home";
 import { I18nProvider } from "@/core/i18n/context";
+import { enUS } from "@/core/i18n/locales/en-US";
+import { zhCN } from "@/core/i18n/locales/zh-CN";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
@@ -19,8 +21,16 @@ vi.mock("@/components/workspace/project-list", () => ({
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const CJK = /[一-鿿]/;
+const CAPABILITY_IDS = [
+  "course-video",
+  "ai_image",
+  "ai_video",
+  "creative-studio",
+  "ppt-master",
+  "podcast-studio",
+] as const;
 
-describe("workspace-home course entry i18n", () => {
+describe("workspace-home six-capability i18n", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -63,63 +73,34 @@ describe("workspace-home course entry i18n", () => {
     });
   }
 
-  it("en-US home, both course entries, and six cards have no CJK fragments", async () => {
+  it("shows the exact English hero and all six cards without CJK or recent projects", async () => {
     await renderHome("en-US");
     const text = container.textContent ?? "";
-    for (const copy of [
-      "What would you like to create?",
-      "Video course",
-      "Visual & audio course",
-      "Text animation",
-      "Image motion",
-      "AI video",
-      "Recent Projects",
-    ]) {
-      expect(text).toContain(copy);
-    }
-    await act(async () => {
-      Array.from(container.querySelectorAll("button"))
-        .find((item) => item.textContent?.includes("Visual & audio course"))
-        ?.click();
-    });
-    const expandedText = container.textContent ?? "";
-    for (const copy of [
-      "Poster design",
-      "PPT creation",
-      "Podcast production",
-    ]) {
-      expect(expandedText).toContain(copy);
-    }
-    expect(expandedText).not.toContain("articles");
-    expect(CJK.test(expandedText), `en-US contains CJK: ${expandedText}`).toBe(
-      false,
+    expect(text).toContain("Great content starts with one idea.");
+    expect(text).toContain(
+      "Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.",
     );
-    expect(container.querySelector("input")).toBeNull();
-    expect(expandedText).not.toContain("Super agents ready");
+    for (const id of CAPABILITY_IDS) {
+      expect(text).toContain(enUS.workspace.home.courseItems[id].title);
+      expect(text).toContain(enUS.workspace.home.courseItems[id].description);
+    }
+    expect(text).not.toContain("Recent Projects");
+    expect(text).not.toContain("Visual & audio course");
+    expect(CJK.test(text), `en-US contains CJK: ${text}`).toBe(false);
   });
 
-  it("zh-CN uses the confirmed home and six entry names", async () => {
+  it("shows the exact Chinese hero and all six descriptions without recent projects", async () => {
     await renderHome("zh-CN");
     const text = container.textContent ?? "";
-    for (const copy of [
-      "想创造什么？",
-      "视频课",
-      "图文音频课",
-      "文字动效",
-      "图片动效",
-      "AI视频",
-      "近期项目",
-    ]) {
-      expect(text).toContain(copy);
+    expect(text).toContain("让好内容，从一个想法开始");
+    expect(text).toContain(
+      "选择一种能力，把文字、图片和资料变成视频、海报、PPT 或播客。",
+    );
+    for (const id of CAPABILITY_IDS) {
+      expect(text).toContain(zhCN.workspace.home.courseItems[id].title);
+      expect(text).toContain(zhCN.workspace.home.courseItems[id].description);
     }
-    await act(async () => {
-      Array.from(container.querySelectorAll("button"))
-        .find((item) => item.textContent?.includes("图文音频课"))
-        ?.click();
-    });
-    for (const copy of ["海报制作", "PPT制作", "语音播客", "播客制作"]) {
-      expect(container.textContent).toContain(copy);
-    }
-    expect(container.textContent).not.toContain("文章");
+    expect(text).not.toContain("近期项目");
+    expect(text).not.toContain("图文音频课");
   });
 });

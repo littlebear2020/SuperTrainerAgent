@@ -1,6 +1,6 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：已执行（任务 0–4；任务 5–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 URL 导航、真实用户底部与角色设置完成，video-assets Playwright 11/11、console 后端 69/69，证据见 `temp/workspace-experience-2026-11-12/`）。
+> **状态**：已执行（任务 0–5；任务 6–8 未执行。任务 0 提交 `1e5face7`，任务 1 提交 `0ee573a8` 并完成一次真实显式 speaker TTS，测试补强提交 `72d61eb5`；任务 2 本地 linux/amd64 sandbox 全部验收通过；任务 3 提交 `f63f0fe7`，普通/Agent/案例 Playwright 12/12；任务 4 提交 `32d38103`，video-assets Playwright 11/11；任务 5 六能力首页、三张 poster、按需媒体与中英移动截图验收完成，首页/landing Playwright 12/12，证据见 `temp/workspace-experience-2026-11-12/`）。
 > **TL;DR**：夜间 goal 串行交付 R1–R6/R8，并完成本地测试、sandbox 镜像/容器验证、最小 TTS、PR/OCR；R7 定价和播客实时 URL 不阻塞 goal；不访问测试/公司服务器、不部署、不构建发布镜像、不重建 remotion-worker，次日由用户人工验收并自行决定公司部署。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
@@ -205,16 +205,16 @@
 - Reuse: `ppt-work.webp`、`knowledge-card.webp`、`podcast-work.webp` 与既有三段 MP4
 - Test: 首页 catalog/DOM/i18n、home-course-entry/landing E2E、视觉截图
 
-- [ ] 先更新失败测试：六卡同显、无分类按钮、无近期项目、初始 video/play=0；保留四 Agent URL 与两个 AI 弹窗交替卸载测试。
-- [ ] 保持创建边界：生产仅首页为 ai_image/ai_video 条件挂载并传 initialTaskType；focused 不渲染通用类型选择器。不新增 unfocused 挂载或 remotion_course/vimax 入口。
-- [ ] 移除首页 useThreads/ProjectList/查看全部，保留 `/workspace/chats` 与侧栏最近对话；不要全局断言线程搜索请求为零。
-- [ ] 六 ID 顺序固定为 course-video、ai_image、ai_video、creative-studio、ppt-master、podcast-studio；动作与真实路由不变，删除 entry 分类、技术 target/badge。
-- [ ] Hero 中文“让好内容，从一个想法开始”，副标题“选择一种能力，把文字、图片和资料变成视频、海报、PPT 或播客。”；英文使用 “Great content starts with one idea.” 与 “Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.”
-- [ ] 六卡说明依次为：①把文稿与知识点变成节奏清晰、易理解的动态讲解视频；②根据脚本生成画面，让静态内容自然流动；③从一个创意生成更自由、更丰富的动态镜头；④把主题与要点做成清晰、醒目的视觉海报；⑤从主题或资料生成结构清晰、可编辑的演示文稿；⑥把文档、公开链接或主题调研做成可下载的 MP3 播客。英文自然等义，不暴露内部 Agent ID。
-- [ ] 容器 max-w-5xl，桌面三列、平板两列、手机单列；媒体容器统一 16:9，auto-rows-fr + 弹性卡体等高，不截断英文，手机允许纵向滚动。
-- [ ] 仅生成并读回三张 960×540 视频 poster；三个静态卡复用现有图，统一 16:9 容器 `object-contain` + 中性背景，完整显示，不用 object-cover 硬裁，不新增静态重制图。
-- [ ] 初始仅 poster；hover 200ms/focus 仅挂载当前视频，离开/页面隐藏即停；触屏与 reduced motion 不挂载视频并关闭装饰动画。播放失败保留 poster 并提示“预览暂不可用，仍可开始创作”，图片失败退中性色块，点击始终可用。
-- [ ] Playwright 验证六入口、两行等高、390px/320px 无横向溢出、键盘/focus、媒体失败、中英文和静态图 computed object-fit=contain；修正 locale helper 使 cookie baseURL 跟随 E2E_PORT，执行 agent 用 ReadMediaFile 检查桌面/移动截图与两侧留白。
+- [x] 先更新失败测试：六卡同显、无分类按钮、无近期项目、初始 video/play=0；保留四 Agent URL 与两个 AI 弹窗交替卸载测试。
+- [x] 保持创建边界：生产仅首页为 ai_image/ai_video 条件挂载并传 initialTaskType；focused 不渲染通用类型选择器。不新增 unfocused 挂载或 remotion_course/vimax 入口。
+- [x] 移除首页 useThreads/ProjectList/查看全部，保留 `/workspace/chats` 与侧栏最近对话；不要全局断言线程搜索请求为零。
+- [x] 六 ID 顺序固定为 course-video、ai_image、ai_video、creative-studio、ppt-master、podcast-studio；动作与真实路由不变，删除 entry 分类、技术 target/badge。
+- [x] Hero 中文“让好内容，从一个想法开始”，副标题“选择一种能力，把文字、图片和资料变成视频、海报、PPT 或播客。”；英文使用 “Great content starts with one idea.” 与 “Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.”
+- [x] 六卡说明依次为：①把文稿与知识点变成节奏清晰、易理解的动态讲解视频；②根据脚本生成画面，让静态内容自然流动；③从一个创意生成更自由、更丰富的动态镜头；④把主题与要点做成清晰、醒目的视觉海报；⑤从主题或资料生成结构清晰、可编辑的演示文稿；⑥把文档、公开链接或主题调研做成可下载的 MP3 播客。英文自然等义，不暴露内部 Agent ID。
+- [x] 容器 max-w-5xl，桌面三列、平板两列、手机单列；媒体容器统一 16:9，auto-rows-fr + 弹性卡体等高，不截断英文，手机允许纵向滚动。
+- [x] 仅生成并读回三张 960×540 视频 poster；三个静态卡复用现有图，统一 16:9 容器 `object-contain` + 中性背景，完整显示，不用 object-cover 硬裁，不新增静态重制图。
+- [x] 初始仅 poster；hover 200ms/focus 仅挂载当前视频，离开/页面隐藏即停；触屏与 reduced motion 不挂载视频并关闭装饰动画。播放失败保留 poster 并提示“预览暂不可用，仍可开始创作”，图片失败退中性色块，点击始终可用。
+- [x] Playwright 验证六入口、两行等高、390px/320px 无横向溢出、键盘/focus、媒体失败、中英文和静态图 computed object-fit=contain；修正 locale helper 使 cookie baseURL 跟随 E2E_PORT，执行 agent 用 ReadMediaFile 检查桌面/移动截图与两侧留白。
 
 ### 任务 6：为我的作品增加六类筛选与 Agent 对话历史（R5）
 

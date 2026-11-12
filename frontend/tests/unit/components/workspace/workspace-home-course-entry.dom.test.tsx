@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   push: vi.fn(),
   dialogProps: [] as Array<Record<string, unknown>>,
   projectThreads: [] as unknown[],
+  useThreads: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -18,16 +19,7 @@ vi.mock("@/core/i18n/hooks", async () => {
 });
 
 vi.mock("@/core/threads/hooks", () => ({
-  useThreads: () => ({
-    data: [
-      {
-        thread_id: "real-thread",
-        values: { title: "真实近期项目" },
-        metadata: { project_type: "course-video" },
-        updated_at: "2026-11-09T08:00:00Z",
-      },
-    ],
-  }),
+  useThreads: h.useThreads,
 }));
 
 vi.mock("@/components/workspace/project-list", () => ({
@@ -92,6 +84,7 @@ describe("WorkspaceHome course entries", () => {
     h.push.mockClear();
     h.dialogProps.length = 0;
     h.projectThreads = [];
+    h.useThreads.mockReset().mockReturnValue({ data: [] });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -144,18 +137,10 @@ describe("WorkspaceHome course entries", () => {
     ]);
   });
 
-  it("routes view all recent projects to the existing chats search page", async () => {
-    await act(async () => entryButton("查看全部 →").click());
-    expect(h.push).toHaveBeenCalledWith("/workspace/chats");
-  });
-
-  it("keeps real recent project list", () => {
-    expect(h.projectThreads).toHaveLength(1);
-    expect(h.projectThreads[0]).toMatchObject({
-      thread_id: "real-thread",
-      values: { title: "真实近期项目" },
-    });
-    expect(document.body.textContent).toContain("真实近期项目");
-    expect(document.body.textContent).not.toContain("新员工入职培训");
+  it("removes recent projects and does not query a home thread list", () => {
+    expect(h.useThreads).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-testid='project-list']")).toBeNull();
+    expect(document.body.textContent).not.toContain("近期项目");
+    expect(document.body.textContent).not.toContain("真实近期项目");
   });
 });

@@ -637,59 +637,42 @@ export const zhCN: Translations = {
   workspace: {
     // 首页 hero、双入口与六张创作卡统一走 i18n。
     home: {
-      heroTitle: "想创造什么？",
-      createHeading: "选择一种创作方式，开始你的下一个作品",
-      videoCourse: "视频课",
-      videoCourseDescription: "从课程脚本到动态画面，快速制作视频内容",
-      textCourse: "图文音频课",
-      textCourseDescription: "用海报、演示文稿和播客讲清知识",
-      playbackUnavailable: "视频暂时无法播放",
+      heroTitle: "让好内容，从一个想法开始",
+      createHeading:
+        "选择一种能力，把文字、图片和资料变成视频、海报、PPT 或播客。",
+      playbackUnavailable: "预览暂不可用，仍可开始创作",
       courseItems: {
         "course-video": {
           title: "文字动效",
-          description: "把课程内容转为结构清晰、富有动效的课程视频",
-          badge: "AI视频",
+          description: "把文稿与知识点变成节奏清晰、易理解的动态讲解视频",
           mediaAlt: "文字动效课程样例",
         },
         ai_image: {
           title: "图片动效",
-          description: "由脚本生成画面，让静态图片自然流动",
-          badge: "AI视频",
+          description: "根据脚本生成画面，让静态内容自然流动",
           mediaAlt: "图片动效样例",
         },
         ai_video: {
           title: "AI视频",
-          description: "根据创意生成动态镜头，表达更丰富的场景",
-          badge: "AI视频",
+          description: "从一个创意生成更自由、更丰富的动态镜头",
           mediaAlt: "AI 视频样例",
         },
         "creative-studio": {
           title: "海报制作",
-          description: "把知识与要点转为清晰、美观的视觉卡片",
-          badge: "视觉设计",
+          description: "把主题与要点做成清晰、醒目的视觉海报",
           mediaAlt: "知识卡片海报样例",
         },
         "ppt-master": {
           title: "PPT制作",
-          description: "从内容结构到可编辑课件，高效完成演示文稿",
-          badge: "演示文稿",
+          description: "从主题或资料生成结构清晰、可编辑的演示文稿",
           mediaAlt: "PPT 演示文稿装饰预览",
-        },
-        "co-writer": {
-          title: "文章写作",
-          description: "协同完成选题、结构、草稿与润色",
-          badge: "协同写作",
-          mediaAlt: "文章写作装饰预览",
         },
         "podcast-studio": {
           title: "播客制作",
-          description: "从文档、公开链接或主题调研生成真实 MP3 音频",
-          badge: "语音播客",
+          description: "把文档、公开链接或主题调研做成可下载的 MP3 播客",
           mediaAlt: "双人耳机与音频波形封面",
         },
       },
-      recentProjects: "近期项目",
-      viewAll: "查看全部 →",
     },
   },
 
