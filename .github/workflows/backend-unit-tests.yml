@@ -84,6 +84,12 @@ jobs:
           ffmpeg -version
           ffprobe -version
 
+      - name: Install Poppler for PDF ingestion
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          pdftotext -v
+
       - name: Install backend dependencies
         working-directory: backend
         run: uv sync --group dev
