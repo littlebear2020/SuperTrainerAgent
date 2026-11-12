@@ -1,6 +1,6 @@
 # 播客 Agent 与音频创作实施计划
 
-> **状态**：执行中（2026-11-12 开始执行；阶段 A 已完成并保留，Task 1 的四个密钥变量名已获用户明确授权；Task 7 四个真实 MP3 后暂停等待人工试听，试听通过前不执行 Task 8 的完成交付）。执行记录将写入 `docs/changelog/changelog-2026-11-12-podcast-studio.md`。
+> **状态**：部分已执行（2026-11-12 开始执行；阶段 A 已完成并保留，Task 1 的四个密钥变量名已获用户明确授权；Task 7 四份真实 MP3 已于 2026-11-12 获用户人工试听通过，实时安全 URL 验收仍未成功，Task 7 Step 5 完成前不执行 Task 8 的完成交付）。执行记录将写入 `docs/changelog/changelog-2026-11-12-podcast-studio.md`。
 > **TL;DR**：新增 `podcast-studio` Agent 和一个四模式共享技能，以文档/链接/调研为来源，经必要确认后用字节 TTS 交付 MP3；首页仅以播客卡替换 co-writer，旧 Agent、Writer 与历史路由全部保留。AUTOBIND 默认关闭，不改 Docker、`.env.example` 或部署文档；真实密钥名集合未获用户当场授权时不得开启或宣称完成。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`，单执行者、单工作区按 Task 1→8 串行，逐项勾选。Task 1 未获用户当场授权时立即停止，不得自行扩权。共享 locale、seed、技能和测试不得并行修改。
@@ -266,7 +266,7 @@
   用真实 PDF 或 HTML 形成至少 4 轮男女访谈；真实确认前零 TTS，确认后角色/段序/裸 speaker 正确，无串声/异常停顿，合并一个 MP3并 present/download。
 - [ ] **Step 5：经真实 Agent 验收 debate_two 与安全 URL**
   输入一个真实公开、安全 URL，成功读取正文后形成至少 4 轮正反辩论；双方立场均存在、无人身攻击。真实确认后才合成，男女音色和顺序正确，最终一个 MP3并 present/download。URL 核心能力不能用 fail-closed 代替成功。
-- [ ] **Step 6：核验四个真实 MP3 的下载与音频质量**
+- [x] **Step 6：核验四个真实 MP3 的下载与音频质量**
   四个 MP3 均绑定各自真实 thread/assistant_id、present/download 200、非空、ffprobe codec=mp3/24kHz、FFmpeg 全解码无错；最终解码时长与分片及 300ms 轮间停顿对账在 0.1s 内，段序/hash 正确。人工试听角色、可懂度与原文/确认稿一致性；失败如实记录，不补静音或换引擎。四个真实模式未全部通过时，不得勾选本计划完成。
 
 ### Task 8：全量门禁、文档与交付
