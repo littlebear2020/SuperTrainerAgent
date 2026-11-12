@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   coarse: false,
   reduced: false,
   onSelect: vi.fn(),
+  play: vi.fn(),
 }));
 
 vi.mock("@/core/i18n/hooks", async () => {
@@ -18,6 +19,11 @@ import { HomeCourseEntry } from "@/components/workspace/home-course-entry";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
+const originalPlayDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "play",
+);
+
 describe("HomeCourseEntry six-card media behavior", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -26,6 +32,8 @@ describe("HomeCourseEntry six-card media behavior", () => {
     h.coarse = false;
     h.reduced = false;
     h.onSelect.mockReset();
+    h.play.mockReset();
+    h.play.mockImplementation(() => Promise.resolve());
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: vi.fn((query: string) => ({
@@ -40,6 +48,11 @@ describe("HomeCourseEntry six-card media behavior", () => {
       configurable: true,
       value: false,
     });
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      writable: true,
+      value: h.play,
+    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -48,6 +61,13 @@ describe("HomeCourseEntry six-card media behavior", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
+    if (originalPlayDescriptor) {
+      Object.defineProperty(
+        HTMLMediaElement.prototype,
+        "play",
+        originalPlayDescriptor,
+      );
+    }
     container.remove();
     vi.useRealTimers();
   });
@@ -115,6 +135,40 @@ describe("HomeCourseEntry six-card media behavior", () => {
     await act(async () => entry("ai_image").focus());
 
     expect(videos()).toHaveLength(0);
+  });
+
+  it("shows the honest fallback and preserves creation when play rejects", async () => {
+    h.play.mockRejectedValue(
+      new DOMException("Playback blocked", "NotAllowedError"),
+    );
+    await renderEntry();
+    const button = entry("course-video");
+    await act(async () => button.focus());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+    expect(h.play).toHaveBeenCalled();
+    expect(videos()).toHaveLength(0);
+    expect(button.querySelector("img")).not.toBeNull();
+    await act(async () => button.click());
+    expect(h.onSelect).toHaveBeenCalledWith(HOME_COURSE_ITEMS[0]);
+  });
+
+  it("ignores only AbortError from play without marking media failed", async () => {
+    h.play.mockRejectedValue(
+      new DOMException("Playback interrupted", "AbortError"),
+    );
+    await renderEntry();
+    await act(async () => entry("course-video").focus());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(h.play).toHaveBeenCalled();
+    expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
+    expect(videos()).toHaveLength(1);
   });
 
   it("keeps creation available after video failure and falls back to a neutral image block", async () => {

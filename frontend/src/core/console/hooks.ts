@@ -38,11 +38,17 @@ export function useIsConsoleAdmin(): boolean {
   return useAuth().isAdmin;
 }
 
+function useConsoleDataScope(): string {
+  const { isAdmin, user } = useAuth();
+  return isAdmin ? "admin" : `user:${user?.id ?? "anonymous"}`;
+}
+
 export function useConsoleStats(userId?: string, days?: number) {
+  const scope = useConsoleDataScope();
   return useQuery({
     // `days` is part of the key: without it, switching the day selector would
     // re-serve the cached all-time (or differently-windowed) numbers.
-    queryKey: ["console", "stats", userId ?? null, days ?? null],
+    queryKey: ["console", scope, "stats", userId ?? null, days ?? null],
     queryFn: () => fetchConsoleStats(userId, days),
     staleTime: STALE_TIME_MS,
   });
@@ -56,9 +62,11 @@ export function useConsoleRuns(options: {
   sortDir: SortDirection;
   userId?: string;
 }) {
+  const scope = useConsoleDataScope();
   return useQuery({
     queryKey: [
       "console",
+      scope,
       "runs",
       options.limit,
       options.offset,
@@ -69,25 +77,29 @@ export function useConsoleRuns(options: {
     ],
     queryFn: () => fetchConsoleRuns(options),
     staleTime: STALE_TIME_MS,
-    // Keep the previous page rendered while the next one loads so sorting and
-    // paging don't blank the table on every click.
-    placeholderData: (previous) => previous,
+    // Keep the previous page only within this data scope; role transitions must
+    // never expose another scope's rows while the scoped request is loading.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === scope ? previous : undefined,
   });
 }
 
 export function useConsoleUsage(options: { days: number; userId?: string }) {
+  const scope = useConsoleDataScope();
   return useQuery({
-    queryKey: ["console", "usage", options.days, options.userId ?? null],
+    queryKey: ["console", scope, "usage", options.days, options.userId ?? null],
     queryFn: () => fetchConsoleUsage(options),
     staleTime: STALE_TIME_MS,
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === scope ? previous : undefined,
   });
 }
 
 /** Admin-only; the query is disabled entirely for regular users so no 403 is provoked. */
 export function useConsoleUsers(enabled: boolean) {
+  const scope = useConsoleDataScope();
   return useQuery({
-    queryKey: ["console", "users"],
+    queryKey: ["console", scope, "users"],
     queryFn: fetchConsoleUsers,
     staleTime: 5 * 60_000,
     enabled,
@@ -96,8 +108,15 @@ export function useConsoleUsers(enabled: boolean) {
 
 // C2: Non-conversation LLM usage (all users, auto-scoped)
 export function useConsoleLlmUsage(options: { days: number; userId?: string }) {
+  const scope = useConsoleDataScope();
   return useQuery({
-    queryKey: ["console", "llm-usage", options.days, options.userId ?? null],
+    queryKey: [
+      "console",
+      scope,
+      "llm-usage",
+      options.days,
+      options.userId ?? null,
+    ],
     queryFn: () => fetchConsoleLlmUsage(options),
     staleTime: STALE_TIME_MS,
   });
@@ -108,9 +127,11 @@ export function useConsoleExternalCalls(options: {
   days: number;
   userId?: string;
 }) {
+  const scope = useConsoleDataScope();
   return useQuery({
     queryKey: [
       "console",
+      scope,
       "external-calls",
       options.days,
       options.userId ?? null,
@@ -129,8 +150,9 @@ export function useConsoleExternalCalls(options: {
  * provokes a 403.  Stale time matches the rest of the console.
  */
 export function useModelPricing(enabled: boolean) {
+  const scope = useConsoleDataScope();
   return useQuery({
-    queryKey: ["console", "model-pricing"],
+    queryKey: ["console", scope, "model-pricing"],
     queryFn: fetchModelPricing,
     staleTime: STALE_TIME_MS,
     enabled,
@@ -143,12 +165,13 @@ export function useModelPricing(enabled: boolean) {
  * because changed prices affect every spend figure on the console.
  */
 export function useUpdateModelPricing() {
+  const scope = useConsoleDataScope();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: ModelPricingUpdateRequest) => putModelPricing(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["console", "model-pricing"],
+        queryKey: ["console", scope, "model-pricing"],
       });
       // Prices drive every cost figure (stats, usage, runs).  Invalidate the
       // whole console namespace so the UI refetches with new prices.
@@ -162,8 +185,9 @@ export function useUpdateModelPricing() {
 // ---------------------------------------------------------------------------
 
 export function useMediaPricing(enabled: boolean) {
+  const scope = useConsoleDataScope();
   return useQuery({
-    queryKey: ["console", "media-pricing"],
+    queryKey: ["console", scope, "media-pricing"],
     queryFn: fetchMediaPricing,
     staleTime: STALE_TIME_MS,
     enabled,
@@ -171,12 +195,13 @@ export function useMediaPricing(enabled: boolean) {
 }
 
 export function useUpdateMediaPricing() {
+  const scope = useConsoleDataScope();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: MediaPricingReplaceRequest) => putMediaPricing(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["console", "media-pricing"],
+        queryKey: ["console", scope, "media-pricing"],
       });
       void queryClient.invalidateQueries({ queryKey: ["console"] });
     },
@@ -185,12 +210,13 @@ export function useUpdateMediaPricing() {
 
 /** C7 (A20): single-row upsert — same invalidation contract as the PUT. */
 export function usePatchMediaPricing() {
+  const scope = useConsoleDataScope();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: MediaPricingPatchRequest) => patchMediaPricing(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["console", "media-pricing"],
+        queryKey: ["console", scope, "media-pricing"],
       });
       void queryClient.invalidateQueries({ queryKey: ["console"] });
     },
@@ -199,6 +225,7 @@ export function usePatchMediaPricing() {
 
 /** C7 (A20): single-row delete — same invalidation contract as the PUT. */
 export function useDeleteMediaPricing() {
+  const scope = useConsoleDataScope();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: {
@@ -208,7 +235,7 @@ export function useDeleteMediaPricing() {
     }) => deleteMediaPricing(params),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["console", "media-pricing"],
+        queryKey: ["console", scope, "media-pricing"],
       });
       void queryClient.invalidateQueries({ queryKey: ["console"] });
     },

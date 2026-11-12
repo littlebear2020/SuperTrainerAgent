@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useI18n } from "@/core/i18n/hooks";
 
@@ -103,6 +103,24 @@ export default function WorkspaceHome() {
   const { t } = useI18n();
   const [createTaskType, setCreateTaskType] =
     useState<InitialVideoTaskType | null>(null);
+  const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(
+    () =>
+      !window.matchMedia("(pointer: coarse)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () =>
+      setAmbientMotionEnabled(!coarse.matches && !reduced.matches);
+    coarse.addEventListener("change", update);
+    reduced.addEventListener("change", update);
+    return () => {
+      coarse.removeEventListener("change", update);
+      reduced.removeEventListener("change", update);
+    };
+  }, []);
 
   const handleSelect = (item: HomeCourseItem) => {
     if (item.kind === "agent") {
@@ -114,8 +132,12 @@ export default function WorkspaceHome() {
 
   return (
     <div className="relative flex h-full flex-col overflow-y-auto">
-      <div className="ws-ambient" aria-hidden="true" />
-      <div className="ws-ambient-orb-cyan" aria-hidden="true" />
+      {ambientMotionEnabled ? (
+        <>
+          <div className="ws-ambient" aria-hidden="true" />
+          <div className="ws-ambient-orb-cyan" aria-hidden="true" />
+        </>
+      ) : null}
       <div className="relative z-10 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <header className="mb-8 text-center">
           <h1 className="text-foreground text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">

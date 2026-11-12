@@ -1,8 +1,24 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { pinEnglishLocale } from "./utils/locale";
 import { mockLangGraphAPI } from "./utils/mock-api";
 import { mockVideoAPI } from "./utils/mock-video-api";
+
+async function ambientAnimationState(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const ambient = document.querySelector(".ws-ambient");
+    const cyan = document.querySelector(".ws-ambient-orb-cyan");
+    return [
+      ambient
+        ? getComputedStyle(ambient, "::before").animationName
+        : "unmounted",
+      ambient
+        ? getComputedStyle(ambient, "::after").animationName
+        : "unmounted",
+      cyan ? getComputedStyle(cyan).animationName : "unmounted",
+    ];
+  });
+}
 
 let pageErrors: string[];
 
@@ -104,9 +120,20 @@ test.describe("home course entries", () => {
   test("hover and focus mount only one preview and leaving unmounts it", async ({
     page,
   }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/workspace");
     const card = page.locator("[data-course-entry='course-video']");
     await expect(page.locator("video")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () =>
+          window.matchMedia("(pointer: coarse)").matches ||
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+    ).toBe(false);
+    await expect
+      .poll(() => ambientAnimationState(page), { timeout: 2_000 })
+      .toEqual(["ws-ambient-drift", "ws-orb-drift-2", "ws-orb-drift-3"]);
     await card.hover();
     await expect(page.locator("video")).toHaveCount(0);
     await expect
@@ -128,11 +155,72 @@ test.describe("home course entries", () => {
     await expect(page.locator("video")).toHaveCount(0);
   });
 
-  test("reduced motion keeps poster and disables preview", async ({ page }) => {
+  test("reduced motion keeps poster and disables all ambient animation", async ({
+    page,
+  }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/workspace");
+    expect(
+      await page.evaluate(() => window.matchMedia("(pointer: coarse)").matches),
+    ).toBe(false);
     await page.locator("[data-course-entry='ai_image']").focus();
     await expect(page.locator("video")).toHaveCount(0);
+    expect(await ambientAnimationState(page)).toEqual([
+      "unmounted",
+      "unmounted",
+      "unmounted",
+    ]);
+  });
+
+  test.describe("real coarse pointer context", () => {
+    test.use({ hasTouch: true });
+
+    test("coarse pointer alone disables all ambient animation", async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await page.goto("/workspace");
+      expect(
+        await page.evaluate(
+          () => window.matchMedia("(pointer: coarse)").matches,
+        ),
+      ).toBe(true);
+      expect(
+        await page.evaluate(
+          () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        ),
+      ).toBe(false);
+      await page.locator("[data-course-entry='ai_image']").focus();
+      await expect(page.locator("video")).toHaveCount(0);
+      expect(await ambientAnimationState(page)).toEqual([
+        "unmounted",
+        "unmounted",
+        "unmounted",
+      ]);
+    });
+  });
+
+  test("play rejection keeps the poster and creation available", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      HTMLMediaElement.prototype.play = function () {
+        if (this.dataset.courseItem === "course-video") {
+          return Promise.reject(
+            new DOMException("Playback blocked", "NotAllowedError"),
+          );
+        }
+        return Promise.resolve();
+      };
+    });
+    await page.goto("/workspace");
+    const card = page.locator("[data-course-entry='course-video']");
+    await card.focus();
+    await expect(card.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
+    await expect(card.locator("img")).toBeVisible();
+    await expect(card.locator("video")).toHaveCount(0);
+    await card.click();
+    await expect(page).toHaveURL("/workspace/agents/course-video/chats/new");
   });
 
   test("alternating AI entries starts clean after close", async ({ page }) => {

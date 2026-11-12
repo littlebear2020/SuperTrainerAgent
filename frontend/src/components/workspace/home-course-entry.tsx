@@ -41,6 +41,18 @@ function CourseMedia({
       {showVideo ? (
         <video
           autoPlay
+          ref={(node) => {
+            if (!node) return;
+            void node.play().catch((error: unknown) => {
+              if (
+                error instanceof DOMException &&
+                error.name === "AbortError"
+              ) {
+                return;
+              }
+              onError();
+            });
+          }}
           className="absolute inset-0 h-full w-full object-contain"
           src={item.media.src}
           poster={poster}

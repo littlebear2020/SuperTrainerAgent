@@ -57,6 +57,10 @@ vi.mock("@/core/models/hooks", () => ({
   useModels: (...args: unknown[]) => mockUseModels(...args),
 }));
 
+vi.mock("@/core/auth/AuthProvider", () => ({
+  useAuth: () => ({ isAdmin: true, user: { id: "admin-1" } }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

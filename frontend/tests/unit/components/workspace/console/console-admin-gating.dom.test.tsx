@@ -59,6 +59,10 @@ function Wrap({
   );
 }
 
+vi.mock("@/core/auth/AuthProvider", () => ({
+  useAuth: () => ({ isAdmin: true, user: { id: "admin-1" } }),
+}));
+
 // The picker fetches the user list; stub the network, not the component.
 vi.mock("@/core/console/api", () => ({
   ConsoleApiError: class extends Error {},
