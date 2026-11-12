@@ -1,7 +1,7 @@
 # 工作区体验与文字动效修复优化实施计划
 
-> **状态**：任务 0–8 全部已执行。隔离真实 API 1/1、backend **10036 passed / 31 skipped / 421 warnings**、frontend **263 files / 1698 tests passed**、E2E **90/90** 与五路由性能门禁均通过；[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`。文档收口分支 `workspace-experience-docs-close` 自身 PR 随后由协调者创建，不新增任务复选框。
-> **TL;DR**：R1–R6/R8 与集中评审修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；实现 PR #3 第三轮 7 checks 全绿、OCR high 清零并已 rebase merge；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建；文档分支自身 PR 随后创建，剩余仅其 checks/merge。
+> **状态**：任务 0–8 全部已执行。隔离真实 API 1/1、backend **10036 passed / 31 skipped / 421 warnings**、frontend **263 files / 1698 tests passed**、E2E **90/90** 与五路由性能门禁均通过；[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。执行记录见 [changelog-2026-11-13-workspace-experience-and-pricing-optimization.md](../changelog/changelog-2026-11-13-workspace-experience-and-pricing-optimization.md)，证据见 `temp/workspace-experience-2026-11-12/`。文档收口通过独立纯文档 PR 执行，不新增任务复选框。
+> **TL;DR**：R1–R6/R8 与集中评审修复均完成；本地隔离 API、全量测试、sandbox 镜像/容器和一次公开 TTS probe 证据齐备；实现 PR #3 第三轮 7 checks 全绿、OCR high 清零并已 rebase merge；R7 定价和播客实时 URL 不阻塞；未访问服务器、未改价格/config；仅任务 2 构建本地 sandbox，未构建发布 frontend/gateway、未重建 remotion-worker、未推镜像，任务 8 未新增 Docker 构建；文档收口通过独立纯文档 PR 执行。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐项实施；不得调用 AskUserQuestion，不得等待人工回复。每个实现任务遵循“失败测试 → 确认功能原因失败 → 最小实现 → 定向回归 → 提交”；全部长命令后台串行，冻结被测输入。
 
@@ -253,7 +253,7 @@
 - [x] 汇总 R1–R6/R8 行为证据、R2 本地镜像/live 证据及 R7/播客实时 URL 的 OUT_OF_SCOPE 说明；更新本计划勾选/状态头和执行 changelog，TL;DR 与「验收记录」写真实命令关键输出和本地证据路径。
 - [x] 最终文档修改后，从根目录运行 `make check && python3 scripts/check_docs_convention.py && git diff --check`；性能预算变化必须归因评审，不得无声抬线。
 - [x] 已按预授权 push 功能分支并用 `GH_REPO=littlebear2020/SuperTrainerAgent gh pr create --base main` 新建 [PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3)（未复用 PR #2）。最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS，OCR high 清零；一个 MQL 性能 medium 和 low 建议记录为 non-blocking 后续优化，16+2 条线程回复及 summary disposition 已发。
-- [x] 第三轮 mergeState=`CLEAN`，PR #3 已于 **2026-11-12T23:09:49Z** 按仓库约定 rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。文档收口分支 `workspace-experience-docs-close` 自身 PR 随后由协调者创建，不为其增加任务复选框。
+- [x] 第三轮 mergeState=`CLEAN`，PR #3 已于 **2026-11-12T23:09:49Z** 按仓库约定 rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`。文档收口通过独立纯文档 PR 执行，不为其增加任务复选框。
 - [x] 清理本批不需要的测试输出与登记容器，恢复 AUTOBIND/本地服务到约定状态；最终报告逐项 PASS/FAIL/SKIPPED/BLOCKED、commit/PR/check/OCR ID、付费调用是否发生及原因、次日人工清单。
 
 ## 五、最终验收追踪表
@@ -278,7 +278,7 @@
 5. R7 价格完全由用户后续配置；三条 Claude TBD 保持，doubao_tts 0.12/0.3 由用户后续决定，不是夜间阻塞。
 6. 不实施定价后端、计价用量、空库播种、迁移、默认价或素材行改造；findings backlog 的独立缺口留后续。
 7. 不顺手处理 vimax-video 空技能建议、旧模型探针名册和 useDeleteThread 双 DELETE，不代勾播客前序计划。
-8. 任务 0–8 全部已按勾选完成实现、隔离真实 API、全量测试、文档验收与远端合入；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，16+2 条线程回复及 summary disposition 已发，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`；MQL 性能 medium 与 low 建议保留为 non-blocking 后续优化。文档收口分支自身 PR 随后由协调者创建，剩余仅其 checks/merge。
+8. 任务 0–8 全部已按勾选完成实现、隔离真实 API、全量测试、文档验收与远端合入；一次历史公开 TTS probe 成功且无人工重试，未修改价格或部署。[PR #3](https://github.com/littlebear2020/SuperTrainerAgent/pull/3) 最终原始 HEAD `a9b57565` 的第三轮 7 checks 全部 SUCCESS、OCR high 清零，16+2 条线程回复及 summary disposition 已发，已于 **2026-11-12T23:09:49Z** rebase merge，mergeCommit=`ec8320dff48c401f9de06ee65b7914006463468f`；MQL 性能 medium 与 low 建议保留为 non-blocking 后续优化。文档收口通过独立纯文档 PR 执行。
 
 ## 七、次日人工验收与后续公司部署（不在夜间 goal 范围）
 
