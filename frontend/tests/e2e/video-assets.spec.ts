@@ -137,7 +137,7 @@ test.describe("video assets", () => {
       "true",
     );
 
-    await page.getByRole("link", { name: "我的作品", exact: true }).click();
+    await page.getByRole("link", { name: "我的作品" }).click();
     await page.getByRole("tab", { name: "图片动效", exact: true }).click();
     await expect(page.getByText("合格图片作品", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "详情" }).click();
@@ -450,6 +450,120 @@ test.describe("video assets", () => {
     );
   });
 
+  test("project cards keep 16:9 media and aligned actions at 1440 and 390", async ({
+    page,
+  }) => {
+    for (let index = 0; index < 3; index += 1) {
+      api.seedProject({
+        id: `visual-project-${index}`,
+        title:
+          index === 1
+            ? "用于检查真实长标题与卡片布局的课程项目"
+            : `视觉项目 ${index}`,
+        visual_style_preset: "precision_eng",
+        updated_at: `2026-11-0${index + 1}T09:00:00Z`,
+      });
+    }
+    await page.goto("/workspace/video-gen?tab=assets");
+    const cards = page
+      .getByTestId("course-project-grid")
+      .locator(":scope > button");
+    const review = async (columns: 1 | 3) => {
+      await expect(cards).toHaveCount(3);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+      ).toBe(true);
+      const metrics = await cards.evaluateAll((elements) =>
+        elements.map((element) => {
+          const card = element.getBoundingClientRect();
+          const media = element.firstElementChild?.getBoundingClientRect();
+          const action =
+            element.lastElementChild?.lastElementChild?.getBoundingClientRect()
+              .bottom;
+          return {
+            left: card.left,
+            top: card.top,
+            height: card.height,
+            mediaWidth: media?.width ?? 0,
+            mediaHeight: media?.height ?? 0,
+            actionBottom: action ?? 0,
+          };
+        }),
+      );
+      for (const metric of metrics) {
+        expect(
+          Math.abs(metric.mediaWidth / metric.mediaHeight - 16 / 9),
+        ).toBeLessThan(0.02);
+      }
+      if (columns === 3) {
+        for (const metric of metrics.slice(1)) {
+          expect(Math.abs(metric.top - metrics[0]!.top)).toBeLessThanOrEqual(1);
+          expect(
+            Math.abs(metric.height - metrics[0]!.height),
+          ).toBeLessThanOrEqual(1);
+          expect(
+            Math.abs(metric.actionBottom - metrics[0]!.actionBottom),
+          ).toBeLessThanOrEqual(1);
+        }
+      } else {
+        for (const metric of metrics.slice(1)) {
+          expect(Math.abs(metric.left - metrics[0]!.left)).toBeLessThanOrEqual(
+            1,
+          );
+        }
+        expect(metrics[1]!.top).toBeGreaterThan(metrics[0]!.top);
+        expect(metrics[2]!.top).toBeGreaterThan(metrics[1]!.top);
+      }
+    };
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await review(3);
+    await page.screenshot({
+      path: test.info().outputPath("assets-1440.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await review(1);
+    await page.screenshot({
+      path: test.info().outputPath("assets-390.png"),
+      fullPage: true,
+    });
+  });
+
+  test("project detail unmounts and resets after sidebar round trip", async ({
+    page,
+  }) => {
+    api.seedProject({ id: "reset-project", title: "需要重置详情的项目" });
+    await page.goto("/workspace/video-gen?tab=assets");
+    await page.getByRole("button", { name: /需要重置详情的项目/ }).click();
+    await expect(
+      page.getByRole("button", { name: "返回项目列表" }),
+    ).toBeVisible();
+    await expect(page.getByPlaceholder("如：AI 入门课程")).toBeVisible();
+
+    await page.getByRole("link", { name: "我的作品" }).click();
+    await expect(
+      page.getByRole("heading", { name: "我的作品", exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/workspace\/video-gen$/);
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
+    await expect(page).toHaveURL(/tab=assets/);
+    await expect(
+      page.getByRole("heading", { name: "我的资产", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByTestId("course-project-grid")).toBeVisible();
+    await expect(page.getByRole("button", { name: "新建项目" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /需要重置详情的项目/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "返回项目列表" }),
+    ).toHaveCount(0);
+    await expect(page.getByPlaceholder("如：AI 入门课程")).toHaveCount(0);
+  });
+
   test("video preview error and mobile tabs degrade honestly", async ({
     page,
   }) => {
@@ -470,7 +584,7 @@ test.describe("video assets", () => {
     ).toBe(true);
     await page.getByRole("button", { name: "加载更多" }).click();
     await expect(page.getByTestId("completed-work-card")).toHaveCount(7);
-    await page.getByRole("link", { name: "我的资产", exact: true }).click();
+    await page.goto("/workspace/video-gen?tab=assets");
     await page.getByRole("button", { name: /移动资产项目/ }).click();
     await expect(
       page.getByRole("button", { name: "返回项目列表" }),
