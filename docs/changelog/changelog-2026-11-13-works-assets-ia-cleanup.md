@@ -1,6 +1,6 @@
 # 我的作品 / 我的资产信息架构与卡片统一
 
-> **状态**：本地实施与验收已完成，PR 收口进行中。
+> **状态**：实施与验收完成；PR #7 的 CI/OCR 已通过，符合 rebase merge 条件。
 > **TL;DR**：移除页内重复作品/资产导航与标题，资产项目改为受控选择；统一成品、对话、项目卡片的 16:9 媒体区与等高底部动作布局；对话新增四种纯 CSS/Lucide Motif 和真实用户轮数。真实封面、路由、创建、分镜、详情、播放、下载、重试、删除与状态行为均保留。
 
 ## 完成内容
@@ -30,3 +30,4 @@
 - `cd frontend && pnpm exec playwright test` → `97 passed (49.1s)`，`3 skipped`，完整 E2E 套件无失败。
 - 3000 端口被无关 HTTP 服务占用时运行 `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts -g "ready non-missing work can preview real media and download"` → `1 passed (6.1s)`，验证专用 Next/下载上游不受外部服务影响。
 - 下载上游缺文件探针 → 修复前进程崩溃并出现 `curl: (52) Empty reply from server`；修复后 `HTTP 500` 且 `/health` 继续通过，随后双 E2E `23 passed (22.7s)`。
+- `GH_REPO=littlebear2020/SuperTrainerAgent gh pr checks 7 --watch --interval 20` → `e2e-tests`、`frontend-unit-tests`、`lint-frontend`、`perf-budgets`、`quick-checks`、`review` 全部 `pass`；最新 OCR 仅 4 条 low，无 Critical/Important/medium。
