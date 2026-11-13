@@ -227,9 +227,9 @@ describe("VideoGenPage URL routing", () => {
       "文字动效",
       "图片动效",
       "AI视频",
-      "海报制作",
-      "PPT制作",
-      "播客制作",
+      "课程海报",
+      "PPT课件",
+      "语音播客",
     ];
     const tabs = Array.from(
       container.querySelectorAll<HTMLButtonElement>(

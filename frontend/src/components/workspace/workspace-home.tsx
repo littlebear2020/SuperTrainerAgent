@@ -124,14 +124,34 @@ export default function WorkspaceHome() {
           <div className="ws-ambient-orb-cyan" aria-hidden="true" />
         </>
       ) : null}
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-        <header className="mb-8 text-center">
-          <h1 className="text-foreground text-3xl leading-tight font-extrabold tracking-tight sm:text-5xl">
-            {t.workspace.home.heroTitle}
-          </h1>
-          <p className="text-muted-foreground mt-3 text-sm sm:text-base">
-            {t.workspace.home.createHeading}
-          </p>
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <header className="mb-8 grid items-end gap-8 md:grid-cols-[minmax(0,1.35fr)_minmax(240px,.65fr)] md:gap-12">
+          <div className="text-center md:text-left">
+            <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold tracking-[0.14em] text-indigo-600 md:justify-start">
+              <span aria-hidden="true" className="h-px w-5 bg-current" />
+              YOUR CONTENT STUDIO
+            </div>
+            <h1 className="text-foreground text-4xl leading-tight font-extrabold tracking-[-0.045em] sm:text-5xl">
+              {t.workspace.home.heroTitle}
+            </h1>
+            <p className="text-muted-foreground mt-4 text-sm leading-7 sm:text-base">
+              {t.workspace.home.createHeading}
+            </p>
+          </div>
+          <div className="relative mx-auto flex h-64 w-full max-w-sm items-end justify-center sm:h-72">
+            <img
+              src="/course-samples/teacher-A-half.png"
+              alt={t.workspace.home.teacherAlt}
+              className="h-64 w-auto max-w-full object-contain sm:h-72"
+            />
+            <span className="absolute right-2 bottom-3 flex items-center gap-1.5 rounded-full border border-indigo-100 bg-white/90 px-3 py-1.5 text-[10px] font-medium text-slate-600 shadow-sm">
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full bg-teal-400"
+              />
+              {t.workspace.home.teacherNote}
+            </span>
+          </div>
         </header>
         <HomeCourseEntry onSelect={handleSelect} />
       </div>

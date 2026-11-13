@@ -12,19 +12,28 @@ vi.mock("@/core/i18n/hooks", () => ({
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function button(text: string): HTMLButtonElement {
-  const result = Array.from(document.querySelectorAll("button")).find((item) =>
-    item.textContent?.includes(text),
-  );
-  if (!result) throw new Error(`button not found: ${text}`);
-  return result;
-}
+const EXPECTED_TAGS = [
+  ["主题变科普视频", "截图变产品教程", "讲稿原样转视频"],
+  ["等距信息图", "白板手绘", "商务实景"],
+  ["纸艺剧场", "3D角色", "商务实景"],
+  ["要点变知识卡", "课程变竖版海报", "知识变连续漫画"],
+  ["主题快速成课件", "旧PPT局部修改", "文字不变做美化"],
+  ["原文朗读", "单人新闻", "双人访谈", "双人辩论"],
+] as const;
+
+const IDS = [
+  "course-video",
+  "ai_image",
+  "ai_video",
+  "creative-studio",
+  "ppt-master",
+  "podcast-studio",
+] as const;
 
 describe("HomeCourseEntry", () => {
   let container: HTMLDivElement;
   let root: Root;
   let onSelect: ReturnType<typeof vi.fn<(item: HomeCourseItem) => void>>;
-  let playSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     Object.defineProperty(window, "matchMedia", {
@@ -39,7 +48,7 @@ describe("HomeCourseEntry", () => {
       configurable: true,
       value: false,
     });
-    playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -59,60 +68,102 @@ describe("HomeCourseEntry", () => {
     });
   }
 
-  it("shows all six capabilities without categories or initial playback", async () => {
+  function entry(id: string): HTMLButtonElement {
+    const result = container.querySelector<HTMLButtonElement>(
+      `[data-course-entry='${id}']`,
+    );
+    if (!result) throw new Error(`entry not found: ${id}`);
+    return result;
+  }
+
+  it("renders two named groups without a count and keeps three videos mounted", async () => {
     await render();
 
+    expect(container.querySelectorAll("[data-course-group]")).toHaveLength(2);
+    const text = container.textContent ?? "";
+    for (const copy of [
+      "视频课",
+      "VIDEO CREATION",
+      "图文音频课",
+      "DESIGN & AUDIO",
+    ]) {
+      expect(text).toContain(copy);
+    }
+    expect(text).not.toContain("03");
     expect(container.querySelectorAll("[data-course-entry]")).toHaveLength(6);
-    expect(container.querySelectorAll("video")).toHaveLength(0);
-    expect(playSpy).not.toHaveBeenCalled();
-    expect(container.textContent).not.toContain("图文音频课");
-    expect(container.textContent).not.toContain("视频课");
+    expect(container.querySelectorAll("video")).toHaveLength(3);
   });
 
-  it("uses the confirmed titles and real artwork without technical badges", async () => {
+  it("uses final names and assistant-toned media labels without status or captions", async () => {
     await render();
 
-    for (const [title, src] of [
-      ["海报制作", "/course-samples/knowledge-card.webp"],
-      ["PPT制作", "/course-samples/ppt-work.webp"],
-      ["播客制作", "/course-samples/podcast-work.webp"],
+    const titles = [
+      "文字动效",
+      "图片动效",
+      "AI视频",
+      "课程海报",
+      "PPT课件",
+      "语音播客",
+    ];
+    const mediaLabels = [
+      "文稿→动态讲解",
+      "文稿→动态图片",
+      "文稿→动态镜头",
+      "主题→视觉海报",
+      "资料→演示文稿",
+      "资料→语音播客",
+    ];
+    IDS.forEach((id, index) => {
+      const card = entry(id);
+      expect(card.textContent).toContain(titles[index]);
+      expect(card.textContent).toContain(mediaLabels[index]);
+      expect(card.querySelector("[data-media-status]")).toBeNull();
+      expect(card.querySelector("[data-media-caption]")).toBeNull();
+      const label = card.querySelector("[data-media-label]")!;
+      expect(label.className).toContain("bg-white/90");
+      expect(label.className).toContain("text-slate-600");
+      for (const tag of card.querySelectorAll("[data-course-tag]")) {
+        expect(tag.className).toContain("bg-violet-50");
+        expect(tag.className).toContain("text-violet-500");
+      }
+    });
+  });
+
+  it("renders exactly the approved 3/3/3/3/3/4 tags and removes rejected copy", async () => {
+    await render();
+
+    IDS.forEach((id, index) => {
+      const tags = Array.from(
+        entry(id).querySelectorAll("[data-course-tag]"),
+      ).map((tag) => tag.textContent);
+      expect(tags).toEqual(EXPECTED_TAGS[index]);
+    });
+    const text = container.textContent ?? "";
+    for (const removed of [
+      "数据变动态图表",
+      "流程变信息图",
+      "文档精编成课件",
+      "精密工程",
+      "纸艺拼贴",
+      "Remotion",
+      "TTS",
+      "研究写作",
+      "原生PPTX",
+      "原生 PPTX",
+    ]) {
+      expect(text).not.toContain(removed);
+    }
+  });
+
+  it("uses the approved static artwork", async () => {
+    await render();
+
+    for (const [id, src] of [
+      ["creative-studio", "/course-samples/poster-design.svg"],
+      ["ppt-master", "/course-samples/ppt-design.svg"],
+      ["podcast-studio", "/course-samples/podcast-work.webp"],
     ] as const) {
-      const card = button(title);
-      expect(card.querySelector("img")?.getAttribute("src")).toBe(src);
-      expect(card.querySelector("svg")).not.toBeNull();
+      expect(entry(id).querySelector("img")?.getAttribute("src")).toBe(src);
     }
-    for (const locale of ["zh-CN", "en-US"] as const) {
-      const copy =
-        translations[locale].workspace.home.courseItems["course-video"];
-      expect(copy.title).toBe(
-        locale === "zh-CN" ? "文字动效" : "Text animation",
-      );
-      expect(copy.mediaAlt).not.toContain("Remotion");
-      expect("badge" in copy).toBe(false);
-    }
-  });
-
-  it("unmounts the active preview when the document becomes hidden", async () => {
-    await render();
-    await act(async () => button("文字动效").focus());
-    expect(container.querySelectorAll("video")).toHaveLength(1);
-
-    Object.defineProperty(document, "hidden", {
-      configurable: true,
-      value: true,
-    });
-    await act(async () =>
-      document.dispatchEvent(new Event("visibilitychange")),
-    );
-    expect(container.querySelectorAll("video")).toHaveLength(0);
-
-    Object.defineProperty(document, "hidden", {
-      configurable: true,
-      value: false,
-    });
-    await act(async () =>
-      document.dispatchEvent(new Event("visibilitychange")),
-    );
-    expect(container.querySelectorAll("video")).toHaveLength(0);
   });
 });

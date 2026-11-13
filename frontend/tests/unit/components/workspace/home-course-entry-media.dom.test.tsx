@@ -33,7 +33,7 @@ const originalPauseDescriptor = Object.getOwnPropertyDescriptor(
   "pause",
 );
 
-describe("HomeCourseEntry six-card media behavior", () => {
+describe("HomeCourseEntry continuous media behavior", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -44,12 +44,20 @@ describe("HomeCourseEntry six-card media behavior", () => {
     h.play.mockReset();
     h.pause.mockReset();
     h.paused = false;
-    h.play.mockImplementation(() => {
+    h.play.mockImplementation(function (this: HTMLMediaElement) {
       h.paused = false;
+      Object.defineProperty(this, "paused", {
+        configurable: true,
+        value: false,
+      });
       return Promise.resolve();
     });
-    h.pause.mockImplementation(() => {
+    h.pause.mockImplementation(function (this: HTMLMediaElement) {
       h.paused = true;
+      Object.defineProperty(this, "paused", {
+        configurable: true,
+        value: true,
+      });
     });
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -78,7 +86,6 @@ describe("HomeCourseEntry six-card media behavior", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    vi.useFakeTimers();
   });
 
   afterEach(async () => {
@@ -98,12 +105,17 @@ describe("HomeCourseEntry six-card media behavior", () => {
       );
     }
     container.remove();
-    vi.useRealTimers();
   });
 
   async function renderEntry() {
     await act(async () => {
       root.render(<HomeCourseEntry onSelect={h.onSelect} />);
+    });
+  }
+
+  async function flushPlay() {
+    await act(async () => {
+      await Promise.resolve();
     });
   }
 
@@ -119,111 +131,62 @@ describe("HomeCourseEntry six-card media behavior", () => {
     return [...container.querySelectorAll("video")];
   }
 
-  it("shows all six cards with equal-row layout and no initial video", async () => {
+  it("mounts and plays all three videos by default with cover media", async () => {
     await renderEntry();
 
-    expect(container.querySelectorAll("[data-course-entry]")).toHaveLength(6);
-    expect(videos()).toHaveLength(0);
-    const grid = container.querySelector("[data-course-entry]")!.parentElement!;
-    expect(grid.className).toContain("auto-rows-fr");
-    expect(grid.className).toContain("sm:grid-cols-2");
-    expect(grid.className).toContain("lg:grid-cols-3");
-    for (const media of container.querySelectorAll("img")) {
-      expect(media.className).toContain("object-contain");
+    expect(videos()).toHaveLength(3);
+    expect(h.play).toHaveBeenCalledTimes(3);
+    for (const video of videos()) {
+      expect(video.autoplay).toBe(true);
+      expect(video.muted).toBe(true);
+      expect(video.loop).toBe(true);
+      expect(video.playsInline).toBe(true);
+      expect(video.className).toContain("object-cover");
     }
+    for (const image of container.querySelectorAll("img")) {
+      expect(image.className).toContain("object-cover");
+      expect(image.className).not.toContain("object-contain");
+    }
+    expect(container.querySelector("[data-media-status]")).toBeNull();
   });
 
-  it("mounts only the hovered card after 200ms and unmounts on leave and blur", async () => {
-    await renderEntry();
-    const button = entry("course-video");
-    await act(async () => {
-      button.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-      vi.advanceTimersByTime(199);
-    });
-    expect(videos()).toHaveLength(0);
-
-    await act(async () => vi.advanceTimersByTime(1));
-    expect(videos()).toHaveLength(1);
-    expect(videos()[0]!.dataset.courseItem).toBe("course-video");
-
-    await act(async () => {
-      button.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
-    });
-    expect(videos()).toHaveLength(0);
-
-    await act(async () => button.focus());
-    expect(videos()).toHaveLength(1);
-    await act(async () => button.blur());
-    expect(videos()).toHaveLength(0);
-  });
-
-  it("never mounts video for reduced motion or coarse pointers", async () => {
-    h.reduced = true;
+  it("plays on coarse pointers but shows posters for reduced motion", async () => {
     h.coarse = true;
     await renderEntry();
-    await act(async () => entry("ai_image").focus());
+    expect(videos()).toHaveLength(3);
 
+    await act(async () => root.unmount());
+    h.reduced = true;
+    root = createRoot(container);
+    await renderEntry();
     expect(videos()).toHaveLength(0);
+    expect(container.querySelectorAll("img")).toHaveLength(6);
+    expect(container.querySelector("[data-media-status]")).toBeNull();
   });
 
-  it("shows the honest fallback and preserves creation when play rejects", async () => {
-    h.play.mockRejectedValue(
-      new DOMException("Playback blocked", "NotAllowedError"),
-    );
+  it("pauses while hidden and resumes all three videos when visible", async () => {
     await renderEntry();
-    const button = entry("course-video");
-    await act(async () => button.focus());
-    await act(async () => {
-      await Promise.resolve();
-    });
+    expect(h.play).toHaveBeenCalledTimes(3);
 
-    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
-    expect(h.play).toHaveBeenCalled();
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: true,
+    });
+    await act(async () =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
     expect(videos()).toHaveLength(0);
-    expect(button.querySelector("img")).not.toBeNull();
-    await act(async () => button.click());
-    expect(h.onSelect).toHaveBeenCalledWith(HOME_COURSE_ITEMS[0]);
-  });
+    expect(h.pause).toHaveBeenCalledTimes(3);
 
-  it("ignores only AbortError from play without marking media failed", async () => {
-    h.play.mockRejectedValue(
-      new DOMException("Playback interrupted", "AbortError"),
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
+    await act(async () =>
+      document.dispatchEvent(new Event("visibilitychange")),
     );
-    await renderEntry();
-    await act(async () => entry("course-video").focus());
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(h.play).toHaveBeenCalled();
-    expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
-    expect(videos()).toHaveLength(1);
-  });
-
-  it("does not clear a fresh failure when queued hover follows a fast focus switch", async () => {
-    await renderEntry();
-    await act(async () => entry("course-video").focus());
-    expect(h.play).toHaveBeenCalledTimes(1);
-
-    h.play.mockRejectedValue(
-      new DOMException("Playback blocked", "NotAllowedError"),
-    );
-    const next = entry("ai_image");
-    await act(async () => {
-      next.focus();
-      next.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-      await Promise.resolve();
-    });
-    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
-    const callsBeforeTimer = h.play.mock.calls.length;
-
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-      await Promise.resolve();
-    });
-
-    expect(h.play).toHaveBeenCalledTimes(callsBeforeTimer);
-    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+    expect(videos()).toHaveLength(3);
+    expect(h.play).toHaveBeenCalledTimes(6);
   });
 
   it("deduplicates play across StrictMode and repeated renders", async () => {
@@ -231,15 +194,16 @@ describe("HomeCourseEntry six-card media behavior", () => {
     const onError = vi.fn();
     const onPlaying = vi.fn();
     const onPosterError = vi.fn();
-    const media = (preview: boolean) => (
+    const media = (playbackAllowed: boolean) => (
       <CourseMedia
         item={item}
-        preview={preview}
+        playbackAllowed={playbackAllowed}
         failed={false}
         posterFailed={false}
         onError={onError}
         onPlaying={onPlaying}
         onPosterError={onPosterError}
+        onRetry={onPlaying}
       />
     );
     await act(async () => {
@@ -265,29 +229,53 @@ describe("HomeCourseEntry six-card media behavior", () => {
     expect(h.play).toHaveBeenCalledTimes(3);
   });
 
-  it("retries and clears the failure after a new hover cycle", async () => {
-    h.play
-      .mockRejectedValueOnce(
-        new DOMException("First failure", "NotAllowedError"),
-      )
-      .mockResolvedValue(undefined);
+  it("shows the honest fallback and preserves creation when play rejects", async () => {
+    h.play.mockRejectedValueOnce(
+      new DOMException("Playback blocked", "NotAllowedError"),
+    );
     await renderEntry();
+    await flushPlay();
+
     const button = entry("course-video");
-    await act(async () => button.focus());
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
+    expect(button.textContent).toContain("预览暂不可用，仍可开始创作");
+    expect(videos()).toHaveLength(2);
+    expect(button.querySelector("video")).toBeNull();
+    expect(button.querySelector("img")).not.toBeNull();
+    await act(async () => button.click());
+    expect(h.onSelect).toHaveBeenCalledWith(HOME_COURSE_ITEMS[0]);
+  });
 
-    await act(async () => button.blur());
-    await act(async () => button.focus());
-    await act(async () => {
-      await Promise.resolve();
-    });
+  it("ignores only AbortError without marking media failed", async () => {
+    h.play.mockRejectedValueOnce(
+      new DOMException("Playback interrupted", "AbortError"),
+    );
+    await renderEntry();
+    await flushPlay();
 
-    expect(h.play).toHaveBeenCalledTimes(2);
     expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
-    expect(videos()).toHaveLength(1);
+    expect(videos()).toHaveLength(3);
+  });
+
+  it("retries a rejected video without losing the creation entry", async () => {
+    h.play.mockRejectedValueOnce(
+      new DOMException("First failure", "NotAllowedError"),
+    );
+    await renderEntry();
+    await flushPlay();
+    expect(entry("course-video").textContent).toContain("预览暂不可用");
+
+    const retry = container.querySelector<HTMLButtonElement>(
+      "[data-course-retry='course-video']",
+    );
+    expect(retry).not.toBeNull();
+    await act(async () => retry!.click());
+    await flushPlay();
+
+    expect(entry("course-video").textContent).not.toContain("预览暂不可用");
+    expect(videos()).toHaveLength(3);
+    expect(h.play).toHaveBeenCalledTimes(4);
+    await act(async () => entry("course-video").click());
+    expect(h.onSelect).toHaveBeenCalledWith(HOME_COURSE_ITEMS[0]);
   });
 
   it("keeps video preview available when only the poster fails", async () => {
@@ -298,22 +286,18 @@ describe("HomeCourseEntry six-card media behavior", () => {
         .querySelector("img")!
         .dispatchEvent(new Event("error", { bubbles: true }));
     });
-    expect(button.querySelector("img")).toBeNull();
 
-    await act(async () => button.focus());
-    expect(videos()).toHaveLength(1);
-    expect(h.play).toHaveBeenCalled();
+    expect(button.querySelector("img")).toBeNull();
+    expect(videos()).toHaveLength(3);
     expect(container.textContent).not.toContain("预览暂不可用，仍可开始创作");
   });
 
-  it("keeps creation available after video failure and falls back to a neutral image block", async () => {
+  it("keeps creation available after media errors and static fallback", async () => {
     await renderEntry();
     const button = entry("course-video");
-    await act(async () => button.focus());
     await act(async () => {
       videos()[0]!.dispatchEvent(new Event("error", { bubbles: true }));
     });
-
     expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
     await act(async () => button.click());
     expect(h.onSelect).toHaveBeenCalledWith(HOME_COURSE_ITEMS[0]);

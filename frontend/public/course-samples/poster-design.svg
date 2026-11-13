@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">编辑式海报设计</title>
+  <desc id="desc">珊瑚红、钴蓝与暖白色构成的大幅几何纸雕海报</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8e9"/><stop offset="1" stop-color="#eadffce"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#243cbb"/><stop offset="1" stop-color="#5968f0"/></linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff8066"/><stop offset="1" stop-color="#e94955"/></linearGradient>
+    <linearGradient id="aqua" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a8f0dc"/><stop offset="1" stop-color="#42c6c2"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#292040" flood-opacity=".2"/></filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="45"/></filter>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#332b64" stroke-opacity=".055" stroke-width="1"/></pattern>
+  </defs>
+  <rect width="1600" height="900" fill="url(#paper)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <circle cx="1330" cy="100" r="260" fill="#ffba8e" opacity=".28" filter="url(#soft)"/>
+  <circle cx="240" cy="790" r="280" fill="#8adfd2" opacity=".28" filter="url(#soft)"/>
+  <g filter="url(#shadow)">
+    <path d="M-90 710 370 160 610 270 150 900H-90Z" fill="url(#blue)"/>
+    <path d="M200 900 655 280 820 385 465 900Z" fill="#172765" opacity=".84"/>
+    <circle cx="945" cy="420" r="310" fill="url(#coral)"/>
+    <path d="M945 110a310 310 0 0 1 263 469L945 420Z" fill="#ffb165"/>
+    <path d="M945 420 1208 579A310 310 0 0 1 701 596Z" fill="#f05561"/>
+    <circle cx="945" cy="420" r="154" fill="#fff5df"/>
+    <circle cx="945" cy="420" r="92" fill="url(#aqua)"/>
+    <path d="M1040 0h370l-190 498-180-70Z" fill="url(#aqua)" opacity=".94"/>
+    <path d="M1260 900 1190 570l330-110 80 230v210Z" fill="url(#blue)"/>
+    <path d="m675 694 255-120 180 326H760Z" fill="#fff9ec"/>
+  </g>
+  <g fill="none" stroke="#fff9ec" stroke-width="10" opacity=".85">
+    <path d="M92 680 402 294"/><path d="M129 735 439 349"/>
+  </g>
+  <g transform="translate(1110 660)">
+    <rect width="302" height="108" rx="54" fill="#182152"/>
+    <circle cx="58" cy="54" r="19" fill="#ff8066"/>
+    <rect x="100" y="34" width="150" height="12" rx="6" fill="#fff8e9" opacity=".9"/>
+    <rect x="100" y="59" width="102" height="10" rx="5" fill="#fff8e9" opacity=".45"/>
+  </g>
+  <g transform="translate(100 92)">
+    <rect width="270" height="104" rx="18" fill="#fffaf0" opacity=".92"/>
+    <rect x="28" y="27" width="118" height="14" rx="7" fill="#273576"/>
+    <rect x="28" y="56" width="204" height="11" rx="5.5" fill="#273576" opacity=".3"/>
+  </g>
+</svg>

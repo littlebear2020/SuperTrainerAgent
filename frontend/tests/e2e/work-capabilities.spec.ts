@@ -89,7 +89,7 @@ test.describe("six work capabilities", () => {
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ai_video/);
 
-    await page.getByRole("tab", { name: "海报制作", exact: true }).click();
+    await page.getByRole("tab", { name: "课程海报", exact: true }).click();
     await expect(
       page
         .locator("#video-assets-panel-works")
@@ -97,7 +97,7 @@ test.describe("six work capabilities", () => {
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=creative-studio/);
 
-    await page.getByRole("tab", { name: "PPT制作", exact: true }).click();
+    await page.getByRole("tab", { name: "PPT课件", exact: true }).click();
     await expect(
       page
         .locator("#video-assets-panel-works")
@@ -105,7 +105,7 @@ test.describe("six work capabilities", () => {
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ppt-master/);
 
-    await page.getByRole("tab", { name: "播客制作", exact: true }).click();
+    await page.getByRole("tab", { name: "语音播客", exact: true }).click();
     await expect(
       page
         .locator("#video-assets-panel-works")
@@ -119,7 +119,7 @@ test.describe("six work capabilities", () => {
         .getByText("真实播客对话", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("tab", { name: "播客制作", exact: true }),
+      page.getByRole("tab", { name: "语音播客", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
 
     await page.goBack();
@@ -223,7 +223,7 @@ test.describe("six work capabilities", () => {
       timeout: 15000,
     });
     await expect(
-      page.locator("#video-assets-panel-works").getByText("暂无播客制作对话"),
+      page.locator("#video-assets-panel-works").getByText("暂无语音播客对话"),
     ).toHaveCount(0);
     await expect(page.getByTestId("agent-conversation-card")).toHaveCount(0);
 

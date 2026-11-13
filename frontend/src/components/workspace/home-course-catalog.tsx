@@ -8,6 +8,8 @@ export type CourseItemId =
   | "ppt-master"
   | "podcast-studio";
 
+export type HomeCourseGroup = "video" | "studio";
+
 type HomeCourseMedia = {
   kind: "video" | "image";
   src: string;
@@ -16,6 +18,7 @@ type HomeCourseMedia = {
 
 type HomeCourseItemBase = {
   id: CourseItemId;
+  group: HomeCourseGroup;
   media: HomeCourseMedia;
 };
 
@@ -35,16 +38,18 @@ export type HomeCourseItem = HomeCourseItemBase &
 export const HOME_COURSE_ITEMS: readonly HomeCourseItem[] = [
   {
     id: "course-video",
+    group: "video",
     kind: "agent",
     agentName: "course-video",
     media: {
       kind: "video",
-      src: "/course-samples/remotion.mp4",
+      src: "/course-samples/text-motion-preview.mp4",
       poster: "/course-samples/text-motion-poster.webp",
     },
   },
   {
     id: "ai_image",
+    group: "video",
     kind: "video-task",
     initialTaskType: "ai_image",
     media: {
@@ -55,6 +60,7 @@ export const HOME_COURSE_ITEMS: readonly HomeCourseItem[] = [
   },
   {
     id: "ai_video",
+    group: "video",
     kind: "video-task",
     initialTaskType: "ai_video",
     media: {
@@ -65,18 +71,21 @@ export const HOME_COURSE_ITEMS: readonly HomeCourseItem[] = [
   },
   {
     id: "creative-studio",
+    group: "studio",
     kind: "agent",
     agentName: "creative-studio",
-    media: { kind: "image", src: "/course-samples/knowledge-card.webp" },
+    media: { kind: "image", src: "/course-samples/poster-design.svg" },
   },
   {
     id: "ppt-master",
+    group: "studio",
     kind: "agent",
     agentName: "ppt-master",
-    media: { kind: "image", src: "/course-samples/ppt-work.webp" },
+    media: { kind: "image", src: "/course-samples/ppt-design.svg" },
   },
   {
     id: "podcast-studio",
+    group: "studio",
     kind: "agent",
     agentName: "podcast-studio",
     media: { kind: "image", src: "/course-samples/podcast-work.webp" },
