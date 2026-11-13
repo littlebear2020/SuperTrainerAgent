@@ -1,7 +1,13 @@
 "use client";
 
+import {
+  AudioLines,
+  Image as ImageIcon,
+  Presentation,
+  Type,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +30,75 @@ const THREAD_SEARCH_PARAMS = {
 } satisfies NonNullable<Parameters<typeof useThreads>[0]>;
 
 type WorkAgentName = Extract<HomeCourseItem, { kind: "agent" }>["agentName"];
+
+export function userTurnCount(thread: AgentThread): number | null {
+  const messages = thread.values?.messages;
+  if (!Array.isArray(messages)) return null;
+  const count = messages.filter((message) => message.type === "human").length;
+  return count > 0 ? count : null;
+}
+
+function ConversationMotif({ agentName }: { agentName: WorkAgentName }) {
+  let content: ReactNode;
+  if (agentName === "course-video") {
+    content = (
+      <div className="bg-background w-full max-w-52 space-y-3 rounded-xl border p-4 shadow-sm">
+        <Type className="h-6 w-6 text-indigo-500" />
+        <div className="h-2 w-full rounded-full bg-indigo-200 dark:bg-indigo-800" />
+        <div className="h-2 w-4/5 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+        <div className="h-2 w-3/5 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+      </div>
+    );
+  } else if (agentName === "creative-studio") {
+    content = (
+      <div className="bg-background flex h-4/5 w-2/5 flex-col items-center justify-center gap-3 rounded-lg border shadow-sm">
+        <ImageIcon className="h-8 w-8 text-indigo-500" />
+        <div className="h-2 w-1/2 rounded-full bg-indigo-200 dark:bg-indigo-800" />
+        <div className="h-2 w-1/3 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+      </div>
+    );
+  } else if (agentName === "ppt-master") {
+    content = (
+      <div className="bg-background w-4/5 space-y-3 rounded-lg border p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Presentation className="h-5 w-5 text-indigo-500" />
+          <div className="h-2 w-1/3 rounded-full bg-indigo-200 dark:bg-indigo-800" />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-md bg-indigo-100 dark:bg-indigo-900/40" />
+          <div className="col-span-2 space-y-2">
+            <div className="h-2 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+            <div className="h-2 w-4/5 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+          </div>
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <div className="flex items-center gap-2">
+        <AudioLines className="mr-2 h-8 w-8 text-indigo-500" />
+        {["h-8", "h-14", "h-20", "h-12", "h-24", "h-16", "h-10"].map(
+          (height) => (
+            <span
+              key={height}
+              className={`w-1.5 rounded-full bg-indigo-400 ${height}`}
+            />
+          ),
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      data-motif={agentName}
+      className="flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden bg-neutral-100 p-5 dark:bg-neutral-900"
+    >
+      {content}
+    </div>
+  );
+}
 
 function conversationTime(thread: AgentThread): number {
   const value = thread.updated_at ?? thread.created_at;
@@ -118,36 +193,47 @@ function AgentConversationGridContent({
   } else {
     content = (
       <>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 justify-start gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {matchingThreads.slice(0, visibleCount).map((thread) => {
             const updatedAt = thread.updated_at ?? thread.created_at;
             const validUpdatedAt =
               updatedAt && Number.isFinite(parseTimestamp(updatedAt).getTime())
                 ? updatedAt
                 : null;
+            const turns = userTurnCount(thread);
             return (
               <article
                 key={thread.thread_id}
                 data-testid="agent-conversation-card"
                 data-thread-id={thread.thread_id}
-                className="bg-background min-w-0 space-y-3 rounded-2xl border p-5 shadow-sm"
+                className="bg-background flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm"
               >
-                <h3 className="font-semibold break-words">
-                  {titleOfThread(thread)}
-                </h3>
-                <p className="text-muted-foreground text-sm">{label}</p>
-                <p className="text-muted-foreground text-xs">
-                  {validUpdatedAt
-                    ? `${t.workspace.works.updated} ${formatDateTime(validUpdatedAt)}`
-                    : t.workspace.works.updatedUnknown}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(pathOfThread(thread))}
-                >
-                  {t.workspace.works.open}
-                </Button>
+                <ConversationMotif agentName={agentName} />
+                <div className="flex flex-1 flex-col space-y-3 p-5">
+                  <h3 className="font-semibold break-words">
+                    {titleOfThread(thread)}
+                  </h3>
+                  <p className="text-muted-foreground text-sm">{label}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {validUpdatedAt
+                      ? `${t.workspace.works.updated} ${formatDateTime(validUpdatedAt)}`
+                      : t.workspace.works.updatedUnknown}
+                  </p>
+                  {turns !== null ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t.workspace.works.turns(turns)}
+                    </p>
+                  ) : null}
+                  <div className="mt-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(pathOfThread(thread))}
+                    >
+                      {t.workspace.works.open}
+                    </Button>
+                  </div>
+                </div>
               </article>
             );
           })}
