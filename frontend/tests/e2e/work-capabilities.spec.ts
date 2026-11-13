@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { mockLangGraphAPI, type MockThread } from "./utils/mock-api";
 import { mockVideoAPI, type MockVideoAPI } from "./utils/mock-video-api";
@@ -19,6 +19,56 @@ function seedVideo(
     task_type: taskType,
     updated_at: "2026-11-02T09:00:00Z",
   });
+}
+
+async function reviewWorkCards(page: Page, cardTestId: string, columns: 1 | 3) {
+  const cards = page.getByTestId(cardTestId);
+  await expect(cards).toHaveCount(3);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    ),
+  ).toBe(true);
+  const metrics = await cards.evaluateAll((elements) =>
+    elements.map((element) => {
+      const card = element.getBoundingClientRect();
+      const media = element.firstElementChild?.getBoundingClientRect();
+      const action = element
+        .querySelector("button")
+        ?.parentElement?.getBoundingClientRect();
+      return {
+        left: card.left,
+        top: card.top,
+        height: card.height,
+        mediaWidth: media?.width ?? 0,
+        mediaHeight: media?.height ?? 0,
+        actionBottom: action?.bottom ?? 0,
+      };
+    }),
+  );
+  for (const metric of metrics) {
+    expect(metric.mediaWidth).toBeGreaterThan(0);
+    expect(
+      Math.abs(metric.mediaWidth / metric.mediaHeight - 16 / 9),
+    ).toBeLessThan(0.02);
+  }
+  if (columns === 3) {
+    for (const metric of metrics.slice(1)) {
+      expect(Math.abs(metric.top - metrics[0]!.top)).toBeLessThanOrEqual(1);
+      expect(Math.abs(metric.height - metrics[0]!.height)).toBeLessThanOrEqual(
+        1,
+      );
+      expect(
+        Math.abs(metric.actionBottom - metrics[0]!.actionBottom),
+      ).toBeLessThanOrEqual(1);
+    }
+  } else {
+    for (const metric of metrics.slice(1)) {
+      expect(Math.abs(metric.left - metrics[0]!.left)).toBeLessThanOrEqual(1);
+    }
+    expect(metrics[1]!.top).toBeGreaterThan(metrics[0]!.top);
+    expect(metrics[2]!.top).toBeGreaterThan(metrics[1]!.top);
+  }
 }
 
 test.describe("six work capabilities", () => {
@@ -147,6 +197,88 @@ test.describe("six work capabilities", () => {
       ),
     ).toBe(true);
   });
+
+  for (const item of [
+    {
+      capability: "course-video",
+      kind: "agent",
+      agentName: "course-video",
+    },
+    {
+      capability: "creative-studio",
+      kind: "agent",
+      agentName: "creative-studio",
+    },
+    { capability: "ppt-master", kind: "agent", agentName: "ppt-master" },
+    {
+      capability: "podcast-studio",
+      kind: "agent",
+      agentName: "podcast-studio",
+    },
+    { capability: "ai_image", kind: "work", taskType: "ai_image" },
+    { capability: "ai_video", kind: "work", taskType: "ai_video" },
+  ] as const) {
+    test(`reviews ${item.capability} card geometry at 1440 and 390`, async ({
+      page,
+    }) => {
+      if (item.kind === "agent") {
+        mockLangGraphAPI(page, {
+          threads: [0, 1, 2].map((index) => ({
+            thread_id: `${item.capability}-visual-${index}`,
+            title:
+              index === 1
+                ? `${item.capability} 一个用于检查真实长标题换行与卡片等高的对话`
+                : `${item.capability} 对话 ${index}`,
+            agent_name: item.agentName,
+            updated_at: `2026-11-0${index + 1}T09:00:00Z`,
+          })),
+        });
+      } else {
+        mockLangGraphAPI(page, { threads: [] });
+        const variants = [
+          { status: "ready", progress: 100, error_message: null },
+          {
+            status: "failed",
+            progress: 70,
+            error_message: "真实失败原因保留完整显示，不通过截断制造卡片等高",
+          },
+          { status: "draft", progress: 100, error_message: null },
+        ] as const;
+        variants.forEach((variant, index) =>
+          api.seedTask({
+            id: `${item.capability}-visual-${index}`,
+            title: `${item.capability} 真实作品 ${index}`,
+            task_type: item.taskType,
+            ...variant,
+            created_at: `2026-11-0${index + 1}T08:00:00Z`,
+            updated_at: `2026-11-0${index + 1}T09:00:00Z`,
+            thumbnail_url: `/api/video/tasks/${item.capability}-visual-${index}/thumbnail`,
+          }),
+        );
+      }
+
+      const cardTestId =
+        item.kind === "agent"
+          ? "agent-conversation-card"
+          : "completed-work-card";
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto(
+        `/workspace/video-gen?tab=works&capability=${item.capability}`,
+      );
+      await reviewWorkCards(page, cardTestId, 3);
+      await page.screenshot({
+        path: test.info().outputPath(`${item.capability}-1440.png`),
+        fullPage: true,
+      });
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await reviewWorkCards(page, cardTestId, 1);
+      await page.screenshot({
+        path: test.info().outputPath(`${item.capability}-390.png`),
+        fullPage: true,
+      });
+    });
+  }
 
   test("fetches beyond offset 50, searches titles and opens the real thread", async ({
     page,
