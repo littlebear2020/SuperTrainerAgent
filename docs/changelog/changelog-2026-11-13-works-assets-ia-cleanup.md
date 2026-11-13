@@ -29,3 +29,4 @@
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - `cd frontend && pnpm exec playwright test` → `97 passed (49.1s)`，`3 skipped`，完整 E2E 套件无失败。
 - 3000 端口被无关 HTTP 服务占用时运行 `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts -g "ready non-missing work can preview real media and download"` → `1 passed (6.1s)`，验证专用 Next/下载上游不受外部服务影响。
+- 下载上游缺文件探针 → 修复前进程崩溃并出现 `curl: (52) Empty reply from server`；修复后 `HTTP 500` 且 `/health` 继续通过，随后双 E2E `23 passed (22.7s)`。
