@@ -124,7 +124,7 @@ describe("HomeCourseEntry", () => {
       expect(label.className).toContain("text-slate-600");
       for (const tag of card.querySelectorAll("[data-course-tag]")) {
         expect(tag.className).toContain("bg-violet-50");
-        expect(tag.className).toContain("text-violet-600");
+        expect(tag.className).toContain("text-slate-500");
       }
     });
   });

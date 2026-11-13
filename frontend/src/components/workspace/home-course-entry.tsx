@@ -196,7 +196,7 @@ function CourseEntryCard({
               <span
                 key={tag}
                 data-course-tag
-                className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-violet-600"
+                className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-slate-500"
               >
                 {tag}
               </span>
