@@ -1,6 +1,6 @@
 # 我的作品 / 我的资产信息架构与卡片统一实施计划
 
-> **状态**：已执行；任务 1～4 实施与本地验收已完成，PR 收口进行中。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
+> **状态**：已执行；任务 1～4 完成，PR #7 的 CI/OCR 验收已通过并符合 rebase merge 条件。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
 > **TL;DR**：只收敛页面信息架构、卡片网格与媒体区；现有配色、字体、胶囊 Tab、圆角、阴影、按钮和状态徽标全部沿用；真实作品封面及创建、分镜、详情、播放、下载、重试能力不删不改；不改后端、不改路由结构。
 
 > **For agentic workers：** 用户复核后使用 `executing-plans` 逐项实施；每项按“失败测试 → 最小实现 → 定向回归”执行并勾选，不得把 demo 当作视觉规范。
@@ -159,7 +159,7 @@ cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2
 
 - [x] **运行交付门禁**：`cd frontend && pnpm test`、`cd frontend && pnpm check`、根 `make check`、`python3 scripts/check_docs_convention.py`。长命令按仓库约定后台执行，记录真实关键输出。
 - [x] **写 changelog**：包含 TL;DR 与「验收记录」；每条为“命令 → 实际输出关键行”，不得伪造。更新本计划状态头并勾完已执行项。
-- [ ] **PR 收口**：按根 AGENTS.md 建分支 `works-assets-ia-cleanup`、逐主题提交、push、PR + OCR；不直推 main。无 Critical/Important 且 CI 绿才可 rebase merge，否则修复或回报。
+- [x] **PR 收口**：按根 AGENTS.md 建分支 `works-assets-ia-cleanup`、逐主题提交、push、PR + OCR；不直推 main。无 Critical/Important 且 CI 绿才可 rebase merge，否则修复或回报。
 
 ## 六、P1 / 明确不做
 
