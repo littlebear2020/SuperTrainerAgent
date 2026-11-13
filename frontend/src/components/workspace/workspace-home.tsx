@@ -129,7 +129,7 @@ export default function WorkspaceHome() {
           <div className="text-center md:text-left">
             <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold tracking-[0.14em] text-indigo-600 md:justify-start">
               <span aria-hidden="true" className="h-px w-5 bg-current" />
-              YOUR CONTENT STUDIO
+              {t.workspace.home.heroKicker}
             </div>
             <h1 className="text-foreground text-4xl leading-tight font-extrabold tracking-[-0.045em] sm:text-5xl">
               {t.workspace.home.heroTitle}

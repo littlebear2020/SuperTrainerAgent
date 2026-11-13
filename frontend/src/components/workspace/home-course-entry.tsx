@@ -21,7 +21,6 @@ export function CourseMedia({
   onError,
   onPlaying,
   onPosterError,
-  onRetry,
 }: {
   item: HomeCourseItem;
   playbackAllowed: boolean;
@@ -30,7 +29,6 @@ export function CourseMedia({
   onError: () => void;
   onPlaying: () => void;
   onPosterError: () => void;
-  onRetry: () => void;
 }) {
   const { t } = useI18n();
   const copy = t.workspace.home.courseItems[item.id];
@@ -109,33 +107,6 @@ export function CourseMedia({
           {copy.mediaLabel}
         </span>
       </div>
-      {failed && item.media.kind === "video" ? (
-        <div
-          role="status"
-          className="bg-background/90 absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 p-4 text-center text-sm"
-        >
-          <span>{t.workspace.home.playbackUnavailable}</span>
-          <span
-            role="button"
-            tabIndex={0}
-            data-course-retry={item.id}
-            className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-700"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRetry();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                event.stopPropagation();
-                onRetry();
-              }
-            }}
-          >
-            {t.workspace.works.retry}
-          </span>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -163,6 +134,7 @@ function CourseEntryCard({
 }) {
   const { t } = useI18n();
   const copy = t.workspace.home.courseItems[item.id];
+  const cardRef = useRef<HTMLButtonElement | null>(null);
   const onError = useCallback(() => {
     setFailedMedia((current) => new Set(current).add(item.id));
   }, [item.id, setFailedMedia]);
@@ -182,52 +154,73 @@ function CourseEntryCard({
       next.delete(item.id);
       return next;
     });
+    queueMicrotask(() => cardRef.current?.focus());
   }, [item.id, setFailedMedia]);
 
   return (
-    <button
-      type="button"
-      data-course-entry={item.id}
-      aria-label={`${copy.title}：${copy.description}`}
-      onClick={() => onSelect(item)}
-      className="group bg-background flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 text-left shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
-    >
-      <CourseMedia
-        item={item}
-        playbackAllowed={playbackAllowed}
-        failed={failed}
-        posterFailed={posterFailed}
-        onError={onError}
-        onPlaying={onPlaying}
-        onPosterError={onPosterError}
-        onRetry={onRetry}
-      />
-      <span className="flex flex-1 flex-col p-4 sm:p-5">
-        <span className="flex items-center justify-between gap-3">
-          <span className="min-w-0 text-base font-semibold">{copy.title}</span>
-          <span
-            aria-hidden="true"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition-colors group-hover:bg-violet-600 group-hover:text-white"
-          >
-            <ArrowRight className="h-3.5 w-3.5" />
+    <article className="group bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl">
+      <button
+        ref={cardRef}
+        type="button"
+        data-course-entry={item.id}
+        aria-label={`${copy.title}：${copy.description}`}
+        onClick={() => onSelect(item)}
+        className="flex h-full w-full flex-col text-left"
+      >
+        <CourseMedia
+          item={item}
+          playbackAllowed={playbackAllowed}
+          failed={failed}
+          posterFailed={posterFailed}
+          onError={onError}
+          onPlaying={onPlaying}
+          onPosterError={onPosterError}
+        />
+        <span className="flex flex-1 flex-col p-4 sm:p-5">
+          <span className="flex items-center justify-between gap-3">
+            <span className="min-w-0 text-base font-semibold">
+              {copy.title}
+            </span>
+            <span
+              aria-hidden="true"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition-colors group-hover:bg-violet-600 group-hover:text-white"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </span>
+          <span className="text-muted-foreground mt-2 flex-1 text-sm leading-6">
+            {copy.description}
+          </span>
+          <span className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
+            {copy.tags.map((tag) => (
+              <span
+                key={tag}
+                data-course-tag
+                className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-violet-600"
+              >
+                {tag}
+              </span>
+            ))}
           </span>
         </span>
-        <span className="text-muted-foreground mt-2 flex-1 text-sm leading-6">
-          {copy.description}
-        </span>
-        <span className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
-          {copy.tags.map((tag) => (
-            <span
-              key={tag}
-              data-course-tag
-              className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-violet-500"
-            >
-              {tag}
-            </span>
-          ))}
-        </span>
-      </span>
-    </button>
+      </button>
+      {failed && item.media.kind === "video" ? (
+        <div
+          role="status"
+          className="bg-background/90 pointer-events-none absolute inset-x-0 top-0 z-20 flex aspect-video flex-col items-center justify-center gap-3 p-4 text-center text-sm"
+        >
+          <span>{t.workspace.home.playbackUnavailable}</span>
+          <button
+            type="button"
+            data-course-retry={item.id}
+            className="pointer-events-auto rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-700"
+            onClick={onRetry}
+          >
+            {t.workspace.works.retry}
+          </button>
+        </div>
+      ) : null}
+    </article>
   );
 }
 

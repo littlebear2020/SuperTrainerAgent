@@ -203,7 +203,6 @@ describe("HomeCourseEntry continuous media behavior", () => {
         onError={onError}
         onPlaying={onPlaying}
         onPosterError={onPosterError}
-        onRetry={onPlaying}
       />
     );
     await act(async () => {
@@ -237,7 +236,7 @@ describe("HomeCourseEntry continuous media behavior", () => {
     await flushPlay();
 
     const button = entry("course-video");
-    expect(button.textContent).toContain("预览暂不可用，仍可开始创作");
+    expect(container.textContent).toContain("预览暂不可用，仍可开始创作");
     expect(videos()).toHaveLength(2);
     expect(button.querySelector("video")).toBeNull();
     expect(button.querySelector("img")).not.toBeNull();
@@ -262,16 +261,18 @@ describe("HomeCourseEntry continuous media behavior", () => {
     );
     await renderEntry();
     await flushPlay();
-    expect(entry("course-video").textContent).toContain("预览暂不可用");
+    expect(container.textContent).toContain("预览暂不可用");
 
     const retry = container.querySelector<HTMLButtonElement>(
       "[data-course-retry='course-video']",
     );
     expect(retry).not.toBeNull();
+    expect(entry("course-video").contains(retry)).toBe(false);
     await act(async () => retry!.click());
     await flushPlay();
 
     expect(entry("course-video").textContent).not.toContain("预览暂不可用");
+    expect(document.activeElement).toBe(entry("course-video"));
     expect(videos()).toHaveLength(3);
     expect(h.play).toHaveBeenCalledTimes(4);
     await act(async () => entry("course-video").click());
