@@ -1,0 +1,29 @@
+# 我的作品 / 我的资产信息架构与卡片统一
+
+> **状态**：本地实施与验收已完成，PR 收口进行中。
+> **TL;DR**：移除页内重复作品/资产导航与标题，资产项目改为受控选择；统一成品、对话、项目卡片的 16:9 媒体区与等高底部动作布局；对话新增四种纯 CSS/Lucide Motif 和真实用户轮数。真实封面、路由、创建、分镜、详情、播放、下载、重试、删除与状态行为均保留。
+
+## 完成内容
+
+- 侧栏作为作品/资产唯一一级入口；页面按现有 `route.tab` 显示单一 h1，保留六能力 Tab、URL canonicalization、无关 query 与键盘 ARIA。
+- `AssetsView` 仅在资产路由挂载，受控管理项目创建、打开、返回及离开后的列表重置；项目详情隐藏列表 CTA。
+- 成品卡继续消费真实 `thumbnail_url`，项目卡保留锚图 → 风格预览 → 主色 fallback；三类卡片统一网格、16:9 媒体区、纵向 flex 与底部动作对齐。
+- 四种对话能力分别使用文字行、海报、幻灯片、声波 Motif；仅统计真实 `type === "human"` 消息，缺省、空数组或无用户消息时不显示轮数。
+- E2E 增加真实资产详情卸载重置及六能力 + 资产的双视口几何检查；为本地下载事件补充可控真实附件上游，不改生产下载逻辑。
+
+## 视觉复核
+
+- 1440px：六能力与资产均为三列，无页面横向溢出；媒体区实测 16:9，同一行卡片等高，动作区底边对齐。
+- 390px：六能力与资产均为单列，无页面横向溢出；媒体区实测 16:9，长标题、真实错误和不同操作数量保留自然行高差异。
+- 14 张 E2E 截图已逐张复核；胶囊 Tab、Indigo、圆角、阴影、按钮与状态徽标沿用现有样式，未采用 demo 样式。
+
+## 验收记录
+
+- `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/video-gen-page-url.dom.test.tsx tests/unit/components/workspace/video-gen/course-project-page.dom.test.tsx tests/unit/components/workspace/video-gen/completed-video-grid.dom.test.tsx tests/unit/components/workspace/video-gen/agent-conversation-grid.dom.test.tsx` → `Test Files 4 passed (4)`，`Tests 36 passed (36)`。
+- `cd frontend && pnpm exec vitest run --project node tests/unit/components/workspace/video-gen/completed-video-grid.test.ts tests/unit/components/workspace/video-gen/course-project-cover.test.ts tests/unit/core/workspace/video-assets-route.test.ts` → `Test Files 3 passed (3)`，`Tests 16 passed (16)`。
+- `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts` → `23 passed (22.1s)`，包含真实播放、下载事件及全部状态行为。
+- `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts -g "card geometry|project cards keep"` → `7 passed (3.1s)`，覆盖六能力与资产的 1440px/390px 几何断言和截图。
+- `cd frontend && pnpm test` → `Test Files 263 passed (263)`，`Tests 1714 passed (1714)`。
+- `cd frontend && pnpm check` → 退出 0；`0 errors`，`All matched files use Prettier code style!`（121 条存量 ESLint warning）。
+- `make check` → 退出 0；后端 `All checks passed!`、`1317 files already formatted`，前端 knip 完成，`i18n key 存活检测通过：607 个叶子全活`，文档约定检查通过。
+- `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
