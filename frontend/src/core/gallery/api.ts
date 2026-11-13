@@ -85,20 +85,6 @@ export interface GalleryListResponse {
   total: number;
 }
 
-export interface GallerySettings {
-  enabled: boolean;
-  ugc_enabled: boolean;
-}
-
-export async function loadGallerySettings(): Promise<GallerySettings> {
-  const url = `${getBackendBaseURL()}/api/gallery/settings`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to load gallery settings: ${res.statusText}`);
-  }
-  return res.json();
-}
-
 export async function loadGalleryCategories(): Promise<string[]> {
   const url = `${getBackendBaseURL()}/api/gallery/categories`;
   const res = await fetch(url);

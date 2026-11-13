@@ -54,6 +54,10 @@ test.describe("Gallery auto-send (方案 A: chat page mount effect)", () => {
   test("long prompt via sessionStorage auto-sends (>500 chars)", async ({
     page,
   }) => {
+    test.skip(
+      true,
+      "Gallery 入口在当前版本隐藏；保留深链自动发送回归，入口恢复时重新启用",
+    );
     let streamCallCount = 0;
     await page.route("**/api/langgraph/runs/stream", (route) => {
       streamCallCount++;

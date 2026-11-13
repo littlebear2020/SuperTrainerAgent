@@ -59,6 +59,15 @@ test.describe("Chat workspace", () => {
     page,
   }) => {
     const suggestionPosts: string[] = [];
+    const galleryCategoryRequests: string[] = [];
+    await page.route("**/api/gallery/categories", (route) => {
+      galleryCategoryRequests.push(route.request().url());
+      return route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Unauthorized" }),
+      });
+    });
     await page.route("**/api/threads/*/suggestions", (route) => {
       if (route.request().method() === "POST") {
         suggestionPosts.push(route.request().url());
@@ -84,6 +93,8 @@ test.describe("Chat workspace", () => {
       page.locator("button[aria-label='Submit'] svg").first(),
     ).toHaveClass(/lucide-arrow-up/, { timeout: 10_000 });
     expect(suggestionPosts).toEqual([]);
+    expect(galleryCategoryRequests).toEqual([]);
+    await expect(page.getByTitle("分享到灵感库")).toHaveCount(0);
     await expect(page.getByText("Hidden follow-up")).toHaveCount(0);
   });
 });

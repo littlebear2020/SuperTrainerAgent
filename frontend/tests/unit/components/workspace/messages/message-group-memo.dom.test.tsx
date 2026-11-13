@@ -96,7 +96,7 @@ test("messages 引用不变时，父组件重渲染不应重渲染 MessageGroup 
   let bump: (() => void) | undefined;
 
   function Parent() {
-    // 与消息无关的 state：真实场景里 galleryEnabled 异步落地就是这个形状。
+    // 与消息无关的 state：异步设置或偏好状态落地就是这个形状。
     const [unrelated, setUnrelated] = useState(0);
     bump = () => setUnrelated((value) => value + 1);
     return (

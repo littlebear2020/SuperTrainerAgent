@@ -8,6 +8,8 @@
  * Mocks the writer + csrf-token endpoints via page.route(). Requires
  * DEER_FLOW_AUTH_DISABLED=1 (set in playwright.config.ts webServer env) to
  * bypass login, mirroring tests/e2e/video-gen.spec.ts.
+ *
+ * 当前版本隐藏新建文档入口，本组暂时跳过；深链实现保留，恢复入口时重新启用。
  */
 
 import { expect, test, type Page } from "@playwright/test";
@@ -71,6 +73,13 @@ function mockWriterAPI(
 }
 
 test.describe("Writer — New Document creation", () => {
+  test.beforeEach(() => {
+    test.skip(
+      true,
+      "Writer 新建文档入口在当前版本隐藏；保留深链回归，入口恢复时重新启用",
+    );
+  });
+
   test("success navigates to the editor route", async ({ page }) => {
     mockWriterAPI(page, { status: 200, body: MOCK_DOC });
 
