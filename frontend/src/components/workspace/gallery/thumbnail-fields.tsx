@@ -2,14 +2,7 @@
 
 /**
  * 灵感库缩略图字段（2026-10-06 近重复合并批，单一事实源）。
- *
- * 已下线的消息分享弹窗与灵感库编辑表单（gallery/page）原本
- * 各持一份「上传截图 / AI 生成 / 预览 / 覆盖操作」UI 与上传 handler
- * （同端点同文案）。收敛为共享组件，复核确认的分叉以 variant 表达：
- * - share：无图时上传 + AI 生成；有图时可「移除」（分享可选图）
- * - gallery：有图时「换一张 / AI 重生成 / 恢复原图」（编辑态不支持清空，
- *   None 语义=不修改）；无图时上传 + AI 生成；slate 暗色主题样式
- * AI 生成 handler 留在调用方（分享侧有内容感知 contentHint 分叉）。
+ * 库内编辑支持换一张、AI 重生成和恢复原图；AI 生成 handler 留在调用方。
  */
 
 import { type ChangeEvent } from "react";
@@ -25,12 +18,11 @@ export interface ThumbnailFieldsProps {
   onGenerate: () => void;
   /** 生成按钮 disabled（如提交中）。 */
   disabled?: boolean;
-  /** 无标题时悬浮提示（两侧文案一致：请先填写标题再生成封面）。 */
+  /** 无标题时悬浮提示（请先填写标题再生成封面）。 */
   generateDisabledTitle?: string;
-  variant: "share" | "gallery";
-  /** gallery：恢复原图的基准（当前值≠基准时显示「恢复原图」）。 */
+  /** 恢复原图的基准（当前值≠基准时显示「恢复原图」）。 */
   originalThumbnail?: string | null;
-  /** gallery 的 slate 双主题样式开关。 */
+  /** slate 双主题样式开关。 */
   isDark?: boolean;
 }
 
@@ -41,7 +33,6 @@ export function ThumbnailFields({
   onGenerate,
   disabled,
   generateDisabledTitle,
-  variant,
   originalThumbnail,
   isDark,
 }: ThumbnailFieldsProps) {
@@ -84,35 +75,6 @@ export function ThumbnailFields({
     </button>
   );
 
-  if (variant === "share") {
-    return thumbnail ? (
-      <div className="flex items-center gap-3">
-        <img
-          loading="lazy"
-          src={thumbnail}
-          alt="缩略图预览"
-          className="aspect-video h-16 rounded-md border object-cover"
-        />
-        <button
-          type="button"
-          onClick={() => onThumbnailChange(null)}
-          className="text-muted-foreground hover:text-foreground text-xs"
-        >
-          移除
-        </button>
-      </div>
-    ) : (
-      <div className="flex items-center gap-2">
-        <label className="bg-muted hover:bg-muted/70 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium">
-          上传截图
-          {fileInput("share-upload")}
-        </label>
-        {generateButton("✨ AI 生成", "share-gen")}
-      </div>
-    );
-  }
-
-  // gallery 变体（slate 双主题）
   const chipClass = cn(
     "cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium",
     isDark

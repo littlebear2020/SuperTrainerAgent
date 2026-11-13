@@ -325,7 +325,6 @@ export function GalleryDetailModal(
                         缩略图
                       </label>
                       <ThumbnailFields
-                        variant="gallery"
                         thumbnail={editThumbnail}
                         onThumbnailChange={setEditThumbnail}
                         isGenerating={isGeneratingThumb}
