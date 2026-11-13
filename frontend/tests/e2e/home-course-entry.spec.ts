@@ -142,12 +142,14 @@ test.describe("home course entries", () => {
         page.locator(`[data-course-entry='${id}'] [data-course-tag]`),
       ).toHaveCount([3, 3, 3, 3, 3, 4][index]!);
     }
+    for (const tag of ["纸艺拼贴", "精密工程"]) {
+      await expect(page.getByText(tag, { exact: true })).toBeVisible();
+    }
     for (const removed of [
       "数据变动态图表",
       "流程变信息图",
       "文档精编成课件",
-      "精密工程",
-      "纸艺拼贴",
+      "纸艺剧场",
     ]) {
       await expect(page.getByText(removed, { exact: true })).toHaveCount(0);
     }

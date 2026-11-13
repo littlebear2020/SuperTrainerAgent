@@ -138,7 +138,7 @@ export default function WorkspaceHome() {
               {t.workspace.home.createHeading}
             </p>
           </div>
-          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:translate-y-8">
+          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:translate-y-16">
             <img
               src="/course-samples/teacher-A-half.png"
               alt={t.workspace.home.teacherAlt}

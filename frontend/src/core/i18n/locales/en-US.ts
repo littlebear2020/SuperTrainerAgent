@@ -716,7 +716,7 @@ export const enUS: Translations = {
           tags: [
             "Isometric infographics",
             "Whiteboard sketch",
-            "Business footage",
+            "Paper collage",
           ],
         },
         ai_video: {
@@ -724,7 +724,7 @@ export const enUS: Translations = {
           description: "Turn one idea into freer, richer dynamic shots",
           mediaAlt: "AI video sample",
           mediaLabel: "Script → dynamic shots",
-          tags: ["Paper theater", "3D characters", "Business footage"],
+          tags: ["Precision engineering", "3D characters", "Business footage"],
         },
         "creative-studio": {
           title: "Course poster",

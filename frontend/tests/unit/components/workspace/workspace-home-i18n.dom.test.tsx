@@ -33,8 +33,8 @@ const IDS = [
 const TAGS = {
   "zh-CN": [
     ["主题变科普视频", "截图变产品教程", "讲稿原样转视频"],
-    ["等距信息图", "白板手绘", "商务实景"],
-    ["纸艺剧场", "3D角色", "商务实景"],
+    ["等距信息图", "白板手绘", "纸艺拼贴"],
+    ["精密工程", "3D角色", "商务实景"],
     ["要点变知识卡", "课程变竖版海报", "知识变连续漫画"],
     ["主题快速成课件", "旧PPT局部修改", "文字不变做美化"],
     ["原文朗读", "单人新闻", "双人访谈", "双人辩论"],
@@ -45,8 +45,8 @@ const TAGS = {
       "Screenshots → product tutorial",
       "Script → video, unchanged",
     ],
-    ["Isometric infographics", "Whiteboard sketch", "Business footage"],
-    ["Paper theater", "3D characters", "Business footage"],
+    ["Isometric infographics", "Whiteboard sketch", "Paper collage"],
+    ["Precision engineering", "3D characters", "Business footage"],
     [
       "Key points → knowledge cards",
       "Course → vertical poster",
