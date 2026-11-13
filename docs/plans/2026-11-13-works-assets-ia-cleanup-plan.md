@@ -1,6 +1,6 @@
 # 我的作品 / 我的资产信息架构与卡片统一实施计划
 
-> **状态**：未执行；任务 1 已完成，任务 2～4 待执行。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
+> **状态**：未执行；任务 1～2 已完成，任务 3～4 待执行。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
 > **TL;DR**：只收敛页面信息架构、卡片网格与媒体区；现有配色、字体、胶囊 Tab、圆角、阴影、按钮和状态徽标全部沿用；真实作品封面及创建、分镜、详情、播放、下载、重试能力不删不改；不改后端、不改路由结构。
 
 > **For agentic workers：** 用户复核后使用 `executing-plans` 逐项实施；每项按“失败测试 → 最小实现 → 定向回归”执行并勾选，不得把 demo 当作视觉规范。
@@ -117,10 +117,10 @@ interface CourseProjectPageProps {
 
 **Interface：** `CompletedVideoGrid`、`CompletedWorkCard`、`selectCompletedWorks`、`canPreviewOrDownload` 的签名均不变。
 
-- [ ] **先补结构与状态断言**：卡片含 `aspect-video` 媒体区；真实 `thumbnail_url` 仍渲染为原 URL；卡片为纵向 flex，正文占剩余空间，动作区底部对齐。参数化覆盖 `running`、`composing`、`qc_repair`、`pending`、`cancelled`，断言状态文案不丢、查看不可用、下载不存在、详情与删除仍在；这些属于旧功能保全回归，不要求在现代码上刻意失败。
-- [ ] **最小实现**：仅调整容器和布局类——`h-full flex flex-col`、媒体 `shrink-0`、正文 `flex flex-1 flex-col`、动作区 `mt-auto`；沿用 `rounded-2xl border shadow-sm`、现有标题/状态行、按钮 variant 和间距。
-- [ ] **明确不做**：不新增播放覆盖层，不移动 StatusBadge，不收纳按钮，不添加业务字段，不自动播放；不通过固定卡片总高度或截断错误信息制造视觉等高。
-- [ ] **定向回归**：运行 completed-video-grid DOM 与纯逻辑测试，逐项核对「旧功能保全表」全部状态，以及加载更多、真实播放/下载和确认弹层。
+- [x] **先补结构与状态断言**：卡片含 `aspect-video` 媒体区；真实 `thumbnail_url` 仍渲染为原 URL；卡片为纵向 flex，正文占剩余空间，动作区底部对齐。参数化覆盖 `running`、`composing`、`qc_repair`、`pending`、`cancelled`，断言状态文案不丢、查看不可用、下载不存在、详情与删除仍在；这些属于旧功能保全回归，不要求在现代码上刻意失败。
+- [x] **最小实现**：仅调整容器和布局类——`h-full flex flex-col`、媒体 `shrink-0`、正文 `flex flex-1 flex-col`、动作区 `mt-auto`；沿用 `rounded-2xl border shadow-sm`、现有标题/状态行、按钮 variant 和间距。
+- [x] **明确不做**：不新增播放覆盖层，不移动 StatusBadge，不收纳按钮，不添加业务字段，不自动播放；不通过固定卡片总高度或截断错误信息制造视觉等高。
+- [x] **定向回归**：运行 completed-video-grid DOM 与纯逻辑测试，逐项核对「旧功能保全表」全部状态，以及加载更多、真实播放/下载和确认弹层。
 
 ### 任务 3：统一对话卡并加入四种 Motif 与条件轮数
 
