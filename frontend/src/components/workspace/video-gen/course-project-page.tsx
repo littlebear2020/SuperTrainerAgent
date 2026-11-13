@@ -1,9 +1,9 @@
 "use client";
 
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { useI18n } from "@/core/i18n/hooks";
 import { formatDateTime, parseTimestamp } from "@/core/utils/datetime";
 import { styleAnchorImageUrl } from "@/core/video-gen/api";
 import { useCourseProjects } from "@/core/video-gen/hooks";
@@ -15,7 +15,6 @@ import {
 import type { CourseProject } from "@/core/video-gen/types";
 
 import { CourseProjectDetailPage } from "./course-project-detail";
-import { CourseProjectDialog } from "./course-project-dialog";
 
 export function courseProjectCoverUrls(project: CourseProject): string[] {
   const preview = stylePreviewImage(
@@ -47,7 +46,7 @@ function CourseProjectCover({ project }: { project: CourseProject }) {
         data-testid="course-project-cover-fallback"
         role="img"
         aria-label="项目封面色块"
-        className="aspect-video w-full"
+        className="aspect-video w-full shrink-0"
         style={{ backgroundColor: courseProjectFallbackColor(project) }}
       />
     );
@@ -60,7 +59,7 @@ function CourseProjectCover({ project }: { project: CourseProject }) {
           ? "项目风格锚图"
           : "项目风格示意图"
       }
-      className="aspect-video w-full object-cover"
+      className="aspect-video w-full shrink-0 object-cover"
       loading="lazy"
       onError={() => setCandidateIndex((index) => index + 1)}
     />
@@ -75,8 +74,18 @@ function projectUpdatedAt(project: CourseProject): string {
   return `最近更新 ${formatDateTime(value)}`;
 }
 
-export function CourseProjectPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+interface CourseProjectPageProps {
+  selectedId: string | null;
+  onSelect: (projectId: string) => void;
+  onBack: () => void;
+}
+
+export function CourseProjectPage({
+  selectedId,
+  onSelect,
+  onBack,
+}: CourseProjectPageProps) {
+  const { t } = useI18n();
   const projectsQ = useCourseProjects();
   const projects = [...(projectsQ.data ?? [])].sort((a, b) => {
     const aValue = a.updated_at ?? a.created_at;
@@ -91,29 +100,11 @@ export function CourseProjectPage() {
   });
 
   if (selectedId) {
-    return (
-      <CourseProjectDetailPage
-        projectId={selectedId}
-        onBack={() => setSelectedId(null)}
-      />
-    );
+    return <CourseProjectDetailPage projectId={selectedId} onBack={onBack} />;
   }
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <FolderOpen className="h-5 w-5 text-indigo-500" />
-          我的资产
-        </h2>
-        <CourseProjectDialog onSelect={(project) => setSelectedId(project.id)}>
-          <Button size="sm">
-            <Plus className="mr-1 h-4 w-4" />
-            新建项目
-          </Button>
-        </CourseProjectDialog>
-      </div>
-
       {projectsQ.isLoading ? (
         <p
           role="status"
@@ -146,11 +137,11 @@ export function CourseProjectPage() {
               <button
                 key={project.id}
                 type="button"
-                onClick={() => setSelectedId(project.id)}
-                className="group bg-background min-w-0 overflow-hidden rounded-2xl border text-left shadow-sm transition-shadow hover:shadow-md"
+                onClick={() => onSelect(project.id)}
+                className="group bg-background flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-shadow hover:shadow-md"
               >
                 <CourseProjectCover key={coverKey} project={project} />
-                <span className="block space-y-2 p-4">
+                <span className="flex flex-1 flex-col space-y-2 p-4">
                   <span className="block truncate font-semibold group-hover:text-indigo-600">
                     {project.title}
                   </span>
@@ -160,8 +151,8 @@ export function CourseProjectPage() {
                   <span className="text-muted-foreground block text-xs">
                     {projectUpdatedAt(project)}
                   </span>
-                  <span className="block pt-1 text-sm font-medium text-indigo-600">
-                    编辑项目
+                  <span className="mt-auto block pt-1 text-sm font-medium text-indigo-600">
+                    {t.workspace.works.openProject}
                   </span>
                 </span>
               </button>

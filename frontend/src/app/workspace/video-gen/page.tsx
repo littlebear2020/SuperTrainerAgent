@@ -10,7 +10,6 @@ function VideoGenPageFallback() {
     >
       <div className="mx-auto w-full max-w-6xl animate-pulse space-y-6">
         <div className="bg-muted h-7 w-28 rounded-md" />
-        <div className="bg-muted h-10 w-64 rounded-md" />
         <div className="bg-muted/50 h-64 rounded-2xl" />
       </div>
     </div>

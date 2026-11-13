@@ -5,6 +5,7 @@ import {
   Loader2,
   Pencil,
   Play,
+  Plus,
   RefreshCw,
   Trash2,
   XCircle,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { AgentConversationGrid } from "@/components/workspace/video-gen/agent-conversation-grid";
+import { CourseProjectDialog } from "@/components/workspace/video-gen/course-project-dialog";
 import { CourseProjectPage } from "@/components/workspace/video-gen/course-project-page";
 import { RecomposeConfirmDialog } from "@/components/workspace/video-gen/video-gen-recompose-dialog";
 import { useI18n } from "@/core/i18n/hooks";
@@ -56,11 +58,6 @@ import { CompletedVideoGrid } from "./completed-video-grid";
 import { TaskThumbnail } from "./task-thumbnail";
 export { CreateTaskDialog, TYPE_CONFIG } from "./video-gen-create-dialog";
 export { TaskThumbnail } from "./task-thumbnail";
-
-const TABS = [
-  { value: "works", label: "我的作品" },
-  { value: "assets", label: "我的资产" },
-] as const;
 
 // ── Status badges ───────────────────────────────────────────────────────
 
@@ -308,12 +305,39 @@ function VideoWorkPanel({ workType }: { workType: "ai_image" | "ai_video" }) {
   );
 }
 
+function AssetsView() {
+  const { t } = useI18n();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold">{t.sidebar.myAssets}</h1>
+        {!selectedId && (
+          <CourseProjectDialog
+            onSelect={(project) => setSelectedId(project.id)}
+          >
+            <Button size="sm">
+              <Plus className="mr-1 h-4 w-4" />
+              新建项目
+            </Button>
+          </CourseProjectDialog>
+        )}
+      </div>
+      <CourseProjectPage
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onBack={() => setSelectedId(null)}
+      />
+    </>
+  );
+}
+
 export function VideoGenPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useI18n();
   const route = parseVideoAssetsRoute(searchParams);
-  const tab = route.tab;
   const currentSearch = searchParams.toString();
   const canonicalHref = buildVideoAssetsHref(route, currentSearch);
   const selectedCapability =
@@ -329,21 +353,6 @@ export function VideoGenPage() {
     }
   }, [canonicalHref, router]);
 
-  const selectTab = (next: (typeof TABS)[number]["value"]) => {
-    const nextRoute =
-      next === "assets"
-        ? { tab: next }
-        : {
-            tab: next,
-            capability:
-              route.tab === "works"
-                ? route.capability
-                : DEFAULT_WORK_CAPABILITY,
-          };
-    router.push(buildVideoAssetsHref(nextRoute, currentSearch));
-    document.getElementById(`video-assets-tab-${next}`)?.focus();
-  };
-
   const selectCapability = (next: WorkCapability) => {
     router.push(
       buildVideoAssetsHref({ tab: "works", capability: next }, currentSearch),
@@ -354,51 +363,9 @@ export function VideoGenPage() {
   return (
     <div className="scrollbar-none flex size-full flex-col overflow-y-auto p-4 sm:p-6">
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        <h1 className="text-lg font-bold">视频资产</h1>
-        <div
-          role="tablist"
-          aria-label="视频资产视图"
-          className="border-border/50 bg-muted/30 flex w-fit max-w-full gap-1 rounded-lg border p-1"
-        >
-          {TABS.map((item) => (
-            <button
-              key={item.value}
-              id={`video-assets-tab-${item.value}`}
-              role="tab"
-              aria-selected={tab === item.value}
-              aria-controls={`video-assets-panel-${item.value}`}
-              tabIndex={tab === item.value ? 0 : -1}
-              onClick={() => selectTab(item.value)}
-              onKeyDown={(event) => {
-                let next: (typeof TABS)[number]["value"];
-                if (event.key === "Home") next = "works";
-                else if (event.key === "End") next = "assets";
-                else if (
-                  event.key === "ArrowLeft" ||
-                  event.key === "ArrowRight"
-                )
-                  next = tab === "works" ? "assets" : "works";
-                else return;
-                event.preventDefault();
-                selectTab(next);
-              }}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                tab === item.value
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div
-          id={`video-assets-panel-${tab}`}
-          role="tabpanel"
-          aria-labelledby={`video-assets-tab-${tab}`}
-        >
-          {tab === "works" && selectedCapability ? (
+        {route.tab === "works" && selectedCapability ? (
+          <div className="space-y-6">
+            <h1 className="text-lg font-bold">{t.sidebar.myWorks}</h1>
             <div className="space-y-5">
               <div
                 id="work-capability-tabs"
@@ -462,10 +429,10 @@ export function VideoGenPage() {
                 )}
               </div>
             </div>
-          ) : (
-            <CourseProjectPage />
-          )}
-        </div>
+          </div>
+        ) : (
+          <AssetsView />
+        )}
       </div>
     </div>
   );

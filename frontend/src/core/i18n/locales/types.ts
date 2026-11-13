@@ -424,6 +424,7 @@ export interface Translations {
       empty: (capability: string) => string;
       noResults: string;
       open: string;
+      openProject: string;
       updated: string;
       updatedUnknown: string;
     };

@@ -702,6 +702,7 @@ export const zhCN: Translations = {
       empty: (capability: string) => `暂无${capability}对话`,
       noResults: "没有匹配的对话",
       open: "打开",
+      openProject: "打开项目",
       updated: "最近更新",
       updatedUnknown: "更新时间未知",
     },

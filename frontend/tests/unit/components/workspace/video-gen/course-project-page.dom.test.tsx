@@ -12,12 +12,19 @@ const h = vi.hoisted(() => ({
     isError: false,
   },
   detailId: null as string | null,
-  selectCreated: null as ((project: CourseProject) => void) | null,
+  selectedId: null as string | null,
+  onSelect: vi.fn(),
+  onBack: vi.fn(),
 }));
 
 vi.mock("@/core/video-gen/hooks", () => ({
   useCourseProjects: () => h.query,
 }));
+
+vi.mock("@/core/i18n/hooks", async () => {
+  const { translations } = await import("@/core/i18n/translations");
+  return { useI18n: () => ({ t: translations["zh-CN"] }) };
+});
 
 vi.mock("@/components/workspace/video-gen/course-project-detail", () => ({
   CourseProjectDetailPage: ({
@@ -31,34 +38,6 @@ vi.mock("@/components/workspace/video-gen/course-project-detail", () => ({
     return (
       <div data-testid="course-project-detail">
         <button onClick={onBack}>返回列表</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock("@/components/workspace/video-gen/course-project-dialog", () => ({
-  CourseProjectDialog: ({
-    children,
-    onSelect,
-  }: {
-    children: React.ReactNode;
-    onSelect?: (project: CourseProject) => void;
-  }) => {
-    h.selectCreated = onSelect ?? null;
-    return (
-      <div>
-        {children}
-        <button
-          onClick={() =>
-            onSelect?.({
-              id: "created-project",
-              user_id: "u1",
-              title: "新建后项目",
-            })
-          }
-        >
-          模拟创建成功
-        </button>
       </div>
     );
   },
@@ -95,7 +74,9 @@ describe("CourseProjectPage assets", () => {
   beforeEach(() => {
     h.query = { data: [project()], isLoading: false, isError: false };
     h.detailId = null;
-    h.selectCreated = null;
+    h.selectedId = null;
+    h.onSelect.mockReset();
+    h.onBack.mockReset();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -108,7 +89,15 @@ describe("CourseProjectPage assets", () => {
   });
 
   async function render() {
-    await act(async () => root.render(<CourseProjectPage />));
+    await act(async () =>
+      root.render(
+        <CourseProjectPage
+          selectedId={h.selectedId}
+          onSelect={h.onSelect}
+          onBack={h.onBack}
+        />,
+      ),
+    );
   }
 
   it("anchor error falls back to style image then color", async () => {
@@ -131,7 +120,7 @@ describe("CourseProjectPage assets", () => {
     expect(fallback?.style.backgroundColor).toBe("#123456");
   });
 
-  it("shows title style update and new/edit actions only", async () => {
+  it("shows real project fields and a bottom-aligned open action without a duplicate header", async () => {
     h.query.data = [
       {
         ...project(),
@@ -142,12 +131,10 @@ describe("CourseProjectPage assets", () => {
     await render();
     const text = container.textContent ?? "";
     for (const expected of [
-      "我的资产",
       "真实资产项目",
       "精密工程",
       "最近更新",
-      "新建项目",
-      "编辑项目",
+      "打开项目",
     ]) {
       expect(text).toContain(expected);
     }
@@ -163,6 +150,8 @@ describe("CourseProjectPage assets", () => {
     ]) {
       expect(text).not.toContain(forbidden);
     }
+    expect(container.querySelector("h2")).toBeNull();
+    expect(text).not.toContain("新建项目");
     const grid = container.querySelector("[data-testid='course-project-grid']");
     for (const className of [
       "grid-cols-1",
@@ -171,16 +160,27 @@ describe("CourseProjectPage assets", () => {
     ]) {
       expect(grid?.className).toContain(className);
     }
+    const card = button("打开项目");
+    for (const className of ["h-full", "flex", "flex-col"]) {
+      expect(card.className).toContain(className);
+    }
+    expect(card.firstElementChild?.className).toContain("aspect-video");
+    const body = card.lastElementChild;
+    expect(body?.className).toContain("flex-1");
+    expect(body?.lastElementChild?.className).toContain("mt-auto");
   });
 
-  it("opens existing detail for edit and passes onSelect for create", async () => {
+  it("delegates project open and detail back to controlled props", async () => {
     await render();
-    await act(async () => button("编辑项目").click());
+    await act(async () => button("打开项目").click());
+    expect(h.onSelect).toHaveBeenCalledExactlyOnceWith("p1");
+    expect(h.detailId).toBeNull();
+
+    h.selectedId = "p1";
+    await render();
     expect(h.detailId).toBe("p1");
     await act(async () => button("返回列表").click());
-    expect(h.selectCreated).not.toBeNull();
-    await act(async () => button("模拟创建成功").click());
-    expect(h.detailId).toBe("created-project");
+    expect(h.onBack).toHaveBeenCalledOnce();
   });
 
   it("keeps loading empty and error states honest", async () => {

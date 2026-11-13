@@ -62,7 +62,37 @@ vi.mock("@/components/workspace/video-gen/agent-conversation-grid", () => ({
 }));
 
 vi.mock("@/components/workspace/video-gen/course-project-page", () => ({
-  CourseProjectPage: () => <div data-testid="assets-panel" />,
+  CourseProjectPage: ({
+    selectedId,
+    onSelect,
+    onBack,
+  }: {
+    selectedId: string | null;
+    onSelect: (projectId: string) => void;
+    onBack: () => void;
+  }) => (
+    <div data-testid="assets-panel" data-selected-id={selectedId ?? ""}>
+      <button onClick={() => onSelect("p1")}>模拟打开项目</button>
+      <button onClick={onBack}>模拟返回项目列表</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/workspace/video-gen/course-project-dialog", () => ({
+  CourseProjectDialog: ({
+    children,
+    onSelect,
+  }: {
+    children?: React.ReactNode;
+    onSelect?: (project: { id: string }) => void;
+  }) => (
+    <div>
+      {children}
+      <button onClick={() => onSelect?.({ id: "created-project" })}>
+        模拟创建资产
+      </button>
+    </div>
+  ),
 }));
 
 import { VideoGenPage } from "@/components/workspace/video-gen/video-gen-page";
@@ -100,11 +130,11 @@ describe("VideoGenPage URL routing", () => {
     await act(async () => root.render(<VideoGenPage />));
   }
 
-  function tab(value: "works" | "assets"): HTMLButtonElement {
-    const element = container.querySelector<HTMLButtonElement>(
-      `#video-assets-tab-${value}`,
-    );
-    if (!element) throw new Error(`missing ${value} tab`);
+  function button(text: string): HTMLButtonElement {
+    const element = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((item) => item.textContent?.includes(text));
+    if (!element) throw new Error(`missing button: ${text}`);
     return element;
   }
 
@@ -120,17 +150,23 @@ describe("VideoGenPage URL routing", () => {
     element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
   }
 
-  it("derives outer panels from the URL and only queries videos for video works", async () => {
+  it("derives a single heading and capability content from the URL without outer tabs", async () => {
     h.search = "tab=works&capability=ai_image";
     await renderPage();
     expect(
       container.querySelector("[data-testid='works-panel']"),
     ).not.toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("我的作品");
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+    expect(container.querySelector("[id^='video-assets-tab-']")).toBeNull();
+    expect(container.querySelector("[id^='video-assets-panel-']")).toBeNull();
+    expect(
+      container.querySelector(
+        "[role='tabpanel'][aria-labelledby^='video-assets-tab-']",
+      ),
+    ).toBeNull();
     expect(h.workType).toBe("ai_image");
     expect(h.tasksCalls).toBeGreaterThan(0);
-
-    await act(async () => tab("assets").click());
-    expect(h.push).toHaveBeenCalledWith("/workspace/video-gen?tab=assets");
 
     const beforeAssets = h.tasksCalls;
     h.search = "tab=assets&capability=ai_video";
@@ -138,10 +174,10 @@ describe("VideoGenPage URL routing", () => {
     expect(
       container.querySelector("[data-testid='assets-panel']"),
     ).not.toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("我的资产");
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
     expect(h.tasksCalls).toBe(beforeAssets);
 
-    await act(async () => tab("works").click());
-    expect(h.push).toHaveBeenCalledWith("/workspace/video-gen");
     h.search = "";
     h.agentName = undefined;
     await renderPage();
@@ -149,6 +185,7 @@ describe("VideoGenPage URL routing", () => {
       container.querySelector("[data-testid='agent-panel']"),
     ).not.toBeNull();
     expect(container.querySelector("[data-testid='works-panel']")).toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("我的作品");
     expect(h.agentName).toBe("course-video");
     expect(h.tasksCalls).toBe(beforeAssets);
   });
@@ -168,24 +205,8 @@ describe("VideoGenPage URL routing", () => {
     expect(h.replace).not.toHaveBeenCalled();
   });
 
-  it("preserves unrelated params when selecting tabs and capabilities", async () => {
+  it("preserves unrelated params when selecting capabilities", async () => {
     h.search = "foo=1&utm_source=review";
-    await renderPage();
-    await act(async () => tab("assets").click());
-    expect(h.push).toHaveBeenCalledWith(
-      "/workspace/video-gen?foo=1&utm_source=review&tab=assets",
-    );
-
-    h.search = "foo=1&utm_source=review&tab=assets&capability=ai_video";
-    h.push.mockClear();
-    await renderPage();
-    await act(async () => tab("works").click());
-    expect(h.push).toHaveBeenCalledWith(
-      "/workspace/video-gen?foo=1&utm_source=review",
-    );
-
-    h.search = "foo=1&utm_source=review";
-    h.push.mockClear();
     await renderPage();
     await act(async () => capabilityTab("ai_image").click());
     expect(h.push).toHaveBeenCalledWith(
@@ -201,24 +222,50 @@ describe("VideoGenPage URL routing", () => {
     expect(h.agentName).toBe("course-video");
   });
 
-  it("supports arrow, Home and End keys on outer tabs", async () => {
-    await renderPage();
-    await act(async () => key(tab("works"), "ArrowRight"));
-    expect(h.push).toHaveBeenLastCalledWith("/workspace/video-gen?tab=assets");
-    h.push.mockClear();
-    await act(async () => key(tab("works"), "End"));
-    expect(h.push).toHaveBeenCalledExactlyOnceWith(
-      "/workspace/video-gen?tab=assets",
-    );
-
+  it("controls asset open create back and resets selection after leaving assets", async () => {
     h.search = "tab=assets";
-    h.push.mockClear();
     await renderPage();
-    await act(async () => key(tab("assets"), "ArrowLeft"));
-    expect(h.push).toHaveBeenLastCalledWith("/workspace/video-gen");
-    h.push.mockClear();
-    await act(async () => key(tab("assets"), "Home"));
-    expect(h.push).toHaveBeenCalledExactlyOnceWith("/workspace/video-gen");
+    expect(button("新建项目")).toBeDefined();
+    expect(
+      container
+        .querySelector("[data-testid='assets-panel']")
+        ?.getAttribute("data-selected-id"),
+    ).toBe("");
+
+    await act(async () => button("模拟打开项目").click());
+    expect(
+      container
+        .querySelector("[data-testid='assets-panel']")
+        ?.getAttribute("data-selected-id"),
+    ).toBe("p1");
+    expect(container.textContent).not.toContain("新建项目");
+
+    await act(async () => button("模拟返回项目列表").click());
+    expect(
+      container
+        .querySelector("[data-testid='assets-panel']")
+        ?.getAttribute("data-selected-id"),
+    ).toBe("");
+    expect(button("新建项目")).toBeDefined();
+
+    await act(async () => button("模拟创建资产").click());
+    expect(
+      container
+        .querySelector("[data-testid='assets-panel']")
+        ?.getAttribute("data-selected-id"),
+    ).toBe("created-project");
+
+    h.search = "";
+    await renderPage();
+    expect(container.querySelector("[data-testid='assets-panel']")).toBeNull();
+    h.search = "tab=assets";
+    await renderPage();
+    expect(
+      container
+        .querySelector("[data-testid='assets-panel']")
+        ?.getAttribute("data-selected-id"),
+    ).toBe("");
+    expect(button("新建项目")).toBeDefined();
   });
 
   it("renders all six i18n capabilities with roving ARIA and pushes selection", async () => {
