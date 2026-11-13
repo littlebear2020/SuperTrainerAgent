@@ -3,7 +3,7 @@
 /**
  * 灵感库 Recipe 编辑器（2026-10-06 近重复合并批，单一事实源）。
  *
- * 分享弹窗（messages/share-button）与灵感库编辑表单（gallery/page）原本
+ * 已下线的消息分享弹窗与灵感库编辑表单（gallery/page）原本
  * 各持一份 goal/steps 受控输入。收敛为共享组件；分享版额外展示
  * 方法论行、步骤 tip 与避坑指南（showMethodologyAndPitfalls），
  * 库内编辑版为精简输入形态。

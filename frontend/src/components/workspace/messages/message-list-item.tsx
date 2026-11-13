@@ -53,7 +53,6 @@ import { CopyButton } from "../copy-button";
 
 import { MarkdownContent } from "./markdown-content";
 import { MessageTokenUsage } from "./message-token-usage";
-import { ShareButton, ShareErrorBoundary } from "./share-button";
 
 function FeedbackButtons({
   threadId,
@@ -130,8 +129,6 @@ function MessageListItemInner({
   tokenUsageEnabled = false,
   feedback,
   runId,
-  promptText,
-  galleryEnabled = false,
 }: {
   className?: string;
   message: Message;
@@ -140,8 +137,6 @@ function MessageListItemInner({
   tokenUsageEnabled?: boolean;
   feedback?: FeedbackData | null;
   runId?: string;
-  promptText?: string;
-  galleryEnabled?: boolean;
 }) {
   const isHuman = message.type === "human";
   return (
@@ -177,11 +172,6 @@ function MessageListItemInner({
                 runId={runId}
                 initialFeedback={feedback}
               />
-            )}
-            {!isHuman && promptText && galleryEnabled && (
-              <ShareErrorBoundary>
-                <ShareButton promptText={promptText} threadId={threadId} />
-              </ShareErrorBoundary>
             )}
           </div>
         </MessageToolbar>

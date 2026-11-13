@@ -170,8 +170,6 @@ export function MessageList({
   // Replaces the old in-render updateSubtask churn that mutated state during render.
   useSyncSubtaskStatus(messages);
 
-  const galleryEnabled = false;
-
   // P1-5：分组复用——内容未变的组沿用上次的 group 对象引用，使 MessageGroup 的 memo
   // 能跳过未变组。流式期末组由 reuseMessageGroups 强制换新引用（SDK 原地 mutate 追加
   // token 必须重渲染），其余组复用旧引用 → memo 命中跳过。prevGroupsRef 跨渲染记忆。
@@ -182,20 +180,6 @@ export function MessageList({
   // disabled）。只在翻转那一帧跳过复用（一次全量重渲染），不逐帧强制（那会触发 FlipDisplay
   // 的 Radix 测量死循环，正是合帧接线崩溃的同类问题）。
   const prevLoadingRef = useRef(thread.isLoading);
-  // 2026-10-06 性能批：消息对象 → 前面最近一条 human 消息文本的 O(n) 预建映射
-  // （messages 引用变化时重算一次；语义同修前 indexOf 反扫——逐条累积最近前驱）。
-  const promptByMsg = useMemo(() => {
-    const map = new WeakMap<object, string>();
-    let lastHuman = "";
-    for (const m of messages) {
-      if (m?.type === "human") {
-        lastHuman = extractContentFromMessage(m) || "";
-      } else {
-        map.set(m, lastHuman);
-      }
-    }
-    return map;
-  }, [messages]);
   const groups = useMemo(() => {
     const next = getMessageGroups(messages);
     const loadingFlipped = prevLoadingRef.current !== thread.isLoading;
@@ -213,10 +197,6 @@ export function MessageList({
     (group: (typeof groups)[number]): React.ReactNode => {
       if (group.type === "human" || group.type === "assistant") {
         return group.messages.map((msg) => {
-          // 2026-10-06 性能批：修前每条消息 indexOf 反扫（O(n²)/渲染，
-          // 长会话流式期帧率杀手）→ O(n) 预建映射（见 promptByMsg）。
-          const promptText =
-            msg.type !== "human" ? (promptByMsg.get(msg) ?? "") : undefined;
           return (
             <MessageListItem
               key={`${group.id}/${msg.id}`}
@@ -224,8 +204,6 @@ export function MessageList({
               message={msg}
               isLoading={thread.isLoading}
               tokenUsageEnabled={tokenUsageEnabled}
-              promptText={promptText}
-              galleryEnabled={galleryEnabled}
             />
           );
         });
@@ -375,14 +353,7 @@ export function MessageList({
         </div>
       );
     },
-    [
-      galleryEnabled,
-      promptByMsg,
-      t,
-      thread.isLoading,
-      threadId,
-      tokenUsageEnabled,
-    ],
+    [t, thread.isLoading, threadId, tokenUsageEnabled],
   );
 
   if (thread.isThreadLoading && messages.length === 0) {
