@@ -1,13 +1,12 @@
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import {
   Conversation,
   ConversationContent,
 } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
-import { loadGallerySettings } from "@/core/gallery/api";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   extractContentFromMessage,
@@ -171,23 +170,7 @@ export function MessageList({
   // Replaces the old in-render updateSubtask churn that mutated state during render.
   useSyncSubtaskStatus(messages);
 
-  const [galleryEnabled, setGalleryEnabled] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    loadGallerySettings()
-      .then((settings) => {
-        if (active) {
-          setGalleryEnabled(settings.ugc_enabled);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load gallery settings in MessageList:", err);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const galleryEnabled = false;
 
   // P1-5：分组复用——内容未变的组沿用上次的 group 对象引用，使 MessageGroup 的 memo
   // 能跳过未变组。流式期末组由 reuseMessageGroups 强制换新引用（SDK 原地 mutate 追加
