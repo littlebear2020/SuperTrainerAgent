@@ -45,6 +45,7 @@ function makeThread(
     title?: string;
     createdAt?: string | null;
     updatedAt?: string | null;
+    messages?: Array<{ type: string; content: string }>;
   } = {},
 ): AgentThread {
   const metadata = options.projectType
@@ -64,7 +65,7 @@ function makeThread(
     status: "idle",
     values: {
       title: options.title ?? `对话 ${id}`,
-      messages: [],
+      messages: options.messages ?? [],
       artifacts: [],
     },
     interrupts: {},
@@ -206,6 +207,72 @@ describe("AgentConversationGrid", () => {
     expect(cardIds().every((id) => id.startsWith("ppt-"))).toBe(true);
   });
 
+  it.each([
+    ["course-video", "文字动效"],
+    ["creative-studio", "课程海报"],
+    ["ppt-master", "PPT课件"],
+    ["podcast-studio", "语音播客"],
+  ] as const)(
+    "renders the %s motif in an aligned card",
+    async (agentName, label) => {
+      h.threads = [makeThread(`motif-${agentName}`, { agentName })];
+      await render(agentName, label);
+      const card = container.querySelector<HTMLElement>(
+        "[data-testid='agent-conversation-card']",
+      )!;
+      const motif = card.querySelector<HTMLElement>("[data-motif]");
+      expect(motif?.getAttribute("data-motif")).toBe(agentName);
+      expect(motif?.getAttribute("aria-hidden")).toBe("true");
+      expect(motif?.className).toContain("aspect-video");
+      expect(motif?.className).toContain("shrink-0");
+      for (const className of ["h-full", "flex", "flex-col"]) {
+        expect(card.className).toContain(className);
+      }
+      const body = card.lastElementChild;
+      for (const className of ["flex", "flex-1", "flex-col"]) {
+        expect(body?.className).toContain(className);
+      }
+      expect(button("继续对话").parentElement?.className).toContain("mt-auto");
+    },
+  );
+
+  it("counts only real human messages as displayed turns", async () => {
+    h.threads = [
+      makeThread("two-turns", {
+        messages: [
+          { type: "human", content: "第一问" },
+          { type: "ai", content: "回答" },
+          { type: "human", content: "第二问" },
+        ],
+      }),
+    ];
+    await render();
+    expect(
+      container.querySelector("[data-thread-id='two-turns']")?.textContent,
+    ).toContain("2 轮");
+  });
+
+  it("omits turns when values or messages are missing empty or have no human message", async () => {
+    const missingValues = {
+      ...makeThread("missing-values"),
+      values: undefined,
+    } as unknown as AgentThread;
+    const missingMessages = {
+      ...makeThread("missing-messages"),
+      values: { title: "缺消息", artifacts: [] },
+    } as unknown as AgentThread;
+    const empty = makeThread("empty-messages");
+    const noHuman = makeThread("no-human", {
+      messages: [{ type: "ai", content: "只有助手消息" }],
+    });
+
+    for (const thread of [missingValues, missingMessages, empty, noHuman]) {
+      h.threads = [thread];
+      await render();
+      expect(container.textContent).not.toContain("轮");
+    }
+  });
+
   it("keeps loading, error with retry, empty and no-result states separate", async () => {
     h.isLoading = true;
     await render();
@@ -238,7 +305,7 @@ describe("AgentConversationGrid", () => {
     expect(container.textContent).toContain("PPT课件");
     expect(container.textContent).toContain("最近更新");
     expect(container.textContent).not.toContain("删除");
-    await act(async () => button("打开").click());
+    await act(async () => button("继续对话").click());
     expect(h.push).toHaveBeenCalledExactlyOnceWith(
       "/workspace/agents/ppt-master/chats/legacy-ppt",
     );

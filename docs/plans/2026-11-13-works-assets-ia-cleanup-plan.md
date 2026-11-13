@@ -1,6 +1,6 @@
 # 我的作品 / 我的资产信息架构与卡片统一实施计划
 
-> **状态**：未执行；任务 1～2 已完成，任务 3～4 待执行。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
+> **状态**：未执行；任务 1～3 已完成，任务 4 待执行。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
 > **TL;DR**：只收敛页面信息架构、卡片网格与媒体区；现有配色、字体、胶囊 Tab、圆角、阴影、按钮和状态徽标全部沿用；真实作品封面及创建、分镜、详情、播放、下载、重试能力不删不改；不改后端、不改路由结构。
 
 > **For agentic workers：** 用户复核后使用 `executing-plans` 逐项实施；每项按“失败测试 → 最小实现 → 定向回归”执行并勾选，不得把 demo 当作视觉规范。
@@ -134,11 +134,11 @@ interface CourseProjectPageProps {
 export function userTurnCount(thread: AgentThread): number | null;
 ```
 
-- [ ] **先写失败测试**：四种 agent 分别产生 `data-motif="course-video|creative-studio|ppt-master|podcast-studio"`；两条 human + 一条 ai 显示「2 轮」，运行时 `values` 或 `messages` 为 undefined、`messages` 为空数组或无 human 时不显示轮数；打开路由仍为原 canonical URL。
-- [ ] **实现 Motif**：按 `agentName` 选择文字行/海报/幻灯片/声波；只用现有 Tailwind 中性色与 Indigo 色板、Lucide 图标和 CSS，`aria-hidden="true"`，不新增图片或依赖。
-- [ ] **统一卡片结构**：复用任务 2 的布局原则，媒体区 `aspect-video`，正文与「继续对话」底部对齐；保留 titleOfThread、能力 label、真实更新时间和现有搜索/分页。
-- [ ] **实现轮数与文案**：`userTurnCount` 只统计 SDK 用户消息 `type === "human"`，正数才返回；读取时容忍运行时 `values` / `messages` 缺省。locale 增加 `turns(count)`，现有 `works.open` 改为「继续对话 / Continue」，并同步 `agent-conversation-grid.dom.test.tsx` 的 `button("打开")` 与 `work-capabilities.spec.ts` 两处「打开」按钮定位为「继续对话」。
-- [ ] **定向回归**：运行 AgentConversationGrid DOM 测试，确认去重、排序、搜索、空态、加载更多、路由和条件轮数全部通过；更新后的 `work-capabilities.spec.ts` 在任务 4 与其他 E2E 一并运行。
+- [x] **先写失败测试**：四种 agent 分别产生 `data-motif="course-video|creative-studio|ppt-master|podcast-studio"`；两条 human + 一条 ai 显示「2 轮」，运行时 `values` 或 `messages` 为 undefined、`messages` 为空数组或无 human 时不显示轮数；打开路由仍为原 canonical URL。
+- [x] **实现 Motif**：按 `agentName` 选择文字行/海报/幻灯片/声波；只用现有 Tailwind 中性色与 Indigo 色板、Lucide 图标和 CSS，`aria-hidden="true"`，不新增图片或依赖。
+- [x] **统一卡片结构**：复用任务 2 的布局原则，媒体区 `aspect-video`，正文与「继续对话」底部对齐；保留 titleOfThread、能力 label、真实更新时间和现有搜索/分页。
+- [x] **实现轮数与文案**：`userTurnCount` 只统计 SDK 用户消息 `type === "human"`，正数才返回；读取时容忍运行时 `values` / `messages` 缺省。locale 增加 `turns(count)`，现有 `works.open` 改为「继续对话 / Continue」，并同步 `agent-conversation-grid.dom.test.tsx` 的 `button("打开")` 与 `work-capabilities.spec.ts` 两处「打开」按钮定位为「继续对话」。
+- [x] **定向回归**：运行 AgentConversationGrid DOM 测试，确认去重、排序、搜索、空态、加载更多、路由和条件轮数全部通过；更新后的 `work-capabilities.spec.ts` 在任务 4 与其他 E2E 一并运行。
 
 ### 任务 4：行为回归、视觉复核与交付
 

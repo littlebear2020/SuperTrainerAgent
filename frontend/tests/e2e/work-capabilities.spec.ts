@@ -129,7 +129,7 @@ test.describe("six work capabilities", () => {
         .getByText("旧课件对话", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ppt-master/);
-    await page.getByRole("button", { name: "打开", exact: true }).click();
+    await page.getByRole("button", { name: "继续对话", exact: true }).click();
     await expect(page).toHaveURL(
       /\/workspace\/agents\/ppt-master\/chats\/ppt-history$/,
     );
@@ -184,7 +184,7 @@ test.describe("six work capabilities", () => {
         .getByText("Offset 五十目标", { exact: true }),
     ).toBeVisible();
     expect(offsets).toContain(50);
-    await page.getByRole("button", { name: "打开", exact: true }).click();
+    await page.getByRole("button", { name: "继续对话", exact: true }).click();
     await expect(page).toHaveURL(
       /\/workspace\/agents\/course-video\/chats\/offset-target$/,
     );

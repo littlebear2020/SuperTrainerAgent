@@ -425,6 +425,7 @@ export interface Translations {
       noResults: string;
       open: string;
       openProject: string;
+      turns: (count: number) => string;
       updated: string;
       updatedUnknown: string;
     };
