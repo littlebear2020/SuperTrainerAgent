@@ -67,11 +67,11 @@ test.describe("video assets", () => {
       });
     }
     await page.goto("/workspace/video-gen?tab=works&capability=ai_image");
-    await expect(page.getByRole("heading", { name: "视频资产" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "我的作品" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      page.getByRole("heading", { name: "我的作品", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("[id^='video-assets-tab-']")).toHaveCount(0);
+    await expect(page.locator("[id^='video-assets-panel-']")).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "图片动效" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -98,16 +98,15 @@ test.describe("video assets", () => {
     ]) {
       await expect(page.getByText(id, { exact: true })).toHaveCount(0);
     }
-    await page.getByRole("tab", { name: "我的资产" }).click();
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
     await expect(
-      page.getByRole("tabpanel", { name: "我的资产" }),
+      page.getByRole("heading", { name: "我的资产", exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/tab=assets/);
     await page.reload();
-    await expect(page.getByRole("tab", { name: "我的资产" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(
+      page.getByRole("heading", { name: "我的资产", exact: true }),
+    ).toBeVisible();
     await expect(page).toHaveURL(/tab=assets/);
     await expect(page.getByRole("button", { name: "新建任务" })).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "全部" })).toHaveCount(0);
@@ -127,7 +126,7 @@ test.describe("video assets", () => {
       "false",
     );
 
-    await page.getByRole("tab", { name: "我的资产" }).click();
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
     await expect(page).toHaveURL(/tab=assets/);
     await expect(page.getByRole("link", { name: "我的作品" })).toHaveAttribute(
       "data-active",
@@ -138,7 +137,7 @@ test.describe("video assets", () => {
       "true",
     );
 
-    await page.getByRole("tab", { name: "我的作品" }).click();
+    await page.getByRole("link", { name: "我的作品", exact: true }).click();
     await page.getByRole("tab", { name: "图片动效", exact: true }).click();
     await expect(page.getByText("合格图片作品", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "详情" }).click();
@@ -395,17 +394,15 @@ test.describe("video assets", () => {
     for (const expected of ["字段真实作品", "AI 生图", "完成", "最近更新"]) {
       expect(text).toContain(expected);
     }
-    await page.getByRole("tab", { name: "我的资产" }).click();
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
     await expect(page.getByText("字段真实资产", { exact: true })).toBeVisible();
-    text = await page
-      .getByRole("tabpanel", { name: "我的资产", exact: true })
-      .textContent();
+    await expect(page.getByRole("button", { name: "新建项目" })).toBeVisible();
+    text = await page.getByTestId("course-project-grid").textContent();
     for (const expected of [
       "字段真实资产",
       "精密工程",
       "最近更新",
-      "新建项目",
-      "编辑项目",
+      "打开项目",
     ]) {
       expect(text).toContain(expected);
     }
@@ -427,7 +424,7 @@ test.describe("video assets", () => {
     page,
   }) => {
     await page.goto("/workspace/video-gen?tab=works&capability=ai_image");
-    await page.getByRole("tab", { name: "我的资产" }).click();
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
     await page.getByRole("button", { name: "新建项目" }).click();
     await page.locator("#cp-title").fill("待编辑项目");
     await page.getByRole("button", { name: "创建项目" }).click();
@@ -473,7 +470,7 @@ test.describe("video assets", () => {
     ).toBe(true);
     await page.getByRole("button", { name: "加载更多" }).click();
     await expect(page.getByTestId("completed-work-card")).toHaveCount(7);
-    await page.getByRole("tab", { name: "我的资产" }).click();
+    await page.getByRole("link", { name: "我的资产", exact: true }).click();
     await page.getByRole("button", { name: /移动资产项目/ }).click();
     await expect(
       page.getByRole("button", { name: "返回项目列表" }),
@@ -495,9 +492,6 @@ test.describe("video assets", () => {
       (request) => request.method === "POST",
     );
     expect(create?.body).toEqual({ title: "新建精简项目" });
-    const text = await page
-      .getByRole("tabpanel", { name: "我的资产", exact: true })
-      .textContent();
     for (const expected of [
       "基本设置",
       "角色参考图",
@@ -505,10 +499,12 @@ test.describe("video assets", () => {
       "道具资产",
       "保存",
     ]) {
-      expect(text).toContain(expected);
+      await expect(
+        page.getByText(expected, { exact: true }).first(),
+      ).toBeVisible();
     }
     for (const removed of ["品牌包", "色彩微调", "关联视频"]) {
-      expect(text).not.toContain(removed);
+      await expect(page.getByText(removed, { exact: true })).toHaveCount(0);
     }
   });
 
@@ -568,11 +564,8 @@ test.describe("video assets", () => {
     await expect(
       page.getByRole("button", { name: "返回项目列表" }),
     ).toBeVisible();
-    const text = await page
-      .getByRole("tabpanel", { name: "我的资产", exact: true })
-      .textContent();
     for (const removed of ["品牌包", "色彩微调", "关联视频"]) {
-      expect(text).not.toContain(removed);
+      await expect(page.getByText(removed, { exact: true })).toHaveCount(0);
     }
 
     const anchorSection = page

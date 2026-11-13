@@ -774,6 +774,7 @@ export const enUS: Translations = {
       empty: (capability: string) => `No ${capability} conversations yet`,
       noResults: "No matching conversations",
       open: "Open",
+      openProject: "Open project",
       updated: "Updated",
       updatedUnknown: "Update time unknown",
     },

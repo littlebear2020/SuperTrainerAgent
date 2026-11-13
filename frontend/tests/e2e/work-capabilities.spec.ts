@@ -69,14 +69,14 @@ test.describe("six work capabilities", () => {
     ).toHaveCount(6);
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-panel-course-video")
         .getByText("真实文字动效对话", { exact: true }),
     ).toBeVisible();
 
     await page.getByRole("tab", { name: "图片动效", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-panel-ai_image")
         .getByText("真实图片作品", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ai_image/);
@@ -84,7 +84,7 @@ test.describe("six work capabilities", () => {
     await page.getByRole("tab", { name: "AI视频", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-panel-ai_video")
         .getByText("真实视频作品", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ai_video/);
@@ -92,7 +92,7 @@ test.describe("six work capabilities", () => {
     await page.getByRole("tab", { name: "课程海报", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-panel-creative-studio")
         .getByText("旧海报对话", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=creative-studio/);
@@ -100,7 +100,7 @@ test.describe("six work capabilities", () => {
     await page.getByRole("tab", { name: "PPT课件", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("旧课件对话", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ppt-master/);
@@ -108,14 +108,14 @@ test.describe("six work capabilities", () => {
     await page.getByRole("tab", { name: "语音播客", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("真实播客对话", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=podcast-studio/);
     await page.reload();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("真实播客对话", { exact: true }),
     ).toBeVisible();
     await expect(
@@ -125,7 +125,7 @@ test.describe("six work capabilities", () => {
     await page.goBack();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("旧课件对话", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ppt-master/);
@@ -138,7 +138,7 @@ test.describe("six work capabilities", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("真实播客对话", { exact: true }),
     ).toBeVisible();
     expect(
@@ -180,7 +180,7 @@ test.describe("six work capabilities", () => {
     await expect(page.getByTestId("agent-conversation-card")).toHaveCount(1);
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("Offset 五十目标", { exact: true }),
     ).toBeVisible();
     expect(offsets).toContain(50);
@@ -217,13 +217,15 @@ test.describe("six work capabilities", () => {
     await page.goto("/workspace/video-gen?tab=works&capability=podcast-studio");
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("对话加载失败，请稍后重试"),
     ).toBeVisible({
       timeout: 15000,
     });
     await expect(
-      page.locator("#video-assets-panel-works").getByText("暂无语音播客对话"),
+      page
+        .locator("#work-capability-tabs + [role='tabpanel']")
+        .getByText("暂无语音播客对话"),
     ).toHaveCount(0);
     await expect(page.getByTestId("agent-conversation-card")).toHaveCount(0);
 
@@ -231,12 +233,12 @@ test.describe("six work capabilities", () => {
     await page.getByRole("button", { name: "重试", exact: true }).click();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("重试后的播客", { exact: true }),
     ).toBeVisible();
     await expect(
       page
-        .locator("#video-assets-panel-works")
+        .locator("#work-capability-tabs + [role='tabpanel']")
         .getByText("对话加载失败，请稍后重试"),
     ).toHaveCount(0);
   });
