@@ -150,6 +150,19 @@ describe("CompletedVideoGrid", () => {
     expect(container.querySelector("img")?.getAttribute("src")).toBe(
       "/api/video/tasks/1/thumbnail",
     );
+    const card = container.querySelector<HTMLElement>(
+      "[data-testid='completed-work-card']",
+    )!;
+    for (const className of ["h-full", "flex", "flex-col"]) {
+      expect(card.className).toContain(className);
+    }
+    expect(card.firstElementChild?.className).toContain("aspect-video");
+    expect(card.firstElementChild?.className).toContain("shrink-0");
+    const body = card.lastElementChild;
+    for (const className of ["flex", "flex-1", "flex-col"]) {
+      expect(body?.className).toContain(className);
+    }
+    expect(button("查看").parentElement?.className).toContain("mt-auto");
     for (const forbidden of [
       "99",
       "88",
@@ -262,6 +275,34 @@ describe("CompletedVideoGrid", () => {
       container.querySelectorAll("[data-testid='completed-work-card']"),
     ).toHaveLength(6);
     expect(container.querySelector("[role='tablist']")).toBeNull();
+  });
+
+  it.each([
+    ["running", "处理中"],
+    ["composing", "重新合成中"],
+    ["qc_repair", "质检修复中"],
+    ["pending", "排队中"],
+    ["cancelled", "排队中"],
+  ])("preserves %s status and safe actions", async (status, label) => {
+    await render([task(status, { status, progress: 40 })]);
+    const card = container.querySelector<HTMLElement>(
+      "[data-testid='completed-work-card']",
+    )!;
+    expect(card.textContent).toContain(label);
+    expect(button("查看").disabled).toBe(true);
+    expect(card.querySelector("a[download]")).toBeNull();
+    expect(button("详情")).toBeDefined();
+    expect(button("删除")).toBeDefined();
+  });
+
+  it("keeps an incomplete draft free of playback download and storyboard actions", async () => {
+    await render([task("drafting", { status: "draft", progress: 40 })]);
+    expect(container.textContent).toContain("生成分镜");
+    expect(button("查看").disabled).toBe(true);
+    expect(container.querySelector("a[download]")).toBeNull();
+    expect(container.textContent).not.toContain("继续编辑分镜");
+    expect(button("详情")).toBeDefined();
+    expect(button("删除")).toBeDefined();
   });
 
   it("restores details storyboard retry confirmation and delete confirmation by exact id", async () => {

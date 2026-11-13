@@ -96,14 +96,14 @@ function CompletedWorkCard({
     <article
       data-testid="completed-work-card"
       data-task-id={task.id}
-      className="bg-background min-w-0 overflow-hidden rounded-2xl border shadow-sm"
+      className="bg-background flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm"
     >
       <TaskThumbnail
         url={task.thumbnail_url}
         artifactMissing={task.artifact_missing}
-        className="aspect-video h-auto w-full rounded-none"
+        className="aspect-video h-auto w-full shrink-0 rounded-none"
       />
-      <div className="space-y-3 p-4">
+      <div className="flex flex-1 flex-col space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="min-w-0 truncate font-semibold">
             {task.title?.trim() ? task.title : "未命名作品"}
@@ -126,7 +126,7 @@ function CompletedWorkCard({
         {task.error_message ? (
           <p className="text-xs text-red-600">{task.error_message}</p>
         ) : null}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-auto flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
