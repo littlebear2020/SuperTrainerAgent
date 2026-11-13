@@ -661,14 +661,14 @@ export const zhCN: Translations = {
           description: "根据脚本生成画面，让静态内容自然流动",
           mediaAlt: "图片动效样例",
           mediaLabel: "文稿→动态图片",
-          tags: ["等距信息图", "白板手绘", "商务实景"],
+          tags: ["等距信息图", "白板手绘", "纸艺拼贴"],
         },
         ai_video: {
           title: "AI视频",
           description: "从一个创意生成更自由、更丰富的动态镜头",
           mediaAlt: "AI 视频样例",
           mediaLabel: "文稿→动态镜头",
-          tags: ["纸艺剧场", "3D角色", "商务实景"],
+          tags: ["精密工程", "3D角色", "商务实景"],
         },
         "creative-studio": {
           title: "课程海报",
