@@ -1,6 +1,6 @@
 # 我的作品 / 我的资产信息架构与卡片统一实施计划
 
-> **状态**：未执行；任务 1～3 已完成，任务 4 待执行。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
+> **状态**：已执行；任务 1～4 实施与本地验收已完成，PR 收口进行中。定稿基线 `4fa78245`；工作区已有 `docs/findings-backlog.md` 修改和两个未跟踪 MP4，均不属于本批，不得覆盖或提交。
 > **TL;DR**：只收敛页面信息架构、卡片网格与媒体区；现有配色、字体、胶囊 Tab、圆角、阴影、按钮和状态徽标全部沿用；真实作品封面及创建、分镜、详情、播放、下载、重试能力不删不改；不改后端、不改路由结构。
 
 > **For agentic workers：** 用户复核后使用 `executing-plans` 逐项实施；每项按“失败测试 → 最小实现 → 定向回归”执行并勾选，不得把 demo 当作视觉规范。
@@ -146,10 +146,10 @@ export function userTurnCount(thread: AgentThread): number | null;
 - Modify：`frontend/tests/e2e/video-assets.spec.ts`、`frontend/tests/e2e/work-capabilities.spec.ts`
 - Create：`docs/changelog/changelog-2026-11-13-works-assets-ia-cleanup.md`
 
-- [ ] **更新行为级 E2E**：通过侧栏链接切换作品/资产；断言页内无一级 Tab、h1 与 URL 正确、六能力切换及详情路由的侧栏 active 不回归。保留真实播放、下载、加载更多、缺产物阻断断言，并运行 `work-capabilities.spec.ts` 覆盖六能力、历史路由和更新后的「继续对话」入口。
-- [ ] **验证资产详情卸载重置**：在真实 E2E 中打开项目详情，经侧栏依次切换「我的作品 → 我的资产」，断言项目列表与「新建项目」可见，旧项目详情和「返回项目列表」不存在；不以 mock 组件的卸载记录替代该行为断言。
-- [ ] **视觉复核**：桌面 1440px 与移动 390px 逐类抽查六能力及资产页；三列/单列无横向溢出，媒体区实际保持 16:9，同一行卡片等高且动作区底部对齐。长标题、真实错误、不同操作数量与展开播放器允许产生合理行高差异，不要求所有卡片总高度固定一致；确认胶囊 Tab、Indigo、圆角、阴影、按钮和状态徽标未变成 demo 样式。
-- [ ] **运行定向测试**：
+- [x] **更新行为级 E2E**：通过侧栏链接切换作品/资产；断言页内无一级 Tab、h1 与 URL 正确、六能力切换及详情路由的侧栏 active 不回归。保留真实播放、下载、加载更多、缺产物阻断断言，并运行 `work-capabilities.spec.ts` 覆盖六能力、历史路由和更新后的「继续对话」入口。
+- [x] **验证资产详情卸载重置**：在真实 E2E 中打开项目详情，经侧栏依次切换「我的作品 → 我的资产」，断言项目列表与「新建项目」可见，旧项目详情和「返回项目列表」不存在；不以 mock 组件的卸载记录替代该行为断言。
+- [x] **视觉复核**：桌面 1440px 与移动 390px 逐类抽查六能力及资产页；三列/单列无横向溢出，媒体区实际保持 16:9，同一行卡片等高且动作区底部对齐。长标题、真实错误、不同操作数量与展开播放器允许产生合理行高差异，不要求所有卡片总高度固定一致；确认胶囊 Tab、Indigo、圆角、阴影、按钮和状态徽标未变成 demo 样式。
+- [x] **运行定向测试**：
 
 ```bash
 cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/video-gen-page-url.dom.test.tsx tests/unit/components/workspace/video-gen/course-project-page.dom.test.tsx tests/unit/components/workspace/video-gen/completed-video-grid.dom.test.tsx tests/unit/components/workspace/video-gen/agent-conversation-grid.dom.test.tsx
@@ -157,8 +157,8 @@ cd frontend && pnpm exec vitest run --project node tests/unit/components/workspa
 cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts
 ```
 
-- [ ] **运行交付门禁**：`cd frontend && pnpm test`、`cd frontend && pnpm check`、根 `make check`、`python3 scripts/check_docs_convention.py`。长命令按仓库约定后台执行，记录真实关键输出。
-- [ ] **写 changelog**：包含 TL;DR 与「验收记录」；每条为“命令 → 实际输出关键行”，不得伪造。更新本计划状态头并勾完已执行项。
+- [x] **运行交付门禁**：`cd frontend && pnpm test`、`cd frontend && pnpm check`、根 `make check`、`python3 scripts/check_docs_convention.py`。长命令按仓库约定后台执行，记录真实关键输出。
+- [x] **写 changelog**：包含 TL;DR 与「验收记录」；每条为“命令 → 实际输出关键行”，不得伪造。更新本计划状态头并勾完已执行项。
 - [ ] **PR 收口**：按根 AGENTS.md 建分支 `works-assets-ia-cleanup`、逐主题提交、push、PR + OCR；不直推 main。无 Critical/Important 且 CI 绿才可 rebase merge，否则修复或回报。
 
 ## 六、P1 / 明确不做
