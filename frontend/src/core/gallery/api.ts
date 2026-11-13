@@ -85,16 +85,6 @@ export interface GalleryListResponse {
   total: number;
 }
 
-export async function loadGalleryCategories(): Promise<string[]> {
-  const url = `${getBackendBaseURL()}/api/gallery/categories`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    return [];
-  }
-  const data = await res.json();
-  return Array.isArray(data?.categories) ? data.categories : [];
-}
-
 export async function loadGalleryCases(
   category?: string,
   skillName?: string,
@@ -112,31 +102,6 @@ export async function loadGalleryCases(
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to load gallery cases: ${res.statusText}`);
-  }
-  return res.json();
-}
-
-export async function shareCase(payload: {
-  title: string;
-  prompt: string;
-  category: string;
-  skill_name?: string;
-  thumbnail?: string | null;
-  recipe?: Recipe | null;
-}): Promise<GalleryCase> {
-  const url = `${getBackendBaseURL()}/api/gallery/cases`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    throw galleryError(
-      await readFastApiErrorDetail(res, "分享失败"),
-      res.status,
-    );
   }
   return res.json();
 }
@@ -253,26 +218,6 @@ function galleryError(message: string, status: number): GalleryError {
   const err = new Error(message) as GalleryError;
   err.status = status;
   return err;
-}
-
-export async function extractRecipe(
-  threadId: string,
-  title: string,
-  category: string,
-): Promise<{ recipe: Recipe }> {
-  const url = `${getBackendBaseURL()}/api/gallery/extract-recipe`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ thread_id: threadId, title, category }),
-  });
-  if (!res.ok) {
-    throw galleryError(
-      await readFastApiErrorDetail(res, "配方提取失败"),
-      res.status,
-    );
-  }
-  return res.json();
 }
 
 export async function instantiateCase(
