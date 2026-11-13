@@ -393,6 +393,7 @@ export interface Translations {
     /** Home hero and the fixed six-capability creation grid. */
     home: {
       heroTitle: string;
+      heroKicker: string;
       createHeading: string;
       teacherAlt: string;
       teacherNote: string;
@@ -410,8 +411,6 @@ export interface Translations {
           description: string;
           mediaAlt: string;
           mediaLabel: string;
-          mediaCaption: string;
-          mediaStatus: string;
           tags: readonly string[];
         }
       >;

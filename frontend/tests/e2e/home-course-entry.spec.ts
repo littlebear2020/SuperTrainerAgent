@@ -209,7 +209,7 @@ test.describe("home course entries", () => {
       .first()
       .evaluate(
         (element) =>
-          getComputedStyle(element.parentElement!).gridTemplateColumns,
+          getComputedStyle(element.closest(".grid")!).gridTemplateColumns,
       );
     expect(columns.split(" ")).toHaveLength(3);
   });
@@ -300,7 +300,7 @@ test.describe("home course entries", () => {
     });
     await page.goto("/workspace");
     const card = page.locator("[data-course-entry='course-video']");
-    await expect(card.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
+    await expect(page.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
     await expect(card.locator("img")).toBeVisible();
     await expect(card.locator("video")).toHaveCount(0);
     await expect(page.locator("video")).toHaveCount(2);
@@ -325,7 +325,7 @@ test.describe("home course entries", () => {
     });
     await page.goto("/workspace");
     const card = page.locator("[data-course-entry='course-video']");
-    await expect(card.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
+    await expect(page.getByText("预览暂不可用，仍可开始创作")).toBeVisible();
     await page.locator("[data-course-retry='course-video']").click();
     await expect(card.getByText("预览暂不可用，仍可开始创作")).toHaveCount(0);
     await expect(card.locator("video")).toBeVisible();
