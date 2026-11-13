@@ -21,9 +21,9 @@
 
 - `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/video-gen-page-url.dom.test.tsx tests/unit/components/workspace/video-gen/course-project-page.dom.test.tsx tests/unit/components/workspace/video-gen/completed-video-grid.dom.test.tsx tests/unit/components/workspace/video-gen/agent-conversation-grid.dom.test.tsx` → `Test Files 4 passed (4)`，`Tests 36 passed (36)`。
 - `cd frontend && pnpm exec vitest run --project node tests/unit/components/workspace/video-gen/completed-video-grid.test.ts tests/unit/components/workspace/video-gen/course-project-cover.test.ts tests/unit/core/workspace/video-assets-route.test.ts` → `Test Files 3 passed (3)`，`Tests 16 passed (16)`。
-- `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts` → `23 passed (22.1s)`，包含真实播放、下载事件及全部状态行为。
+- `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts` → rebase 到最新 `origin/main` 后 `23 passed (25.3s)`，包含真实播放、下载事件及全部状态行为。
 - `cd frontend && pnpm exec playwright test tests/e2e/video-assets.spec.ts tests/e2e/work-capabilities.spec.ts -g "card geometry|project cards keep"` → `7 passed (3.1s)`，覆盖六能力与资产的 1440px/390px 几何断言和截图。
 - `cd frontend && pnpm test` → `Test Files 263 passed (263)`，`Tests 1714 passed (1714)`。
 - `cd frontend && pnpm check` → 退出 0；`0 errors`，`All matched files use Prettier code style!`（121 条存量 ESLint warning）。
-- `make check` → 退出 0；后端 `All checks passed!`、`1317 files already formatted`，前端 knip 完成，`i18n key 存活检测通过：607 个叶子全活`，文档约定检查通过。
+- `make check` → 退出 0；后端 `All checks passed!`、`1317 files already formatted`，前端 knip 完成，rebase 后 `i18n key 存活检测通过：606 个叶子全活`，文档约定检查通过。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
