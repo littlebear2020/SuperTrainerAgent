@@ -138,19 +138,12 @@ export default function WorkspaceHome() {
               {t.workspace.home.createHeading}
             </p>
           </div>
-          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:translate-y-16">
+          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:translate-y-[72px]">
             <img
               src="/course-samples/teacher-A-half.png"
               alt={t.workspace.home.teacherAlt}
-              className="h-64 w-auto max-w-full object-contain sm:h-72"
+              className="h-52 w-auto max-w-full object-contain sm:h-60"
             />
-            <span className="absolute right-2 bottom-3 flex items-center gap-1.5 rounded-full border border-indigo-100 bg-white/90 px-3 py-1.5 text-[10px] font-medium text-slate-600 shadow-sm">
-              <span
-                aria-hidden="true"
-                className="size-1.5 rounded-full bg-teal-400"
-              />
-              {t.workspace.home.teacherNote}
-            </span>
           </div>
         </header>
         <HomeCourseEntry onSelect={handleSelect} />

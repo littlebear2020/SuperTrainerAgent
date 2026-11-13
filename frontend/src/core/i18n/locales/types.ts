@@ -396,7 +396,6 @@ export interface Translations {
       heroKicker: string;
       createHeading: string;
       teacherAlt: string;
-      teacherNote: string;
       playbackUnavailable: string;
       groups: Record<"video" | "studio", { title: string; kicker: string }>;
       courseItems: Record<

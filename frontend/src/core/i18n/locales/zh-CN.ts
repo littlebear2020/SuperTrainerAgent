@@ -642,7 +642,6 @@ export const zhCN: Translations = {
       createHeading:
         "选择一种能力，把文字、图片和资料变成视频、海报、PPT 或播客。",
       teacherAlt: "手持书本和教鞭、面带微笑的卡通亚洲年轻男老师",
-      teacherNote: "你的 AI 创作助教",
       playbackUnavailable: "预览暂不可用，仍可开始创作",
       groups: {
         video: { title: "视频课", kicker: "VIDEO CREATION" },

@@ -117,7 +117,7 @@ describe("workspace-home final i18n and teacher hero", () => {
     expect(text).toContain("VIDEO CREATION");
     expect(text).toContain("Design & audio courses");
     expect(text).toContain("DESIGN & AUDIO");
-    expect(text).toContain("Your AI creative assistant");
+    expect(text).not.toContain("Your AI creative assistant");
     const teacherAlt =
       "Smiling young Asian male cartoon teacher holding a book and pointer";
     const teacher = container.querySelector(`img[alt="${teacherAlt}"]`);
@@ -149,7 +149,7 @@ describe("workspace-home final i18n and teacher hero", () => {
     expect(text).toContain("VIDEO CREATION");
     expect(text).toContain("图文音频课");
     expect(text).toContain("DESIGN & AUDIO");
-    expect(text).toContain("你的 AI 创作助教");
+    expect(text).not.toContain("你的 AI 创作助教");
     const teacherAlt = "手持书本和教鞭、面带微笑的卡通亚洲年轻男老师";
     const teacher = container.querySelector(`img[alt="${teacherAlt}"]`);
     expect(teacher?.getAttribute("src")).toBe(

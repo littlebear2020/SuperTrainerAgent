@@ -688,7 +688,6 @@ export const enUS: Translations = {
         "Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.",
       teacherAlt:
         "Smiling young Asian male cartoon teacher holding a book and pointer",
-      teacherNote: "Your AI creative assistant",
       playbackUnavailable: "Preview unavailable. You can still start creating.",
       groups: {
         video: { title: "Video courses", kicker: "VIDEO CREATION" },
