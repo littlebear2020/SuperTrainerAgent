@@ -394,7 +394,10 @@ export interface Translations {
     home: {
       heroTitle: string;
       createHeading: string;
+      teacherAlt: string;
+      teacherNote: string;
       playbackUnavailable: string;
+      groups: Record<"video" | "studio", { title: string; kicker: string }>;
       courseItems: Record<
         | "course-video"
         | "ai_image"
@@ -406,6 +409,10 @@ export interface Translations {
           title: string;
           description: string;
           mediaAlt: string;
+          mediaLabel: string;
+          mediaCaption: string;
+          mediaStatus: string;
+          tags: readonly string[];
         }
       >;
     };

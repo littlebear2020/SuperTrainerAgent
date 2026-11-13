@@ -198,7 +198,7 @@ describe("AgentConversationGrid", () => {
     h.threads = Array.from({ length: 8 }, (_, index) =>
       makeThread(`ppt-${index}`, { agentName: "ppt-master" }),
     );
-    await render("ppt-master", "PPT制作");
+    await render("ppt-master", "PPT课件");
     expect(
       document.querySelector<HTMLInputElement>("input[type='search']")?.value,
     ).toBe("");
@@ -233,9 +233,9 @@ describe("AgentConversationGrid", () => {
         title: "旧版课件",
       }),
     ];
-    await render("ppt-master", "PPT制作");
+    await render("ppt-master", "PPT课件");
     expect(container.textContent).toContain("旧版课件");
-    expect(container.textContent).toContain("PPT制作");
+    expect(container.textContent).toContain("PPT课件");
     expect(container.textContent).toContain("最近更新");
     expect(container.textContent).not.toContain("删除");
     await act(async () => button("打开").click());

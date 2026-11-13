@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { HOME_COURSE_ITEMS } from "@/components/workspace/home-course-catalog";
 
 describe("HOME_COURSE_ITEMS", () => {
-  it("exposes exactly six capabilities in stable order without category entries", () => {
+  it("keeps the six stable IDs and assigns three video and three studio groups", () => {
     expect(HOME_COURSE_ITEMS.map((item) => item.id)).toEqual([
       "course-video",
       "ai_image",
@@ -12,10 +14,18 @@ describe("HOME_COURSE_ITEMS", () => {
       "ppt-master",
       "podcast-studio",
     ]);
+    expect(HOME_COURSE_ITEMS.map((item) => item.group)).toEqual([
+      "video",
+      "video",
+      "video",
+      "studio",
+      "studio",
+      "studio",
+    ]);
     expect(HOME_COURSE_ITEMS.every((item) => !("entry" in item))).toBe(true);
   });
 
-  it("maps agent entries and AI entries without adding remotion_course or vimax routes", () => {
+  it("keeps the existing agent routes and AI task types", () => {
     expect(
       HOME_COURSE_ITEMS.filter((item) => item.kind === "agent").map(
         (item) => item.agentName,
@@ -31,14 +41,13 @@ describe("HOME_COURSE_ITEMS", () => {
         (item) => item.initialTaskType,
       ),
     ).toEqual(["ai_image", "ai_video"]);
-    expect(HOME_COURSE_ITEMS[0]?.kind).toBe("agent");
   });
 
-  it("uses dedicated posters for videos and existing static images", () => {
+  it("uses the approved video, poster and presentation media", () => {
     expect(HOME_COURSE_ITEMS.slice(0, 3).map((item) => item.media)).toEqual([
       {
         kind: "video",
-        src: "/course-samples/remotion.mp4",
+        src: "/course-samples/text-motion-preview.mp4",
         poster: "/course-samples/text-motion-poster.webp",
       },
       {
@@ -53,9 +62,18 @@ describe("HOME_COURSE_ITEMS", () => {
       },
     ]);
     expect(HOME_COURSE_ITEMS.slice(3).map((item) => item.media)).toEqual([
-      { kind: "image", src: "/course-samples/knowledge-card.webp" },
-      { kind: "image", src: "/course-samples/ppt-work.webp" },
+      { kind: "image", src: "/course-samples/poster-design.svg" },
+      { kind: "image", src: "/course-samples/ppt-design.svg" },
       { kind: "image", src: "/course-samples/podcast-work.webp" },
     ]);
+  });
+
+  it.each([
+    "teacher-A-half.png",
+    "poster-design.svg",
+    "ppt-design.svg",
+    "text-motion-preview.mp4",
+  ])("ships the approved production asset %s", (asset) => {
+    expect(existsSync(`public/course-samples/${asset}`)).toBe(true);
   });
 });

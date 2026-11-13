@@ -685,42 +685,94 @@ export const enUS: Translations = {
       heroTitle: "Great content starts with one idea.",
       createHeading:
         "Choose a tool to turn your text, images, and source material into videos, posters, slides, or podcasts.",
+      teacherAlt:
+        "Smiling young Asian male cartoon teacher holding a book and pointer",
+      teacherNote: "Your AI creative assistant",
       playbackUnavailable: "Preview unavailable. You can still start creating.",
+      groups: {
+        video: { title: "Video courses", kicker: "VIDEO CREATION" },
+        studio: { title: "Design & audio courses", kicker: "DESIGN & AUDIO" },
+      },
       courseItems: {
         "course-video": {
           title: "Text animation",
           description:
             "Turn scripts and key ideas into clear, easy-to-follow animated explainer videos",
           mediaAlt: "Text animation course sample",
+          mediaLabel: "Script → animated lesson",
+          mediaCaption: "Turn knowledge into a clear, paced explanation",
+          mediaStatus: "Looping",
+          tags: [
+            "Topic → explainer video",
+            "Screenshots → product tutorial",
+            "Script → video, unchanged",
+          ],
         },
         ai_image: {
           title: "Image motion",
           description:
             "Generate scenes from your script and bring static content to life",
           mediaAlt: "Image motion sample",
+          mediaLabel: "Script → moving images",
+          mediaCaption: "Give still images a cinematic voice",
+          mediaStatus: "Looping",
+          tags: [
+            "Isometric infographics",
+            "Whiteboard sketch",
+            "Business footage",
+          ],
         },
         ai_video: {
           title: "AI video",
           description: "Turn one idea into freer, richer dynamic shots",
           mediaAlt: "AI video sample",
+          mediaLabel: "Script → dynamic shots",
+          mediaCaption: "Open up more visuals from a single idea",
+          mediaStatus: "Looping",
+          tags: ["Paper theater", "3D characters", "Business footage"],
         },
         "creative-studio": {
-          title: "Poster design",
+          title: "Course poster",
           description:
             "Turn a topic and key points into clear, striking visual posters",
-          mediaAlt: "Knowledge card poster sample",
+          mediaAlt: "Full-bleed editorial poster artwork",
+          mediaLabel: "Topic → visual poster",
+          mediaCaption: "Make your topic visible at first glance",
+          mediaStatus: "Full artwork",
+          tags: [
+            "Key points → knowledge cards",
+            "Course → vertical poster",
+            "Knowledge → comic series",
+          ],
         },
         "ppt-master": {
-          title: "PPT creation",
+          title: "PPT slides",
           description:
             "Turn a topic or source material into structured, editable presentations",
-          mediaAlt: "Presentation preview",
+          mediaAlt: "Presentation canvases and charts",
+          mediaLabel: "Sources → presentation",
+          mediaCaption: "Clear structure makes a better story",
+          mediaStatus: "Editable",
+          tags: [
+            "Topic → quick slides",
+            "Edit part of an old deck",
+            "Restyle, keep text unchanged",
+          ],
         },
         "podcast-studio": {
-          title: "Podcast production",
+          title: "Voice podcast",
           description:
             "Turn documents, public links, or topic research into a downloadable MP3 podcast",
           mediaAlt: "Headphones and audio waveform cover",
+          mediaLabel: "Sources → voice podcast",
+          mediaCaption: "Share ideas worth hearing",
+          mediaStatus: "Downloadable",
+          tags: [
+            "Read the original text",
+            "Solo news",
+            "Two-person interview",
+            "Two-person debate",
+          ],
         },
       },
     },
