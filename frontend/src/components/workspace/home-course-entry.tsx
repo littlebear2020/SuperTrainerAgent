@@ -45,6 +45,7 @@ export function CourseMedia({
     if (playRequestedRef.current) return;
     const video = videoRef.current;
     if (!video) return;
+    video.playsInline = true;
     playRequestedRef.current = true;
 
     let cancelled = false;
@@ -71,7 +72,7 @@ export function CourseMedia({
 
   return (
     <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-900">
-      {!posterFailed ? (
+      {!posterFailed && (poster || item.media.kind === "image") ? (
         <img
           src={poster ?? item.media.src}
           alt={copy.mediaAlt}
@@ -84,7 +85,6 @@ export function CourseMedia({
         <video
           ref={(node) => {
             videoRef.current = node;
-            if (node) node.playsInline = true;
           }}
           className="absolute inset-0 h-full w-full object-cover"
           src={item.media.src}
