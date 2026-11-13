@@ -18,6 +18,7 @@
 - `pnpm exec vitest run tests/unit/components/workspace/workspace-home-i18n.dom.test.tsx` → **2/2 passed**；随后 `pnpm test` → **263 files / 1702 tests passed**；`pnpm check` → **0 errors / 121 个既有 warnings**，Prettier 通过；日志 `frontend-unit-check-final.log`。
 - 最终 `{ make check && cd frontend && pnpm test && cd .. && git diff --check; }` → 退出码 0；knip、i18n 605 叶子、docs convention、diff check 全过，单元测试再次 **263 files / 1702 tests passed**；日志 `root-check-chat-home-final.log`。
 - OCR 可维护性建议后，进一步删除不可达分享 prop、弹窗及分享专用 API helper；聊天定向 E2E **8/8 passed**（`pr6-ocr-chat-green.log`），同一根门禁与 **1702/1702** 再次通过（`pr6-ocr-root-check.log`）。
+- 第二轮 OCR 的 Recipe/缩略图死分支也已清理；最终根门禁、knip、i18n、docs convention 与 **1702/1702** 通过（`pr6-final-cleanup-check.log`）。
 - 首页词条 RED→GREEN：`home-tags-red.log` 记录旧词导致失败，`home-tags-green.log` 记录 **4/4 passed**。
 - 桌面截图 `home-polish-final.png` 已读回：助教底边与视频课标题接近，不遮挡卡片，两处新词可见。
 
