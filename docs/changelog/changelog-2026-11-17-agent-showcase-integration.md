@@ -1,6 +1,6 @@
 # Agent 新会话案例展示集成
 
-> **状态**：2026-11-17 已完成实现与本地/真实行为验收；PR 评审与 CI 合入流程进行中。
+> **状态**：T0–T6 已完成实现与验收；[PR #12](https://github.com/littlebear2020/SuperTrainerAgent/pull/12) 评审与既有 CI 通过，最终文档提交后合入。
 > **TL;DR**：为课程视频、PPT、播客、视觉设计四个 Agent 的新会话页落地人物 hero、scoped composer 与 20 个真实案例；关键决策 = 复用真实 InputBox、草稿/提交与工作流，案例数据统一驱动四类媒体和 58 个静态素材；影响面 = frontend 指定展示/测试/文档路径，不改 backend、skills、路由、stream、registry 或 lockfile。
 
 ## 实施内容

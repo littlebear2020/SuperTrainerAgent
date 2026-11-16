@@ -1,6 +1,6 @@
 # Agent 新会话案例展示落地计划
 
-> **状态**：已执行（2026-11-17 T0–T5 实现与验收完成；T6 changelog 已落地，PR 评审与合入待完成；[changelog](../changelog/changelog-2026-11-17-agent-showcase-integration.md)）。
+> **状态**：已执行（2026-11-17 T0–T6 实现与验收完成；[PR #12](https://github.com/littlebear2020/SuperTrainerAgent/pull/12) 评审与既有 CI 通过，最终文档提交后合入 main）。
 > **TL;DR**：把 demo 的“人物 + 大字 + HOW IT WORKS + 真实案例”迁入 4 个 Agent 的新会话引导页，保留真实 `InputBox`、草稿确认和 `co-writer` 旧体验。素材放 `frontend/public/agent-showcase`，UI 与案例元数据双语、提示词中文且保留 Agent 工作流标记。实施先过人物图技术验证，再跑通 `course-video` 垂直切片，随后扩展其余三类；验收定向优先、按风险补充全量或专项测试，禁止无新信号的重复空跑。
 
 **Spec / 需求来源**：用户 2026-11-17 截图与三轮补充说明；当前 demo `temp/agent-listenhub-demo-v2/bundle.html`；项目现有 `AgentNewChatGuide`、`InputBox`、`agentAppearance`、i18n 与设计 token；2026-11-17 计划评审及用户对“前端改动、杜绝不必要测试”的补充约束。已确认的决策见下表。
@@ -430,7 +430,7 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts
 
 - [x] 必写 `docs/changelog/changelog-2026-11-17-agent-showcase-integration.md`，包含 TL;DR、资产来源/58 文件/实际体积/压缩口径、验收记录（命令 → 实际关键输出）和首屏截图路径。
 - [x] 更新本计划勾选与状态头，链接 changelog；执行 `python3 scripts/check_docs_convention.py` 一次。
-- [ ] 按仓库约定走分支 + PR + AI 评审，既有 CI 通过后再合并；不默认新增本批专用 CI。若后续迁 CDN，只在 changelog 留指针，不在本批实现。
+- [x] 按仓库约定走分支 + PR + AI 评审，既有 CI 通过后再合并；不默认新增本批专用 CI。若后续迁 CDN，只在 changelog 留指针，不在本批实现。
 
 ## 十、验证清单（实现级 / 行为级）
 
