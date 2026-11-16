@@ -112,6 +112,18 @@ function useProviderEnv(
   useEnv(t, { ...cleared, ...values });
 }
 
+function captureWarnings(t: TestContext): string[] {
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map(String).join(" "));
+  };
+  t.after(() => {
+    console.warn = originalWarn;
+  });
+  return warnings;
+}
+
 const PNG_BYTES = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const PNG_BASE64 = "iVBORw0KGgo=";
 const JPEG_BYTES = Uint8Array.from([255, 216, 255, 224]);
@@ -120,17 +132,19 @@ async function makeTempDir(prefix: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
 }
 
-async function makeQihuStub(t: TestContext) {
+async function makeQihuStub(t: TestContext, responseStatus = 200) {
   let requestCount = 0;
   const server = createServer((request, response) => {
     requestCount += 1;
     request.resume();
     request.on("end", () => {
-      response.writeHead(200, {
+      response.writeHead(responseStatus, {
         "Content-Type": "application/json",
         Connection: "close",
       });
-      response.end(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }));
+      response.end(responseStatus === 200
+        ? JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] })
+        : "stub failure");
     });
   });
   await new Promise<void>((resolve, reject) => {
@@ -156,6 +170,26 @@ async function makeQihuStub(t: TestContext) {
   };
 }
 
+function getCurrentTsxRuntimeArgs(): string[] {
+  const runtimeArgs: string[] = [];
+  for (let i = 0; i < process.execArgv.length; i++) {
+    const flag = process.execArgv[i]!;
+    const value = process.execArgv[i + 1];
+    if (
+      (flag === "--require" || flag === "--import") &&
+      value &&
+      (value === "tsx" || /[\\/]tsx[\\/]/.test(value))
+    ) {
+      runtimeArgs.push(flag, value);
+      i += 1;
+    }
+  }
+  if (runtimeArgs.length === 0) {
+    throw new Error("CLI tests must run with tsx so the same loader can be reused");
+  }
+  return runtimeArgs;
+}
+
 function runMainCli(
   args: string[],
   cwd: string,
@@ -163,15 +197,17 @@ function runMainCli(
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile(
-      "npx",
-      ["--no-install", "tsx", path.join(import.meta.dirname, "main.ts"), ...args],
+      process.execPath,
+      [
+        ...getCurrentTsxRuntimeArgs(),
+        path.join(import.meta.dirname, "main.ts"),
+        ...args,
+      ],
       {
         cwd,
         env: {
           PATH: process.env.PATH ?? "",
           HOME: cwd,
-          npm_config_cache:
-            process.env.npm_config_cache ?? path.join(os.homedir(), ".npm"),
           QIHU_API_KEY: "offline-test-key",
           QIHU_BASE_URL: qihuBaseUrl,
           QIHU_IMAGE_MODEL: "bytedance/doubao-seedream-5.0-pro",
@@ -594,6 +630,24 @@ test("detectProvider infers qihu360 from bytedance seedream model ids", (t) => {
   );
 });
 
+test("detectProvider rejects Gemini/google and explicit non-Seedream QIHU models before generation setup", (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+
+  for (const model of [
+    "google/gemini-3.1-flash-image-preview",
+    "gemini-2.5-flash-image",
+  ]) {
+    assert.throws(
+      () => detectProvider(makeArgs({ model })),
+      /qihu360 supports only Seedream models/,
+    );
+  }
+  assert.throws(
+    () => detectProvider(makeArgs({ provider: "qihu360", model: "gpt-image-2" })),
+    /qihu360 supports only Seedream models/,
+  );
+});
+
 test("detectProvider keeps an explicit --provider over the QIHU default", (t) => {
   useProviderEnv(t, {
     QIHU_API_KEY: "qihu-key",
@@ -653,7 +707,22 @@ test("qihu360 body requests PNG in extra_body and maps sizes to the three Seedre
   });
 });
 
-test("qihu360 explicit size takes precedence over aspect ratio before tier mapping", () => {
+test("qihu360 warns that quality=normal still uses a 2K tier", (t) => {
+  const warnings = captureWarnings(t);
+  const body = buildGenerationsBody(
+    "prompt",
+    "bytedance/doubao-seedream-5.0-pro",
+    makeArgs({ quality: "normal", aspectRatio: "16:9" }),
+  );
+
+  assert.equal((body.extra_body as { size: string }).size, "2048x1152");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /quality=normal/);
+  assert.match(warnings[0]!, /2K/);
+});
+
+test("qihu360 explicit size takes precedence over aspect ratio before tier mapping and warns about normalization", (t) => {
+  const warnings = captureWarnings(t);
   const body = buildGenerationsBody(
     "prompt",
     "bytedance/doubao-seedream-5.0-pro",
@@ -664,11 +733,48 @@ test("qihu360 explicit size takes precedence over aspect ratio before tier mappi
     (body.extra_body as { size: string }).size,
     "2048x1152",
   );
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /1600x900/);
+  assert.match(warnings[0]!, /2048x1152/);
+});
+
+test("qihu360 warns when an aspect ratio is normalized but not for an exact tier ratio", (t) => {
+  const warnings = captureWarnings(t);
+  const model = "bytedance/doubao-seedream-5.0-pro";
+  const normalized = buildGenerationsBody(
+    "prompt",
+    model,
+    makeArgs({ aspectRatio: "4:3" }),
+  );
+
+  assert.equal((normalized.extra_body as { size: string }).size, "2048x2048");
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /4:3/);
+  assert.match(warnings[0]!, /2048x2048/);
+
+  warnings.length = 0;
+  buildGenerationsBody("prompt", model, makeArgs({ aspectRatio: "16:9" }));
+  assert.deepEqual(warnings, []);
 });
 
 test("qihu360 default model is the 360 Seedream 5.0 Pro id", (t) => {
   useProviderEnv(t);
   assert.equal(getDefaultModel(), "bytedance/doubao-seedream-5.0-pro");
+});
+
+test("qihu360 getDefaultModel rejects non-Seedream environment overrides with a compatibility error", (t) => {
+  useProviderEnv(t);
+
+  for (const model of [
+    "google/gemini-3.1-flash-image-preview",
+    "gpt-image-2",
+  ]) {
+    process.env.QIHU_IMAGE_MODEL = model;
+    assert.throws(
+      () => getDefaultModel(),
+      /QIHU_IMAGE_MODEL supports only Seedream models/,
+    );
+  }
 });
 
 test("qihu360 generateImage posts generations, downloads the image, and never sends top-level size", async (t) => {
@@ -818,11 +924,8 @@ for (const failure of urlFailureCases) {
   });
 }
 
-test("qihu360 rejects legacy Gemini and other non-Seedream models before any request", async (t) => {
-  useProviderEnv(t, {
-    QIHU_API_KEY: "qihu-key",
-    QIHU_IMAGE_MODEL: "google/gemini-3.1-flash-image-preview",
-  });
+test("qihu360 rejects non-Seedream models before any request", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
   let calls = 0;
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => {
@@ -837,7 +940,7 @@ test("qihu360 rejects legacy Gemini and other non-Seedream models before any req
   });
 
   await assert.rejects(
-    generateImage("prompt", getDefaultModel(), makeArgs()),
+    generateImage("prompt", "google/gemini-3.1-flash-image-preview", makeArgs()),
     /supports only Seedream models/,
   );
   await assert.rejects(
@@ -971,6 +1074,59 @@ test("qihu360 edits encode PNG, JPEG, BMP, and TIFF references with the right MI
   assert.match(multiBody.extra_body.image[4], /^data:image\/tiff;base64,/);
 });
 
+test("qihu360 rejects unknown local reference extensions before fetch", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const root = await makeTempDir("qihu-unknown-ref-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const reference = path.join(root, "reference.svg");
+  await fs.writeFile(reference, "<svg xmlns=\"http://www.w3.org/2000/svg\"/>");
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    generateImage("edit", getDefaultModel(), makeArgs({ referenceImages: [reference] })),
+    /Reference image.*unsupported extension.*\.svg/,
+  );
+  assert.equal(calls, 0);
+});
+
+test("qihu360 rejects local references over 10 MB before reading and uploading them", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const root = await makeTempDir("qihu-large-ref-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const reference = path.join(root, "large.png");
+  await fs.writeFile(reference, "");
+  await fs.truncate(reference, 10 * 1024 * 1024 + 1);
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    generateImage("edit", getDefaultModel(), makeArgs({ referenceImages: [reference] })),
+    /Reference image.*exceeds 10 MB/,
+  );
+  assert.equal(calls, 0);
+});
+
 test("qihu360 single-image CLI rejects a JPG output before fetch and defaults an extensionless output to PNG", async (t) => {
   const root = await makeTempDir("trainerai-imagine-single-output-");
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -1047,6 +1203,71 @@ test("qihu360 batch CLI rejects a WebP output during preparation without fetchin
   assert.match(result.stderr, /qihu360 supports only PNG output paths/);
   assert.equal(stub.requestCount, 0);
   await assert.rejects(fs.access(webpPath));
+});
+
+test("qihu360 CLI retries a server failure three times and rejects n!=1 without another request", async (t) => {
+  const root = await makeTempDir("trainerai-imagine-attempts-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stub = await makeQihuStub(t, 500);
+  const baseArgs = [
+    "--provider",
+    "qihu360",
+    "--model",
+    "bytedance/doubao-seedream-5.0-pro",
+    "--prompt",
+    "course cover",
+  ];
+  const outputPath = path.join(root, "attempt.png");
+
+  const failed = await runMainCli(
+    [...baseArgs, "--image", outputPath],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.stderr, /generation failed after 3 attempts/);
+  assert.equal(stub.requestCount, 3);
+  await assert.rejects(fs.access(outputPath));
+
+  const multiOutputPath = path.join(root, "multi.png");
+  const rejected = await runMainCli(
+    [...baseArgs, "--image", multiOutputPath, "--n", "2"],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.notEqual(rejected.code, 0);
+  assert.match(rejected.stderr, /exactly one output image/);
+  assert.equal(stub.requestCount, 3);
+  await assert.rejects(fs.access(multiOutputPath));
+});
+
+test("qihu360 CLI stops after one attempt for a non-retryable API error", async (t) => {
+  const root = await makeTempDir("trainerai-imagine-non-retryable-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stub = await makeQihuStub(t, 400);
+  const outputPath = path.join(root, "attempt.png");
+
+  const failed = await runMainCli(
+    [
+      "--provider",
+      "qihu360",
+      "--model",
+      "bytedance/doubao-seedream-5.0-pro",
+      "--prompt",
+      "course cover",
+      "--image",
+      outputPath,
+    ],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.notEqual(failed.code, 0);
+  assert.equal(stub.requestCount, 1);
+  assert.match(failed.stderr, /generation failed after 1 attempts/);
+  await assert.rejects(fs.access(outputPath));
 });
 
 test("batch worker and provider-rate-limit configuration prefer env over EXTEND config", (t) => {

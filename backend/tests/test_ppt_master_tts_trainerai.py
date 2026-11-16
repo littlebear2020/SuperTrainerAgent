@@ -6,6 +6,7 @@ VOLCENGINE_VOICE_ACCESS_KEY；notes_to_audio 的 trainerai 接线与 CLI 帮助�
 """
 
 import base64
+import binascii
 import importlib.util
 import io
 import json
@@ -164,6 +165,52 @@ def test_generate_rejects_malformed_sse_json_even_with_audio_and_152(mod, monkey
     monkeypatch.setattr(mod, "urlopen", lambda req, timeout=0: FakeStream(raw))
 
     with pytest.raises(RuntimeError, match="JSON"):
+        mod.generate("hi", tmp_path / "a.mp3", api_key="test-key", voice_id="")
+
+
+@pytest.mark.parametrize("control_data", ["", "[DONE]"])
+def test_generate_ignores_empty_and_done_sse_control_frames(mod, monkeypatch, tmp_path, control_data):
+    raw = _sse([_audio_event()]) + f"event: 351\ndata: {control_data}\n\n".encode() + _sse([_finish_event()])
+    monkeypatch.setattr(mod, "urlopen", lambda req, timeout=0: FakeStream(raw))
+    output = tmp_path / "control.mp3"
+
+    mod.generate("hi", output, api_key="test-key", voice_id="")
+
+    assert output.read_bytes() == AUDIO_BYTES
+
+
+def test_generate_rejects_truncated_sse_json_even_with_audio_and_152(mod, monkeypatch, tmp_path):
+    raw = _sse([_audio_event()]) + b'event: 352\ndata: {"code": 0, "data": "truncated\n' + _sse([_finish_event()])
+    monkeypatch.setattr(mod, "urlopen", lambda req, timeout=0: FakeStream(raw))
+
+    with pytest.raises(RuntimeError, match="JSON"):
+        mod.generate("hi", tmp_path / "a.mp3", api_key="test-key", voice_id="")
+
+
+def test_generate_decodes_base64_with_embedded_whitespace(mod, monkeypatch, tmp_path):
+    encoded = base64.b64encode(AUDIO_BYTES).decode("ascii")
+    wrapped = f" \t{encoded[:6]}\n{encoded[6:12]}\r\n{encoded[12:]} \t"
+    _capture_urlopen(
+        mod,
+        monkeypatch,
+        [("352", {"code": 0, "data": wrapped}), _finish_event()],
+    )
+    output = tmp_path / "wrapped.mp3"
+
+    mod.generate("hi", output, api_key="test-key", voice_id="")
+
+    assert output.read_bytes() == AUDIO_BYTES
+
+
+def test_generate_still_rejects_non_base64_characters(mod, monkeypatch, tmp_path):
+    encoded = base64.b64encode(AUDIO_BYTES).decode("ascii") + "$"
+    _capture_urlopen(
+        mod,
+        monkeypatch,
+        [("352", {"code": 0, "data": encoded}), _finish_event()],
+    )
+
+    with pytest.raises(binascii.Error):
         mod.generate("hi", tmp_path / "a.mp3", api_key="test-key", voice_id="")
 
 

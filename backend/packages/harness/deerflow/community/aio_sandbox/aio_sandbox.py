@@ -44,6 +44,32 @@ def tag_sandbox_dead(exc: BaseException) -> str:
     return f"Error: {SANDBOX_DEAD_MARKER} {detail}"
 
 
+_BASH_SESSION_INVALID_SIGNATURES = (
+    "session not found",
+    "session id not found",
+    "session expired",
+    "session is expired",
+    "session has expired",
+    "expired session",
+    "session invalid",
+    "session is invalid",
+    "invalid session",
+    "session closed",
+    "session is closed",
+    "session was closed",
+    "closed session",
+    "unknown session",
+    "session unknown",
+    "no such session",
+    "session does not exist",
+)
+
+
+def _is_bash_session_invalid_error(exc: BaseException) -> bool:
+    text = str(exc).lower().replace("_", " ")
+    return any(signature in text for signature in _BASH_SESSION_INVALID_SIGNATURES)
+
+
 def _aggregate_console_output(data) -> str:
     """Collect partial command output from ``data.console`` records.
 
@@ -118,8 +144,9 @@ class AioSandbox(Sandbox):
 
         bash.exec 与 shell.exec_command 是并列 API（独立会话空间），支持
         ``env`` 参数——这正是上游 required-secrets 注入链的消费端。首次调用
-        保存返回的 session_id，后续复用以保留 cwd；超时双闸语义与主路径一致
-        （hard=墙钟），死亡打标复用同一指纹清单。
+        保存返回的 session_id，后续复用以保留 cwd；仅明确的会话失效错误允许
+        无 session_id 重试一次，通用异常与沙箱死亡不重复执行。超时双闸语义
+        与主路径一致（hard=墙钟），死亡打标复用同一指纹清单。
 
         返回形状注意（2026-10-13 公司服务器实测修正）：bash.exec 的 data 是
         ``stdout``/``stderr``/``exit_code``——与 shell.exec_command 的
@@ -138,7 +165,15 @@ class AioSandbox(Sandbox):
                 }
                 if self._bash_session_id is not None:
                     exec_kwargs["session_id"] = self._bash_session_id
-                result = self._client.bash.exec(**exec_kwargs)
+                try:
+                    result = self._client.bash.exec(**exec_kwargs)
+                except Exception as e:
+                    if self._bash_session_id is None or is_sandbox_dead_error(e) or not _is_bash_session_invalid_error(e):
+                        raise
+                    logger.warning("Bash session is no longer valid; retrying once with a fresh session")
+                    self._bash_session_id = None
+                    exec_kwargs.pop("session_id", None)
+                    result = self._client.bash.exec(**exec_kwargs)
                 parts: list[str] = []
                 exit_code = None
                 if result.data is not None:

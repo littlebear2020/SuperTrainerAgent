@@ -162,7 +162,7 @@ Use `openai-native` for the OpenAI native API or strict clones; try `ratio-metad
 
 ## Auto-Fallback
 
-No automatic fallback chain is configured by default. When the primary provider (qihu360 Seedream by default) fails all 3 retry attempts, the generation fails with an error.
+No automatic fallback chain is configured by default. When the primary provider (qihu360 Seedream by default) fails its single attempt, the generation fails with an error.
 
 To enable a custom fallback chain, add to `.baoyu-skills/trainerai-imagine/EXTEND.md`:
 
@@ -219,7 +219,7 @@ Each entry supports the same options as CLI flags (`prompt`, `image`, `provider`
 | Situation | Prefer | Why |
 |-----------|--------|-----|
 | One image, or 1-2 simple images | Sequential | Lower coordination overhead, easier debugging |
-| Multiple images with saved prompt files | Batch (`--batchfile`) | Reuses finalized prompts, applies shared throttling/retries, predictable throughput |
+| Multiple images with saved prompt files | Batch (`--batchfile`) | Reuses finalized prompts, applies shared throttling, predictable throughput |
 | Each image still needs its own reasoning / prompt writing / style exploration | Subagents | Work is still exploratory, each needs independent analysis |
 | Input is `outline.md` + `prompts/` (e.g. from `trainerai-article-visuals` illustration mode) | Batch — use `scripts/build-batch.ts` to assemble the payload | The outline + prompt files already contain everything needed |
 
@@ -230,13 +230,13 @@ Rule of thumb: once prompt files are saved and the task is "generate all of thes
 - Default worker count is automatic, capped by config, built-in default 10
 - Provider-specific throttling applies only in batch mode; defaults are tuned for throughput while avoiding RPM bursts
 - Override with `--jobs <count>`
-- Each image retries up to 3 attempts
+- Each image is attempted once without automatic retries
 - Final output includes success count, failure count, and per-image failure reasons
 
 ## Error Handling
 
 - Missing API key → error with setup instructions
-- Generation failure → auto-retry up to 3 attempts per image
+- Generation failure → no automatic retry; the error is surfaced
 - Invalid aspect ratio → warning, proceed with default
 - Reference images with unsupported provider/model → error with fix hint
 
