@@ -50,30 +50,14 @@ export const enUS: Translations = {
 
   // Home
   home: {
-    tagline: "Your AI SuperAgent Workspace",
     enterWorkspace: "Enter Workspace",
-    highlights: [
-      {
-        label: "Deep Research",
-        description:
-          "Multi-angle systematic research with comprehensive reports",
-      },
-      {
-        label: "Data Analysis",
-        description: "Upload data files, SQL queries and visualizations",
-      },
-      {
-        label: "Creative Generation",
-        description: "Generate images, videos, podcasts, slides and web pages",
-      },
-    ],
   },
 
   // Welcome
   welcome: {
     greeting: "Hello, again!",
     description:
-      "Welcome to 🦌 Trainer AI, an open source super agent. With built-in and custom skills, Trainer AI helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
+      "Welcome to Trainer AI, an open source super agent. With built-in and custom skills, Trainer AI helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:

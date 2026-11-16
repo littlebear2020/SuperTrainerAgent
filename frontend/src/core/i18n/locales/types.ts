@@ -61,12 +61,7 @@ export interface Translations {
   };
 
   home: {
-    tagline: string;
     enterWorkspace: string;
-    highlights: {
-      label: string;
-      description: string;
-    }[];
   };
 
   // Welcome
