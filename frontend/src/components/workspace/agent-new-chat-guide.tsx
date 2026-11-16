@@ -203,6 +203,7 @@ export function AgentNewChatGuide({
             {inputBox}
             {status === "ready" ? (
               <AgentShowcase
+                key={showcase.id}
                 agent={showcase}
                 disabled={!handoffReady || disabled || status !== "ready"}
                 onUsePrompt={selectCase}
