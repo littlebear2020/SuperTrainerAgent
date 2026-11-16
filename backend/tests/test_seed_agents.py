@@ -142,6 +142,39 @@ def test_course_video_seed_soul_is_direct_write_and_scrubbed():
     assert "generate_video" not in soul
 
 
+def test_course_video_pins_minimal_workflow_contract():
+    import yaml
+
+    cfg = yaml.safe_load((SEED_DIR / "course-video" / "config.yaml").read_text(encoding="utf-8"))
+
+    assert cfg["skills"] == ["deep-research", "auto-video-flow"]
+    assert cfg["tool_groups"] == ["web", "file:read", "file:write", "bash"]
+
+
+def test_course_video_soul_pins_document_and_creation_rules():
+    soul = (SEED_DIR / "course-video" / "SOUL.md").read_text(encoding="utf-8")
+
+    for anchor in (
+        "Document.iter_inner_content()",
+        "pdftotext -layout",
+        "read_only=True",
+        "data_only=False",
+        "pip install",
+        "不主动联网调研",
+        "原生 Remotion",
+        "数据元素",
+        "npx remotion render",
+        "--concurrency=1",
+        "/mnt/user-data/workspace/<name>-input/<原始文件名>.txt",
+        "has_cell_content = False",
+        "if not has_cell_content:",
+    ):
+        assert anchor in soul, f"course-video SOUL 缺少规则锚点: {anchor}"
+    assert "--concurrency=2" not in soul
+    assert "/mnt/user-data/workspace/<name>/source.txt" not in soul
+    assert 'mkdir -p "/mnt/user-data/workspace/<name>-input" && pdftotext -layout' in soul
+
+
 def test_vimax_video_seed_uses_backend_engine_tools():
     """vimax-video is the ViMax agent: routes through plan_storyboard→generate_video
     (backend VimaxEngine). category:public so it surfaces on /workspace/agents."""
@@ -343,7 +376,7 @@ def test_reseed_preserves_runtime_memory_json(tmp_path: Path, monkeypatch):
 
 
 def test_seed_version_and_exact_agent_roster():
-    assert SEED_VERSION == "2026-11-12"
+    assert SEED_VERSION == "2026-11-16"
     agent_names = {path.name for path in SEED_DIR.iterdir() if path.is_dir() and (path / "config.yaml").exists()}
     assert agent_names == {
         "co-writer",

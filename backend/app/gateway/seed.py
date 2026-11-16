@@ -43,7 +43,8 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # memory.json 由 _RUNTIME_PRESERVED_FILES 保护）。
 # 2026-11-12: 新增 podcast-studio（四模式来源/确认/固定音色 MP3）；标准全量
 # reseed 保留六个旧 Agent 备份与既有 memory.json，旧 Agent seed 内容不变。
-SEED_VERSION = "2026-11-12"
+# 2026-11-16: course-video 收敛为 deep-research + auto-video-flow，SOUL 补固定文档读取。
+SEED_VERSION = "2026-11-16"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 
