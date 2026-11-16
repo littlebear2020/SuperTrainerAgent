@@ -168,4 +168,108 @@ describe("AgentShowcase", () => {
     expect(svg?.href).toContain("/visual/diagrams/diagram-rag-architecture.svg");
     expect(svg?.download).toBe("visual-diagram-rag.svg");
   });
+
+  it("plays podcasts through one shared audio element with progress and exclusive switching", async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    await renderShowcase("podcast-studio");
+    expect(container.querySelectorAll("article")).toHaveLength(4);
+    const audio = document.querySelector<HTMLAudioElement>("audio");
+    expect(audio?.preload).toBe("none");
+    expect(audio?.getAttribute("src")).toBeNull();
+
+    await click(element("showcase-play-podcast-context"));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio?.src).toContain("/podcast/ep1.mp3");
+    expect(element("showcase-play-podcast-context").getAttribute("aria-label")).toContain("暂停");
+    Object.defineProperty(audio, "currentTime", { configurable: true, value: 12 });
+    await act(async () => {
+      audio?.dispatchEvent(new Event("timeupdate"));
+    });
+    expect(element<HTMLProgressElement>("showcase-progress-podcast-context").value).toBe(12);
+
+    await click(element("showcase-play-podcast-agent2026"));
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(pause).toHaveBeenCalled();
+    expect(audio?.src).toContain("/podcast/ep2.mp3");
+    expect(element("showcase-play-podcast-context").getAttribute("aria-label")).toContain("播放");
+    expect(element("showcase-play-podcast-agent2026").getAttribute("aria-label")).toContain("暂停");
+    expect(document.querySelectorAll("audio")).toHaveLength(1);
+  });
+
+  it("ignores stale play promises after a rapid podcast switch", async () => {
+    const pending: { resolve: () => void; reject: (reason?: unknown) => void }[] = [];
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(
+      () => new Promise<void>((resolve, reject) => pending.push({ resolve, reject })),
+    );
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    await renderShowcase("podcast-studio");
+
+    await click(element("showcase-play-podcast-context"));
+    await click(element("showcase-play-podcast-agent2026"));
+    expect(pending).toHaveLength(2);
+    await act(async () => {
+      pending[0]!.reject(new DOMException("Interrupted", "AbortError"));
+      await Promise.resolve();
+    });
+    expect(container.textContent).not.toContain("音频暂时无法播放");
+    await act(async () => {
+      pending[1]!.resolve();
+      await Promise.resolve();
+    });
+    expect(element("showcase-play-podcast-agent2026").getAttribute("aria-label")).toContain("暂停");
+    expect(element("showcase-play-podcast-context").getAttribute("aria-label")).toContain("播放");
+  });
+
+  it("handles rejected playback, ended, media errors and unmount cleanup", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockRejectedValueOnce(new DOMException("Denied", "NotAllowedError"))
+      .mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    await renderShowcase("podcast-studio");
+
+    await click(element("showcase-play-podcast-context"));
+    expect(container.textContent).toContain("音频暂时无法播放，请重试。");
+    await click(element("showcase-play-podcast-context"));
+    expect(play).toHaveBeenCalledTimes(2);
+    const audio = document.querySelector<HTMLAudioElement>("audio");
+    Object.defineProperty(audio, "currentTime", { configurable: true, value: 9 });
+    await act(async () => {
+      audio?.dispatchEvent(new Event("timeupdate"));
+      audio?.dispatchEvent(new Event("ended"));
+    });
+    expect(element("showcase-play-podcast-context").getAttribute("aria-label")).toContain("播放");
+    expect(element<HTMLProgressElement>("showcase-progress-podcast-context").value).toBe(0);
+
+    await act(async () => {
+      audio?.dispatchEvent(new Event("error"));
+    });
+    expect(container.textContent).toContain("音频暂时无法播放，请重试。");
+    pause.mockClear();
+    await act(async () => {
+      root.render(<></>);
+    });
+    expect(pause).toHaveBeenCalled();
+  });
+
+  it("opens transcripts with safe source links and keeps media enabled when prompts are disabled", async () => {
+    await renderShowcase("podcast-studio", true);
+    expect(element<HTMLButtonElement>("showcase-prompt-podcast-agent2026").disabled).toBe(true);
+    expect(element<HTMLButtonElement>("showcase-play-podcast-agent2026").disabled).toBe(false);
+    const trigger = element("showcase-transcript-podcast-agent2026");
+    trigger.focus();
+
+    await click(trigger);
+    expect(document.body.textContent).toContain("2026 年，AI Agent 的关键词");
+    expect(document.body.textContent).toContain("InfoQ 2026 趋势报告");
+    const source = document.querySelector<HTMLAnchorElement>("[data-testid='showcase-podcast-source-0']");
+    expect(source?.target).toBe("_blank");
+    expect(source?.rel).toContain("noreferrer");
+    expect(source?.rel).toContain("noopener");
+    const download = document.querySelector<HTMLAnchorElement>("[data-testid='showcase-download-mp3']");
+    expect(download?.href).toContain("/podcast/ep2.mp3");
+    await click(document.querySelector<HTMLElement>("[data-testid='showcase-dialog-close']")!);
+    expect(document.activeElement).toBe(trigger);
+  });
 });

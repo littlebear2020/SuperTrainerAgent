@@ -400,9 +400,9 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts \
 
 ### T4 播客案例扩展
 
-- [ ] 增加 podcast card、音频播放/暂停/进度/时长、单音频互斥、transcript Dialog 和来源安全链接。
-- [ ] 处理 `play()` 拒绝、快速切换过期 Promise、`ended`、错误与卸载清理；关闭/离开页面后不残留播放。
-- [ ] 在 DOM 测试覆盖单音频、切换竞态、播放失败、transcript 和禁用态；在现有 E2E 文件补一条真实试听 + 文稿代表路径，留到 T5 统一跑。
+- [x] 增加 podcast card、音频播放/暂停/进度/时长、单音频互斥、transcript Dialog 和来源安全链接。
+- [x] 处理 `play()` 拒绝、快速切换过期 Promise、`ended`、错误与卸载清理；关闭/离开页面后不残留播放。
+- [x] 在 DOM 测试覆盖单音频、切换竞态、播放失败、transcript 和禁用态；在现有 E2E 文件补一条真实试听 + 文稿代表路径，留到 T5 统一跑。
 
 **定向验证**：`pnpm exec vitest run --project dom tests/unit/components/workspace/agent-showcase.dom.test.tsx`；不新增 voice-twin 套件或 backend/live 测试。
 
