@@ -58,6 +58,7 @@ export function AgentShowcase({
   );
   const hasVisualCases = agent.cases.some((item) => item.kind === "visual");
   const hasPodcastCases = podcastCases.length > 0;
+  const gridCases = visibleCases.filter((item) => item.kind !== "podcast");
   const visualFilters = [
     ["all", t.agents.showcase.filterAll],
     ["poster", t.agents.showcase.filterPoster],
@@ -174,13 +175,13 @@ export function AgentShowcase({
               }}
             />
           ) : null}
-          {!hasPodcastCases ? (
+          {gridCases.length > 0 ? (
             <div
               data-testid="agent-guide-cases"
               data-showcase
               className={showcaseCardClass(hasVisualCases ? "three" : "two")}
             >
-              {visibleCases.map((item, index) => {
+              {gridCases.map((item, index) => {
                 if (item.kind === "video") {
                   return (
                     <VideoCard
