@@ -124,9 +124,9 @@ export default function WorkspaceHome() {
           <div className="ws-ambient-orb-cyan" aria-hidden="true" />
         </>
       ) : null}
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <header className="mb-8 grid items-end gap-8 md:grid-cols-[minmax(0,1.35fr)_minmax(240px,.65fr)] md:gap-12">
-          <div className="text-center md:text-left">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:pt-3 sm:pb-8">
+        <header className="mb-8 grid items-center gap-8 md:grid-cols-[minmax(0,1.35fr)_minmax(240px,.65fr)] md:gap-12">
+          <div className="text-center md:translate-y-7 md:text-left">
             <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold tracking-[0.14em] text-indigo-600 md:justify-start">
               <span aria-hidden="true" className="h-px w-5 bg-current" />
               {t.workspace.home.heroKicker}
@@ -138,11 +138,11 @@ export default function WorkspaceHome() {
               {t.workspace.home.createHeading}
             </p>
           </div>
-          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:translate-y-[72px]">
+          <div className="relative mx-auto flex h-64 w-full max-w-sm translate-y-6 items-end justify-center sm:h-72 md:h-64 md:translate-y-16">
             <img
               src="/course-samples/teacher-A-half.png"
               alt={t.workspace.home.teacherAlt}
-              className="h-52 w-auto max-w-full object-contain sm:h-60"
+              className="h-52 w-auto max-w-full origin-bottom scale-110 object-contain sm:h-60"
             />
           </div>
         </header>

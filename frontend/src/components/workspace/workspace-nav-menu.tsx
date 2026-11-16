@@ -82,13 +82,15 @@ export function WorkspaceNavMenu() {
             isSidebarOpen={isSidebarOpen}
             t={t}
           />
-          <SidebarMenuButton
-            aria-label={t.common.settings}
-            className="size-8 shrink-0"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Settings2Icon />
-          </SidebarMenuButton>
+          {isSidebarOpen && (
+            <SidebarMenuButton
+              aria-label={t.common.settings}
+              className="size-8 shrink-0"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings2Icon />
+            </SidebarMenuButton>
+          )}
         </SidebarMenuItem>
       </SidebarMenu>
     </>
