@@ -434,7 +434,6 @@ export const zhCN: Translations = {
       transcript: "查看文稿",
       sources: "调研来源",
       close: "关闭",
-      download: "下载",
       downloadOriginal: "下载原图",
       downloadSvg: "下载 SVG",
       downloadPptx: "下载 PPTX",

@@ -29,8 +29,16 @@ export function ShowcaseHero({ agent }: { agent: ShowcaseAgent }) {
       />
       <div className="min-w-0 space-y-2 sm:space-y-3">
         <div className="flex items-center gap-2">
-          <span aria-hidden="true" className={cn("h-0.5 w-6 rounded-full bg-current", appearance.text)} />
-          <p className={cn("text-[10px] font-semibold tracking-[0.18em] uppercase sm:text-xs", appearance.text)}>
+          <span
+            aria-hidden="true"
+            className={cn("h-0.5 w-6 rounded-full bg-current", appearance.text)}
+          />
+          <p
+            className={cn(
+              "text-[10px] font-semibold tracking-[0.18em] uppercase sm:text-xs",
+              appearance.text,
+            )}
+          >
             {localized(agent.label, language)}
           </p>
         </div>

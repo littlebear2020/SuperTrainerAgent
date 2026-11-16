@@ -394,7 +394,6 @@ export interface Translations {
       transcript: string;
       sources: string;
       close: string;
-      download: string;
       downloadOriginal: string;
       downloadSvg: string;
       downloadPptx: string;

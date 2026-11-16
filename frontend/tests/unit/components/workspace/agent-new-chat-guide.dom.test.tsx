@@ -152,7 +152,9 @@ describe("AgentNewChatGuide", () => {
     expect(container.textContent).not.toContain("把知识与素材做成视频课");
     expect(caseButtons()).toHaveLength(3);
     expect(
-      container.querySelector("[data-testid='showcase-open-video-hallucination']"),
+      container.querySelector(
+        "[data-testid='showcase-open-video-hallucination']",
+      ),
     ).not.toBeNull();
     expect(container.querySelector("svg.lucide-clapperboard")).toBeNull();
 

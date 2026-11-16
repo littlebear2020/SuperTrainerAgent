@@ -27,7 +27,12 @@ import type {
 } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 
-import { formatBytes, formatDuration, localized, type ShowcaseLocale } from "./showcase-utils";
+import {
+  formatBytes,
+  formatDuration,
+  localized,
+  type ShowcaseLocale,
+} from "./showcase-utils";
 
 export function SourceLinks({
   sources,
@@ -93,7 +98,8 @@ export function VideoDialog({
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>{localized(item.title, locale)}</DialogTitle>
           <DialogDescription>
-            {localized(item.tag, locale)} · {formatDuration(item.durationSeconds)}
+            {localized(item.tag, locale)} ·{" "}
+            {formatDuration(item.durationSeconds)}
           </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
@@ -127,7 +133,6 @@ export function VideoDialog({
   );
 }
 
-
 export function DeckDialog({
   item,
   locale,
@@ -152,7 +157,9 @@ export function DeckDialog({
           }
           if (event.key === "ArrowRight") {
             event.preventDefault();
-            setIndex((current) => Math.min(item.slides.length - 1, current + 1));
+            setIndex((current) =>
+              Math.min(item.slides.length - 1, current + 1),
+            );
           }
         }}
         className="max-h-[94vh] overflow-y-auto rounded-2xl p-4 sm:max-w-5xl sm:p-6 dark:border-white/10 dark:bg-[#0b1020]"
@@ -160,7 +167,8 @@ export function DeckDialog({
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {localized(item.tag, locale)} · {item.pageCount} {t.agents.showcase.slides}
+            {localized(item.tag, locale)} · {item.pageCount}{" "}
+            {t.agents.showcase.slides}
           </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
@@ -193,7 +201,7 @@ export function DeckDialog({
             data-testid="showcase-deck-previous"
             disabled={index === 0}
             onClick={() => setIndex((current) => Math.max(0, current - 1))}
-            className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border px-3 text-xs disabled:opacity-40 dark:border-white/10"
+            className="border-border inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs disabled:opacity-40 dark:border-white/10"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             {t.agents.showcase.previous}
@@ -202,8 +210,12 @@ export function DeckDialog({
             type="button"
             data-testid="showcase-deck-next"
             disabled={index === item.slides.length - 1}
-            onClick={() => setIndex((current) => Math.min(item.slides.length - 1, current + 1))}
-            className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border px-3 text-xs disabled:opacity-40 dark:border-white/10"
+            onClick={() =>
+              setIndex((current) =>
+                Math.min(item.slides.length - 1, current + 1),
+              )
+            }
+            className="border-border inline-flex min-h-9 items-center gap-1 rounded-full border px-3 text-xs disabled:opacity-40 dark:border-white/10"
           >
             {t.agents.showcase.next}
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -234,7 +246,8 @@ export function DeckDialog({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-muted-foreground text-xs">
-            {localized(item.styleLabel, locale)} · {formatBytes(item.pptxBytes, locale)}
+            {localized(item.styleLabel, locale)} ·{" "}
+            {formatBytes(item.pptxBytes, locale)}
           </span>
           <a
             data-testid="showcase-download-pptx"
@@ -310,7 +323,11 @@ export function VisualDialog({
             {localized(item.styleLabel, locale)} · {item.width} × {item.height}
           </span>
           <a
-            data-testid={item.vector ? "showcase-download-svg" : "showcase-download-original"}
+            data-testid={
+              item.vector
+                ? "showcase-download-svg"
+                : "showcase-download-original"
+            }
             href={item.vector ?? item.original}
             download={item.downloadName}
             className="inline-flex min-h-9 items-center gap-2 rounded-full bg-fuchsia-600 px-4 text-xs font-medium text-white hover:bg-fuchsia-500 focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none"
@@ -325,7 +342,6 @@ export function VisualDialog({
     </Dialog>
   );
 }
-
 
 export function PodcastDialog({
   item,
@@ -346,7 +362,8 @@ export function PodcastDialog({
         <DialogHeader className="pr-10 text-left">
           <DialogTitle>{localized(item.title, locale)}</DialogTitle>
           <DialogDescription>
-            {localized(item.tag, locale)} · {formatDuration(item.durationSeconds)} · {item.transcript.length}
+            {localized(item.tag, locale)} ·{" "}
+            {formatDuration(item.durationSeconds)} · {item.transcript.length}
           </DialogDescription>
         </DialogHeader>
         <DialogClose asChild>
@@ -366,7 +383,10 @@ export function PodcastDialog({
         />
         <div className="grid gap-4">
           {item.transcript.map((turn, index) => (
-            <div key={`${turn.speaker.en}-${index}`} className="grid gap-1 border-l-2 border-cyan-200 pl-3 dark:border-cyan-400/30">
+            <div
+              key={`${turn.speaker.en}-${index}`}
+              className="grid gap-1 border-l-2 border-cyan-200 pl-3 dark:border-cyan-400/30"
+            >
               <span className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
                 {localized(turn.speaker, locale)}
               </span>

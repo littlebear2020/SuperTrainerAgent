@@ -20,7 +20,12 @@ import type {
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
-import { formatBytes, formatDuration, localized, type ShowcaseLocale } from "./showcase-utils";
+import {
+  formatBytes,
+  formatDuration,
+  localized,
+  type ShowcaseLocale,
+} from "./showcase-utils";
 
 export function PromptButton({
   item,
@@ -105,21 +110,31 @@ export function VideoCard({
           {formatDuration(item.durationSeconds)}
         </span>
         <span className="absolute top-1/2 left-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-indigo-700 shadow-lg transition group-hover:scale-105 motion-reduce:group-hover:scale-100">
-          <Play className="ml-0.5 h-5 w-5" fill="currentColor" aria-hidden="true" />
+          <Play
+            className="ml-0.5 h-5 w-5"
+            fill="currentColor"
+            aria-hidden="true"
+          />
         </span>
       </button>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-300">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">{title}</h3>
+        <h3 className="text-foreground text-sm leading-6 font-semibold">
+          {title}
+        </h3>
         <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
           {localized(item.description, locale)}
         </p>
         <div className="mt-auto flex items-end justify-between gap-3 pt-2">
           <div className="text-muted-foreground min-w-0 text-[11px] leading-5">
-            <span className="block truncate">{localized(item.voice, locale)}</span>
-            <span className="block truncate">{localized(item.styleLabel, locale)}</span>
+            <span className="block truncate">
+              {localized(item.voice, locale)}
+            </span>
+            <span className="block truncate">
+              {localized(item.styleLabel, locale)}
+            </span>
           </div>
           <PromptButton
             item={item}
@@ -192,21 +207,30 @@ export function DeckCard({
         <span className="text-[11px] font-medium text-teal-700 dark:text-teal-300">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">{title}</h3>
+        <h3 className="text-foreground text-sm leading-6 font-semibold">
+          {title}
+        </h3>
         <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
           {localized(item.description, locale)}
         </p>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {item.features.map((feature) => (
-            <span key={feature.en} className="text-muted-foreground inline-flex items-center gap-1 text-[10px]">
-              <FileCheck2 className="h-3 w-3 text-teal-600 dark:text-teal-300" aria-hidden="true" />
+            <span
+              key={feature.en}
+              className="text-muted-foreground inline-flex items-center gap-1 text-[10px]"
+            >
+              <FileCheck2
+                className="h-3 w-3 text-teal-600 dark:text-teal-300"
+                aria-hidden="true"
+              />
               {localized(feature, locale)}
             </span>
           ))}
         </div>
         <div className="mt-auto flex items-end justify-between gap-3 pt-2">
           <span className="text-muted-foreground text-[11px]">
-            {localized(item.styleLabel, locale)} · {formatBytes(item.pptxBytes, locale)}
+            {localized(item.styleLabel, locale)} ·{" "}
+            {formatBytes(item.pptxBytes, locale)}
           </span>
           <PromptButton
             item={item}
@@ -287,7 +311,9 @@ export function VisualCard({
         <span className="text-[11px] font-medium text-fuchsia-700 dark:text-fuchsia-300">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">{title}</h3>
+        <h3 className="text-foreground text-sm leading-6 font-semibold">
+          {title}
+        </h3>
         <p className="text-muted-foreground line-clamp-2 text-xs leading-5">
           {localized(item.description, locale)}
         </p>

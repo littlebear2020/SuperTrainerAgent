@@ -126,7 +126,10 @@ export function AgentShowcase({
             {t.agents.showcase.casesDescription}
           </p>
           {agent.id === "creative-studio" ? (
-            <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label={t.agents.showcase.casesTitle}>
+            <div
+              className="mb-4 flex gap-2 overflow-x-auto pb-1"
+              aria-label={t.agents.showcase.casesTitle}
+            >
               {visualFilters.map(([value, label]) => (
                 <button
                   key={value}
@@ -134,7 +137,7 @@ export function AgentShowcase({
                   data-testid={`showcase-filter-${value}`}
                   aria-pressed={visualFilter === value}
                   onClick={() => setVisualFilter(value)}
-                  className="min-h-9 shrink-0 rounded-full border border-border px-3 text-xs whitespace-nowrap transition hover:border-fuchsia-300 aria-pressed:border-fuchsia-500 aria-pressed:bg-fuchsia-50 aria-pressed:text-fuchsia-700 focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none dark:border-white/10 dark:aria-pressed:border-fuchsia-400 dark:aria-pressed:bg-fuchsia-400/10 dark:aria-pressed:text-fuchsia-300"
+                  className="border-border min-h-9 shrink-0 rounded-full border px-3 text-xs whitespace-nowrap transition hover:border-fuchsia-300 focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none aria-pressed:border-fuchsia-500 aria-pressed:bg-fuchsia-50 aria-pressed:text-fuchsia-700 dark:border-white/10 dark:aria-pressed:border-fuchsia-400 dark:aria-pressed:bg-fuchsia-400/10 dark:aria-pressed:text-fuchsia-300"
                 >
                   {label}
                 </button>
@@ -160,78 +163,95 @@ export function AgentShowcase({
             <div
               data-testid="agent-guide-cases"
               data-showcase
-              className={showcaseCardClass(agent.id === "creative-studio" ? "three" : "two")}
+              className={showcaseCardClass(
+                agent.id === "creative-studio" ? "three" : "two",
+              )}
             >
-            {visibleCases.map((item, index) => {
-              if (item.kind === "video") {
-                return (
-                  <VideoCard
-                    key={item.id}
-                    item={item}
-                    locale={language}
-                    eager={index === 0}
-                    disabled={disabled}
-                    onOpen={(video, trigger) => {
-                      triggerRef.current = trigger;
-                      setActiveVideo(video);
-                    }}
-                    onUsePrompt={onUsePrompt}
-                  />
-                );
-              }
-              if (item.kind === "deck") {
-                return (
-                  <DeckCard
-                    key={item.id}
-                    item={item}
-                    locale={language}
-                    eager={index === 0}
-                    disabled={disabled}
-                    onOpen={(deck, trigger) => {
-                      triggerRef.current = trigger;
-                      setActiveDeck(deck);
-                    }}
-                    onUsePrompt={onUsePrompt}
-                  />
-                );
-              }
-              if (item.kind === "visual") {
-                return (
-                  <VisualCard
-                    key={item.id}
-                    item={item}
-                    locale={language}
-                    eager={index === 0}
-                    disabled={disabled}
-                    onOpen={(visual, trigger) => {
-                      triggerRef.current = trigger;
-                      setActiveVisual(visual);
-                    }}
-                    onUsePrompt={onUsePrompt}
-                  />
-                );
-              }
-              return null;
-            })}
+              {visibleCases.map((item, index) => {
+                if (item.kind === "video") {
+                  return (
+                    <VideoCard
+                      key={item.id}
+                      item={item}
+                      locale={language}
+                      eager={index === 0}
+                      disabled={disabled}
+                      onOpen={(video, trigger) => {
+                        triggerRef.current = trigger;
+                        setActiveVideo(video);
+                      }}
+                      onUsePrompt={onUsePrompt}
+                    />
+                  );
+                }
+                if (item.kind === "deck") {
+                  return (
+                    <DeckCard
+                      key={item.id}
+                      item={item}
+                      locale={language}
+                      eager={index === 0}
+                      disabled={disabled}
+                      onOpen={(deck, trigger) => {
+                        triggerRef.current = trigger;
+                        setActiveDeck(deck);
+                      }}
+                      onUsePrompt={onUsePrompt}
+                    />
+                  );
+                }
+                if (item.kind === "visual") {
+                  return (
+                    <VisualCard
+                      key={item.id}
+                      item={item}
+                      locale={language}
+                      eager={index === 0}
+                      disabled={disabled}
+                      onOpen={(visual, trigger) => {
+                        triggerRef.current = trigger;
+                        setActiveVisual(visual);
+                      }}
+                      onUsePrompt={onUsePrompt}
+                    />
+                  );
+                }
+                return null;
+              })}
             </div>
           ) : null}
           <p className="text-muted-foreground mt-4 flex gap-2 text-[11px] leading-5">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+            <CheckCircle2
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500"
+              aria-hidden="true"
+            />
             {localized(agent.note, language)}
           </p>
         </div>
       </section>
       {activeVideo ? (
-        <VideoDialog item={activeVideo} locale={language} onClose={closeDialog} />
+        <VideoDialog
+          item={activeVideo}
+          locale={language}
+          onClose={closeDialog}
+        />
       ) : null}
       {activeDeck ? (
         <DeckDialog item={activeDeck} locale={language} onClose={closeDialog} />
       ) : null}
       {activeVisual ? (
-        <VisualDialog item={activeVisual} locale={language} onClose={closeDialog} />
+        <VisualDialog
+          item={activeVisual}
+          locale={language}
+          onClose={closeDialog}
+        />
       ) : null}
       {activePodcast ? (
-        <PodcastDialog item={activePodcast} locale={language} onClose={closeDialog} />
+        <PodcastDialog
+          item={activePodcast}
+          locale={language}
+          onClose={closeDialog}
+        />
       ) : null}
     </>
   );

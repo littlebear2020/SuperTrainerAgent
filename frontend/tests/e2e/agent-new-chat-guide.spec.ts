@@ -48,6 +48,13 @@ test.describe("Agent new-chat task guides", () => {
   });
 
   function mockGuideAPI(page: Page) {
+    void page.route("**/api/v1/auth/csrf-token", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ token: "mock-csrf-token" }),
+      }),
+    );
     mockLangGraphAPI(page, { agents: GUIDE_AGENTS });
   }
 
@@ -149,7 +156,9 @@ test.describe("Agent new-chat task guides", () => {
         exact: true,
       }),
     ).toHaveCount(0);
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(3);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      3,
+    );
 
     const frame = page.getByTestId("agent-guide-input");
     const inputBox = frame.locator(".glass-input-box");
@@ -157,20 +166,49 @@ test.describe("Agent new-chat task guides", () => {
     expect((await inputBox.boundingBox())!.width).toBeGreaterThanOrEqual(900);
     await expect(inputBox).toHaveCSS("border-radius", "28px");
     await expect(inputGroup).toHaveCSS("border-radius", "28px");
-    expect(await frame.evaluate((element) => getComputedStyle(element).overflow)).not.toBe("hidden");
+    expect(
+      await frame.evaluate((element) => getComputedStyle(element).overflow),
+    ).not.toBe("hidden");
 
     await frame.locator("[data-slot='dialog-trigger']").click();
-    await expect(page.getByRole("dialog", { name: "Model Selector" })).toBeVisible();
-    await expect(page.getByPlaceholder(zhCN.inputBox.searchModels)).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Model Selector" }),
+    ).toBeVisible();
+    await expect(
+      page.getByPlaceholder(zhCN.inputBox.searchModels),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(page.getByText("/skill", { exact: false })).toHaveCount(0);
+
+    await frame.locator("input[type='file']").setInputFiles({
+      name: "verification.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Agent showcase composer verification"),
+    });
+    const removeAttachment = frame.getByLabel("Remove attachment");
+    await expect(removeAttachment).toBeVisible();
+    await expect(removeAttachment).toBeInViewport();
+    await expect(
+      frame.getByText("verification.txt", { exact: true }),
+    ).toBeVisible();
+    expect(
+      await frame.evaluate((element) => getComputedStyle(element).overflow),
+    ).not.toBe("hidden");
+    await removeAttachment.click();
 
     const firstMedia = page.getByTestId("showcase-open-video-hallucination");
     await firstMedia.click();
     const video = page.locator("video");
     await expect(video).toBeVisible();
-    expect(await video.evaluate((element: HTMLVideoElement) => element.autoplay)).toBe(false);
+    expect(
+      await video.evaluate((element: HTMLVideoElement) => element.autoplay),
+    ).toBe(false);
     await video.evaluate((element: HTMLVideoElement) => element.play());
-    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0);
     await page.getByTestId("showcase-dialog-close").click();
     await expect(page.locator("video")).toHaveCount(0);
     await expect(firstMedia).toBeFocused();
@@ -197,7 +235,9 @@ test.describe("Agent new-chat task guides", () => {
   }) => {
     mockGuideAPI(page);
     await openGuide(page, "ppt-master");
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(3);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      3,
+    );
 
     await page.getByTestId("showcase-open-ppt-quick").click();
     const current = page.getByTestId("showcase-deck-current");
@@ -223,16 +263,27 @@ test.describe("Agent new-chat task guides", () => {
   }) => {
     mockGuideAPI(page);
     await openGuide(page, "creative-studio");
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(10);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      10,
+    );
 
     await page.getByTestId("showcase-filter-card").click();
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(2);
-    await expect(page.getByTestId("showcase-filter-card")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      2,
+    );
+    await expect(page.getByTestId("showcase-filter-card")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     const imageTrigger = page.getByTestId("showcase-open-visual-card-rag");
     await imageTrigger.click();
     const original = page.getByTestId("showcase-visual-original");
     await expect(original).toBeVisible();
-    await expect.poll(() => original.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        original.evaluate((image: HTMLImageElement) => image.naturalWidth),
+      )
+      .toBeGreaterThan(0);
     const jpgPromise = page.waitForEvent("download");
     await page.getByTestId("showcase-download-original").click();
     const jpg = await jpgPromise;
@@ -242,9 +293,14 @@ test.describe("Agent new-chat task guides", () => {
     await expect(imageTrigger).toBeFocused();
 
     await page.getByTestId("showcase-filter-diagram").click();
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(2);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      2,
+    );
     await page.getByTestId("showcase-open-visual-diagram-rag").click();
-    await expect(page.getByTestId("showcase-visual-original")).toHaveAttribute("src", /diagram-rag-architecture\.svg$/);
+    await expect(page.getByTestId("showcase-visual-original")).toHaveAttribute(
+      "src",
+      /diagram-rag-architecture\.svg$/,
+    );
     const svgPromise = page.waitForEvent("download");
     await page.getByTestId("showcase-download-svg").click();
     const svg = await svgPromise;
@@ -258,32 +314,51 @@ test.describe("Agent new-chat task guides", () => {
     mockGuideAPI(page);
     const calls = trackSending(page);
     await openGuide(page, "podcast-studio");
-    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(4);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
+      4,
+    );
     const audio = page.locator("audio");
     await expect(audio).toHaveCount(1);
     await expect(audio).toHaveAttribute("preload", "none");
     await expect(audio).not.toHaveAttribute("src", /.+/);
 
     await page.getByTestId("showcase-play-podcast-context").click();
-    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        audio.evaluate((element: HTMLAudioElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0);
     await page.getByTestId("showcase-play-podcast-agent2026").click();
     await expect(audio).toHaveAttribute("src", /ep2\.mp3$/);
-    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
-    await expect(page.getByTestId("showcase-play-podcast-context")).toHaveAttribute("aria-label", /^播放 /);
-    await expect(page.getByTestId("showcase-play-podcast-agent2026")).toHaveAttribute("aria-label", /^暂停 /);
+    await expect
+      .poll(() =>
+        audio.evaluate((element: HTMLAudioElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0);
+    await expect(
+      page.getByTestId("showcase-play-podcast-context"),
+    ).toHaveAttribute("aria-label", /^播放 /);
+    await expect(
+      page.getByTestId("showcase-play-podcast-agent2026"),
+    ).toHaveAttribute("aria-label", /^暂停 /);
 
     await page.getByTestId("showcase-transcript-podcast-agent2026").click();
-    await expect(page.getByRole("dialog")).toContainText("2026 年，AI Agent 的关键词");
+    await expect(page.getByRole("dialog")).toContainText(
+      "2026 年，AI Agent 的关键词",
+    );
     const source = page.getByTestId("showcase-podcast-source-0");
     await expect(source).toHaveAttribute("target", "_blank");
     await expect(source).toHaveAttribute("rel", /noreferrer/);
     await expect(source).toHaveAttribute("rel", /noopener/);
     await expect(source).toHaveAttribute("href", /infoq\.cn/);
-    await expect(page.getByTestId("showcase-download-mp3")).toHaveAttribute("href", /ep2\.mp3$/);
+    await expect(page.getByTestId("showcase-download-mp3")).toHaveAttribute(
+      "href",
+      /ep2\.mp3$/,
+    );
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
-  test("podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
+  test("shared podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
     page,
   }) => {
     mockGuideAPI(page);
@@ -383,7 +458,7 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
-  test("URL handoff wins over case clicks and never auto-sends", async ({
+  test("shared URL handoff wins over case clicks and never auto-sends", async ({
     page,
   }) => {
     mockGuideAPI(page);
@@ -402,7 +477,7 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
-  test("sessionStorage handoff is consumed once and not overwritten", async ({
+  test("shared sessionStorage handoff is consumed once and not overwritten", async ({
     page,
   }) => {
     const handoff = "长文本 handoff。".repeat(40);
@@ -430,7 +505,7 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
-  test("English prompts come from the locale and preserve Co-writer markers", async ({
+  test("legacy English prompts come from the locale and preserve Co-writer markers", async ({
     page,
   }) => {
     await pinEnglishLocale(page);
@@ -451,7 +526,7 @@ test.describe("Agent new-chat task guides", () => {
     expect(guide.cases[0].prompt).toContain("[从零创作]");
   });
 
-  test("only explicit submission creates one thread and stage markers stay hidden", async ({
+  test("shared only explicit submission creates one thread and stage markers stay hidden", async ({
     page,
   }) => {
     mockGuideAPI(page);
@@ -509,7 +584,7 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 1, runs: 1 });
   });
 
-  test("existing target threads keep their messages and do not show a guide", async ({
+  test("shared existing target threads keep their messages and do not show a guide", async ({
     page,
   }) => {
     mockLangGraphAPI(page, {
@@ -531,7 +606,9 @@ test.describe("Agent new-chat task guides", () => {
     await expect(page.getByTestId("agent-new-chat-guide")).toHaveCount(0);
   });
 
-  test("retired aliases resolve to their approved guide", async ({ page }) => {
+  test("shared retired aliases resolve to their approved guide", async ({
+    page,
+  }) => {
     mockGuideAPI(page);
     for (const [alias, agentName] of [
       ["card-poster", "creative-studio"],
@@ -540,7 +617,7 @@ test.describe("Agent new-chat task guides", () => {
       await page.goto(`/workspace/agents/${alias}/chats/new`);
       await expect(
         page.getByRole("heading", {
-          name: zhCN.agents.newChatGuides[agentName].title,
+          name: showcaseFor(agentName)!.heroLine.zh.join(" "),
           exact: true,
         }),
       ).toBeVisible();
@@ -573,7 +650,7 @@ test.describe("Agent new-chat task guides", () => {
     await expect(page.getByTestId("agent-new-chat-guide")).toHaveCount(0);
   });
 
-  test("manual retry, not automatic query retry, recovers an agent failure", async ({
+  test("shared manual retry, not automatic query retry, recovers an agent failure", async ({
     page,
   }) => {
     let allowSuccess = false;
@@ -628,12 +705,12 @@ test.describe("Agent new-chat task guides", () => {
       .click();
     await expect(
       page.getByRole("heading", {
-        name: zhCN.agents.newChatGuides["course-video"].title,
+        name: showcaseFor("course-video")!.heroLine.zh.join(" "),
       }),
     ).toBeVisible();
   });
 
-  test("loading disables submission and reveals cases only after agent success", async ({
+  test("shared loading disables submission and reveals cases only after agent success", async ({
     page,
   }) => {
     mockLangGraphAPI(page, { agents: [] });
@@ -678,7 +755,7 @@ test.describe("Agent new-chat task guides", () => {
 
     const foreground = await page
       .getByRole("heading", {
-        name: zhCN.agents.newChatGuides["course-video"].title,
+        name: showcaseFor("course-video")!.heroLine.zh.join(" "),
       })
       .evaluate((element) => getComputedStyle(element).color);
     const background = await page.evaluate(() =>
@@ -710,45 +787,189 @@ test.describe("Agent new-chat task guides", () => {
       (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
       (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
     expect(contrast).toBeGreaterThanOrEqual(4.5);
+
+    const cardTitle = page
+      .locator("[data-testid^='showcase-case-'] h3")
+      .first();
+    await expect(cardTitle).toHaveCSS("color", foreground);
+    await page.getByTestId("showcase-open-video-hallucination").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading")).toHaveCSS("color", foreground);
+    await expect(dialog.locator("video")).toHaveCSS(
+      "background-color",
+      /^(?:rgb\(10, 10, 10\)|lab\(2\.75381 0 0\))$/,
+    );
   });
 
-  test("desktop and mobile keep regions separate and keyboard usable", async ({
-    page,
-  }) => {
-    mockGuideAPI(page);
-    await openGuide(page, "course-video");
+  for (const viewport of [
+    { width: 1440, height: 900, firstCardTop: 820 },
+    { width: 1024, height: 768, cardTitleBottom: 768 },
+    { width: 390, height: 844, firstCardTop: 764 },
+  ]) {
+    test(`showcase viewport ${viewport.width}x${viewport.height} preserves the first screen without overflow`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      mockGuideAPI(page);
+      await openGuide(page, "course-video");
 
-    async function expectNoOverlap() {
-      const cases = await page.getByTestId("agent-guide-cases").boundingBox();
+      const hero = await page.getByTestId("showcase-hero").boundingBox();
       const input = await page.getByTestId("agent-guide-input").boundingBox();
-      const tips = await page.getByTestId("agent-guide-tips").boundingBox();
-      expect(cases).not.toBeNull();
+      const cases = await page.getByTestId("agent-guide-cases").boundingBox();
+      const casesTitle = await page
+        .getByRole("heading", {
+          name: new RegExp(`^${zhCN.agents.showcase.casesTitle}`),
+        })
+        .boundingBox();
+      const firstCard = page.locator("[data-testid^='showcase-case-']").first();
+      const firstCardBox = await firstCard.boundingBox();
+      expect(hero).not.toBeNull();
       expect(input).not.toBeNull();
-      expect(tips).not.toBeNull();
-      expect(cases!.y + cases!.height).toBeLessThanOrEqual(input!.y);
-      expect(input!.y + input!.height).toBeLessThanOrEqual(tips!.y);
+      expect(cases).not.toBeNull();
+      expect(casesTitle).not.toBeNull();
+      expect(firstCardBox).not.toBeNull();
+      expect(hero!.y + hero!.height).toBeLessThanOrEqual(viewport.height);
+      expect(input!.y + input!.height).toBeLessThanOrEqual(viewport.height);
+      expect(casesTitle!.y + casesTitle!.height).toBeLessThanOrEqual(
+        viewport.height,
+      );
+      expect(input!.y + input!.height).toBeLessThanOrEqual(cases!.y);
+      if ("firstCardTop" in viewport) {
+        expect(firstCardBox!.y).toBeLessThanOrEqual(viewport.firstCardTop!);
+      } else {
+        const title = await firstCard.locator("h3").boundingBox();
+        expect(title!.y + title!.height).toBeLessThanOrEqual(
+          viewport.cardTitleBottom,
+        );
+      }
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
         ),
       ).toBe(true);
-    }
 
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await expectNoOverlap();
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expectNoOverlap();
-
-    const textarea = page.locator("textarea[name='message']");
-    await expect(textarea).not.toBeFocused();
-    const first = zhCN.agents.newChatGuides["course-video"].cases[0];
-    const firstCase = page.getByRole("button", {
-      name: first.title,
-      exact: true,
+      const radius = viewport.width < 640 ? "24px" : "28px";
+      const inputBox = page.locator(".glass-input-box");
+      await expect(inputBox).toHaveCSS("border-radius", radius);
+      await expect(
+        inputBox.locator("[data-slot='input-group']").first(),
+      ).toHaveCSS("border-radius", radius);
+      if (viewport.width === 1440) {
+        expect((await inputBox.boundingBox())!.width).toBeGreaterThanOrEqual(
+          900,
+        );
+      }
     });
-    await firstCase.focus();
+  }
+
+  test("shared keyboard opens and closes media then refills the real composer", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    const calls = trackSending(page);
+    await openGuide(page, "course-video");
+    const firstMedia = page.getByTestId("showcase-open-video-hallucination");
+    await firstMedia.focus();
     await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(firstMedia).toBeFocused();
+
+    const first = showcaseFor("course-video")!.cases[0]!;
+    const prompt = page.getByTestId(`showcase-prompt-${first.id}`);
+    await prompt.focus();
+    await page.keyboard.press("Enter");
+    const textarea = page.locator("textarea[name='message']");
     await expect(textarea).toHaveValue(first.prompt);
     await expect(textarea).toBeFocused();
+    expect(calls).toEqual({ threads: 0, runs: 0 });
   });
+
+  test("English showcase keeps long hero and UI English while prompts stay Chinese", async ({
+    page,
+  }) => {
+    await pinEnglishLocale(page);
+    mockGuideAPI(page);
+    const showcase = showcaseFor("ppt-master")!;
+    await openGuide(page, "ppt-master");
+
+    await expect(
+      page.getByRole("heading", {
+        name: showcase.heroLine.en.join(" "),
+        exact: true,
+      }),
+    ).toBeVisible();
+    const guide = page.getByTestId("agent-new-chat-guide");
+    expect(await guide.innerText()).not.toMatch(/[一-鿿]/);
+    await expect(
+      page.getByRole("button", { name: /^Use this prompt:/ }),
+    ).toHaveCount(3);
+    await page.getByTestId("showcase-prompt-ppt-standard").click();
+    const prompt = showcase.cases[1]!.prompt;
+    await expect(page.locator("textarea[name='message']")).toHaveValue(prompt);
+    expect(prompt).toContain("Default");
+    expect(prompt).toMatch(/[一-鿿]/);
+  });
+
+  test("creative-studio cold-cache initial media stays within budget without errors or deferred originals", async ({
+    page,
+  }) => {
+    const mediaBytes: { url: string; bytes: number }[] = [];
+    const failedMedia: string[] = [];
+    const consoleErrors: string[] = [];
+    const pending: Promise<void>[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error")
+        consoleErrors.push(`${message.text()} @ ${message.location().url}`);
+    });
+    page.on("response", (response) => {
+      if (!response.url().includes("/agent-showcase/")) return;
+      if (response.status() >= 400) failedMedia.push(response.url());
+      pending.push(
+        response.body().then((body) => {
+          mediaBytes.push({ url: response.url(), bytes: body.length });
+        }),
+      );
+    });
+    mockGuideAPI(page);
+    await openGuide(page, "creative-studio");
+    await page.waitForLoadState("networkidle");
+    await Promise.all(pending);
+
+    const bytes = mediaBytes.reduce((total, item) => total + item.bytes, 0);
+    expect(bytes).toBeLessThanOrEqual(1_500_000);
+    expect(mediaBytes.map((item) => item.url)).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\/podcast\/|\/originals\/|\.pptx(?:$|\?)/),
+      ]),
+    );
+    expect(failedMedia).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  for (const agentName of [
+    "course-video",
+    "ppt-master",
+    "podcast-studio",
+  ] as const) {
+    test(`${agentName} initially avoids video, audio, originals and PPTX requests`, async ({
+      page,
+    }) => {
+      const requests: string[] = [];
+      page.on("request", (request) => {
+        if (request.url().includes("/agent-showcase/"))
+          requests.push(request.url());
+      });
+      mockGuideAPI(page);
+      await openGuide(page, agentName);
+      await page.waitForLoadState("networkidle");
+      expect(
+        requests.filter((url) =>
+          /\/videos\/v\d|\/podcast\/|\/originals\/|\.pptx(?:$|\?)/.test(url),
+        ),
+      ).toEqual([]);
+    });
+  }
 });

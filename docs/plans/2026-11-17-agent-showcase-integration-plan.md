@@ -1,6 +1,6 @@
 # Agent 新会话案例展示落地计划
 
-> **状态**：未执行（2026-11-17 优化定稿；本计划只做设计与实施拆解，未改代码）。
+> **状态**：已执行（2026-11-17 T0–T5 实现与验收完成；T6 changelog 已落地，PR 评审与合入待完成；[changelog](../changelog/changelog-2026-11-17-agent-showcase-integration.md)）。
 > **TL;DR**：把 demo 的“人物 + 大字 + HOW IT WORKS + 真实案例”迁入 4 个 Agent 的新会话引导页，保留真实 `InputBox`、草稿确认和 `co-writer` 旧体验。素材放 `frontend/public/agent-showcase`，UI 与案例元数据双语、提示词中文且保留 Agent 工作流标记。实施先过人物图技术验证，再跑通 `course-video` 垂直切片，随后扩展其余三类；验收定向优先、按风险补充全量或专项测试，禁止无新信号的重复空跑。
 
 **Spec / 需求来源**：用户 2026-11-17 截图与三轮补充说明；当前 demo `temp/agent-listenhub-demo-v2/bundle.html`；项目现有 `AgentNewChatGuide`、`InputBox`、`agentAppearance`、i18n 与设计 token；2026-11-17 计划评审及用户对“前端改动、杜绝不必要测试”的补充约束。已确认的决策见下表。
@@ -408,10 +408,10 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts \
 
 ### T5 相关回归与交付验证
 
-- [ ] 完成现有 E2E 文件的 legacy/showcase/shared 拆分：保留 co-writer 英文 prompt、草稿与显式提交；更新 showcase 中文 prompt、别名、retry、暗色 hero 选择器，不删除共享回归。
-- [ ] 用一个参数化用例覆盖 1440×900 / 1024×768 / 390×844 首屏与横向溢出；用一个英文用例抽查长 hero/UI；用一个暗色用例检查 hero、卡片和 Dialog。
-- [ ] 用一次冷缓存请求记录验证最重 creative-studio 初始 showcase 媒体 ≤1,500,000 bytes，并确认首屏不请求视频/音频/原图/PPTX；正常素材下无 console error/404。
-- [ ] 实际执行以下命令一次；失败时按第三节的分层规则定位、修复和重跑失败目标：
+- [x] 完成现有 E2E 文件的 legacy/showcase/shared 拆分：保留 co-writer 英文 prompt、草稿与显式提交；更新 showcase 中文 prompt、别名、retry、暗色 hero 选择器，不删除共享回归。
+- [x] 用一个参数化用例覆盖 1440×900 / 1024×768 / 390×844 首屏与横向溢出；用一个英文用例抽查长 hero/UI；用一个暗色用例检查 hero、卡片和 Dialog。
+- [x] 用一次冷缓存请求记录验证最重 creative-studio 初始 showcase 媒体 ≤1,500,000 bytes，并确认首屏不请求视频/音频/原图/PPTX；正常素材下无 console error/404。
+- [x] 实际执行以下命令一次；失败时按第三节的分层规则定位、修复和重跑失败目标：
 
 ```bash
 make -C frontend check
@@ -422,36 +422,36 @@ pnpm exec vitest run \
 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts
 ```
 
-- [ ] 仅在出现既定升级信号时补全量 Vitest/Playwright、WebKit 或 perf 专项；没有新信号时不重复全量测试。
+- [x] 仅在出现既定升级信号时补全量 Vitest/Playwright、WebKit 或 perf 专项；没有新信号时不重复全量测试。
 
 **验收**：相关静态门禁与定向回归通过；四类媒体各有一条真实浏览器行为证据；首屏、暗色、双语、键盘和草稿契约满足第五节至第八节要求。
 
 ### T6 文档与交付
 
-- [ ] 必写 `docs/changelog/changelog-2026-11-17-agent-showcase-integration.md`，包含 TL;DR、资产来源/58 文件/实际体积/压缩口径、验收记录（命令 → 实际关键输出）和首屏截图路径。
-- [ ] 更新本计划勾选与状态头，链接 changelog；执行 `python3 scripts/check_docs_convention.py` 一次。
+- [x] 必写 `docs/changelog/changelog-2026-11-17-agent-showcase-integration.md`，包含 TL;DR、资产来源/58 文件/实际体积/压缩口径、验收记录（命令 → 实际关键输出）和首屏截图路径。
+- [x] 更新本计划勾选与状态头，链接 changelog；执行 `python3 scripts/check_docs_convention.py` 一次。
 - [ ] 按仓库约定走分支 + PR + AI 评审，既有 CI 通过后再合并；不默认新增本批专用 CI。若后续迁 CDN，只在 changelog 留指针，不在本批实现。
 
 ## 十、验证清单（实现级 / 行为级）
 
 ### 实现级（主要走 node/DOM）
 
-- [ ] `showcaseFor` 覆盖 4 个 Agent，返回 `null` 给 co-writer；案例数 3/3/4/10，prompt 工作流标记符合第五节契约。
-- [ ] 58 个媒体引用（含 `character`）与实际文件集合相等；PPT 预览 21、视觉预览 10、MP3 4、hero 4，总量 ≤20,000,000 bytes。
-- [ ] 四个 showcase Agent 不渲染原 guide h1/description 和简单 cases；co-writer 原 header/cases/输入框/tips 顺序不变。
-- [ ] 人物采用 T0 选定的统一方案；透明方案无白边，浅色底板方案呈现为明确设计容器，暗色无意外图片白块。
-- [ ] prompt 回填走 `PromptInputController`，不自动提交；locale 切换不重写已有草稿。
-- [ ] composer frame 仅影响四个 showcase 新会话 guide；1440 宽 ≥900px，内外两层 radius = 28px，移动 = 24px；全局 InputBox/已有会话不变。
+- [x] `showcaseFor` 覆盖 4 个 Agent，返回 `null` 给 co-writer；案例数 3/3/4/10，prompt 工作流标记符合第五节契约。
+- [x] 58 个媒体引用（含 `character`）与实际文件集合相等；PPT 预览 21、视觉预览 10、MP3 4、hero 4，总量 ≤20,000,000 bytes。
+- [x] 四个 showcase Agent 不渲染原 guide h1/description 和简单 cases；co-writer 原 header/cases/输入框/tips 顺序不变。
+- [x] 人物采用 T0 选定的统一方案；透明方案无白边，浅色底板方案呈现为明确设计容器，暗色无意外图片白块。
+- [x] prompt 回填走 `PromptInputController`，不自动提交；locale 切换不重写已有草稿。
+- [x] composer frame 仅影响四个 showcase 新会话 guide；1440 宽 ≥900px，内外两层 radius = 28px，移动 = 24px；全局 InputBox/已有会话不变。
 
 ### 行为级（现有 E2E 文件中的代表路径）
 
-- [ ] course-video：3 卡；prompt 填入；海报打开并播放；关闭后暂停/卸载；模型/技能/上传弹层不裁切。
-- [ ] ppt-master：打开一套 deck，完成翻页与一次真实 PPTX 下载；其余数量/路径由 node 测试覆盖。
-- [ ] creative-studio：验证一类筛选和一次图片或 SVG 下载；冷缓存初始媒体字节达标。
-- [ ] podcast-studio：真实试听一个节目、切换到另一个时前者停止、打开文稿/来源；播放竞态与卸载清理由 DOM 覆盖。
-- [ ] 非空草稿出现追加/替换/取消，取消不改草稿；URL/sessionStorage handoff 不被覆盖；只有显式提交创建 run。
-- [ ] loading/error 不出现假案例；disabled 禁止 prompt；旧别名、重试和已有会话行为保持。
-- [ ] 三个目标视口首屏达标、无横向溢出；暗色可读；键盘可打开/关闭 Dialog 并回填，焦点返回触发元素。
+- [x] course-video：3 卡；prompt 填入；海报打开并播放；关闭后暂停/卸载；模型/技能/上传弹层不裁切。
+- [x] ppt-master：打开一套 deck，完成翻页与一次真实 PPTX 下载；其余数量/路径由 node 测试覆盖。
+- [x] creative-studio：验证一类筛选和一次图片或 SVG 下载；冷缓存初始媒体字节达标。
+- [x] podcast-studio：真实试听一个节目、切换到另一个时前者停止、打开文稿/来源；播放竞态与卸载清理由 DOM 覆盖。
+- [x] 非空草稿出现追加/替换/取消，取消不改草稿；URL/sessionStorage handoff 不被覆盖；只有显式提交创建 run。
+- [x] loading/error 不出现假案例；disabled 禁止 prompt；旧别名、重试和已有会话行为保持。
+- [x] 三个目标视口首屏达标、无横向溢出；暗色可读；键盘可打开/关闭 Dialog 并回填，焦点返回触发元素。
 
 > 全量或专项测试不是禁止项：出现第三节所列共享回归、跨页回归、媒体兼容或资产预算信号时必须补做；没有新信号时不以重复全量运行代替定位。
 
