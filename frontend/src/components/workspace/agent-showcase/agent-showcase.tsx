@@ -5,12 +5,14 @@ import { useRef, useState } from "react";
 
 import type {
   DeckCase,
+  PodcastCase,
   ShowcaseAgent,
   VideoCase,
   VisualCase,
 } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 
+import { ShowcaseAudioPlayer } from "./showcase-audio-player";
 import {
   DeckCard,
   showcaseCardClass,
@@ -19,6 +21,7 @@ import {
 } from "./showcase-cards";
 import {
   DeckDialog,
+  PodcastDialog,
   VideoDialog,
   VisualDialog,
 } from "./showcase-dialogs";
@@ -38,6 +41,7 @@ export function AgentShowcase({
   const [activeVideo, setActiveVideo] = useState<VideoCase | null>(null);
   const [activeDeck, setActiveDeck] = useState<DeckCase | null>(null);
   const [activeVisual, setActiveVisual] = useState<VisualCase | null>(null);
+  const [activePodcast, setActivePodcast] = useState<PodcastCase | null>(null);
   const [visualFilter, setVisualFilter] = useState<
     VisualCase["category"] | "all"
   >("all");
@@ -47,6 +51,9 @@ export function AgentShowcase({
       item.kind !== "visual" ||
       visualFilter === "all" ||
       item.category === visualFilter,
+  );
+  const podcastCases = agent.cases.filter(
+    (item): item is PodcastCase => item.kind === "podcast",
   );
   const visualFilters = [
     ["all", t.agents.showcase.filterAll],
@@ -61,6 +68,7 @@ export function AgentShowcase({
     setActiveVideo(null);
     setActiveDeck(null);
     setActiveVisual(null);
+    setActivePodcast(null);
     setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
@@ -136,11 +144,24 @@ export function AgentShowcase({
               </span>
             </div>
           ) : null}
-          <div
-            data-testid="agent-guide-cases"
-            data-showcase
-            className={showcaseCardClass(agent.id === "creative-studio" ? "three" : "two")}
-          >
+          {agent.id === "podcast-studio" ? (
+            <ShowcaseAudioPlayer
+              items={podcastCases}
+              locale={language}
+              disabled={disabled}
+              onUsePrompt={onUsePrompt}
+              onTranscript={(podcast, trigger) => {
+                triggerRef.current = trigger;
+                setActivePodcast(podcast);
+              }}
+            />
+          ) : null}
+          {agent.id !== "podcast-studio" ? (
+            <div
+              data-testid="agent-guide-cases"
+              data-showcase
+              className={showcaseCardClass(agent.id === "creative-studio" ? "three" : "two")}
+            >
             {visibleCases.map((item, index) => {
               if (item.kind === "video") {
                 return (
@@ -192,7 +213,8 @@ export function AgentShowcase({
               }
               return null;
             })}
-          </div>
+            </div>
+          ) : null}
           <p className="text-muted-foreground mt-4 flex gap-2 text-[11px] leading-5">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
             {localized(agent.note, language)}
@@ -207,6 +229,9 @@ export function AgentShowcase({
       ) : null}
       {activeVisual ? (
         <VisualDialog item={activeVisual} locale={language} onClose={closeDialog} />
+      ) : null}
+      {activePodcast ? (
+        <PodcastDialog item={activePodcast} locale={language} onClose={closeDialog} />
       ) : null}
     </>
   );

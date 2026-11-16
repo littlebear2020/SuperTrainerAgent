@@ -252,6 +252,37 @@ test.describe("Agent new-chat task guides", () => {
     expect(await svg.failure()).toBeNull();
   });
 
+  test("podcast-studio showcase plays and switches real audio and opens transcript sources", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    const calls = trackSending(page);
+    await openGuide(page, "podcast-studio");
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(4);
+    const audio = page.locator("audio");
+    await expect(audio).toHaveCount(1);
+    await expect(audio).toHaveAttribute("preload", "none");
+    await expect(audio).not.toHaveAttribute("src", /.+/);
+
+    await page.getByTestId("showcase-play-podcast-context").click();
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
+    await page.getByTestId("showcase-play-podcast-agent2026").click();
+    await expect(audio).toHaveAttribute("src", /ep2\.mp3$/);
+    await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0);
+    await expect(page.getByTestId("showcase-play-podcast-context")).toHaveAttribute("aria-label", /^播放 /);
+    await expect(page.getByTestId("showcase-play-podcast-agent2026")).toHaveAttribute("aria-label", /^暂停 /);
+
+    await page.getByTestId("showcase-transcript-podcast-agent2026").click();
+    await expect(page.getByRole("dialog")).toContainText("2026 年，AI Agent 的关键词");
+    const source = page.getByTestId("showcase-podcast-source-0");
+    await expect(source).toHaveAttribute("target", "_blank");
+    await expect(source).toHaveAttribute("rel", /noreferrer/);
+    await expect(source).toHaveAttribute("rel", /noopener/);
+    await expect(source).toHaveAttribute("href", /infoq\.cn/);
+    await expect(page.getByTestId("showcase-download-mp3")).toHaveAttribute("href", /ep2\.mp3$/);
+    expect(calls).toEqual({ threads: 0, runs: 0 });
+  });
+
   test("podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
     page,
   }) => {
@@ -312,8 +343,8 @@ test.describe("Agent new-chat task guides", () => {
     }
     const calls = trackSending(page);
     await openGuide(page, "podcast-studio");
-    const item = zhCN.agents.newChatGuides["podcast-studio"].cases[0];
-    await page.getByRole("button", { name: item.title, exact: true }).click();
+    const item = showcaseFor("podcast-studio")!.cases[0]!;
+    await page.getByTestId(`showcase-prompt-${item.id}`).click();
     const textarea = page.locator("textarea[name='message']");
     await expect(textarea).toHaveValue(item.prompt);
     expect(item.prompt).toContain("[模式: read_original]");

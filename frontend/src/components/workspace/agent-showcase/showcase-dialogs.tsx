@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import type {
   DeckCase,
+  PodcastCase,
   ShowcaseSource,
   VideoCase,
   VisualCase,
@@ -31,9 +32,11 @@ import { formatBytes, formatDuration, localized, type ShowcaseLocale } from "./s
 export function SourceLinks({
   sources,
   locale,
+  testIdPrefix,
 }: {
   sources?: ShowcaseSource[];
   locale: ShowcaseLocale;
+  testIdPrefix?: string;
 }) {
   const { t } = useI18n();
   if (!sources?.length) return null;
@@ -42,9 +45,10 @@ export function SourceLinks({
       <span className="text-muted-foreground font-medium">
         {t.agents.showcase.sources}
       </span>
-      {sources.map((source) => (
+      {sources.map((source, index) => (
         <a
           key={source.url}
+          data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
           href={source.url}
           target="_blank"
           rel="noreferrer noopener"
@@ -315,6 +319,70 @@ export function VisualDialog({
             {item.vector
               ? t.agents.showcase.downloadSvg
               : t.agents.showcase.downloadOriginal}
+          </a>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+export function PodcastDialog({
+  item,
+  locale,
+  onClose,
+}: {
+  item: PodcastCase;
+  locale: ShowcaseLocale;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[94vh] overflow-y-auto rounded-2xl p-4 sm:max-w-3xl sm:p-6 dark:border-white/10 dark:bg-[#0b1020]"
+      >
+        <DialogHeader className="pr-10 text-left">
+          <DialogTitle>{localized(item.title, locale)}</DialogTitle>
+          <DialogDescription>
+            {localized(item.tag, locale)} · {formatDuration(item.durationSeconds)} · {item.transcript.length}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogClose asChild>
+          <button
+            type="button"
+            data-testid="showcase-dialog-close"
+            aria-label={t.agents.showcase.close}
+            className="text-muted-foreground hover:bg-accent hover:text-foreground absolute top-4 right-4 rounded-full p-2 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </DialogClose>
+        <SourceLinks
+          sources={item.sources}
+          locale={locale}
+          testIdPrefix="showcase-podcast-source"
+        />
+        <div className="grid gap-4">
+          {item.transcript.map((turn, index) => (
+            <div key={`${turn.speaker.en}-${index}`} className="grid gap-1 border-l-2 border-cyan-200 pl-3 dark:border-cyan-400/30">
+              <span className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                {localized(turn.speaker, locale)}
+              </span>
+              <p className="text-foreground text-sm leading-7">{turn.text}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end">
+          <a
+            data-testid="showcase-download-mp3"
+            href={item.audio}
+            download={`${item.id}.mp3`}
+            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-cyan-600 px-4 text-xs font-medium text-white hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {t.agents.showcase.downloadMp3}
           </a>
         </div>
       </DialogContent>
