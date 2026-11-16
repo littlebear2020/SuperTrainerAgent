@@ -1,8 +1,9 @@
 "use client";
 
-import { BoltIcon, LayoutDashboard } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import {
   SidebarMenu,
@@ -17,7 +18,12 @@ import { cn } from "@/lib/utils";
 export function WorkspaceHeader({ className }: { className?: string }) {
   const { t } = useI18n();
   const { state } = useSidebar();
+  const { resolvedTheme } = useTheme();
   const pathname = usePathname();
+  const brandMark =
+    resolvedTheme === "dark"
+      ? "/images/trainer-ai-mark-inverse.svg"
+      : "/images/trainer-ai-mark.svg";
   return (
     <>
       <div
@@ -30,20 +36,27 @@ export function WorkspaceHeader({ className }: { className?: string }) {
           <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y flex w-full cursor-pointer items-center justify-center">
             <Link
               href="/"
+              aria-label="Trainer AI"
               className="block pt-1 group-hover/workspace-header:hidden"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#6366f1] to-[#ec4899] shadow-[0_4px_14px_rgba(99,102,241,0.5)]">
-                <BoltIcon className="h-3.5 w-3.5 text-white" />
-              </div>
+              <img
+                src={brandMark}
+                alt=""
+                aria-hidden="true"
+                className="h-8 w-8"
+              />
             </Link>
             <SidebarTrigger className="hidden pl-2 group-hover/workspace-header:block" />
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
             <Link href="/" className="ml-2 flex items-center gap-3">
-              <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#6366f1] to-[#ec4899] shadow-[0_4px_14px_rgba(99,102,241,0.5)]">
-                <BoltIcon className="h-3.5 w-3.5 text-white" />
-              </div>
+              <img
+                src={brandMark}
+                alt=""
+                aria-hidden="true"
+                className="h-[34px] w-[34px] shrink-0"
+              />
               <div className="flex flex-col">
                 <span
                   className="text-[17px] font-bold tracking-[-0.5px]"

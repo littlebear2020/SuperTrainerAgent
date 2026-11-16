@@ -21,7 +21,13 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
         className,
       )}
     >
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3">
+        <img
+          src="/images/trainer-ai-mark-inverse.svg"
+          alt=""
+          aria-hidden="true"
+          className="h-9 w-9"
+        />
         <h1
           className="text-xl font-bold"
           style={{

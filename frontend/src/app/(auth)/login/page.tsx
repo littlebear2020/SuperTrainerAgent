@@ -135,6 +135,16 @@ export default function LoginPage() {
         className="interactive-glass relative z-10 w-full max-w-md space-y-6 rounded-3xl p-8"
       >
         <div className="relative z-[1] text-center">
+          <img
+            src={
+              isDark
+                ? "/images/trainer-ai-mark-inverse.svg"
+                : "/images/trainer-ai-mark.svg"
+            }
+            alt=""
+            aria-hidden="true"
+            className="mx-auto mb-3 h-10 w-10"
+          />
           <h1
             className="text-3xl font-extrabold"
             style={{

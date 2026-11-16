@@ -14,6 +14,11 @@ import { I18nProvider } from "@/core/i18n/context";
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 let mockPathname = "/workspace";
+let mockTheme = "light";
+
+vi.mock("next-themes", () => ({
+  useTheme: () => ({ resolvedTheme: mockTheme }),
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
@@ -25,6 +30,7 @@ describe("侧边栏「工作台」入口高亮", () => {
   let root: Root;
 
   beforeEach(() => {
+    mockTheme = "light";
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -37,11 +43,13 @@ describe("侧边栏「工作台」入口高亮", () => {
     container.remove();
   });
 
-  const renderHeader = async (): Promise<HTMLAnchorElement | null> => {
+  const renderHeader = async (
+    collapsed = false,
+  ): Promise<HTMLAnchorElement | null> => {
     await act(async () => {
       root.render(
         <I18nProvider initialLocale="zh-CN">
-          <SidebarProvider>
+          <SidebarProvider defaultOpen={!collapsed}>
             <WorkspaceHeader />
           </SidebarProvider>
         </I18nProvider>,
@@ -56,6 +64,27 @@ describe("侧边栏「工作台」入口高亮", () => {
 
     expect(link).not.toBeNull();
     expect(link?.getAttribute("data-active")).toBe("true");
+  });
+
+  it("使用 Trainer AI 品牌图标", async () => {
+    mockPathname = "/workspace";
+    await renderHeader();
+
+    expect(
+      container.querySelector("img[src='/images/trainer-ai-mark.svg']"),
+    ).not.toBeNull();
+  });
+
+  it("深色模式在展开和收起状态都使用反白品牌图标", async () => {
+    mockTheme = "dark";
+    await renderHeader();
+    expect(
+      container.querySelector("img[src='/images/trainer-ai-mark-inverse.svg']"),
+    ).not.toBeNull();
+    await renderHeader(true);
+    expect(
+      container.querySelector("img[src='/images/trainer-ai-mark-inverse.svg']"),
+    ).not.toBeNull();
   });
 
   it("在 course-assistant 聊天页时不激活（归「智能体」入口）", async () => {

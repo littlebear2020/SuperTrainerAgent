@@ -50,23 +50,14 @@ export const zhCN: Translations = {
 
   // Home
   home: {
-    tagline: "你的 AI 超级智能体工作台",
     enterWorkspace: "进入工作台",
-    highlights: [
-      {
-        label: "深度研究",
-        description: "多角度系统化研究，综合分析并生成报告",
-      },
-      { label: "数据分析", description: "上传数据文件，SQL 查询与可视化图表" },
-      { label: "创作生成", description: "生成图片、视频、播客、PPT 和网页" },
-    ],
   },
 
   // Welcome
   welcome: {
     greeting: "你好，欢迎回来！",
     description:
-      "欢迎使用 🦌 Trainer AI，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nTrainer AI 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
+      "欢迎使用 Trainer AI，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nTrainer AI 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:

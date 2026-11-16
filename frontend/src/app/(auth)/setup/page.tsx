@@ -204,7 +204,7 @@ export default function SetupPage() {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <FlickeringGrid
-          className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
+          className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[180vw] mask-center mask-no-repeat md:mask-size-[130vh]"
           squareSize={4}
           gridGap={4}
           color={actualTheme === "dark" ? "white" : "black"}
@@ -213,6 +213,16 @@ export default function SetupPage() {
         />
         <div className="border-border/20 bg-background/5 w-full max-w-md space-y-6 rounded-3xl border p-8 backdrop-blur-sm">
           <div className="text-center">
+            <img
+              src={
+                actualTheme === "dark"
+                  ? "/images/trainer-ai-mark-inverse.svg"
+                  : "/images/trainer-ai-mark.svg"
+              }
+              alt=""
+              aria-hidden="true"
+              className="mx-auto mb-3 h-10 w-10"
+            />
             <h1
               className="text-3xl font-bold"
               style={{
@@ -309,7 +319,7 @@ export default function SetupPage() {
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
       <FlickeringGrid
-        className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
+        className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[180vw] mask-center mask-no-repeat md:mask-size-[130vh]"
         squareSize={4}
         gridGap={4}
         color={actualTheme === "dark" ? "white" : "black"}
@@ -318,6 +328,16 @@ export default function SetupPage() {
       />
       <div className="border-border/20 bg-background/5 w-full max-w-md space-y-6 rounded-3xl border p-8 backdrop-blur-sm">
         <div className="text-center">
+          <img
+            src={
+              actualTheme === "dark"
+                ? "/images/trainer-ai-mark-inverse.svg"
+                : "/images/trainer-ai-mark.svg"
+            }
+            alt=""
+            aria-hidden="true"
+            className="mx-auto mb-3 h-10 w-10"
+          />
           <h1 className="font-serif text-3xl">Trainer AI</h1>
           <p className="text-muted-foreground mt-2">
             {t.auth.completeSetupSubtitle}

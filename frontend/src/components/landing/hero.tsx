@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, ChevronRightIcon, Palette, Search } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,6 @@ import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import Galaxy from "@/components/ui/galaxy";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
-
-const highlightIcons = [Search, BarChart3, Palette];
 
 export function Hero({ className }: { className?: string }) {
   const { t } = useI18n();
@@ -31,7 +29,7 @@ export function Hero({ className }: { className?: string }) {
         />
       </div>
       <FlickeringGrid
-        className="absolute inset-0 z-0 translate-y-8 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
+        className="absolute inset-0 z-0 translate-y-8 mask-[url(/images/deer.svg)] mask-size-[180vw] mask-center mask-no-repeat md:mask-size-[130vh]"
         squareSize={4}
         gridGap={4}
         color={"white"}
@@ -49,28 +47,6 @@ export function Hero({ className }: { className?: string }) {
         >
           Trainer AI
         </h1>
-        <p className="text-muted-foreground mt-6 text-center text-xl md:text-2xl">
-          {t.home.tagline}
-        </p>
-
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4 md:gap-6">
-          {t.home.highlights.map((item, i) => {
-            const Icon = highlightIcons[i] ?? Search;
-            return (
-              <div
-                key={item.label}
-                className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-sm"
-              >
-                <Icon className="size-6 text-white/80" />
-                <span className="text-sm font-medium">{item.label}</span>
-                <span className="text-muted-foreground max-w-[160px] text-center text-xs">
-                  {item.description}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
         <Link href="/workspace" className="mt-10">
           <Button className="size-lg scale-108" size="lg">
             <span className="text-md">{t.home.enterWorkspace}</span>
