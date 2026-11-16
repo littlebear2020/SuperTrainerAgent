@@ -54,7 +54,7 @@ describe("AgentShowcase", () => {
   }
 
   function element<T extends HTMLElement>(testId: string): T {
-    const value = container.querySelector<T>(`[data-testid='${testId}']`);
+    const value = document.querySelector<T>(`[data-testid='${testId}']`);
     if (!value) throw new Error(`element not found: ${testId}`);
     return value;
   }
@@ -115,5 +115,57 @@ describe("AgentShowcase", () => {
 
     expect(container.textContent).toContain("媒体暂时无法显示");
     expect(element<HTMLButtonElement>("showcase-prompt-video-hallucination").disabled).toBe(false);
+  });
+
+  it("navigates deck boundaries and resets to slide one when another deck opens", async () => {
+    await renderShowcase("ppt-master");
+    expect(container.querySelectorAll("article")).toHaveLength(3);
+
+    await click(element("showcase-open-ppt-quick"));
+    const current = () => document.querySelector<HTMLImageElement>("[data-testid='showcase-deck-current']");
+    expect(current()?.src).toContain("/quick/slide-1.webp");
+    expect(document.querySelector<HTMLButtonElement>("[data-testid='showcase-deck-previous']")?.disabled).toBe(true);
+
+    await click(element("showcase-deck-next"));
+    expect(current()?.src).toContain("/quick/slide-2.webp");
+    await click(element("showcase-deck-thumbnail-6"));
+    expect(current()?.src).toContain("/quick/slide-7.webp");
+    expect(document.querySelector<HTMLButtonElement>("[data-testid='showcase-deck-next']")?.disabled).toBe(true);
+    await click(document.querySelector<HTMLElement>("[data-testid='showcase-dialog-close']")!);
+
+    await click(element("showcase-open-ppt-standard"));
+    expect(current()?.src).toContain("/standard/slide-1.webp");
+    const download = document.querySelector<HTMLAnchorElement>("[data-testid='showcase-download-pptx']");
+    expect(download?.href).toContain("/agent-showcase/ppt/standard-llm-app-v2.pptx");
+    expect(download?.download).toBe("ppt-standard.pptx");
+  });
+
+  it("filters visual cases with aria state and opens original and SVG downloads", async () => {
+    await renderShowcase("creative-studio");
+    expect(container.querySelectorAll("article")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-testid^='showcase-filter-']")).toHaveLength(6);
+
+    await click(element("showcase-filter-card"));
+    expect(container.querySelectorAll("article")).toHaveLength(2);
+    expect(element("showcase-filter-card").getAttribute("aria-pressed")).toBe("true");
+    expect(element("showcase-filter-all").getAttribute("aria-pressed")).toBe("false");
+
+    const trigger = element("showcase-open-visual-card-rag");
+    trigger.focus();
+    await click(trigger);
+    const preview = document.querySelector<HTMLImageElement>("[data-testid='showcase-visual-original']");
+    expect(preview?.src).toContain("/visual/originals/card-rag.jpg");
+    const original = document.querySelector<HTMLAnchorElement>("[data-testid='showcase-download-original']");
+    expect(original?.href).toContain("/visual/originals/card-rag.jpg");
+    expect(original?.download).toBe("visual-card-rag.jpg");
+    await click(document.querySelector<HTMLElement>("[data-testid='showcase-dialog-close']")!);
+    expect(document.activeElement).toBe(trigger);
+
+    await click(element("showcase-filter-diagram"));
+    expect(container.querySelectorAll("article")).toHaveLength(2);
+    await click(element("showcase-open-visual-diagram-rag"));
+    const svg = document.querySelector<HTMLAnchorElement>("[data-testid='showcase-download-svg']");
+    expect(svg?.href).toContain("/visual/diagrams/diagram-rag-architecture.svg");
+    expect(svg?.download).toBe("visual-diagram-rag.svg");
   });
 });

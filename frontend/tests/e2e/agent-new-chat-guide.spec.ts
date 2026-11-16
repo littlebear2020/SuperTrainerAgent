@@ -192,6 +192,66 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
+  test("ppt-master showcase pages through slides and downloads a real PPTX", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await openGuide(page, "ppt-master");
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(3);
+
+    await page.getByTestId("showcase-open-ppt-quick").click();
+    const current = page.getByTestId("showcase-deck-current");
+    await expect(current).toHaveAttribute("src", /quick\/slide-1\.webp$/);
+    await expect(page.getByTestId("showcase-deck-previous")).toBeDisabled();
+    await page.getByTestId("showcase-deck-next").click();
+    await expect(current).toHaveAttribute("src", /quick\/slide-2\.webp$/);
+    await page.keyboard.press("ArrowRight");
+    await expect(current).toHaveAttribute("src", /quick\/slide-3\.webp$/);
+    await page.getByTestId("showcase-deck-thumbnail-6").click();
+    await expect(current).toHaveAttribute("src", /quick\/slide-7\.webp$/);
+    await expect(page.getByTestId("showcase-deck-next")).toBeDisabled();
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("showcase-download-pptx").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("ppt-quick.pptx");
+    expect(await download.failure()).toBeNull();
+  });
+
+  test("creative-studio showcase filters real designs and downloads JPG and SVG originals", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await openGuide(page, "creative-studio");
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(10);
+
+    await page.getByTestId("showcase-filter-card").click();
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(2);
+    await expect(page.getByTestId("showcase-filter-card")).toHaveAttribute("aria-pressed", "true");
+    const imageTrigger = page.getByTestId("showcase-open-visual-card-rag");
+    await imageTrigger.click();
+    const original = page.getByTestId("showcase-visual-original");
+    await expect(original).toBeVisible();
+    await expect.poll(() => original.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    const jpgPromise = page.waitForEvent("download");
+    await page.getByTestId("showcase-download-original").click();
+    const jpg = await jpgPromise;
+    expect(jpg.suggestedFilename()).toBe("visual-card-rag.jpg");
+    expect(await jpg.failure()).toBeNull();
+    await page.getByTestId("showcase-dialog-close").click();
+    await expect(imageTrigger).toBeFocused();
+
+    await page.getByTestId("showcase-filter-diagram").click();
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(2);
+    await page.getByTestId("showcase-open-visual-diagram-rag").click();
+    await expect(page.getByTestId("showcase-visual-original")).toHaveAttribute("src", /diagram-rag-architecture\.svg$/);
+    const svgPromise = page.waitForEvent("download");
+    await page.getByTestId("showcase-download-svg").click();
+    const svg = await svgPromise;
+    expect(svg.suggestedFilename()).toBe("visual-diagram-rag.svg");
+    expect(await svg.failure()).toBeNull();
+  });
+
   test("podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
     page,
   }) => {
