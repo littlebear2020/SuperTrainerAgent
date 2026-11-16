@@ -1,5 +1,5 @@
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import type { CliArgs, OpenAIImageApiDialect } from "../types";
 
 // 2026-11-16: TrainerAI 默认生图通道 = 360 Seedream 5.0 Pro。
@@ -14,11 +14,21 @@ const SIZE_TIERS = [
 ] as const;
 
 export function getDefaultModel(): string {
-  return process.env.QIHU_IMAGE_MODEL || DEFAULT_MODEL;
+  const configured = process.env.QIHU_IMAGE_MODEL;
+  if (configured && !configured.toLowerCase().includes("seedream")) {
+    throw new Error(
+      `QIHU_IMAGE_MODEL supports only Seedream models; received ${configured}. Remove the override or use ${DEFAULT_MODEL}.`
+    );
+  }
+  return configured || DEFAULT_MODEL;
 }
 
 type Qihu360ImageResponse = { data: Array<{ url?: string; b64_json?: string }> };
-type Qihu360GenerationsBody = Record<string, unknown>;
+type Qihu360GenerationsBody = {
+  model: string;
+  prompt: string;
+  extra_body: Record<string, unknown>;
+};
 
 function getApiKey(): string | null {
   return process.env.QIHU_API_KEY || null;
@@ -32,25 +42,55 @@ export function getQihu360ImageApiDialect(args: Pick<CliArgs, "imageApiDialect">
   return args.imageApiDialect ?? "openai-native";
 }
 
-function parseRatio(value: string | null): number | null {
+function parseDimensions(value: string | null): readonly [number, number] | null {
   if (!value) return null;
   const match = /^(\d+(?:\.\d+)?)[x:](\d+(?:\.\d+)?)$/i.exec(value.trim());
   if (!match) return null;
   const width = Number.parseFloat(match[1]!);
   const height = Number.parseFloat(match[2]!);
   if (!(width > 0) || !(height > 0)) return null;
-  return width / height;
+  return [width, height];
 }
 
-function resolveSize(aspectRatio: string | null, explicitSize: string | null): string {
-  const ratio = parseRatio(explicitSize) ?? parseRatio(aspectRatio) ?? 1;
+function parseRatio(value: string | null): number | null {
+  const dimensions = parseDimensions(value);
+  return dimensions ? dimensions[0] / dimensions[1] : null;
+}
+
+function resolveSize(
+  aspectRatio: string | null,
+  explicitSize: string | null,
+  quality: CliArgs["quality"]
+): string {
+  const explicitDimensions = parseDimensions(explicitSize);
+  const ratio = explicitDimensions
+    ? explicitDimensions[0] / explicitDimensions[1]
+    : parseRatio(aspectRatio) ?? 1;
   let best: (typeof SIZE_TIERS)[number] = SIZE_TIERS[0];
   for (const tier of SIZE_TIERS) {
     if (Math.abs(tier[0] / tier[1] - ratio) < Math.abs(best[0] / best[1] - ratio)) {
       best = tier;
     }
   }
-  return `${best[0]}x${best[1]}`;
+  const resolved = `${best[0]}x${best[1]}`;
+  if (quality === "normal") {
+    console.warn(`qihu360 quality=normal requested; using the 2K Seedream tier ${resolved}.`);
+  }
+  if (explicitSize) {
+    if (
+      !explicitDimensions ||
+      explicitDimensions[0] !== best[0] ||
+      explicitDimensions[1] !== best[1]
+    ) {
+      console.warn(`qihu360 normalized explicit size ${explicitSize} to ${resolved} (2K Seedream tier).`);
+    }
+  } else if (aspectRatio) {
+    const requestedRatio = parseRatio(aspectRatio);
+    if (requestedRatio === null || Math.abs(requestedRatio - best[0] / best[1]) > 1e-9) {
+      console.warn(`qihu360 normalized aspect ratio ${aspectRatio} to ${resolved} (2K Seedream tier).`);
+    }
+  }
+  return resolved;
 }
 
 export function validateArgs(model: string, args: CliArgs): void {
@@ -77,7 +117,7 @@ export function buildGenerationsBody(
     model,
     prompt,
     extra_body: {
-      size: resolveSize(args.aspectRatio, args.size),
+      size: resolveSize(args.aspectRatio, args.size, args.quality),
       watermark: false,
       output_format: "png",
     },
@@ -86,19 +126,31 @@ export function buildGenerationsBody(
 
 function guessMimeType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".png") return "image/png";
   if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
   if (ext === ".webp") return "image/webp";
   if (ext === ".gif") return "image/gif";
   if (ext === ".bmp") return "image/bmp";
   if (ext === ".tiff" || ext === ".tif") return "image/tiff";
-  return "image/png";
+  throw new Error(
+    `Reference image ${filePath} has unsupported extension "${ext || "(none)"}". Use PNG, JPEG, WebP, GIF, BMP, or TIFF.`
+  );
 }
+
+const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024;
 
 async function referenceToDataUri(reference: string): Promise<string> {
   if (/^(https?:|data:)/i.test(reference)) return reference;
   const fullPath = path.resolve(reference);
+  const mimeType = guessMimeType(fullPath);
+  const metadata = await stat(fullPath);
+  if (metadata.size > MAX_REFERENCE_IMAGE_BYTES) {
+    throw new Error(
+      `Reference image ${fullPath} exceeds 10 MB (${metadata.size} bytes). Resize it before uploading.`
+    );
+  }
   const bytes = await readFile(fullPath);
-  return `data:${guessMimeType(fullPath)};base64,${bytes.toString("base64")}`;
+  return `data:${mimeType};base64,${bytes.toString("base64")}`;
 }
 
 export async function generateImage(
@@ -115,11 +167,8 @@ export async function generateImage(
 
   validateArgs(model, args);
   const baseUrl = getBaseUrl();
-  const extraBody: Record<string, unknown> = {
-    size: resolveSize(args.aspectRatio, args.size),
-    watermark: false,
-    output_format: "png",
-  };
+  const body = buildGenerationsBody(prompt, model, args);
+  const extraBody = body.extra_body;
   let endpoint = `${baseUrl}/v1/images/generations`;
 
   if (args.referenceImages.length > 0) {
@@ -129,7 +178,6 @@ export async function generateImage(
     endpoint = `${baseUrl}/v1/images/edits`;
   }
 
-  const body = { model, prompt, extra_body: extraBody };
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {

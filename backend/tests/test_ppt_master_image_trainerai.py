@@ -133,6 +133,35 @@ def test_generate_generations_body_contract(mod, monkeypatch, tmp_path):
     assert Path(result).read_bytes() == PNG_BYTES
 
 
+def test_generate_warns_when_image_size_is_not_2k(mod, monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("QIHU_API_KEY", "test-qihu-key")
+    valid_png = _valid_png_bytes(tmp_path)
+    encoded = base64.b64encode(valid_png).decode("ascii")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        captured["body"] = json
+        return FakeResponse({"data": [{"b64_json": encoded}]})
+
+    monkeypatch.setattr(mod.requests, "post", fake_post)
+
+    mod.generate(
+        "non-default size still uses exact tiers",
+        aspect_ratio="16:9",
+        image_size="1K",
+        output_dir=str(tmp_path),
+        filename="non-2k",
+        max_retries=0,
+    )
+
+    warning = capsys.readouterr().err
+    assert "warning" in warning.lower()
+    assert "image_size" in warning
+    assert "1K" in warning
+    assert "2K" in warning
+    assert captured["body"]["extra_body"]["size"] == "2048x1152"
+
+
 def test_generate_prefers_url_when_response_also_has_invalid_b64(mod, monkeypatch, tmp_path):
     monkeypatch.setenv("QIHU_API_KEY", "test-qihu-key")
     valid_png = _valid_png_bytes(tmp_path)
@@ -353,6 +382,23 @@ def test_reference_image_preserves_bmp_and_tiff_mime(mod, tmp_path, suffix, expe
 
     assert data_uri.startswith(f"data:{expected_mime};base64,")
     assert base64.b64decode(data_uri.split(",", 1)[1]) == b"local-reference-image"
+
+
+def test_reference_image_rejects_unknown_extension(mod, tmp_path):
+    reference = tmp_path / "reference.unknown"
+    reference.write_bytes(b"not-a-supported-reference")
+
+    with pytest.raises(ValueError, match="extension|supported"):
+        mod._reference_to_data_uri(str(reference))
+
+
+def test_reference_image_rejects_files_over_10mb_before_encoding(mod, tmp_path):
+    reference = tmp_path / "too-large.png"
+    with reference.open("wb") as stream:
+        stream.truncate(10 * 1024 * 1024 + 1)
+
+    with pytest.raises(ValueError, match="10 MB"):
+        mod._reference_to_data_uri(str(reference))
 
 
 def test_generate_requires_qihu_key(mod, monkeypatch, tmp_path):

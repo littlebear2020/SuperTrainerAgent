@@ -662,9 +662,18 @@ function inferProviderFromModel(model: string | null): Provider | null {
   if (/^bytedance\/.*seedream/i.test(normalized)) return "qihu360";
   if (normalized.includes("seedream") || normalized.includes("seededit")) return "seedream";
   if (normalized === "glm-image" || normalized === "cogview-4-250304") return "zai";
+  // 360 仅收敛 Seedream；gpt-image 不再路由到 360，始终按 OpenAI 模型处理。
   if (normalized.toLowerCase().includes("gpt-image")) return "openai";
   if (normalized.includes("gemini") || normalized.startsWith("google/")) return "qihu360";
   return null;
+}
+
+function assertQihuModelCompatibility(model: string | null): void {
+  if (model && !model.toLowerCase().includes("seedream")) {
+    throw new Error(
+      `qihu360 supports only Seedream models; received ${model}. Gemini/google and other non-Seedream models are incompatible.`
+    );
+  }
 }
 
 export function detectProvider(args: CliArgs): Provider {
@@ -681,7 +690,10 @@ export function detectProvider(args: CliArgs): Provider {
     );
   }
 
-  if (args.provider) return args.provider;
+  if (args.provider) {
+    if (args.provider === "qihu360") assertQihuModelCompatibility(args.model);
+    return args.provider;
+  }
 
   const hasAzure = !!(process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_BASE_URL);
   const hasOpenai = !!process.env.OPENAI_API_KEY;
@@ -712,6 +724,7 @@ export function detectProvider(args: CliArgs): Provider {
   }
 
   if (modelProvider === "qihu360") {
+    assertQihuModelCompatibility(args.model);
     if (!hasQihu360) {
       throw new Error("Model looks like a 360 image model, but QIHU_API_KEY is not set.");
     }
@@ -1059,8 +1072,8 @@ async function generatePreparedTask(
     model: task.model,
     outputPath: task.outputPath,
     success: false,
-    attempts: MAX_ATTEMPTS,
-    error: `${task.provider} generation failed after ${MAX_ATTEMPTS} attempts`,
+    attempts,
+    error: `${task.provider} generation failed after ${attempts} attempts`,
   };
 }
 

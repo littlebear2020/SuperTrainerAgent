@@ -215,6 +215,8 @@ def _handle_sse_event(
     data_str: str,
     audio_chunks: list[bytes],
 ) -> bool:
+    if not data_str.strip() or data_str == "[DONE]":
+        return False
     try:
         event = json.loads(data_str)
     except json.JSONDecodeError as exc:
@@ -230,8 +232,9 @@ def _handle_sse_event(
         if code != 0:
             raise RuntimeError(f"doubao TTS error (code={code}): {message}")
         audio_b64 = event.get("data", "")
-        if audio_b64:
-            audio_chunks.append(base64.b64decode(audio_b64, validate=True))
+        normalized_audio_b64 = "".join(audio_b64.split())
+        if normalized_audio_b64:
+            audio_chunks.append(base64.b64decode(normalized_audio_b64, validate=True))
     elif event_type == "152":
         if str(code) != "20000000":
             raise RuntimeError(f"doubao TTS session error (code={code}): {message}")

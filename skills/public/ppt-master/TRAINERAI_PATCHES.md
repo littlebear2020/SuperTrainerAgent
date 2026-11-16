@@ -47,6 +47,7 @@
 | P25 | scripts/image_backends/backend_qihu360.py（新增）+ scripts/image_gen.py | 注册 `IMAGE_BACKEND=qihu360`（360 Seedream `bytedance/doubao-seedream-5.0-pro`）：generations/edits 双端点、`extra_body.size` 三档、`extra_body.image` 参考图、`SUPPORTS_REFERENCE_IMAGE=True`；`QIHU_` 加进 env 前缀 | 2026-11-16：PPT 默认配图走 360 Seedream，参考图能力可用 |
 | P26 | scripts/image_backends/backend_trainerai.py + SKILL.md 覆盖段第 1/2 条 | 选择策略收敛为 QIHU→qihu360；覆盖段改字节 TTS 与 360 Seedream | 2026-11-16：与 P24/P25 对齐文档与自动选择 |
 | P27 | scripts/image_gen.py + scripts/image_backends/backend_qihu360.py + scripts/tts_backends/backend_trainerai.py + scripts/notes_to_audio.py + SKILL.md + workflows/stages/generate-audio.md + backend/seed/agents/ppt-master/SOUL.md | 无显式 backend 时 QIHU 自动选 qihu360；360 `extra_body.output_format=png` + BMP/TIFF MIME + 响应 URL 优先、下载失败回退 b64（b64-only 兼容）；TTS 仅成功 152 接受、`additions.enable_language_detector=true`（不传 `explicit_language`）、按句分片 ffmpeg 合成并原子发布；CLI/SKILL 命令补 project_path | 2026-11-16：评审修复默认路由、流式 fail-closed 与长 notes 产物完整性 |
+| P28 | scripts/tts_backends/backend_trainerai.py + scripts/image_backends/backend_qihu360.py | SSE 仅忽略空 data/`[DONE]`，其他坏 JSON/截断帧仍 fail-closed；base64 去空白后仍 validate=True；非 2K image_size 明确 warning；未知参考图扩展报错，本地参考图 >10MB 提前拒绝 | 2026-11-16：PR #11 评审边界修复，防静默丢音频与参考图误标 |
 
 **硬钉测试**：`backend/tests/test_ppt_master_skill_vendored.py`——attribution_guard 冒烟
 （vendored 补丁后必须 exit 0）+ P1 覆盖段 P11/P12/P13 marker 断言。P12/P13 为文档级

@@ -60,6 +60,7 @@ from image_backends.backend_common import (
 DEFAULT_BASE_URL = "https://api.360.cn"
 DEFAULT_MODEL = "bytedance/doubao-seedream-5.0-pro"
 SUPPORTED_MODELS = {DEFAULT_MODEL}
+MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
 
 # 360/Seedream 精确三档（16:9 / 1:1 / 9:16 的 2K 档）。
 _SIZE_TIERS: tuple[tuple[int, int], ...] = ((2048, 1152), (2048, 2048), (1152, 2048))
@@ -111,13 +112,25 @@ def _resolve_url(base_url: str, *, reference_image: str | None) -> str:
 
 
 def _reference_to_data_uri(reference_image: str) -> str:
-    """Pass URLs/data URIs through; convert a local image to a base64 data URI."""
+    """Pass URLs/data URIs through; convert a supported local image up to 10 MB."""
     if reference_image.startswith(("http://", "https://", "data:")):
         return reference_image
     path = Path(reference_image)
     if not path.is_file():
         raise FileNotFoundError(f"Reference image not found: {reference_image}")
-    mime = _LOCAL_REF_MIME.get(path.suffix.lower(), "image/png")
+    mime = _LOCAL_REF_MIME.get(path.suffix.lower())
+    if mime is None:
+        supported = ", ".join(sorted(_LOCAL_REF_MIME))
+        raise ValueError(
+            f"Unsupported reference image extension '{path.suffix}'. "
+            f"Supported extensions: {supported}"
+        )
+    size_bytes = path.stat().st_size
+    if size_bytes > MAX_REFERENCE_IMAGE_BYTES:
+        raise ValueError(
+            f"Reference image exceeds the 10 MB limit ({size_bytes} bytes): "
+            f"{reference_image}"
+        )
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
 
@@ -136,6 +149,12 @@ def _generate_image(
     """Generate/edit one image with the 360 Seedream gateway."""
     model = _validate_model(model)
     size = _resolve_size(aspect_ratio)
+    if str(image_size).strip().upper() != "2K":
+        print(
+            f"Warning: qihu360 image_size={image_size!r} is not 2K; "
+            f"using the fixed 2K tier {size} for aspect_ratio={aspect_ratio}.",
+            file=sys.stderr,
+        )
     extra_body: dict = {
         "size": size,
         "watermark": False,
