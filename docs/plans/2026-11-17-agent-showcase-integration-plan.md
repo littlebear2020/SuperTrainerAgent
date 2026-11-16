@@ -373,11 +373,11 @@ type ShowcaseCase = VideoCase | VisualCase | DeckCase | PodcastCase;
 
 ### T2 course-video 垂直切片
 
-- [ ] 新增通用 `ShowcaseHero`、composer CSS module 和 `AgentShowcase` 布局；本切片只接 video card/dialog，其他类型在后续任务扩展。
-- [ ] 在 `AgentNewChatGuide` 接入条件结构：showcase = hero → 输入框 → showcase → tips；非 showcase 保持 header → cases → 输入框 → tips。loading/error 继续显示现有状态卡，不渲染假案例。
-- [ ] 复用 `selectCase`、草稿确认和禁用条件；保留 `agent-guide-cases` testid，media button 与 prompt button 分离。
-- [ ] 完成 video Dialog 的打开、关闭暂停/卸载和焦点返回；composer 只改 scoped width/radius，不动全局 InputBox。
-- [ ] 更新 guide DOM 的 course-video/co-writer/shared 断言；新建 `agent-showcase.dom.test.tsx` 覆盖 video Dialog/prompt；在现有 E2E 文件加入 course-video 代表路径、composer computed radius/宽度和弹层不裁切断言。
+- [x] 新增通用 `ShowcaseHero`、composer CSS module 和 `AgentShowcase` 布局；本切片只接 video card/dialog，其他类型在后续任务扩展。
+- [x] 在 `AgentNewChatGuide` 接入条件结构：showcase = hero → 输入框 → showcase → tips；非 showcase 保持 header → cases → 输入框 → tips。loading/error 继续显示现有状态卡，不渲染假案例。
+- [x] 复用 `selectCase`、草稿确认和禁用条件；保留 `agent-guide-cases` testid，media button 与 prompt button 分离。
+- [x] 完成 video Dialog 的打开、关闭暂停/卸载和焦点返回；composer 只改 scoped width/radius，不动全局 InputBox。
+- [x] 更新 guide DOM 的 course-video/co-writer/shared 断言；新建 `agent-showcase.dom.test.tsx` 覆盖 video Dialog/prompt；在现有 E2E 文件加入 course-video 代表路径、composer computed radius/宽度和弹层不裁切断言。
 
 **定向验证**：证明首个切片端到端可用，不跑其他浏览器套件。
 
