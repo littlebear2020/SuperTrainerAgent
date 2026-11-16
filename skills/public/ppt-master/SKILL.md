@@ -16,18 +16,25 @@ metadata:
   sponsors:
     - "SPONSORS.md"
     - "SPONSORS_CN.md"
+required-secrets:
+  - name: VOLCENGINE_VOICE_ACCESS_KEY
+  - name: QIHU_API_KEY
 ---
 
 > ## ⚠️ TrainerAI 覆盖（优先级高于下方上游内容）
 >
 > TrainerAI 宿主环境约束——与任何 route/profile/stage/reference 文档冲突时，以本节为准：
 >
-> 1. **配音（override，P2/P8）**：旁白 TTS 统一走 Voice Twin（360 预置音色），
->    `python3 ${SKILL_DIR}/scripts/notes_to_audio.py --provider trainerai --voice-id 146`
->    （或 `preset:146`）；**禁止 edge-tts**。需要 `QIHU_API_KEY`（或 `ZYUN_API_KEY`）。
-> 2. **生图（override，P3）**：AI 配图复用 TrainerAI provider，**不用上游 .env**。首选
->    `IMAGE_BACKEND=volcengine`（Seedream/Ark，读 `ARK_API_KEY`）；备选 `qwen`
->    （`DASHSCOPE_API_KEY`）/ `zhipu`（`ZHIPU_API_KEY`）。不确定时运行
+> 1. **配音（override，P2/P8）**：旁白 TTS 统一走字节 `seed-tts-2.0`（openSpeech SSE），
+>    默认音色 `zh_male_m191_uranus_bigtts`（云舟 2.0 男声），输出 MP3：
+>    `python3 ${SKILL_DIR}/scripts/notes_to_audio.py <project_path> --provider trainerai`
+>    （需换音色时显式加 `--voice-id <speaker>`）；自动识别语种，长 notes 按句分片，
+>    全部成功后由 ffmpeg 合成一个 MP3，任一片或合成失败均不发布；**禁止 edge-tts**，
+>    也不回退旧 360 `stream_speech`。需要 `VOLCENGINE_VOICE_ACCESS_KEY`，多分片时需要 ffmpeg。
+> 2. **生图（override，P3）**：AI 配图统一走 360 Seedream（`IMAGE_BACKEND=qihu360`，
+>    默认模型 `bytedance/doubao-seedream-5.0-pro`，读 `QIHU_API_KEY`），**不用上游
+>    .env**；无 `IMAGE_BACKEND` 且无 `--backend` 时，有 `QIHU_API_KEY` 即真正默认 qihu360；
+>    请求显式 `extra_body.output_format=png`，支持 `--reference-image`（`extra_body.image` + `/v1/images/edits`）。不确定时运行
 >    `python3 ${SKILL_DIR}/scripts/image_backends/backend_trainerai.py` 打印自动选择结果。
 >    `IMAGE_BACKEND=auto` 的降级终点为 `manual`（提示用户手动上传图片），**不走
 >    host-native**（TrainerAI 宿主无该形态）。

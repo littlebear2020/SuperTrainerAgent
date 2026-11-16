@@ -6,15 +6,17 @@ description: Shared post-processing stage for narration audio, PPTX embedding, P
 
 > ## ⚠️ TrainerAI Provider Override（P9，优先级高于本文件上游内容）
 >
-> - **默认 provider = `trainerai`**（TrainerAI 托管 360 配音）：
->   `python3 ${SKILL_DIR}/scripts/notes_to_audio.py <project_path> --provider trainerai --voice-id 146`。
->   上游"Default to **edge**"及 edge 推荐值规则在 TrainerAI 环境**作废**——
->   edge-tts 禁用（国内服务器不可达 speech.platform.bing.com），勿安装勿调用。
-> - **音色推荐（trainerai 预设）**：默认 `146` 知岚（女声）；男声 `142` 知轩 /
->   `284` 知远；另一位女声 `158` 知悦。候选清单走
->   `--provider trainerai --list-voices`（四预设），不用上游 edge 的 `COMMON_VOICES`。
-> - **trainerai 输出 WAV**（PowerPoint 原生可靠），无逐字时间戳——本阶段
->   "provider-timed SRT" 能力对 trainerai 不适用：页面级 SRT 需求出现时，
+> - **默认 provider = `trainerai`**（字节 `seed-tts-2.0`，openSpeech SSE）：
+>   `python3 ${SKILL_DIR}/scripts/notes_to_audio.py <project_path> --provider trainerai`。
+>   未传 `--voice-id` 时使用默认 speaker `zh_male_m191_uranus_bigtts`（云舟 2.0 男声）；
+>   需要换音色时显式加 `--voice-id <speaker>`。上游"Default to **edge**"及 edge
+>   推荐值规则在 TrainerAI 环境**作废**——edge-tts 禁用（国内服务器不可达
+>   speech.platform.bing.com），勿安装勿调用。
+> - **音色清单**：`--provider trainerai --list-voices` 只展示上述固定默认音色
+>   （旧 360 预置四音色已随 Voice Twin 通道一起移除），不用上游 edge 的 `COMMON_VOICES`。
+> - **trainerai 输出 MP3**，自动识别语种；长 notes 按句分片请求，全部成功后由 ffmpeg
+>   重编码合成为一个页面 MP3，任一片或合成失败均不替换已有音频。无逐字时间戳——
+>   本阶段"provider-timed SRT"能力对 trainerai 不适用：页面级 SRT 需求出现时，
 >   如实声明"trainerai 仅音频"，不虚构字幕时轴（与上游 Qwen audio-only 同口径）。
 > - 云端高级/克隆音色（elevenlabs/minimax/qwen/cosyvoice）仅在用户明确要求时使用；
 >   一次性五项确认交互（mode/voice/rate/embed/video）与上游一致，走 chat。

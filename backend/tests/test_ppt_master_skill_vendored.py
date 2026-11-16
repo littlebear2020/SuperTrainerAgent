@@ -31,6 +31,29 @@ def test_core_scripts_referenced_by_soul_exist():
         assert (SKILL_DIR / rel).exists(), f"{rel} 缺失"
 
 
+def test_frontmatter_declares_the_two_allowed_required_secrets():
+    """2026-11-16：frontmatter 只声明沙箱允许自动注入的两个宿主键。"""
+    import yaml
+
+    text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    frontmatter = text.split("---", 2)[1]
+    metadata = yaml.safe_load(frontmatter)
+    assert [item["name"] for item in metadata["required-secrets"]] == [
+        "VOLCENGINE_VOICE_ACCESS_KEY",
+        "QIHU_API_KEY",
+    ]
+
+
+def test_loader_exposes_the_two_declared_secrets():
+    from deerflow.skills.loader import load_skills
+
+    skills = {s.name: s for s in load_skills()}
+    assert {req.name for req in skills["ppt-master"].required_secrets} == {
+        "VOLCENGINE_VOICE_ACCESS_KEY",
+        "QIHU_API_KEY",
+    }
+
+
 def test_skill_discovered_and_enabled_by_loader():
     from deerflow.skills.loader import load_skills
 

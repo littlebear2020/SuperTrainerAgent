@@ -3,24 +3,26 @@
 
 This script uses provider backends for the same per-slide output contract on
 macOS, Linux, and Windows. TrainerAI patch (P8): the default provider is
-`trainerai` (Voice Twin 360 preset voices); `edge-tts` is forbidden in the
-TrainerAI sandbox. Upstream default was `edge-tts`.
+`trainerai` (ByteDance seed-tts-2.0 via openSpeech SSE, automatic language detection);
+`edge-tts` is forbidden in the TrainerAI sandbox. Long notes are split by
+sentence and merged into MP3 with ffmpeg only after every chunk succeeds.
+Upstream default was `edge-tts`.
 also writes one compact, word-timed SRT file per slide from the same TTS stream.
 MiniMax and CosyVoice request word timings; ElevenLabs requests character
 alignment. All four apply the same compact, text-faithful cue regrouping.
 Qwen remains audio-only because its current TTS API exposes no timestamps.
 
 Usage:
-    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --voice zh-CN-XiaoxiaoNeural
+    python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider trainerai
     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider elevenlabs --voice-id <voice_id>
     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider minimax --voice-id <voice_id>
     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider qwen --voice-id <voice>
     python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider cosyvoice --voice-id <voice>
-    python3 skills/ppt-master/scripts/notes_to_audio.py --list-common-voices
-    python3 skills/ppt-master/scripts/notes_to_audio.py --list-voices --locale zh-CN
+    python3 skills/ppt-master/scripts/notes_to_audio.py --provider trainerai --list-voices
 
 Dependencies:
-    python3 -m pip install edge-tts
+    VOLCENGINE_VOICE_ACCESS_KEY=<key> for --provider trainerai
+    ffmpeg on PATH for multi-chunk trainerai narration
     ELEVENLABS_API_KEY=<key> for --provider elevenlabs
     MINIMAX_API_KEY=<key> for --provider minimax
     QWEN_API_KEY or DASHSCOPE_API_KEY=<key> for --provider qwen
@@ -54,7 +56,7 @@ from tts_backends import (
     backend_elevenlabs,
     backend_minimax,
     backend_qwen,
-    backend_trainerai,  # TrainerAI patch P8: Voice Twin (360 preset), no edge-tts
+    backend_trainerai,  # TrainerAI patch P8: ByteDance seed-tts-2.0, no edge-tts
 )
 from tts_backends.backend_common import temporary_path
 
@@ -93,8 +95,7 @@ def _load_tts_env_file() -> None:
         "QWEN_",
         "DASHSCOPE_",
         "COSYVOICE_",
-        "QIHU_",   # TrainerAI patch P8: backend_trainerai reads QIHU_/ZYUN_ keys
-        "ZYUN_",
+        "VOLCENGINE_",  # TrainerAI patch P8: backend_trainerai reads VOLCENGINE_VOICE_ACCESS_KEY
     ))
 
 
@@ -311,8 +312,8 @@ def _provider_manifest_details(
             "custom_instructions": True if args.qwen_instructions else None,
         }
     if backend.provider == "trainerai":
-        # TrainerAI patch P8: 360 preset voice, no extra knobs.
-        return "360/tts-stream", {"preset_voice": backend.voice_id}
+        # TrainerAI patch P8: ByteDance seed-tts-2.0, fixed/open speaker.
+        return "seed-tts-2.0", {"speaker": backend.voice_id}
     return args.cosyvoice_model, {
         "volume": args.cosyvoice_volume,
         "rate": args.cosyvoice_rate,
@@ -587,9 +588,8 @@ def main() -> int:
             elif args.provider == "cosyvoice":
                 backend_cosyvoice.print_voices()
             elif args.provider == "trainerai":
-                # TrainerAI patch P8: preset voices ship in the backend module.
-                for vid, label in sorted(backend_trainerai.PRESET_VOICES.items()):
-                    print(f"{vid}	{label}")
+                # TrainerAI patch P8: 固定 seed-tts-2.0 默认音色，不列旧 360 预置表。
+                print(f"{backend_trainerai.DEFAULT_SPEAKER}	豆包 seed-tts-2.0 默认男声（云舟 2.0）")
             else:
                 asyncio.run(backend_edge.print_voices(args.locale))
         except Exception as exc:
@@ -601,6 +601,10 @@ def main() -> int:
         parser.error("project_path is required unless --list-voices or --list-common-voices is used")
 
     voice_id = args.voice_id or args.voice
+
+    if args.provider == "trainerai":
+        # TrainerAI patch P8: 未传 voice 时使用字节固定默认 speaker。
+        voice_id = voice_id or backend_trainerai.DEFAULT_SPEAKER
 
     if args.provider == "edge" and not args.voice:
         parser.error(
@@ -701,7 +705,7 @@ def main() -> int:
             voice_id=voice_id,
         )
     elif args.provider == "trainerai":
-        # TrainerAI patch P8: Voice Twin (360 preset voices); edge-tts is forbidden.
+        # TrainerAI patch P8: ByteDance seed-tts-2.0; edge-tts is forbidden.
         try:
             api_key = backend_trainerai.read_trainerai_api_key()
         except Exception as exc:
