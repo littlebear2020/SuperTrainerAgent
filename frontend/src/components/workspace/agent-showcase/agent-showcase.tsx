@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type {
   DeckCase,
@@ -46,6 +46,7 @@ export function AgentShowcase({
     VisualCase["category"] | "all"
   >("all");
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleCases = agent.cases.filter(
     (item) =>
       item.kind !== "visual" ||
@@ -55,6 +56,8 @@ export function AgentShowcase({
   const podcastCases = agent.cases.filter(
     (item): item is PodcastCase => item.kind === "podcast",
   );
+  const hasVisualCases = agent.cases.some((item) => item.kind === "visual");
+  const hasPodcastCases = podcastCases.length > 0;
   const visualFilters = [
     ["all", t.agents.showcase.filterAll],
     ["poster", t.agents.showcase.filterPoster],
@@ -64,12 +67,24 @@ export function AgentShowcase({
     ["diagram", t.agents.showcase.filterDiagram],
   ] as const;
 
+  useEffect(() => {
+    return () => {
+      if (focusTimeoutRef.current !== null) {
+        clearTimeout(focusTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const closeDialog = () => {
+    if (focusTimeoutRef.current !== null) {
+      clearTimeout(focusTimeoutRef.current);
+    }
+    const trigger = triggerRef.current;
     setActiveVideo(null);
     setActiveDeck(null);
     setActiveVisual(null);
     setActivePodcast(null);
-    setTimeout(() => triggerRef.current?.focus(), 0);
+    focusTimeoutRef.current = setTimeout(() => trigger?.focus(), 0);
   };
 
   return (
@@ -125,7 +140,7 @@ export function AgentShowcase({
           <p className="text-muted-foreground sr-only">
             {t.agents.showcase.casesDescription}
           </p>
-          {agent.id === "creative-studio" ? (
+          {hasVisualCases ? (
             <div
               className="mb-4 flex gap-2 overflow-x-auto pb-1"
               aria-label={t.agents.showcase.casesTitle}
@@ -147,7 +162,7 @@ export function AgentShowcase({
               </span>
             </div>
           ) : null}
-          {agent.id === "podcast-studio" ? (
+          {hasPodcastCases ? (
             <ShowcaseAudioPlayer
               items={podcastCases}
               locale={language}
@@ -159,13 +174,11 @@ export function AgentShowcase({
               }}
             />
           ) : null}
-          {agent.id !== "podcast-studio" ? (
+          {!hasPodcastCases ? (
             <div
               data-testid="agent-guide-cases"
               data-showcase
-              className={showcaseCardClass(
-                agent.id === "creative-studio" ? "three" : "two",
-              )}
+              className={showcaseCardClass(hasVisualCases ? "three" : "two")}
             >
               {visibleCases.map((item, index) => {
                 if (item.kind === "video") {

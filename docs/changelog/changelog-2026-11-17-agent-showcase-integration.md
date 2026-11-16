@@ -9,7 +9,7 @@
 - 保留播客四种 `[模式: …]`、PPT Quick/Default/Edit Native、视觉两种模式与课程 `auto-video-flow`/真实素材/确认边界。
 - 四个 showcase Agent 使用人物 + 小标签 + 两行大标题替换旧 header；co-writer 保留原 header、4 个简单卡和旧顺序。
 - 真实 `InputBox` 仅增加 scoped `max-w-5xl`、28/24px 圆角，未覆盖玻璃背景、边框、阴影或全局样式，弹层保持可溢出。
-- 视频支持真实播放、关闭暂停/卸载与焦点返回；PPT 支持 7 页缩略图、翻页边界、切换重置和 PPTX 下载；视觉支持五类筛选、大图、JPG/SVG 下载；播客支持单音频互斥、进度、过期 Promise 防护、播放失败/ended/error/卸载清理、文稿和来源安全链接。
+- 视频支持真实播放、关闭暂停/卸载与焦点返回；PPT 支持 7 页缩略图、翻页边界、切换重置和 PPTX 下载；视觉支持五类筛选、大图、JPG/SVG 下载；播客支持单音频互斥、进度、过期 Promise/过期媒体事件防护、播放失败/ended/error/卸载清理、文稿和来源安全链接；外部报道统一使用 HTTPS 原文。
 - 草稿取消/追加/替换、显式提交、URL/sessionStorage handoff、旧别名、retry、loading/error、已有会话和 co-writer 英文 prompt 均保留相关回归。
 
 ## 素材与压缩口径
@@ -23,7 +23,7 @@
 ## 验收记录
 
 - `make -C frontend check` → ESLint 0 errors（121 个既有 warnings）、TypeScript 通过、Prettier 通过、knip 通过、`i18n key 存活检测通过：632 个叶子全活。`
-- `pnpm exec vitest run tests/unit/core/agents/showcase.test.ts tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx tests/unit/components/workspace/agent-showcase.dom.test.tsx` → `Test Files 3 passed (3)`，`Tests 27 passed (27)`。
+- `pnpm exec vitest run tests/unit/core/agents/showcase.test.ts tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx tests/unit/components/workspace/agent-showcase.dom.test.tsx` → `Test Files 3 passed (3)`，`Tests 29 passed (29)`。
 - `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts` → `27 passed (19.3s)`。
 - `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts --grep "course-video showcase"` → `1 passed`；模型弹层、技能列表按既有 `showNewThreadSuggestions=false` 不渲染、真实附件选择与预览均通过，composer 不裁切。
 - `pnpm build` → 生产构建成功，用于最终行为验收。

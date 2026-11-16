@@ -35,6 +35,7 @@ describe("AgentShowcase", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -338,6 +339,51 @@ describe("AgentShowcase", () => {
       root.render(<></>);
     });
     expect(pause).toHaveBeenCalled();
+  });
+
+  it("cancels a pending dialog focus return when the showcase unmounts", async () => {
+    vi.useFakeTimers();
+    await renderShowcase();
+    const trigger = element("showcase-open-video-hallucination");
+    trigger.focus();
+    await act(async () => {
+      trigger.click();
+    });
+    const close = document.querySelector<HTMLElement>(
+      "[data-testid='showcase-dialog-close']",
+    );
+    if (!close) throw new Error("dialog close not found");
+    const focus = vi.spyOn(trigger, "focus");
+
+    await act(async () => {
+      close.click();
+    });
+    await act(async () => {
+      root.render(<></>);
+    });
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late media error after the user pauses playback", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    mockPause();
+    await renderShowcase("podcast-studio");
+
+    await click(element("showcase-play-podcast-context"));
+    await click(element("showcase-play-podcast-context"));
+    const audio = document.querySelector<HTMLAudioElement>("audio");
+    await act(async () => {
+      audio?.dispatchEvent(new Event("error"));
+    });
+
+    expect(container.textContent).not.toContain("音频暂时无法播放，请重试。");
+    expect(
+      element("showcase-play-podcast-context").getAttribute("aria-label"),
+    ).toContain("播放");
   });
 
   it("opens transcripts with safe source links and keeps media enabled when prompts are disabled", async () => {

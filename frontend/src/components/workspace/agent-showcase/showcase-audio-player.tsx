@@ -53,7 +53,9 @@ export function ShowcaseAudioPlayer({
       (playingId === item.id || loadingId === item.id)
     ) {
       requestRef.current += 1;
+      activeIdRef.current = null;
       audio.pause();
+      setActiveId(null);
       setPlayingId(null);
       setLoadingId(null);
       setCurrentTime(0);
@@ -95,19 +97,31 @@ export function ShowcaseAudioPlayer({
           setCurrentTime(event.currentTarget.currentTime)
         }
         onEnded={() => {
-          requestRef.current += 1;
-          setPlayingId(null);
-          setLoadingId(null);
-          setCurrentTime(0);
+          const id = activeIdRef.current;
+          const request = requestRef.current;
+          if (!id) return;
+          queueMicrotask(() => {
+            if (activeIdRef.current !== id || requestRef.current !== request)
+              return;
+            requestRef.current += 1;
+            setPlayingId(null);
+            setLoadingId(null);
+            setCurrentTime(0);
+          });
         }}
         onError={() => {
           const id = activeIdRef.current;
+          const request = requestRef.current;
           if (!id) return;
-          requestRef.current += 1;
-          setPlayingId(null);
-          setLoadingId(null);
-          setErrorId(id);
-          setCurrentTime(0);
+          queueMicrotask(() => {
+            if (activeIdRef.current !== id || requestRef.current !== request)
+              return;
+            requestRef.current += 1;
+            setPlayingId(null);
+            setLoadingId(null);
+            setErrorId(id);
+            setCurrentTime(0);
+          });
         }}
       />
       <div
