@@ -448,7 +448,8 @@ export const enUS: Translations = {
     showcase: {
       howItWorks: "HOW IT WORKS",
       casesTitle: "Real examples",
-      casesDescription: "Open real outputs or fill a matching prompt and keep editing.",
+      casesDescription:
+        "Open real outputs or fill a matching prompt and keep editing.",
       caseUnit: "verifiable examples",
       itemUnit: "items",
       usePrompt: "Use this prompt",
@@ -459,7 +460,6 @@ export const enUS: Translations = {
       transcript: "View transcript",
       sources: "Sources",
       close: "Close",
-      download: "Download",
       downloadOriginal: "Download original",
       downloadSvg: "Download SVG",
       downloadPptx: "Download PPTX",

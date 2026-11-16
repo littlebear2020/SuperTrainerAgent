@@ -35,7 +35,11 @@ function caseAssets(item: ShowcaseCase): string[] {
     case "video":
       return [item.poster, item.video];
     case "visual":
-      return [item.preview, item.original, ...(item.vector ? [item.vector] : [])];
+      return [
+        item.preview,
+        item.original,
+        ...(item.vector ? [item.vector] : []),
+      ];
     case "deck":
       return [...item.slides, item.pptx];
     case "podcast":
@@ -119,7 +123,9 @@ describe("Agent showcase data and assets", () => {
 
     expect([...references].sort()).toEqual(actual);
     expect(references.size).toBe(58);
-    expect(actual.filter((path) => path.startsWith("/agent-showcase/hero/"))).toHaveLength(4);
+    expect(
+      actual.filter((path) => path.startsWith("/agent-showcase/hero/")),
+    ).toHaveLength(4);
     expect(actual.filter((path) => path.endsWith(".mp3"))).toHaveLength(4);
     expect(
       actual.filter((path) =>
@@ -127,9 +133,7 @@ describe("Agent showcase data and assets", () => {
       ),
     ).toHaveLength(10);
     expect(
-      actual.filter((path) =>
-        path.startsWith("/agent-showcase/ppt/previews/"),
-      ),
+      actual.filter((path) => path.startsWith("/agent-showcase/ppt/previews/")),
     ).toHaveLength(21);
 
     let totalBytes = 0;

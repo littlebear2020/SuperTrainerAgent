@@ -7,7 +7,11 @@ import type { PodcastCase } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 
 import { PromptButton } from "./showcase-cards";
-import { formatDuration, localized, type ShowcaseLocale } from "./showcase-utils";
+import {
+  formatDuration,
+  localized,
+  type ShowcaseLocale,
+} from "./showcase-utils";
 
 export function ShowcaseAudioPlayer({
   items,
@@ -87,7 +91,9 @@ export function ShowcaseAudioPlayer({
       <audio
         ref={audioRef}
         preload="none"
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) =>
+          setCurrentTime(event.currentTarget.currentTime)
+        }
         onEnded={() => {
           requestRef.current += 1;
           setPlayingId(null);
@@ -129,7 +135,9 @@ export function ShowcaseAudioPlayer({
                 </span>
               </div>
               <div>
-                <h3 className="text-foreground text-sm leading-6 font-semibold">{title}</h3>
+                <h3 className="text-foreground text-sm leading-6 font-semibold">
+                  {title}
+                </h3>
                 <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-5">
                   {localized(item.description, locale)}
                 </p>
@@ -143,9 +151,17 @@ export function ShowcaseAudioPlayer({
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-white shadow-sm transition hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
                 >
                   {isPlaying ? (
-                    <Pause className="h-4 w-4" fill="currentColor" aria-hidden="true" />
+                    <Pause
+                      className="h-4 w-4"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <Play className="ml-0.5 h-4 w-4" fill="currentColor" aria-hidden="true" />
+                    <Play
+                      className="ml-0.5 h-4 w-4"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    />
                   )}
                 </button>
                 <div className="min-w-0 flex-1">
@@ -164,14 +180,20 @@ export function ShowcaseAudioPlayer({
               </div>
               <div className="flex flex-wrap gap-2">
                 {item.voices.map((voice) => (
-                  <span key={voice.en} className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-1 text-[10px] text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200">
+                  <span
+                    key={voice.en}
+                    className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-1 text-[10px] text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200"
+                  >
                     <AudioLines className="h-3 w-3" aria-hidden="true" />
                     {localized(voice, locale)}
                   </span>
                 ))}
               </div>
               {errorId === item.id ? (
-                <p role="status" className="text-xs text-rose-600 dark:text-rose-300">
+                <p
+                  role="status"
+                  className="text-xs text-rose-600 dark:text-rose-300"
+                >
                   {t.agents.showcase.playbackError}
                 </p>
               ) : null}

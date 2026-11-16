@@ -4,8 +4,6 @@ import { useState, type ReactNode } from "react";
 
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
-import { AgentShowcase } from "@/components/workspace/agent-showcase/agent-showcase";
-import { ShowcaseHero } from "@/components/workspace/agent-showcase/showcase-hero";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AgentShowcase } from "@/components/workspace/agent-showcase/agent-showcase";
+import { ShowcaseHero } from "@/components/workspace/agent-showcase/showcase-hero";
 import { agentAppearance } from "@/core/agents/appearance";
 import type { AgentNewChatGuideId } from "@/core/agents/new-chat";
 import { showcaseFor } from "@/core/agents/showcase";
