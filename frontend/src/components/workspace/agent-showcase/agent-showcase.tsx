@@ -59,14 +59,24 @@ export function AgentShowcase({
   const hasVisualCases = agent.cases.some((item) => item.kind === "visual");
   const hasPodcastCases = podcastCases.length > 0;
   const gridCases = visibleCases.filter((item) => item.kind !== "podcast");
-  const visualFilters = [
-    ["all", t.agents.showcase.filterAll],
-    ["poster", t.agents.showcase.filterPoster],
-    ["card", t.agents.showcase.filterCard],
-    ["comic", t.agents.showcase.filterComic],
-    ["infographic", t.agents.showcase.filterInfographic],
-    ["diagram", t.agents.showcase.filterDiagram],
-  ] as const;
+  const filterLabels: Record<VisualCase["category"] | "all", string> = {
+    all: t.agents.showcase.filterAll,
+    poster: t.agents.showcase.filterPoster,
+    card: t.agents.showcase.filterCard,
+    comic: t.agents.showcase.filterComic,
+    infographic: t.agents.showcase.filterInfographic,
+    diagram: t.agents.showcase.filterDiagram,
+  };
+  const availableCategories = new Set(
+    agent.cases
+      .filter((item): item is VisualCase => item.kind === "visual")
+      .map((item) => item.category),
+  );
+  const visualFilters = (
+    ["all", "poster", "card", "comic", "infographic", "diagram"] as const
+  )
+    .filter((value) => value === "all" || availableCategories.has(value))
+    .map((value) => [value, filterLabels[value]] as const);
 
   useEffect(() => {
     return () => {

@@ -341,6 +341,35 @@ describe("AgentShowcase", () => {
     expect(pause).toHaveBeenCalled();
   });
 
+  it("derives visual filters from the categories actually present", async () => {
+    const creativeAgent = showcaseFor("creative-studio")!;
+    const cardCase = creativeAgent.cases.find(
+      (item) => item.kind === "visual" && item.category === "card",
+    );
+    if (!cardCase) throw new Error("card case not found");
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN">
+          <AgentShowcase
+            agent={{ ...creativeAgent, cases: [cardCase] }}
+            disabled={false}
+            onUsePrompt={onUsePrompt}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(
+      container.querySelectorAll("[data-testid^='showcase-filter-']"),
+    ).toHaveLength(2);
+    expect(element("showcase-filter-all")).not.toBeNull();
+    expect(element("showcase-filter-card")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='showcase-filter-poster']"),
+    ).toBeNull();
+    expect(container.querySelectorAll("article")).toHaveLength(1);
+  });
+
   it("renders both audio and non-audio cases for a mixed-media agent", async () => {
     const videoAgent = showcaseFor("course-video")!;
     const podcastAgent = showcaseFor("podcast-studio")!;
