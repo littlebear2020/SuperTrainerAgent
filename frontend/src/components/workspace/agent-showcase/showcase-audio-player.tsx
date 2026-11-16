@@ -45,7 +45,7 @@ export function ShowcaseAudioPlayer({
     };
   }, []);
 
-  const toggle = (item: PodcastCase) => {
+  const toggle = async (item: PodcastCase) => {
     const audio = audioRef.current;
     if (!audio) return;
     if (
@@ -73,19 +73,17 @@ export function ShowcaseAudioPlayer({
     audio.src = item.audio;
     const isCurrent = () =>
       requestRef.current === request && activeIdRef.current === item.id;
-    void Promise.resolve(audio.play()).then(
-      () => {
-        if (!isCurrent()) return;
-        setPlayingId(item.id);
-        setLoadingId(null);
-      },
-      () => {
-        if (!isCurrent()) return;
-        setPlayingId(null);
-        setLoadingId(null);
-        setErrorId(item.id);
-      },
-    );
+    try {
+      await audio.play();
+      if (!isCurrent()) return;
+      setPlayingId(item.id);
+      setLoadingId(null);
+    } catch {
+      if (!isCurrent()) return;
+      setPlayingId(null);
+      setLoadingId(null);
+      setErrorId(item.id);
+    }
   };
 
   return (
@@ -161,7 +159,7 @@ export function ShowcaseAudioPlayer({
                   type="button"
                   data-testid={`showcase-play-${item.id}`}
                   aria-label={`${isPlaying ? t.agents.showcase.pause : t.agents.showcase.play} ${title}`}
-                  onClick={() => toggle(item)}
+                  onClick={() => void toggle(item)}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-white shadow-sm transition hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
                 >
                   {isPlaying ? (
