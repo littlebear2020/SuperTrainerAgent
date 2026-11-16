@@ -1,22 +1,39 @@
 """required-secrets 注入链装配端（评审二轮修复 H1，2026-09-30）。
 
 上游链路：skill_activation_middleware（未移植）→ ``__active_skill_secrets`` →
-bash 工具 env 注入。fork 简化装配：``_resolve_injected_secrets`` 读两源——
-① run context 的 ``__active_skill_secrets`` / ``secrets``（上游原生，P2/P3
-middleware 接通后生效）；② ``DEER_FLOW_SKILL_SECRET_AUTOBIND=1`` 时从网关进程
-env 按启用技能声明并集代填（部署侧显式开启的受控通道）。
+bash 工具 env 注入。``_resolve_injected_secrets`` 先读 run context 的
+``__active_skill_secrets`` / ``secrets``，再按 available_skills 走双键受限
+宿主注入；没有 available_skills 时才保留 ``DEER_FLOW_SKILL_SECRET_AUTOBIND=1``
+的启用技能声明并集 legacy 通道。
 """
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 import deerflow.sandbox.tools as tools
 from deerflow.sandbox.tools import _resolve_injected_secrets, mask_secret_values_in_output
+from deerflow.skills.types import SecretRequirement
 
 
-def _runtime_with_context(ctx: dict | None) -> SimpleNamespace:
-    return SimpleNamespace(context=ctx, state=None)
+def _runtime_with_context(ctx: dict | None, config: dict | None = None) -> SimpleNamespace:
+    return SimpleNamespace(context=ctx, state=None, config=config)
+
+
+def _runtime_with_skills(skill_names: list[str] | None, ctx: dict | None = None) -> SimpleNamespace:
+    metadata = {} if skill_names is None else {"available_skills": skill_names}
+    return _runtime_with_context(ctx, config={"metadata": metadata})
+
+
+def _skill(name: str, declared: tuple[str, ...], *, category: str = "public", enabled: bool = True) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=name,
+        category=category,
+        enabled=enabled,
+        required_secrets=tuple(SecretRequirement(req) for req in declared),
+    )
 
 
 class TestResolveInjectedSecrets:
@@ -114,6 +131,151 @@ class TestResolveInjectedSecrets:
         tools._declared_names_cache = None
 
 
+class TestRestrictedHostSkillInjection:
+    """2026-11-16: 有 available_skills 时，只按白名单公共启用技能声明注入两个允许的宿主键。"""
+
+    @pytest.fixture(autouse=True)
+    def _clear_restricted_cache(self):
+        tools._restricted_declared_names_cache.clear()
+        yield
+        tools._restricted_declared_names_cache.clear()
+
+    @staticmethod
+    def _patch_skills(monkeypatch, skills):
+        calls: dict[str, bool] = {}
+
+        def fake_load_skills(*, enabled_only: bool = False, strict_extensions_config: bool = False):
+            calls["enabled_only"] = enabled_only
+            calls["strict_extensions_config"] = strict_extensions_config
+            return [skill for skill in skills if skill.enabled] if enabled_only else skills
+
+        monkeypatch.setattr("deerflow.skills.load_skills", fake_load_skills)
+        return calls
+
+    def test_allowlisted_public_skill_gets_only_the_two_allowed_host_keys(self, monkeypatch):
+        skills = [
+            _skill(
+                "ppt-master",
+                ("QIHU_API_KEY", "VOLCENGINE_VOICE_ACCESS_KEY", "DATABASE_URL", "ARK_API_KEY", "MISSING_KEY"),
+            ),
+            _skill("podcast-studio", ("VOLCENGINE_VOICE_ACCESS_KEY",)),
+        ]
+        self._patch_skills(monkeypatch, skills)
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+        monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "voice-host-value")
+        monkeypatch.setenv("DATABASE_URL", "postgres://host/db")
+        monkeypatch.setenv("ARK_API_KEY", "ark-host-value")
+        monkeypatch.delenv("MISSING_KEY", raising=False)
+
+        injected = _resolve_injected_secrets(_runtime_with_skills(["ppt-master"]))
+
+        assert injected == {
+            "QIHU_API_KEY": "qihu-host-value",
+            "VOLCENGINE_VOICE_ACCESS_KEY": "voice-host-value",
+        }
+
+    def test_forbidden_declared_names_are_never_injected(self, monkeypatch):
+        self._patch_skills(monkeypatch, [_skill("evil", ("DATABASE_URL", "ARK_API_KEY"))])
+        monkeypatch.setenv("DATABASE_URL", "postgres://host/db")
+        monkeypatch.setenv("ARK_API_KEY", "ark-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["evil"])) is None
+
+    def test_custom_and_legacy_skills_do_not_participate(self, monkeypatch):
+        self._patch_skills(
+            monkeypatch,
+            [
+                _skill("custom-ppt", ("QIHU_API_KEY",), category="custom"),
+                _skill("legacy-tts", ("VOLCENGINE_VOICE_ACCESS_KEY",), category="legacy"),
+            ],
+        )
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+        monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "voice-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["custom-ppt", "legacy-tts"])) is None
+
+    def test_disabled_skill_does_not_participate(self, monkeypatch):
+        calls = self._patch_skills(monkeypatch, [_skill("ppt-master", ("QIHU_API_KEY",), enabled=False)])
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["ppt-master"])) is None
+        assert calls["enabled_only"] is True
+
+    def test_empty_allowlist_injects_nothing(self, monkeypatch):
+        self._patch_skills(monkeypatch, [_skill("ppt-master", ("QIHU_API_KEY",))])
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills([])) is None
+
+    def test_skill_lists_do_not_share_declaration_cache(self, monkeypatch):
+        self._patch_skills(
+            monkeypatch,
+            [
+                _skill("skill-a", ("QIHU_API_KEY",)),
+                _skill("skill-b", ("VOLCENGINE_VOICE_ACCESS_KEY",)),
+            ],
+        )
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+        monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "voice-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["skill-a"])) == {"QIHU_API_KEY": "qihu-host-value"}
+        assert _resolve_injected_secrets(_runtime_with_skills(["skill-b"])) == {"VOLCENGINE_VOICE_ACCESS_KEY": "voice-host-value"}
+        # 回到第一个列表仍命中自己的声明集合，不被第二个列表污染。
+        assert _resolve_injected_secrets(_runtime_with_skills(["skill-a"])) == {"QIHU_API_KEY": "qihu-host-value"}
+
+    def test_values_are_read_per_call_not_cached(self, monkeypatch):
+        self._patch_skills(monkeypatch, [_skill("skill-a", ("QIHU_API_KEY",))])
+        monkeypatch.setenv("QIHU_API_KEY", "first-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["skill-a"])) == {"QIHU_API_KEY": "first-value"}
+
+        monkeypatch.setenv("QIHU_API_KEY", "second-value")
+        assert _resolve_injected_secrets(_runtime_with_skills(["skill-a"])) == {"QIHU_API_KEY": "second-value"}
+
+    def test_active_and_request_secrets_keep_priority(self, monkeypatch):
+        self._patch_skills(monkeypatch, [_skill("ppt-master", ("QIHU_API_KEY",))])
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+
+        active_ctx = {"__active_skill_secrets": {"ARK_API_KEY": "active-secret"}}
+        assert _resolve_injected_secrets(_runtime_with_skills(["ppt-master"], active_ctx)) == {"ARK_API_KEY": "active-secret"}
+
+        request_ctx = {"secrets": {"OPENAI_API_KEY": "request-secret"}}
+        assert _resolve_injected_secrets(_runtime_with_skills(["ppt-master"], request_ctx)) == {"OPENAI_API_KEY": "request-secret"}
+
+    def test_extensions_config_read_failure_disables_default_host_injection(self, monkeypatch, tmp_path):
+        """真实 loader 接线：extensions 配置损坏不能退化为全部启用并注入宿主密钥。"""
+        from deerflow.config.extensions_config import ExtensionsConfig
+
+        skill_dir = tmp_path / "skills" / "public" / "ppt-master"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: ppt-master\ndescription: test\nrequired-secrets:\n  - name: QIHU_API_KEY\n---\n\n# ppt-master\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            "deerflow.config.get_app_config",
+            lambda: SimpleNamespace(skills=SimpleNamespace(get_skills_path=lambda: tmp_path / "skills")),
+        )
+
+        def fail_from_file(cls, config_path=None):
+            raise RuntimeError("broken extensions config")
+
+        monkeypatch.setattr(ExtensionsConfig, "from_file", classmethod(fail_from_file))
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+
+        assert _resolve_injected_secrets(_runtime_with_skills(["ppt-master"])) is None
+
+    def test_missing_or_none_available_skills_keeps_legacy_autobind(self, monkeypatch):
+        monkeypatch.setenv("DEER_FLOW_SKILL_SECRET_AUTOBIND", "1")
+        monkeypatch.setattr(tools, "_declared_skill_secret_names", lambda: {"QIHU_API_KEY"})
+        monkeypatch.setenv("QIHU_API_KEY", "qihu-host-value")
+
+        # 无 metadata.available_skills 字段
+        assert _resolve_injected_secrets(_runtime_with_context(None, config={"metadata": {}})) == {"QIHU_API_KEY": "qihu-host-value"}
+        # 字段存在但为 None
+        assert _resolve_injected_secrets(_runtime_with_context(None, config={"metadata": {"available_skills": None}})) == {"QIHU_API_KEY": "qihu-host-value"}
+
+
 class TestMaskInjectedValues:
     def test_mask_covers_injected_values(self):
         out = mask_secret_values_in_output("key=sk-live-abcdef123456 tail", injected_values=["sk-live-abcdef123456"])
@@ -162,4 +324,58 @@ class TestBashToolWiring:
         out = tools_mod.bash_tool.func(runtime, description="d", command="echo hi")
         assert captured["env"] == {"MY_SKILL_KEY": "sk-wired-secret-987654"}
         assert "sk-wired-secret-987654" not in out  # 回显打码
+        assert "***" in out
+
+    def test_local_branch_restricted_host_injection_only_allowlisted_keys(self, monkeypatch):
+        """白名单公共技能 → 只注入两个允许的宿主键，且回显打码。"""
+        from types import SimpleNamespace as NS
+
+        import deerflow.sandbox.tools as tools_mod
+        from deerflow.skills.types import SecretRequirement
+
+        captured = {}
+
+        class _FakeSandbox:
+            def execute_command(self, command, timeout=None, env=None):
+                captured["env"] = env
+                return "echo back: sk-wired-qihu-123456"
+
+        skill = NS(
+            name="ppt-master",
+            category="public",
+            enabled=True,
+            required_secrets=(
+                SecretRequirement("QIHU_API_KEY"),
+                SecretRequirement("DATABASE_URL"),
+            ),
+        )
+        monkeypatch.setattr(
+            "deerflow.skills.load_skills",
+            lambda *, enabled_only=False, strict_extensions_config=False: [skill],
+        )
+        monkeypatch.setenv("QIHU_API_KEY", "sk-wired-qihu-123456")
+        monkeypatch.setenv("DATABASE_URL", "postgres://user:pw@host/db")
+        tools_mod._restricted_declared_names_cache.clear()
+
+        runtime = NS(
+            context=None,
+            config={"metadata": {"available_skills": ["ppt-master"]}},
+            state={"thread_data": {"workspace_path": "/tmp/w", "uploads_path": "/tmp/u", "outputs_path": "/tmp/o"}},
+        )
+        monkeypatch.setattr(tools_mod, "ensure_sandbox_initialized", lambda rt: _FakeSandbox())
+        monkeypatch.setattr(tools_mod, "is_local_sandbox", lambda rt: True)
+        monkeypatch.setattr(tools_mod, "is_host_bash_allowed", lambda: True)
+        monkeypatch.setattr(tools_mod, "ensure_thread_directories_exist", lambda rt: None)
+        monkeypatch.setattr(
+            "deerflow.config.app_config.get_app_config",
+            lambda: NS(sandbox=NS(bash_output_max_chars=20000, bash_command_timeout=300)),
+        )
+
+        try:
+            out = tools_mod.bash_tool.func(runtime, description="d", command="echo hi")
+        finally:
+            tools_mod._restricted_declared_names_cache.clear()
+
+        assert captured["env"] == {"QIHU_API_KEY": "sk-wired-qihu-123456"}
+        assert "sk-wired-qihu-123456" not in out
         assert "***" in out

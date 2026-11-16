@@ -418,6 +418,46 @@ class TestAsyncExecutionPath:
         assert result.completed_at is not None
 
     @pytest.mark.anyio
+    async def test_aexecute_passes_sorted_skill_allowlist_to_run_config(self, classes, base_config, mock_agent, msg):
+        """子代理必须把自己的有效技能白名单交给 bash 注入层（2026-11-16 Task 1）。"""
+        SubagentExecutor = classes["SubagentExecutor"]
+        captured: dict = {}
+        final_state = {"messages": [msg.human("Task"), msg.ai("done", "msg-1")]}
+
+        def fake_astream(state, config=None, context=None, stream_mode=None):
+            captured["config"] = config
+            return async_iterator([final_state])
+
+        mock_agent.astream = fake_astream
+        base_config.skills = ["zeta", "alpha"]
+
+        executor = SubagentExecutor(config=base_config, tools=[], thread_id="test-thread")
+        with patch.object(executor, "_create_agent", return_value=mock_agent):
+            await executor._aexecute("Task")
+
+        assert captured["config"]["metadata"]["available_skills"] == ["alpha", "zeta"]
+
+    @pytest.mark.anyio
+    async def test_aexecute_keeps_none_skill_allowlist_in_run_config(self, classes, base_config, mock_agent, msg):
+        """skills=None 表示继承全部启用技能，metadata 原样保留 None。"""
+        SubagentExecutor = classes["SubagentExecutor"]
+        captured: dict = {}
+        final_state = {"messages": [msg.human("Task"), msg.ai("done", "msg-1")]}
+
+        def fake_astream(state, config=None, context=None, stream_mode=None):
+            captured["config"] = config
+            return async_iterator([final_state])
+
+        mock_agent.astream = fake_astream
+        assert base_config.skills is None
+
+        executor = SubagentExecutor(config=base_config, tools=[], thread_id="test-thread")
+        with patch.object(executor, "_create_agent", return_value=mock_agent):
+            await executor._aexecute("Task")
+
+        assert captured["config"]["metadata"]["available_skills"] is None
+
+    @pytest.mark.anyio
     async def test_aexecute_collects_ai_messages(self, classes, base_config, mock_agent, msg):
         """Test that AI messages are collected during streaming."""
         SubagentExecutor = classes["SubagentExecutor"]

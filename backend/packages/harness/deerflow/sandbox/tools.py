@@ -684,15 +684,22 @@ def _sandbox_secret_values() -> list[str]:
 #
 # 上游链路 = skill_activation_middleware（把 request secrets 解析成
 # ``__active_skill_secrets``）→ bash 工具 env 注入。middleware 属 P2/P3
-# 移植面；fork 简化装配读两源：① run context 的 active/request secrets
-# （上游原生，middleware 接通后即刻生效）；② AUTOBIND=1 时按启用技能声明
-# 并集从网关进程 env 代填（部署侧显式开启的受控通道——范围=声明键白名单，
-# per-call 注入不驻留容器 env；开启即意味着 agent 可经 echo 读到，与 P1-S2
-# 前"全平台密钥进容器 env"相比是范围收窄+瞬时化，不是对 agent 保密）。
+# 移植面；fork 装配先读 run context 的 active/request secrets（上游原生，
+# middleware 接通后即刻生效）。两者为空时，有 available_skills 走双键受限
+# 宿主注入；没有该字段才允许 AUTOBIND=1 按启用技能声明并集从网关 env 代填。
+# per-call 注入不驻留容器 env；agent 可经 echo 读到注入值，因此这不是对
+# agent 保密，但输出会打码，且默认通道只放开两个明确允许的键。
 
 _AUTOBIND_ENV_FLAG = "DEER_FLOW_SKILL_SECRET_AUTOBIND"
 _DECLARED_NAMES_CACHE_TTL_SECONDS = 60.0
 _declared_names_cache: tuple[float, set[str]] | None = None
+
+# 2026-11-16：默认宿主自动注入从"全声明并集"收窄为"当前 Agent 白名单中的
+# 公共启用技能声明 ∩ 这两个允许名 ∩ 宿主已有值"。active/request secrets 的
+# 优先级不变；AUTOBIND 兼容通道只在没有 available_skills 时保留。
+_ALLOWED_HOST_SKILL_SECRET_NAMES = frozenset({"QIHU_API_KEY", "VOLCENGINE_VOICE_ACCESS_KEY"})
+_restricted_declared_names_cache: dict[tuple[str, ...], tuple[float, set[str]]] = {}
+_RESTRICTED_DECLARED_NAMES_CACHE_MAX_ENTRIES = 32
 
 
 def _ttl_cached_declared_names(compute) -> set[str]:
@@ -751,8 +758,66 @@ def _autobind_skill_secrets() -> dict[str, str] | None:
     return injected or None
 
 
+def _restricted_declared_skill_secret_names(skill_names: list[str]) -> set[str]:
+    """白名单内公共启用技能的 required-secrets 声明集合（按技能列表缓存名字）。
+
+    缓存 key = 规范化后的技能名元组：不同 Agent / 不同白名单不共用声明集合，
+    避免连续执行时把上一个 Agent 的声明带进下一个（2026-11-16 Task 1）。
+    只缓存声明名，密钥值仍在每次 bash 调用时从宿主 env 读取。
+    """
+    import time as _time
+
+    key = tuple(sorted({name for name in skill_names if isinstance(name, str) and name}))
+    if not key:
+        return set()
+
+    now = _time.monotonic()
+    cached = _restricted_declared_names_cache.get(key)
+    if cached is not None and (now - cached[0]) < _DECLARED_NAMES_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    def _compute() -> set[str]:
+        try:
+            from deerflow.skills import load_skills
+
+            names: set[str] = set()
+            for skill in load_skills(enabled_only=True, strict_extensions_config=True):
+                if getattr(skill, "category", None) != "public":
+                    continue
+                if getattr(skill, "name", None) not in key:
+                    continue
+                for req in getattr(skill, "required_secrets", ()) or ():
+                    names.add(req.name)
+            return names
+        except Exception:
+            logger.warning("Failed to collect allowlisted required-secrets; skipping host injection", exc_info=True)
+            return set()
+
+    names = _compute()
+    if len(_restricted_declared_names_cache) >= _RESTRICTED_DECLARED_NAMES_CACHE_MAX_ENTRIES:
+        _restricted_declared_names_cache.clear()
+    _restricted_declared_names_cache[key] = (now, names)
+    return names
+
+
+def _restricted_host_skill_secrets(available_skills: list) -> dict[str, str] | None:
+    """默认宿主注入：白名单技能声明 ∩ 两个允许名 ∩ 宿主已有值。"""
+    import os as _os
+
+    declared = _restricted_declared_skill_secret_names(available_skills)
+    allowed = declared & _ALLOWED_HOST_SKILL_SECRET_NAMES
+    if not allowed:
+        return None
+    injected: dict[str, str] = {}
+    for name in sorted(allowed):
+        value = _os.environ.get(name)
+        if value:
+            injected[name] = value
+    return injected or None
+
+
 def _resolve_injected_secrets(runtime) -> dict[str, str] | None:
-    """bash 工具注入解析：active secrets → request secrets → AUTOBIND（都空则 None）。"""
+    """bash 工具注入解析：active secrets → request secrets → 受限宿主注入/AUTOBIND。"""
     try:
         from deerflow.runtime.secret_context import read_active_secrets
 
@@ -767,6 +832,14 @@ def _resolve_injected_secrets(runtime) -> dict[str, str] | None:
             request = extract_request_secrets(ctx)
         if request:
             return request
+        available_skills = None
+        config = getattr(runtime, "config", None)
+        if isinstance(config, dict):
+            metadata = config.get("metadata")
+            if isinstance(metadata, dict):
+                available_skills = metadata.get("available_skills")
+        if isinstance(available_skills, list):
+            return _restricted_host_skill_secrets(available_skills)
         return _autobind_skill_secrets()
     except Exception:
         logger.warning("Failed to resolve injected secrets; executing without env injection", exc_info=True)

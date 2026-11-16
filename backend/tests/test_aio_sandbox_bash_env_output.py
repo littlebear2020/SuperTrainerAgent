@@ -31,6 +31,35 @@ def test_bash_env_output_empty_data_returns_empty():
     assert s.execute_command("x", env={"K": "V"}) == ""
 
 
-def test_bash_env_output_none_fields_returns_empty():
+def test_bash_env_output_nonzero_exit_is_explicit_even_without_output():
     s = _sandbox_with_bash_result(SimpleNamespace(stdout=None, stderr=None, exit_code=1))
-    assert s.execute_command("x", env={"K": "V"}) == ""
+    out = s.execute_command("x", env={"K": "V"})
+    assert "Exit Code: 1" in out
+
+
+def test_bash_env_reuses_returned_session_id_to_preserve_cwd():
+    s = AioSandbox(id="t", base_url="http://offline.invalid")
+    sessions: dict[str, str] = {}
+    calls = []
+
+    def bash_exec(**kwargs):
+        calls.append(kwargs)
+        session_id = kwargs.get("session_id") or f"session-{len(calls)}"
+        cwd = sessions.get(session_id, "/")
+        command = kwargs["command"]
+        if command.startswith("cd "):
+            cwd = command.removeprefix("cd ")
+            sessions[session_id] = cwd
+            stdout = ""
+        else:
+            stdout = f"{cwd}\n"
+        return SimpleNamespace(data=SimpleNamespace(session_id=session_id, stdout=stdout, stderr=None, exit_code=0))
+
+    s._client = SimpleNamespace(bash=SimpleNamespace(exec=bash_exec))
+
+    s.execute_command("cd /mnt/user-data/workspace", env={"K": "secret-value"})
+    out = s.execute_command("pwd", env={"K": "secret-value"})
+
+    assert out == "/mnt/user-data/workspace\n"
+    assert calls[1]["session_id"] == "session-1"
+    assert [call["command"] for call in calls] == ["cd /mnt/user-data/workspace", "pwd"]

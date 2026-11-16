@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+
+from deerflow.config.extensions_config import ExtensionsConfig
 from deerflow.skills.loader import get_skills_root_path, load_skills
 
 
@@ -62,6 +65,31 @@ def test_load_skills_skips_hidden_directories(tmp_path: Path):
 
     assert "ok-skill" in names
     assert "secret-skill" not in names
+
+
+def test_strict_extensions_config_error_propagates(tmp_path: Path, monkeypatch):
+    """敏感调用方必须能区分配置损坏与正常缺省，不能收到默认全启用列表。"""
+    skills_root = tmp_path / "skills"
+    _write_skill(skills_root / "public" / "root-skill", "root-skill", "Root skill")
+
+    def fail_from_file(cls, config_path=None):
+        raise RuntimeError("broken extensions config")
+
+    monkeypatch.setattr(ExtensionsConfig, "from_file", classmethod(fail_from_file))
+
+    with pytest.raises(RuntimeError, match="broken extensions config"):
+        load_skills(skills_path=skills_root, use_config=False, enabled_only=True, strict_extensions_config=True)
+
+
+def test_strict_extensions_config_missing_keeps_public_default_enabled(tmp_path: Path, monkeypatch):
+    """正常无 extensions 配置不是错误，公共技能仍按既有默认启用。"""
+    skills_root = tmp_path / "skills"
+    _write_skill(skills_root / "public" / "root-skill", "root-skill", "Root skill")
+    monkeypatch.setattr(ExtensionsConfig, "resolve_config_path", classmethod(lambda cls, config_path=None: None))
+
+    skills = load_skills(skills_path=skills_root, use_config=False, enabled_only=True, strict_extensions_config=True)
+
+    assert [skill.name for skill in skills] == ["root-skill"]
 
 
 def test_load_skills_prefers_custom_over_public_with_same_name(tmp_path: Path):
