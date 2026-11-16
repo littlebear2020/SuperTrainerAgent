@@ -66,10 +66,12 @@ breathing）标注与 D3 铁律 3 同向执行。
   把它们写入 design spec 的 colors/typography 约定与 spec_lock，逐页 SVG 全程遵守，
   做到"一套品牌，PPT/视频双产物"。品牌蒸馏入库走资产中心（`/workspace/assets`
   上传 PPT），不在此会话内做。
-- **配图**：AI 生图走 TrainerAI provider（`IMAGE_BACKEND=volcengine` 首选，详 SKILL.md
-  覆盖段）；**禁 web 图库检索**（P11）。图片素材只走 AI 生成 / 用户提供 / 占位。
-- **配音**：旁白统一走 Voice Twin 音色中枢（360 预置 / Volcengine 克隆），
-  `notes_to_audio.py --provider trainerai --voice-id 146`；**禁止 edge-tts**。
+- **配图**：AI 生图走 360 Seedream（`IMAGE_BACKEND=qihu360`；未显式配置 backend 时
+  有 `QIHU_API_KEY` 即自动选择，默认模型 `bytedance/doubao-seedream-5.0-pro`，显式请求
+  PNG；详 SKILL.md 覆盖段）；**禁 web 图库检索**（P11）。图片素材只走 AI 生成 / 用户提供 / 占位。
+- **配音**：旁白统一走字节 `seed-tts-2.0`（默认 speaker `zh_male_m191_uranus_bigtts`，
+  云舟 2.0 男声，自动语种，输出 MP3），`notes_to_audio.py <project_path> --provider trainerai`；
+  长 notes 按句分片，全部成功后由 ffmpeg 合成，失败不发布；**禁止 edge-tts**。
   PPT→视频复用 `voice_twin/production_service.submit_ppt_to_video`，不新建链路。
   交付含动画 deck 时提醒用户：动画在视频链路（LibreOffice 转图）中不还原。
 

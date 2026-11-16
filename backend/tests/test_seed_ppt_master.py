@@ -32,6 +32,20 @@ def test_soul_references_vendored_skill():
     assert "data-element-id" in soul  # D3 铁律 #6 仍在
 
 
+def test_soul_pins_bytedance_tts_and_qihu360_image():
+    """2026-11-16：默认旁白换字节 seed-tts-2.0，默认配图换 360 Seedream。"""
+    soul = (SEED_DIR / "SOUL.md").read_text(encoding="utf-8")
+    for anchor in (
+        "seed-tts-2.0",
+        "zh_male_m191_uranus_bigtts",
+        "IMAGE_BACKEND=qihu360",
+        "bytedance/doubao-seedream-5.0-pro",
+    ):
+        assert anchor in soul, f"SOUL 缺少新通道锚点: {anchor}"
+    assert "360/tts-stream" not in soul
+    assert "Voice Twin 音色中枢" not in soul
+
+
 def test_soul_aligned_to_630_semantics():
     """2026-09-11 升级 6.3.0：SOUL 必须对齐路由制/两段式确认/新禁用项。"""
     soul = (SEED_DIR / "SOUL.md").read_text(encoding="utf-8")

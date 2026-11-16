@@ -2,7 +2,8 @@
 """
 Unified Image Generation Tool
 
-Dispatches to the appropriate backend based on explicit provider configuration.
+Dispatches to the appropriate backend based on explicit provider configuration,
+falling back to qihu360 when QIHU_API_KEY is available without IMAGE_BACKEND.
 
 Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment):
   IMAGE_BACKEND=gemini      -> Gemini backend (google-genai SDK)
@@ -14,6 +15,7 @@ Backend selection (`IMAGE_BACKEND` in `.env` or the current process environment)
   IMAGE_BACKEND=qwen        -> Alibaba Qwen image backend
   IMAGE_BACKEND=zhipu       -> Zhipu GLM-Image backend
   IMAGE_BACKEND=volcengine  -> Volcengine Seedream backend
+  IMAGE_BACKEND=qihu360     -> 360 Seedream backend (TrainerAI primary)
   IMAGE_BACKEND=tencent     -> Tencent Cloud TokenHub backend
   IMAGE_BACKEND=modelscope  -> ModelScope backend
   IMAGE_BACKEND=siliconflow -> SiliconFlow backend
@@ -30,7 +32,7 @@ Configuration source (process env wins, `.env` is the fallback layer):
      - `~/.ppt-master/.env` (user-level config)
 
 Supported keys:
-  IMAGE_BACKEND    (required) backend name
+  IMAGE_BACKEND    (optional) backend name; QIHU_API_KEY alone defaults to qihu360
 
   Provider-specific keys are used for credentials and overrides, for example:
     GEMINI_API_KEY / GEMINI_MODEL / GEMINI_BASE_URL
@@ -84,6 +86,7 @@ IMAGE_ENV_PREFIXES = (
     "FAL_",
     "REPLICATE_",
     "OPENROUTER_",
+    "QIHU_",
 )
 DEPRECATED_IMAGE_KEYS = {
     "IMAGE_API_KEY",
@@ -156,6 +159,15 @@ BACKEND_REGISTRY = {
         "default_image_size": "2K",
         "key_hint": "LAS_API_KEY / VOLCENGINE_API_KEY / ARK_API_KEY",
         "aliases": ["ark", "doubao", "seedream"],
+    },
+    "qihu360": {
+        "module": "backend_qihu360",
+        "tier": "core",
+        "label": "360 Seedream",
+        "default_model": "bytedance/doubao-seedream-5.0-pro",
+        "default_image_size": "2K",
+        "key_hint": "QIHU_API_KEY",
+        "aliases": ["qihu", "360", "seedream-360"],
     },
     "tencent": {
         "module": "backend_tencent",
@@ -339,6 +351,10 @@ def _print_backend_resolution() -> None:
         return
 
     backend_name = os.environ.get("IMAGE_BACKEND", "").strip().lower()
+    if not backend_name and (os.environ.get("QIHU_API_KEY") or "").strip():
+        print("Resolved backend: qihu360")
+        print("Configuration source: QIHU_API_KEY automatic default")
+        return
     if not backend_name:
         if backend_from_process:
             source = "process environment (empty)"
@@ -400,7 +416,7 @@ def _check_backend_aspect_ratio(backend_module, aspect_ratio: str) -> None:
 
 def _resolve_backend() -> tuple[object, str]:
     """
-    Determine which backend to use from explicit configuration.
+    Determine the explicit backend, or default to qihu360 with QIHU_API_KEY.
 
     Returns:
         A backend module with a generate() function.
@@ -413,6 +429,9 @@ def _resolve_backend() -> tuple[object, str]:
             print(f"Error: Unknown IMAGE_BACKEND='{backend_name}'. Supported: {supported}")
             sys.exit(1)
         return _load_backend(canonical)
+
+    if (os.environ.get("QIHU_API_KEY") or "").strip():
+        return _load_backend("qihu360")
 
     supported = ", ".join(SUPPORTED_BACKENDS)
     print(
@@ -1297,7 +1316,7 @@ def main() -> None:
         help=(
             "Source image for image-to-image editing (single-image mode only). "
             "When set, the prompt is used as the edit instruction. Only backends "
-            "that support editing accept this (currently: gemini, openai). Not "
+            "that support editing accept this (currently: gemini, openai, qihu360). Not "
             "valid with --manifest / --render-md / --list-backends."
         ),
     )
@@ -1427,7 +1446,7 @@ def main() -> None:
             print(
                 f"Error: backend '{backend_name}' does not support image editing "
                 "(--reference-image). Use a backend that does "
-                "(currently: gemini, openai)."
+                "(currently: gemini, openai, qihu360)."
             )
             sys.exit(1)
         gen_kwargs["reference_image"] = args.reference_image

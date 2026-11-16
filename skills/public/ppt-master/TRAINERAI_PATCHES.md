@@ -20,16 +20,16 @@
 
 | # | 文件 | 偏离 | 原因 |
 |---|------|------|------|
-| P1 | SKILL.md | frontmatter 后插 TrainerAI 覆盖段（8 条；frontmatter 不动，gate marker 不重复） | 声明 TTS/生图 override + P11/P12/P13 + C 扩展降级口径 + D3 铁律指向 SOUL.md；命令示例统一 `${SKILL_DIR}` 形态 |
-| P2 | scripts/tts_backends/backend_trainerai.py | 新增（TrainerAI 专属，随升级原样移植） | 配音走 Voice Twin（360 预设），禁 edge-tts |
-| P3 | scripts/image_backends/backend_trainerai.py | 新增（选择策略 + 文档化；docstring 补 6.3.0 注册表口径） | 生图 provider 选择（volcengine/qwen/zhipu 均为 6.3.0 原生 backend）；**`auto` 降级终点显式 = `manual`，不走上游 `host-native` Path B**（TrainerAI 宿主无宿主生图工具） |
+| P1 | SKILL.md | frontmatter 后插 TrainerAI 覆盖段（11 条；三身份字段与 gate marker 不动，仅追加 required-secrets） | 声明 TTS/生图 override + P11/P12/P13 + C 扩展降级口径 + D3 铁律指向 SOUL.md；命令示例统一 `${SKILL_DIR}` 形态 |
+| P2 | scripts/tts_backends/backend_trainerai.py | 新增（TrainerAI 专属，随升级原样移植；2026-11-16 重写为字节 seed-tts-2.0 SSE） | 配音走字节 seed-tts-2.0，禁 edge-tts，不回退 360 stream_speech |
+| P3 | scripts/image_backends/backend_trainerai.py | 新增（选择策略 + 文档化；2026-11-16 收敛为 QIHU→qihu360 单选） | 生图 provider 选择固定 360 Seedream；**`auto` 降级终点显式 = `manual`，不走上游 `host-native` Path B**（TrainerAI 宿主无宿主生图工具） |
 | P4 | scripts/model_tiers.py | 新增（TrainerAI 专属，原样移植） | 4 档模型选择映射 /api/models 元数据；上游无同名脚本 |
 | P5 | scripts/runtime_limits.py | 新增（TrainerAI 专属，原样移植） | 子进程输出 BoundedTextBuffer 防 OOM |
 | P6 | scripts/mock_fixtures.py | 新增（TrainerAI 专属；2026-09-11 补 title/subtitle XML 转义=旧 K5 修复） | 前端/CI 确定性 fixture |
 | P7 | scripts/ppt_visual_review.py | 新增（TrainerAI 专属；2026-09-11 补 sys.path 判重=旧 K3 修复） | 视觉质检包装；6.3.0 `SVGQualityChecker.check_file` 经 `svg_quality.checker` 再导出且签名向后兼容（新增 kwargs 可选），零改动移植 |
-| P8 | scripts/notes_to_audio.py | trainerai 六接线点：import / env 前缀(QIHU_/ZYUN_) / `--provider` choices+默认 / 构造分支 / 生成分发分支 / `_provider_manifest_details` 分支 / `--list-voices` 分支（本次新增，旧版缺） | 接线 P2；6.3.0 的 tts_backends 扩到 5 后端（elevenlabs/minimax/qwen/cosyvoice/edge），注册链断言见 `test_ppt_master_tts_trainerai.py` |
-| P9 | workflows/stages/generate-audio.md | 文档顶部插 TrainerAI Provider Override 块（新路径；旧路径 workflows/generate-audio.md 已不存在） | 默认 provider=trainerai(146)、edge 作废、预设音色表、trainerai WAV 无逐字时轴如实声明 |
-| P10 | scripts/tts_backends/backend_trainerai.py | SSE `data: null` 防御（`(event.get("data") or {})` + isinstance 守卫）——已内嵌于 P2 模块 | 6.3.0 上游 5 个 TTS 后端无 360 SSE 同源代码，防御保留在 vendored backend 内 |
+| P8 | scripts/notes_to_audio.py | trainerai 六接线点：import / env 前缀(VOLCENGINE_) / `--provider` choices+默认 / 构造分支（默认 speaker）/ 生成分发分支 / `_provider_manifest_details` 分支（seed-tts-2.0）/ `--list-voices` 分支（固定音色） | 接线 P2；6.3.0 的 tts_backends 扩到 5 后端（elevenlabs/minimax/qwen/cosyvoice/edge），注册链断言见 `test_ppt_master_tts_trainerai.py` |
+| P9 | workflows/stages/generate-audio.md | 文档顶部插 TrainerAI Provider Override 块（新路径；旧路径 workflows/generate-audio.md 已不存在；2026-11-16 更新默认音色与格式） | 默认 provider=trainerai（字节 seed-tts-2.0，默认 speaker `zh_male_m191_uranus_bigtts`，MP3，无逐字时轴）；edge 作废 |
+| P10 | scripts/tts_backends/backend_trainerai.py | ~~SSE `data: null` 防御~~——2026-11-16 随 360 stream_speech 一起移除，改由字节 SSE 的 `data` 字符串判空承接 | 旧 360 SSE 通道已退役 |
 | P11 | SKILL.md（P1 覆盖段第 3 条） | 文档级禁用：`Acquire Via` 禁 `web`、不加载 image-searcher.md/executor-web-image.md、不运行 image_search.py、不产出 image_sources.json | 生产环境图库图片下载不可靠 + 素材自闭环；6.3.0 挂载点 9 处（清单见 Phase 0 结论文档）；`svg_quality` checker 对缺失 manifest 优雅跳过（已实测）；vendored `scripts/image_sources/` 代码保留不删 |
 | P12 | SKILL.md（P1 覆盖段第 4 条） | 确认面 chat-only：恒视同 confirm-surface.md §1 chat 分支；禁 `confirm_ui/server.py` 全部调用形态；Default 与 **Beautify**（复用 Default Step 4 编排）同受约束；`split`/`resume-execute` 一并声明禁用 | 沙箱无端口发布通路；per-thread sandbox 跨会话失效；quick-generate/roundtrip 上游本就不触 confirm_ui |
 | P13 | SKILL.md（P1 覆盖段第 5 条） | 禁 `svg_editor/server.py` 全部触点（Step 6 Mandatory 自启动/live-preview/visual-review）；预览走 artifacts（`template_preview_pptx.py` + LibreOffice PNG + present_files）；visual-review 阶段与 `visual_review.py` 同步禁用 | 同上；`visual_review.py` 依赖 live-preview server（不可达 exit=2） |
@@ -42,6 +42,11 @@
 | P20 | SKILL.md（P1 覆盖段第 9 条）+ workflows/generate-pptx.md Step 4 + workflows/governance/failure-recovery.md §3 | Chat 确认持久化：Stage1/Stage2 用户明确确认后立即写 `<project>/confirm_state.json`（stage、确认值摘要、confirmed_at）；恢复时与 `design_spec.md`/`spec_lock.md` 互证，一致则按断点续跑，禁止重新确认或重跑策划 | 2026-10-14 事故：确认证据仅存 chat 上下文，上下文丢失后按恢复规则重跑策划并发生方案漂移 |
 | P21 | SKILL.md（P1 覆盖段第 10 条）+ workflows/generate-pptx.md Step 1 | 源图转写落盘与复查收敛：首次读准立即写 `<project>/analysis/source_image_transcriptions.md`，后续以文本为准；单格存疑只复查该格，整图重读 ≤1 次；OCR 与目视冲突以目视为准并记录冲突格 | 2026-10-14 事故：表格截图反复整图 OCR/目读 15+ 轮，源文档全量重读 3–4 次，转写结果不落盘导致 token 失控 |
 | P22 | SKILL.md（P1 覆盖段第 11 条）+ workflows/generate-pptx.md Step 6 | Step 6 前与长任务每 5 页执行 `df -h` 磁盘预检，工作区分区可用 <1GB 即停并报告；每写完一个 SVG 校验大小 >0，0 字节即删除、报告并停止 | 2026-10-14 事故：根分区写满后 P01 产生 0 字节 SVG，agent 仅释放 4.7MB 即继续写页，最终导出必败且浪费 token |
+| P23 | SKILL.md frontmatter | 追加 `required-secrets`（`VOLCENGINE_VOICE_ACCESS_KEY`、`QIHU_API_KEY`）；三身份字段、sponsors 与 gate marker 不动 | 2026-11-16：沙箱 bash 按 Agent 白名单内公共启用技能声明识别可注入的宿主键；两键即本技能全部外部凭据 |
+| P24 | scripts/tts_backends/backend_trainerai.py + scripts/notes_to_audio.py + backend/seed/agents/ppt-master/SOUL.md | 360 stream_speech/WAV 合并 → 字节 seed-tts-2.0/MP3；默认 speaker `zh_male_m191_uranus_bigtts`；env 只读 `VOLCENGINE_VOICE_ACCESS_KEY` | 2026-11-16：统一 TTS 通道，去掉 360 数字音色与 ZYUN 兜底 |
+| P25 | scripts/image_backends/backend_qihu360.py（新增）+ scripts/image_gen.py | 注册 `IMAGE_BACKEND=qihu360`（360 Seedream `bytedance/doubao-seedream-5.0-pro`）：generations/edits 双端点、`extra_body.size` 三档、`extra_body.image` 参考图、`SUPPORTS_REFERENCE_IMAGE=True`；`QIHU_` 加进 env 前缀 | 2026-11-16：PPT 默认配图走 360 Seedream，参考图能力可用 |
+| P26 | scripts/image_backends/backend_trainerai.py + SKILL.md 覆盖段第 1/2 条 | 选择策略收敛为 QIHU→qihu360；覆盖段改字节 TTS 与 360 Seedream | 2026-11-16：与 P24/P25 对齐文档与自动选择 |
+| P27 | scripts/image_gen.py + scripts/image_backends/backend_qihu360.py + scripts/tts_backends/backend_trainerai.py + scripts/notes_to_audio.py + SKILL.md + workflows/stages/generate-audio.md + backend/seed/agents/ppt-master/SOUL.md | 无显式 backend 时 QIHU 自动选 qihu360；360 `extra_body.output_format=png` + BMP/TIFF MIME + 响应 URL 优先、下载失败回退 b64（b64-only 兼容）；TTS 仅成功 152 接受、`additions.enable_language_detector=true`（不传 `explicit_language`）、按句分片 ffmpeg 合成并原子发布；CLI/SKILL 命令补 project_path | 2026-11-16：评审修复默认路由、流式 fail-closed 与长 notes 产物完整性 |
 
 **硬钉测试**：`backend/tests/test_ppt_master_skill_vendored.py`——attribution_guard 冒烟
 （vendored 补丁后必须 exit 0）+ P1 覆盖段 P11/P12/P13 marker 断言。P12/P13 为文档级
@@ -51,7 +56,7 @@
 
 | # | 位置 | 状态 |
 |---|------|------|
-| K1 | tts backend_trainerai `resolve_voice_id` | **维持登记**：PRESET_VOICES 之外的合法 360 音色静默落回 146（warning）——有意收窄为旁白预设，fail-open 对 agent 友好 |
+| K1 | tts backend_trainerai `resolve_voice_id` | ~~维持登记~~ ✅ 2026-11-16 随 360 预置音色退役删除，改为 DEFAULT_SPEAKER 兜底 |
 | K2 | ~~SSE 空 code~~ | ✅ 已修并入 P10（2026-07-27） |
 | K3 | ppt_visual_review `_load_checker` sys.path 累积 | ✅ 2026-09-11 修复（判重后 insert） |
 | K4 | runtime_limits `rss_mb` macOS 启发式误判 | **维持登记**：best-effort 监控展示用途 |
