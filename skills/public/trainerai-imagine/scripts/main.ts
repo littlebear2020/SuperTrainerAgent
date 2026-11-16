@@ -117,7 +117,7 @@ Environment variables:
   BIGMODEL_IMAGE_MODEL      Backward-compatible alias for Z.AI model (glm-image)
   SEEDREAM_IMAGE_MODEL      Default Seedream model (doubao-seedream-5-0-260128)
   QIHU_API_KEY              360 API key (for qihu360 provider)
-  QIHU_IMAGE_MODEL          Default 360 image model (google/gemini-3.1-flash-image-preview)
+  QIHU_IMAGE_MODEL          Default 360 image model (bytedance/doubao-seedream-5.0-pro)
   QIHU_BASE_URL             Custom 360 API endpoint
   OPENAI_BASE_URL           Custom OpenAI endpoint
   OPENAI_IMAGE_API_DIALECT  OpenAI-compatible image dialect (openai-native|ratio-metadata)
@@ -658,8 +658,11 @@ export function normalizeOutputImagePath(p: string, defaultExtension = ".png"): 
 function inferProviderFromModel(model: string | null): Provider | null {
   if (!model) return null;
   const normalized = model.trim();
+  // 2026-11-16: 360 Seedream 用 bytedance/ 前缀的点号命名；必须先于方舟 id 判断。
+  if (/^bytedance\/.*seedream/i.test(normalized)) return "qihu360";
   if (normalized.includes("seedream") || normalized.includes("seededit")) return "seedream";
   if (normalized === "glm-image" || normalized === "cogview-4-250304") return "zai";
+  if (normalized.toLowerCase().includes("gpt-image")) return "openai";
   if (normalized.includes("gemini") || normalized.startsWith("google/")) return "qihu360";
   return null;
 }
@@ -670,10 +673,11 @@ export function detectProvider(args: CliArgs): Provider {
     args.provider &&
     args.provider !== "openai" &&
     args.provider !== "azure" &&
-    args.provider !== "seedream"
+    args.provider !== "seedream" &&
+    args.provider !== "qihu360"
   ) {
     throw new Error(
-      "Reference images require a ref-capable provider. Use --provider openai (GPT Image edits), --provider azure (Azure OpenAI), or --provider seedream for supported Seedream models."
+      "Reference images require a ref-capable provider. Use --provider qihu360 (360 Seedream edits), --provider openai (GPT Image edits), --provider azure (Azure OpenAI), or --provider seedream for supported Seedream models."
     );
   }
 
@@ -685,6 +689,13 @@ export function detectProvider(args: CliArgs): Provider {
   const hasSeedream = !!process.env.ARK_API_KEY;
   const hasQihu360 = !!process.env.QIHU_API_KEY;
   const modelProvider = inferProviderFromModel(args.model);
+
+  if (modelProvider === "openai") {
+    if (!hasOpenai) {
+      throw new Error("Model looks like an OpenAI image model, but OPENAI_API_KEY is not set.");
+    }
+    return "openai";
+  }
 
   if (modelProvider === "seedream") {
     if (!hasSeedream) {
@@ -707,6 +718,10 @@ export function detectProvider(args: CliArgs): Provider {
     return "qihu360";
   }
 
+  // 2026-11-16: 仅在未显式指定 provider/model 时，QIHU_API_KEY 触发
+  // 360 Seedream 默认（含 --ref），不受其他 provider key 影响。
+  if (!args.model && hasQihu360) return "qihu360";
+
   if (args.referenceImages.length > 0) {
     // 2026-08-08: auto-route --ref to seedream (Ark) for identity preservation.
     // gpt-image-2 via 360 causes identity drift on multi-frame reference editing.
@@ -714,11 +729,12 @@ export function detectProvider(args: CliArgs): Provider {
     if (hasOpenai) return "openai";
     if (hasAzure) return "azure";
     throw new Error(
-      "Reference images require Seedream, OpenAI, or Azure. Set ARK_API_KEY, OPENAI_API_KEY, or AZURE_OPENAI_API_KEY+AZURE_OPENAI_BASE_URL, or remove --ref."
+      "Reference images require 360 Seedream, Seedream, OpenAI, or Azure. Set QIHU_API_KEY, ARK_API_KEY, OPENAI_API_KEY, or AZURE_OPENAI_API_KEY+AZURE_OPENAI_BASE_URL, or remove --ref."
     );
   }
 
-  // 2026-08-08: default text-to-image prefers openai (gpt-image-2 via 360 gateway).
+  // 未显式 model 的 360 默认已在上面返回；这里处理显式模型的安全回退
+  // 或 QIHU 缺席场景，保留原有 provider 顺序。
   const available = [
     hasOpenai && "openai",
     hasSeedream && "seedream",

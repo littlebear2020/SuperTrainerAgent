@@ -2,7 +2,16 @@ import path from "node:path";
 import { readFile } from "node:fs/promises";
 import type { CliArgs, OpenAIImageApiDialect } from "../types";
 
-const DEFAULT_MODEL = "google/gemini-3.1-flash-image-preview";
+// 2026-11-16: TrainerAI 默认生图通道 = 360 Seedream 5.0 Pro。
+const DEFAULT_MODEL = "bytedance/doubao-seedream-5.0-pro";
+
+// 360/Seedream 精确三档（16:9 / 1:1 / 9:16）；顶层 size 会被网关静默改派，
+// 所以尺寸一律下发到 extra_body.size，且只落这三档。
+const SIZE_TIERS = [
+  [2048, 1152],
+  [2048, 2048],
+  [1152, 2048],
+] as const;
 
 export function getDefaultModel(): string {
   return process.env.QIHU_IMAGE_MODEL || DEFAULT_MODEL;
@@ -23,42 +32,39 @@ export function getQihu360ImageApiDialect(args: Pick<CliArgs, "imageApiDialect">
   return args.imageApiDialect ?? "openai-native";
 }
 
-function parseAspectRatio(ar: string): { width: number; height: number } | null {
-  const match = ar.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+function parseRatio(value: string | null): number | null {
+  if (!value) return null;
+  const match = /^(\d+(?:\.\d+)?)[x:](\d+(?:\.\d+)?)$/i.exec(value.trim());
   if (!match) return null;
-  const w = parseFloat(match[1]!);
-  const h = parseFloat(match[2]!);
-  if (w <= 0 || h <= 0) return null;
-  return { width: w, height: h };
+  const width = Number.parseFloat(match[1]!);
+  const height = Number.parseFloat(match[2]!);
+  if (!(width > 0) || !(height > 0)) return null;
+  return width / height;
 }
 
-function getSize(model: string, ar: string | null, quality: CliArgs["quality"]): string {
-  const parsed = ar ? parseAspectRatio(ar) : null;
-  const ratio = parsed ? parsed.width / parsed.height : 1;
-
-  if (!parsed || Math.abs(ratio - 1) < 0.1) {
-    const edge = quality === "2k" ? 2048 : 1024;
-    return `${edge}x${edge}`;
+function resolveSize(aspectRatio: string | null, explicitSize: string | null): string {
+  const ratio = parseRatio(explicitSize) ?? parseRatio(aspectRatio) ?? 1;
+  let best: (typeof SIZE_TIERS)[number] = SIZE_TIERS[0];
+  for (const tier of SIZE_TIERS) {
+    if (Math.abs(tier[0] / tier[1] - ratio) < Math.abs(best[0] / best[1] - ratio)) {
+      best = tier;
+    }
   }
-
-  const targetLongEdge = quality === "2k" ? 2048 : 1024;
-  let width: number;
-  let height: number;
-
-  if (ratio > 1) {
-    width = targetLongEdge;
-    height = Math.round(width / ratio);
-  } else {
-    height = targetLongEdge;
-    width = Math.round(height * ratio);
-  }
-
-  return `${width}x${height}`;
+  return `${best[0]}x${best[1]}`;
 }
 
 export function validateArgs(model: string, args: CliArgs): void {
-  if (args.n > 4) {
-    throw new Error("360 image generation supports at most 4 images per request.");
+  if (!model.toLowerCase().includes("seedream")) {
+    throw new Error(`360 image generation supports only Seedream models; received ${model}.`);
+  }
+  if (args.n !== 1) {
+    throw new Error("360 image generation models support exactly one output image per request.");
+  }
+  const outputExtension = args.imagePath ? path.extname(args.imagePath).toLowerCase() : "";
+  if (outputExtension && outputExtension !== ".png") {
+    throw new Error(
+      `qihu360 supports only PNG output paths (.png); received ${args.imagePath}. Use .png or omit the extension.`
+    );
   }
 }
 
@@ -67,13 +73,32 @@ export function buildGenerationsBody(
   model: string,
   args: Pick<CliArgs, "aspectRatio" | "size" | "quality" | "imageApiDialect">
 ): Qihu360GenerationsBody {
-  const body: Qihu360GenerationsBody = {
+  return {
     model,
     prompt,
-    size: args.size || getSize(model, args.aspectRatio, args.quality),
+    extra_body: {
+      size: resolveSize(args.aspectRatio, args.size),
+      watermark: false,
+      output_format: "png",
+    },
   };
+}
 
-  return body;
+function guessMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  if (ext === ".bmp") return "image/bmp";
+  if (ext === ".tiff" || ext === ".tif") return "image/tiff";
+  return "image/png";
+}
+
+async function referenceToDataUri(reference: string): Promise<string> {
+  if (/^(https?:|data:)/i.test(reference)) return reference;
+  const fullPath = path.resolve(reference);
+  const bytes = await readFile(fullPath);
+  return `data:${guessMimeType(fullPath)};base64,${bytes.toString("base64")}`;
 }
 
 export async function generateImage(
@@ -88,14 +113,24 @@ export async function generateImage(
     );
   }
 
+  validateArgs(model, args);
   const baseUrl = getBaseUrl();
-  const body = buildGenerationsBody(prompt, model, args);
+  const extraBody: Record<string, unknown> = {
+    size: resolveSize(args.aspectRatio, args.size),
+    watermark: false,
+    output_format: "png",
+  };
+  let endpoint = `${baseUrl}/v1/images/generations`;
 
-  if (args.n > 1) {
-    body.n = args.n;
+  if (args.referenceImages.length > 0) {
+    // 参考图（单图字符串 / 多图数组）走 /v1/images/edits 的 extra_body.image。
+    const references = await Promise.all(args.referenceImages.map(referenceToDataUri));
+    extraBody.image = references.length === 1 ? references[0] : references;
+    endpoint = `${baseUrl}/v1/images/edits`;
   }
 
-  const response = await fetch(`${baseUrl}/v1/images/generations`, {
+  const body = { model, prompt, extra_body: extraBody };
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -110,7 +145,23 @@ export async function generateImage(
   }
 
   const result = (await response.json()) as Qihu360ImageResponse;
-  return extractImageFromResponse(result);
+  const imageData = await extractImageFromResponse(result);
+  assertPngImage(imageData);
+  return imageData;
+}
+
+const PNG_MAGIC_BYTES = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function assertPngImage(imageData: Uint8Array): void {
+  if (PNG_MAGIC_BYTES.every((byte, index) => imageData[index] === byte)) return;
+  if (imageData[0] === 255 && imageData[1] === 216 && imageData[2] === 255) {
+    throw new Error(
+      "Unexpected JPEG data; expected PNG magic bytes from 360 Image API after requesting output_format=png."
+    );
+  }
+  throw new Error(
+    "Unexpected non-PNG data; expected PNG magic bytes from 360 Image API after requesting output_format=png."
+  );
 }
 
 // Cap how long a CDN image download may hang. undici's default headers/body
@@ -137,26 +188,33 @@ function wrapDownloadError(url: string, e: unknown): Error {
 export async function extractImageFromResponse(result: Qihu360ImageResponse): Promise<Uint8Array> {
   const img = result.data?.[0];
 
-  if (img?.b64_json) {
+  if (img?.b64_json && !img.url) {
     return Uint8Array.from(Buffer.from(img.b64_json, "base64"));
   }
 
   if (img?.url) {
-    let imgRes: Response;
     try {
-      imgRes = await fetch(img.url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
-    } catch (e) {
-      throw wrapDownloadError(img.url, e);
-    }
-    if (!imgRes.ok) {
-      throw new Error(`Download ${img.url} returned HTTP ${imgRes.status} ${imgRes.statusText}`);
-    }
-    // Body read can still fail mid-stream (reset/timeout) after a 200 — wrap it
-    // so the URL + cause are surfaced instead of a bare Node fetch error.
-    try {
-      return new Uint8Array(await imgRes.arrayBuffer());
-    } catch (e) {
-      throw wrapDownloadError(img.url, e);
+      let imgRes: Response;
+      try {
+        imgRes = await fetch(img.url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+      } catch (e) {
+        throw wrapDownloadError(img.url, e);
+      }
+      if (!imgRes.ok) {
+        throw new Error(`Download ${img.url} returned HTTP ${imgRes.status} ${imgRes.statusText}`);
+      }
+      // Body read can still fail mid-stream (reset/timeout) after a 200 — wrap it
+      // so the URL + cause are surfaced instead of a bare Node fetch error.
+      try {
+        return new Uint8Array(await imgRes.arrayBuffer());
+      } catch (e) {
+        throw wrapDownloadError(img.url, e);
+      }
+    } catch (error) {
+      if (img.b64_json) {
+        return Uint8Array.from(Buffer.from(img.b64_json, "base64"));
+      }
+      throw error;
     }
   }
 

@@ -275,9 +275,6 @@ def test_non_video_seed_agents_do_not_mount_video_engine_tools():
 # SEC-C2/C3 (security plan 2026-09-02 B2 step 3): null tool_groups 显式化
 # ---------------------------------------------------------------------------
 
-# 2026-09-11 course-ppt 完全退役（ppt-master 6.3.0 批次，quick-generate E2E 过门后）
-SEC_NULL_EXPLICIT_AGENTS = ("course-assistant",)
-
 
 def test_all_seed_agents_declare_explicit_tool_groups():
     """No seed agent may ship tool_groups: null — null means "mount every
@@ -299,20 +296,8 @@ def test_vimax_video_mounts_video_engine_only():
     assert cfg["tool_groups"] == ["video_engine"]
 
 
-def test_skill_seed_agents_mount_sandbox_trio_only():
-    """技能执行型 agent（2026-09-11 course-ppt 退役后仅剩 course-assistant）的
-    技能全部经沙箱脚本执行（HTML/canvas/docx/ffmpeg——config 的 web 组当前为
-    空），显式组 = ['file:read', 'file:write', 'bash']，不携带 video_engine；
-    creative-studio 因含 web 组由 test_creative_studio_pins_merge_contract 单独钉。"""
-    import yaml
-
-    for agent in SEC_NULL_EXPLICIT_AGENTS:
-        cfg = yaml.safe_load((SEED_DIR / agent / "config.yaml").read_text(encoding="utf-8"))
-        assert cfg.get("tool_groups") == ["file:read", "file:write", "bash"], f"{agent}: expected sandbox trio, got {cfg.get('tool_groups')}"
-        assert (SEED_DIR / agent / "SOUL.md").exists(), f"{agent}: SOUL.md missing from seed"
-
-
-# 2026-09-09 创意工作合并：钉死 creative-studio 的合并契约（计划 2.1 表），防漂移
+# 2026-11-16 创意工作收敛：白名单从 19 个降为 7 个视觉生图技能，剪辑与研究写作
+# 不再属于 creative-studio（分别由独立入口/co-writer 承接）。
 CREATIVE_STUDIO_SKILLS = [
     "trainerai-imagine",
     "trainerai-diagram",
@@ -320,25 +305,13 @@ CREATIVE_STUDIO_SKILLS = [
     "trainerai-infographic",
     "trainerai-comic",
     "trainerai-article-visuals",
-    "knowledge-card-auto-generator",
     "course-poster",
-    "canvas-design",
-    "deep-research",
-    "data-analysis",
-    "consulting-analysis",
-    "chart-visualization",
-    "docx",
-    "pdf",
-    "xlsx",
-    "video-clip",
-    "video-dl",
-    "video-frames",
 ]
 
 
 def test_creative_studio_pins_merge_contract():
-    """creative-studio = 五壳合并产物：tool_groups = web + 沙箱三件套（并集，
-    无 video_engine），skills = 计划 2.1 的 19 个白名单。"""
+    """creative-studio = 视觉生图入口：tool_groups = web + 沙箱三件套（并集，
+    无 video_engine），skills = 7 个视觉生图技能。"""
     import yaml
 
     cfg = yaml.safe_load((SEED_DIR / "creative-studio" / "config.yaml").read_text(encoding="utf-8"))
@@ -376,11 +349,11 @@ def test_reseed_preserves_runtime_memory_json(tmp_path: Path, monkeypatch):
 
 
 def test_seed_version_and_exact_agent_roster():
-    assert SEED_VERSION == "2026-11-16"
+    # 2026-11-16.2: course-assistant 退役（用户不再使用，不保留别名）。
+    assert SEED_VERSION == "2026-11-16.2"
     agent_names = {path.name for path in SEED_DIR.iterdir() if path.is_dir() and (path / "config.yaml").exists()}
     assert agent_names == {
         "co-writer",
-        "course-assistant",
         "course-video",
         "creative-studio",
         "ppt-master",

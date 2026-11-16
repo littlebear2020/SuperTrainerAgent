@@ -148,7 +148,7 @@ topic: alan-turing-biography
 time_span: 1912-1954
 source_language: en
 user_language: zh  # From EXTEND.md or detected
-aspect_ratio: "3:4"
+aspect_ratio: "9:16"
 recommended_page_count: 16
 recommended_art: ligne-claire  # ligne-claire|manga|realistic|ink-brush|chalk
 recommended_tone: neutral      # neutral|warm|dramatic|romantic|energetic|vintage|action

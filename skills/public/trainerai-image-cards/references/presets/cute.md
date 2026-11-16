@@ -11,7 +11,7 @@ Sweet, adorable, girly - classic Xiaohongshu aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | dual | quad
 
 image_effects:

@@ -27,9 +27,9 @@ Each panel serves a specific narrative role (起承转合 / kishōtenketsu):
 
 ## Aspect Ratio
 
-- Recommended page aspect: **4:3** (landscape)
+- Recommended page aspect: **16:9** (landscape)
 - Landscape gives each panel a comfortable wide rectangle
-- Portrait (3:4) makes panels tall and narrow — avoid for this layout
+- Portrait (9:16) makes panels tall and narrow — avoid for this layout
 
 ## Best For
 

@@ -10,7 +10,7 @@ time_span: "[e.g., 1912-1954]"
 narrative_approach: "[chronological/thematic/character-focused]"
 recommended_style: "[style name]"
 recommended_layout: "[layout name or varies]"
-aspect_ratio: "3:4"    # 3:4 (portrait), 4:3 (landscape), 16:9 (widescreen)
+aspect_ratio: "9:16"    # 9:16 (portrait), 16:9 (landscape), 1:1 (square)
 language: "[zh/en/ja/etc.]"
 page_count: [N]
 generated: "YYYY-MM-DD HH:mm"

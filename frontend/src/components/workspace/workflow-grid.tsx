@@ -30,24 +30,18 @@ export const WORKFLOWS = [
     tags: ["PPT生成", "SVG模板", "可编辑PPTX"],
   },
   {
-    // 五壳合并宿主（card-poster/case-article 视觉部分/design-specialist/
-    // knowledge-extraction/video-clip），配色沿用 design-specialist 的 fuchsia。
+    // 2026-11-16 收敛为视觉生图入口（研究写作/视频剪辑已移出白名单）；配色沿用
+    // design-specialist 的 fuchsia。
     type: "creative-studio",
     name: "创意工作",
-    desc: "创意内容生产：文案、设计、知识萃取、视频剪辑一体化",
-    tags: ["知识萃取", "海报设计", "视频剪辑"],
+    desc: "视觉生图：海报、信息图、图片卡片、漫画与封面",
+    tags: ["海报设计", "信息图", "图片卡片"],
   },
   {
     type: "co-writer",
     name: "协同写作专家",
     desc: "AI 协同写作：改写、润色、续写、结构化成文",
     tags: ["案例研写", "润色改写", "结构化"],
-  },
-  {
-    type: "course-assistant",
-    name: "课程助理",
-    desc: "自由对话兜底：课程设计问答与任务编排",
-    tags: ["自由对话", "课程设计", "任务编排"],
   },
   {
     type: "podcast-studio",

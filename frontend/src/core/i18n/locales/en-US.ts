@@ -540,11 +540,10 @@ export const enUS: Translations = {
         cases: [
           {
             id: "knowledge-card",
-            title: "Create glassmorphism knowledge cards",
-            description:
-              "Three themes, with SVG static cards and MP4 animation",
+            title: "Create an image-card series",
+            description: "A set of social image cards delivered as PNG files",
             prompt:
-              "Distill [topic] into three key takeaways and create a glassmorphism knowledge card. Choose one of three themes: tech blue, neon purple, or emerald green. Deliver an SVG static image and an MP4 animation.",
+              "Turn [topic] into a social image-card series for [audience]. Confirm the style, layout, and count first, then deliver PNG files.",
           },
           {
             id: "course-poster",
@@ -712,14 +711,10 @@ export const enUS: Translations = {
         "creative-studio": {
           title: "Course poster",
           description:
-            "Turn a topic and key points into clear, striking visual posters",
+            "Visual generation: posters, infographics, image cards, comics, and covers",
           mediaAlt: "Full-bleed editorial poster artwork",
           mediaLabel: "Topic → visual poster",
-          tags: [
-            "Key points → knowledge cards",
-            "Course → vertical poster",
-            "Knowledge → comic series",
-          ],
+          tags: ["Poster design", "Infographics", "Image cards"],
         },
         "ppt-master": {
           title: "PPT slides",

@@ -61,6 +61,8 @@ Example: `--style notion --layout dense` makes an intellectual knowledge card; a
 
 **Palette behavior**: no `--palette` → style's built-in colors; `--palette <name>` → overrides colors only, rendering rules unchanged. Some styles declare a `default_palette` (e.g., sketch-notes defaults to macaron).
 
+**Aspect ratio**: default `1:1` (`2048×2048` at 360 2K). Use `9:16` (`1152×2048`) for explicit vertical outputs and `16:9` (`2048×1152`) for landscape. Keep the prompt's aspect ratio and the backend `--ar` value identical; these are the only 360 output ratios.
+
 ## Styles (12)
 
 | Style | Description |

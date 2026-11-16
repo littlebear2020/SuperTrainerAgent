@@ -31,12 +31,12 @@ def test_podcast_soul_routes_four_modes_and_preserves_approval_boundary():
     assert "present_files" in soul
 
 
-def test_reseed_six_existing_plus_one_preserves_memory_and_is_idempotent(tmp_path, monkeypatch):
+def test_reseed_existing_agents_preserves_memory_and_is_idempotent(tmp_path, monkeypatch):
     seed_copy = tmp_path / "seed" / "agents"
     shutil.copytree(SEED_DIR, seed_copy)
     runtime = tmp_path / "runtime" / "agents"
     runtime.mkdir(parents=True)
-    old_names = ["co-writer", "course-assistant", "course-video", "creative-studio", "ppt-master", "vimax-video"]
+    old_names = ["co-writer", "course-video", "creative-studio", "ppt-master", "podcast-studio", "vimax-video"]
     for name in old_names:
         target = runtime / name
         target.mkdir()
@@ -47,7 +47,7 @@ def test_reseed_six_existing_plus_one_preserves_memory_and_is_idempotent(tmp_pat
     monkeypatch.setattr("app.gateway.seed.SEED_DIR", seed_copy)
     monkeypatch.setattr("deerflow.config.paths.get_paths", lambda: type("P", (), {"agents_dir": runtime})())
 
-    assert seed_agents() == 7
+    assert seed_agents() == 6
     assert (runtime / "podcast-studio" / "config.yaml").is_file()
     assert (runtime / "co-writer" / "memory.json").read_text(encoding="utf-8") == '{"facts":["keep"]}'
     backups = [path for path in runtime.iterdir() if ".bak." in path.name]

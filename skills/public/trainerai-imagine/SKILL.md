@@ -1,6 +1,6 @@
 ---
 name: trainerai-imagine
-description: AI 图片生成核心引擎，支持5家供应商（360 API/Google Gemini、OpenAI、Azure、智谱Z.AI、豆包Seedream）。默认优先使用360 API的google/gemini-3.1-flash-image-preview。提供批量生成、参考图引导和高质量预设。当任何技能需要AI生成图片时使用。触发词：'生成图片'、'AI画图'、'画一张'。
+description: AI 图片生成核心引擎，默认使用 360 API 的字节豆包 Seedream 5.0 Pro（bytedance/doubao-seedream-5.0-pro），也保留显式指定 OpenAI、Azure、智谱Z.AI、豆包Seedream（方舟）的能力。提供批量生成、参考图引导和高质量预设。当任何技能需要AI生成图片时使用。触发词：'生成图片'、'AI画图'、'画一张'。
 license: MIT
 metadata:
   openclaw:
@@ -10,18 +10,12 @@ metadata:
         - npx
 required-secrets:
   - name: QIHU_API_KEY
-  - name: OPENAI_API_KEY
-    optional: true
-  - name: AZURE_OPENAI_API_KEY
-    optional: true
-  - name: ARK_API_KEY
-    optional: true
 
 ---
 
 # Image Generation (AI SDK)
 
-Official API-based image generation. Supports 5 providers: **360 API (Google Gemini)** as primary, plus OpenAI GPT Image 2, Azure OpenAI, Z.AI GLM-Image, and Seedream (豆包).
+Official API-based image generation. Default primary: **360 API (ByteDance Seedream 5.0 Pro)**; explicit providers remain available: OpenAI GPT Image 2, Azure OpenAI, Z.AI GLM-Image, and Seedream (豆包/方舟).
 
 ## User Input Tools
 
@@ -75,8 +69,8 @@ tsx {baseDir}/scripts/main.ts --prompt "A cat" --image out.png --provider zai
 # Seedream (豆包)
 tsx {baseDir}/scripts/main.ts --prompt "A cat" --image out.png --provider seedream
 
-# 360 API (Google Gemini) — default primary
-tsx {baseDir}/scripts/main.ts --prompt "A cat" --image out.png --provider qihu360 --model google/gemini-3.1-flash-image-preview
+# 360 API (ByteDance Seedream 5.0 Pro) — default primary
+tsx {baseDir}/scripts/main.ts --prompt "A cat" --image out.png --provider qihu360 --model bytedance/doubao-seedream-5.0-pro
 
 # Batch mode
 tsx {baseDir}/scripts/main.ts --batchfile batch.json --jobs 4
@@ -91,13 +85,13 @@ tsx {baseDir}/scripts/main.ts --batchfile batch.json --jobs 4
 | `--image <path>` | Output image path (required in single-image mode) |
 | `--batchfile <path>` | JSON batch file for multi-image generation |
 | `--jobs <count>` | Worker count for batch mode (default: auto, max from config, built-in default 10) |
-| `--provider qihu360\|openai\|azure\|zai\|seedream` | Force provider (default: auto-detect: openai > seedream > qihu360 > azure > zai; **--ref auto-routes to seedream** for identity preservation) |
+| `--provider qihu360\|openai\|azure\|zai\|seedream` | Force provider (default: auto-detect: qihu360 when `QIHU_API_KEY` is set, else openai > seedream > azure > zai; **--ref also defaults to qihu360** when the key exists) |
 | `--model <id>`, `-m` | Model ID — see provider references for defaults and allowed values |
 | `--ar <ratio>` | Aspect ratio (`16:9`, `1:1`, `4:3`, …) |
 | `--size <WxH>` | Explicit size (e.g., `1024x1024`; for `gpt-image-2`, width/height must be multiples of 16, max edge 3840px, ratio no wider than 3:1) |
 | `--quality normal\|2k` | Quality preset (default: `2k`) |
 | `--imageApiDialect openai-native\|ratio-metadata` | OpenAI-compatible endpoint dialect — use `ratio-metadata` for gateways that expect aspect-ratio `size` plus `metadata.resolution` |
-| `--ref <files...>` | Reference images. Supported by OpenAI GPT Image edits, Azure OpenAI edits (PNG/JPG only), Seedream 5.0/4.5/4.0. Not supported by Seedream 3.0 or SeedEdit 3.0 |
+| `--ref <files...>` | Reference images. Supported by 360 Seedream (image edits), OpenAI GPT Image edits, Azure OpenAI edits (PNG/JPG only), Seedream 5.0/4.5/4.0. Not supported by Seedream 3.0 or SeedEdit 3.0 |
 | `--n <count>` | Number of images |
 | `--json` | JSON output |
 
@@ -109,7 +103,7 @@ tsx {baseDir}/scripts/main.ts --batchfile batch.json --jobs 4
 
 | Variable | Provider |
 |----------|----------|
-| `QIHU_API_KEY` | 360 API (Google Gemini) — **default primary** |
+| `QIHU_API_KEY` | 360 API (ByteDance Seedream 5.0 Pro) — **default primary** |
 | `OPENAI_API_KEY` | OpenAI |
 | `AZURE_OPENAI_API_KEY` | Azure OpenAI (also needs `AZURE_OPENAI_BASE_URL`) |
 | `ZAI_API_KEY` (alias `BIGMODEL_API_KEY`) | Z.AI |
@@ -120,7 +114,7 @@ tsx {baseDir}/scripts/main.ts --batchfile batch.json --jobs 4
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `QIHU_BASE_URL` | 360 API endpoint | `https://api.360.cn` |
-| `QIHU_IMAGE_MODEL` | 360 API model | `google/gemini-3.1-flash-image-preview` |
+| `QIHU_IMAGE_MODEL` | 360 API model | `bytedance/doubao-seedream-5.0-pro` |
 | `OPENAI_IMAGE_MODEL` | OpenAI model | `gpt-image-2` |
 | `ZAI_IMAGE_MODEL` / `BIGMODEL_IMAGE_MODEL` | Z.AI model | `glm-image` |
 | `SEEDREAM_IMAGE_MODEL` | Seedream model | `doubao-seedream-5-0-pro-260628` |
@@ -160,14 +154,15 @@ Use `openai-native` for the OpenAI native API or strict clones; try `ratio-metad
 
 ## Provider Selection
 
-1. `--ref` provided + no `--provider` → auto-select OpenAI → Azure → Seedream (qihu360 does not support reference images)
-2. `--provider` specified → use it (if `--ref`, must be openai/azure/seedream)
-3. Only one API key present → use that provider
-4. Multiple keys → default priority: **qihu360 → openai → azure → zai → seedream**
+1. `--provider` specified → use it (if `--ref`, must be qihu360/openai/azure/seedream)
+2. Model id starts with `bytedance/` + Seedream → qihu360; other Seedream/SeedEdit ids → seedream (Ark)
+3. No explicit provider/model and `QIHU_API_KEY` present → **qihu360**（含 `--ref`），不受其他 provider key 影响
+4. Otherwise `--ref` → auto-select Seedream → OpenAI → Azure
+5. Otherwise one key present → use that provider; multiple keys → openai → seedream → azure → zai
 
 ## Auto-Fallback
 
-No automatic fallback chain is configured by default. When the primary provider (openai/gpt-image-2) fails all 3 retry attempts, the generation fails with an error.
+No automatic fallback chain is configured by default. When the primary provider (qihu360 Seedream by default) fails all 3 retry attempts, the generation fails with an error.
 
 To enable a custom fallback chain, add to `.baoyu-skills/trainerai-imagine/EXTEND.md`:
 
@@ -184,12 +179,14 @@ fallback:
 | `normal` | Quick previews |
 | `2k` (default) | Covers, illustrations, infographics |
 
+For qihu360, both presets use the exact Seedream 2K tiers `2048x1152` / `2048x2048` / `1152x2048` (nearest-ratio mapping; top-level `size` is never sent).
 For OpenAI native `gpt-image-2`, `normal` maps to `quality=medium` and a low-latency valid size near the requested aspect ratio; `2k` maps to `quality=high` and 2048px-class sizes such as `2048x2048`, `2048x1152`, or `1152x2048`. Use explicit `--size` for valid custom or 4K outputs, e.g. `3840x2160`.
 
 ## Aspect Ratios
 
 Supported: `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `2.35:1`.
 
+- qihu360: nearest of the three Seedream tiers (`2048x1152`, `2048x2048`, `1152x2048`)
 - OpenAI: `gpt-image-2` uses the closest valid custom size for the requested ratio; older GPT Image and DALL·E models use their closest supported fixed size
 - Z.AI / Seedream: model-specific ratio handling
 

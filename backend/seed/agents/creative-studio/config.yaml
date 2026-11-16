@@ -1,9 +1,8 @@
 name: creative-studio
-description: "创意工作：知识卡片/海报/信息图/漫画/封面插图等视觉创作、案例研究与报告写作、视频剪辑——按产出物类型模式路由（2026-09-09 由 card-poster/case-article/design-specialist/knowledge-extraction/video-clip 五壳合并而成）"
+description: "创意工作：海报、信息图、图片卡片、漫画、文章封面与插图等视觉创作，按产出物类型路由到 7 个视觉生图技能（2026-11-16 收敛为视觉生图，研究写作与视频剪辑已移出）"
 model: null
-# tool_groups = 五壳并集（web 来自 design-specialist，deep-research 需要；其余为三件套
-# 原持有），无新增敏感面。memory_scope 不设 = per-agent 缺省（与五壳一致；旧壳记忆由
-# backend/scripts/migrate_retired_agent_memory.py 迁入本 agent 名下）。
+# tool_groups：web 供参考图/品牌资料检索，三件套负责脚本执行与产物落盘；无 video_engine。
+# memory_scope 不设 = per-agent 缺省（历史五壳记忆已迁入本 agent 名下）。
 tool_groups:
   - web
   - file:read
@@ -16,19 +15,7 @@ skills:
   - trainerai-infographic
   - trainerai-comic
   - trainerai-article-visuals
-  - knowledge-card-auto-generator
   - course-poster
-  - canvas-design
-  - deep-research
-  - data-analysis
-  - consulting-analysis
-  - chart-visualization
-  - docx
-  - pdf
-  - xlsx
-  - video-clip
-  - video-dl
-  - video-frames
 category: public
 created_by: admin
 created_at: "2026-09-09T00:00:00+00:00"

@@ -4,7 +4,7 @@ Create a knowledge biography comic page following these guidelines:
 
 - **Type**: Comic book page with multiple panels
 - **Orientation**: Portrait (vertical)
-- **Aspect Ratio**: 2:3
+- **Aspect Ratio**: 9:16
 - **Style**: See style-specific reference for visual guidelines
 
 ## Panel Structure

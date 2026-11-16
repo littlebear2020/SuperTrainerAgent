@@ -11,7 +11,7 @@ Black chalkboard background with colorful chalk drawing aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | dual | triptych
 
 image_effects:

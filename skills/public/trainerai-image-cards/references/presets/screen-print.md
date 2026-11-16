@@ -11,7 +11,7 @@ Bold poster art with halftone textures, limited colors, and symbolic storytellin
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | dual
 
 image_effects:

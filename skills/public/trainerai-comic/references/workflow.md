@@ -454,7 +454,7 @@ Character sheet is recommended for multi-page comics with recurring characters, 
 - Invoke that installed skill via its documented interface, not by calling its scripts directly
 - For every page, use `prompts/01-page-xxx.md` as the prompt-file input
 - Save output to `01-page-xxx.png`
-- Use aspect ratio from storyboard (default `3:4`, preset may override)
+- Use aspect ratio from storyboard (default `9:16`, preset may override)
 - Pass `characters/characters.png` (or compressed version) as `--ref`
 
 **`--ref` failure recovery**:

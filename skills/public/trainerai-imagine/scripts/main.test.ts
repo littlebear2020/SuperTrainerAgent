@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
@@ -21,6 +23,11 @@ import {
   parseSimpleYaml,
   validateReferenceImages,
 } from "./main.ts";
+import {
+  buildGenerationsBody,
+  generateImage,
+  getDefaultModel,
+} from "./providers/qihu360.ts";
 
 function makeArgs(overrides: Partial<CliArgs> = {}): CliArgs {
   return {
@@ -71,8 +78,119 @@ function useEnv(
   });
 }
 
+const PROVIDER_ENV_KEYS = [
+  "OPENAI_API_KEY",
+  "OPENAI_BASE_URL",
+  "OPENAI_IMAGE_MODEL",
+  "OPENAI_IMAGE_USE_CHAT",
+  "AZURE_OPENAI_API_KEY",
+  "AZURE_OPENAI_BASE_URL",
+  "AZURE_OPENAI_DEPLOYMENT",
+  "AZURE_OPENAI_IMAGE_MODEL",
+  "AZURE_API_VERSION",
+  "ZAI_API_KEY",
+  "BIGMODEL_API_KEY",
+  "ZAI_IMAGE_MODEL",
+  "BIGMODEL_IMAGE_MODEL",
+  "ZAI_BASE_URL",
+  "BIGMODEL_BASE_URL",
+  "ARK_API_KEY",
+  "SEEDREAM_IMAGE_MODEL",
+  "SEEDREAM_BASE_URL",
+  "QIHU_API_KEY",
+  "QIHU_IMAGE_MODEL",
+  "QIHU_BASE_URL",
+] as const;
+
+function useProviderEnv(
+  t: TestContext,
+  values: Record<string, string | null> = {},
+): void {
+  const cleared = Object.fromEntries(
+    PROVIDER_ENV_KEYS.map((key) => [key, null]),
+  ) as Record<string, string | null>;
+  useEnv(t, { ...cleared, ...values });
+}
+
+const PNG_BYTES = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const PNG_BASE64 = "iVBORw0KGgo=";
+const JPEG_BYTES = Uint8Array.from([255, 216, 255, 224]);
+
 async function makeTempDir(prefix: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), prefix));
+}
+
+async function makeQihuStub(t: TestContext) {
+  let requestCount = 0;
+  const server = createServer((request, response) => {
+    requestCount += 1;
+    request.resume();
+    request.on("end", () => {
+      response.writeHead(200, {
+        "Content-Type": "application/json",
+        Connection: "close",
+      });
+      response.end(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  t.after(() => new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+  }));
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("QIHU stub did not bind to a TCP port");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    get requestCount() {
+      return requestCount;
+    },
+  };
+}
+
+function runMainCli(
+  args: string[],
+  cwd: string,
+  qihuBaseUrl: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "npx",
+      ["--no-install", "tsx", path.join(import.meta.dirname, "main.ts"), ...args],
+      {
+        cwd,
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: cwd,
+          npm_config_cache:
+            process.env.npm_config_cache ?? path.join(os.homedir(), ".npm"),
+          QIHU_API_KEY: "offline-test-key",
+          QIHU_BASE_URL: qihuBaseUrl,
+          QIHU_IMAGE_MODEL: "bytedance/doubao-seedream-5.0-pro",
+        },
+        timeout: 30_000,
+      },
+      (error, stdout, stderr) => {
+        if (error && typeof error.code !== "number") {
+          reject(error);
+          return;
+        }
+        resolve({
+          code: typeof error?.code === "number" ? error.code : 0,
+          stdout,
+          stderr,
+        });
+      },
+    );
+  });
 }
 
 test("parseArgs parses the main trainerai-imagine CLI flags", () => {
@@ -328,7 +446,7 @@ test("detectProvider rejects non-ref-capable providers and prefers first availab
     /Reference images require a ref-capable provider/,
   );
 
-  useEnv(t, {
+  useProviderEnv(t, {
     OPENAI_API_KEY: "openai-key",
     ARK_API_KEY: null,
   });
@@ -336,7 +454,7 @@ test("detectProvider rejects non-ref-capable providers and prefers first availab
 });
 
 test("detectProvider selects an available ref-capable provider for reference-image tasks", (t) => {
-  useEnv(t, {
+  useProviderEnv(t, {
     OPENAI_API_KEY: "openai-key",
     AZURE_OPENAI_API_KEY: null,
     AZURE_OPENAI_BASE_URL: null,
@@ -349,7 +467,7 @@ test("detectProvider selects an available ref-capable provider for reference-ima
 });
 
 test("detectProvider selects Azure when only Azure credentials are configured", (t) => {
-  useEnv(t, {
+  useProviderEnv(t, {
     OPENAI_API_KEY: null,
     AZURE_OPENAI_API_KEY: "azure-key",
     AZURE_OPENAI_BASE_URL: "https://example.openai.azure.com",
@@ -364,7 +482,7 @@ test("detectProvider selects Azure when only Azure credentials are configured", 
 });
 
 test("detectProvider selects Z.AI when credentials are present or the model id matches", (t) => {
-  useEnv(t, {
+  useProviderEnv(t, {
     OPENAI_API_KEY: null,
     AZURE_OPENAI_API_KEY: null,
     AZURE_OPENAI_BASE_URL: null,
@@ -378,7 +496,7 @@ test("detectProvider selects Z.AI when credentials are present or the model id m
 });
 
 test("detectProvider infers Seedream from model id and allows Seedream reference-image workflows", (t) => {
-  useEnv(t, {
+  useProviderEnv(t, {
     OPENAI_API_KEY: null,
     ARK_API_KEY: "ark-key",
   });
@@ -404,10 +522,10 @@ test("detectProvider infers Seedream from model id and allows Seedream reference
   );
 });
 
-test("detectProvider prefers openai (gpt-image-2) for plain text-to-image when multiple keys exist (2026-08-08 default switch)", (t) => {
-  // New default order: openai > seedream > qihu360 > azure > zai.
-  // Pins the behavior change: with OPENAI+ARK+QIHU all set, default must be openai.
-  useEnv(t, {
+test("detectProvider prefers qihu360 for plain text-to-image when QIHU is present (2026-11-16 default switch)", (t) => {
+  // 2026-11-16: 默认配图通道收敛为 360 Seedream（bytedance/doubao-seedream-5.0-pro）。
+  // QIHU+OPENAI+ARK 同时存在时默认仍必须是 qihu360。
+  useProviderEnv(t, {
     OPENAI_API_KEY: "openai-key",
     ARK_API_KEY: "ark-key",
     QIHU_API_KEY: "qihu-key",
@@ -417,13 +535,33 @@ test("detectProvider prefers openai (gpt-image-2) for plain text-to-image when m
     BIGMODEL_API_KEY: null,
   });
 
-  assert.equal(detectProvider(makeArgs()), "openai");
+  assert.equal(detectProvider(makeArgs()), "qihu360");
 });
 
-test("detectProvider auto-routes --ref to seedream even when openai is available (identity preservation, 2026-08-08)", (t) => {
-  // gpt-image-2 via 360 has identity drift on reference editing; --ref must
-  // prefer seedream (Ark direct) whenever ARK_API_KEY is present.
-  useEnv(t, {
+test("detectProvider infers OpenAI from an explicit gpt-image model instead of applying the QIHU default", (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    OPENAI_API_KEY: "openai-key",
+  });
+
+  assert.equal(detectProvider(makeArgs({ model: "gpt-image-2" })), "openai");
+  assert.equal(
+    detectProvider(makeArgs({ model: "openai/gpt-image-1.5" })),
+    "openai",
+  );
+});
+
+test("detectProvider does not send an explicit gpt-image model to QIHU when OpenAI is unavailable", (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+
+  assert.throws(
+    () => detectProvider(makeArgs({ model: "gpt-image-2" })),
+    /OPENAI_API_KEY/,
+  );
+});
+
+test("detectProvider auto-routes --ref to qihu360 when QIHU is available", (t) => {
+  useProviderEnv(t, {
     OPENAI_API_KEY: "openai-key",
     ARK_API_KEY: "ark-key",
     QIHU_API_KEY: "qihu-key",
@@ -435,8 +573,480 @@ test("detectProvider auto-routes --ref to seedream even when openai is available
 
   assert.equal(
     detectProvider(makeArgs({ referenceImages: ["ref.png"] })),
-    "seedream",
+    "qihu360",
   );
+});
+
+test("detectProvider infers qihu360 from bytedance seedream model ids", (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    OPENAI_API_KEY: null,
+    ARK_API_KEY: null,
+    AZURE_OPENAI_API_KEY: null,
+    AZURE_OPENAI_BASE_URL: null,
+    ZAI_API_KEY: null,
+    BIGMODEL_API_KEY: null,
+  });
+
+  assert.equal(
+    detectProvider(makeArgs({ model: "bytedance/doubao-seedream-5.0-pro" })),
+    "qihu360",
+  );
+});
+
+test("detectProvider keeps an explicit --provider over the QIHU default", (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    OPENAI_API_KEY: "openai-key",
+    ARK_API_KEY: null,
+    AZURE_OPENAI_API_KEY: null,
+    AZURE_OPENAI_BASE_URL: null,
+    ZAI_API_KEY: null,
+    BIGMODEL_API_KEY: null,
+  });
+
+  assert.equal(detectProvider(makeArgs({ provider: "openai" })), "openai");
+});
+
+test("detectProvider allows explicit qihu360 reference-image edits", (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    OPENAI_API_KEY: null,
+    ARK_API_KEY: null,
+    AZURE_OPENAI_API_KEY: null,
+    AZURE_OPENAI_BASE_URL: null,
+    ZAI_API_KEY: null,
+    BIGMODEL_API_KEY: null,
+  });
+
+  assert.equal(
+    detectProvider(
+      makeArgs({ provider: "qihu360", referenceImages: ["ref.png"] }),
+    ),
+    "qihu360",
+  );
+});
+
+test("qihu360 body requests PNG in extra_body and maps sizes to the three Seedream tiers", () => {
+  const model = "bytedance/doubao-seedream-5.0-pro";
+  const landscape = buildGenerationsBody("prompt", model, makeArgs({ aspectRatio: "16:9" }));
+  assert.deepEqual(landscape, {
+    model,
+    prompt: "prompt",
+    extra_body: { size: "2048x1152", watermark: false, output_format: "png" },
+  });
+  assert.equal("size" in landscape, false);
+  assert.equal("sequential_image_generation" in landscape, false);
+
+  const square = buildGenerationsBody("prompt", model, makeArgs({ aspectRatio: "1:1" }));
+  assert.deepEqual(square.extra_body, {
+    size: "2048x2048",
+    watermark: false,
+    output_format: "png",
+  });
+
+  const portrait = buildGenerationsBody("prompt", model, makeArgs({ aspectRatio: "9:16" }));
+  assert.deepEqual(portrait.extra_body, {
+    size: "1152x2048",
+    watermark: false,
+    output_format: "png",
+  });
+});
+
+test("qihu360 explicit size takes precedence over aspect ratio before tier mapping", () => {
+  const body = buildGenerationsBody(
+    "prompt",
+    "bytedance/doubao-seedream-5.0-pro",
+    makeArgs({ aspectRatio: "9:16", size: "1600x900" }),
+  );
+
+  assert.equal(
+    (body.extra_body as { size: string }).size,
+    "2048x1152",
+  );
+});
+
+test("qihu360 default model is the 360 Seedream 5.0 Pro id", (t) => {
+  useProviderEnv(t);
+  assert.equal(getDefaultModel(), "bytedance/doubao-seedream-5.0-pro");
+});
+
+test("qihu360 generateImage posts generations, downloads the image, and never sends top-level size", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    if (calls.length === 1) {
+      return new Response(
+        JSON.stringify({ data: [{ url: "https://cdn.example/x.png" }] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(PNG_BYTES, {
+      status: 200,
+      headers: { "Content-Type": "image/png" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const bytes = await generateImage(
+    "a course cover",
+    getDefaultModel(),
+    makeArgs({ aspectRatio: "16:9" }),
+  );
+
+  assert.deepEqual([...bytes], [...PNG_BYTES]);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0]!.url, "https://api.360.cn/v1/images/generations");
+  assert.equal(calls[1]!.url, "https://cdn.example/x.png");
+  const body = JSON.parse(String(calls[0]!.init.body));
+  assert.equal(body.model, "bytedance/doubao-seedream-5.0-pro");
+  assert.deepEqual(body.extra_body, {
+    size: "2048x1152",
+    watermark: false,
+    output_format: "png",
+  });
+  assert.equal("size" in body, false);
+  assert.equal("sequential_image_generation" in body, false);
+});
+
+test("qihu360 downloads the URL when a response also contains non-image b64_json", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const calls: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    calls.push(url);
+    if (calls.length === 1) {
+      return new Response(JSON.stringify({
+        data: [
+          {
+            url: "https://cdn.example/usable.png",
+            b64_json: Buffer.alloc(33, 0x41).toString("base64"),
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(PNG_BYTES, {
+      status: 200,
+      headers: { "Content-Type": "image/png" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const bytes = await generateImage("prompt", getDefaultModel(), makeArgs());
+
+  assert.deepEqual([...bytes], [...PNG_BYTES]);
+  assert.deepEqual(calls, [
+    "https://api.360.cn/v1/images/generations",
+    "https://cdn.example/usable.png",
+  ]);
+});
+
+const urlFailureCases: Array<{
+  name: string;
+  respond: () => Promise<Response>;
+}> = [
+  {
+    name: "HTTP status failure",
+    respond: async () => new Response("unavailable", {
+      status: 503,
+      statusText: "Service Unavailable",
+    }),
+  },
+  {
+    name: "network failure",
+    respond: async () => {
+      throw Object.assign(new Error("connect timeout"), {
+        cause: { code: "UND_ERR_CONNECT_TIMEOUT" },
+      });
+    },
+  },
+  {
+    name: "response stream failure",
+    respond: async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      arrayBuffer: () => Promise.reject(new Error("stream reset mid-body")),
+    }) as unknown as Response,
+  },
+];
+
+for (const failure of urlFailureCases) {
+  test(`qihu360 falls back to valid b64_json after URL ${failure.name}`, async (t) => {
+    useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+    const calls: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (calls.length === 1) {
+        return new Response(JSON.stringify({
+          data: [
+            {
+              url: "https://cdn.example/unavailable.png",
+              b64_json: PNG_BASE64,
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return failure.respond();
+    }) as typeof fetch;
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    const bytes = await generateImage("prompt", getDefaultModel(), makeArgs());
+
+    assert.deepEqual([...bytes], [...PNG_BYTES]);
+    assert.deepEqual(calls, [
+      "https://api.360.cn/v1/images/generations",
+      "https://cdn.example/unavailable.png",
+    ]);
+  });
+}
+
+test("qihu360 rejects legacy Gemini and other non-Seedream models before any request", async (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    QIHU_IMAGE_MODEL: "google/gemini-3.1-flash-image-preview",
+  });
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    generateImage("prompt", getDefaultModel(), makeArgs()),
+    /supports only Seedream models/,
+  );
+  await assert.rejects(
+    generateImage("prompt", "gpt-image-2", makeArgs()),
+    /supports only Seedream models/,
+  );
+  assert.equal(calls, 0);
+});
+
+test("qihu360 rejects every image count other than one before any request", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  for (const n of [0, 2, 4]) {
+    await assert.rejects(
+      generateImage("prompt", getDefaultModel(), makeArgs({ n })),
+      /exactly one output image/,
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("qihu360 rejects JPEG bytes instead of returning them for saving as PNG", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({
+        data: [{ b64_json: Buffer.from(JPEG_BYTES).toString("base64") }],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    generateImage("prompt", getDefaultModel(), makeArgs()),
+    /JPEG data; expected PNG magic bytes/,
+  );
+});
+
+test("qihu360 edits request PNG output in extra_body", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  let outputFormat: unknown;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    const requestBody = JSON.parse(String(init?.body));
+    outputFormat = requestBody.extra_body.output_format;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await generateImage(
+    "edit",
+    getDefaultModel(),
+    makeArgs({ referenceImages: ["data:image/png;base64,AQID"] }),
+  );
+
+  assert.equal(outputFormat, "png");
+});
+
+test("qihu360 edits encode PNG, JPEG, BMP, and TIFF references with the right MIME", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const tmp = await makeTempDir("qihu-ref-");
+  t.after(() => fs.rm(tmp, { recursive: true, force: true }));
+  const first = path.join(tmp, "a.png");
+  const second = path.join(tmp, "b.jpg");
+  const bmp = path.join(tmp, "c.bmp");
+  const tiff = path.join(tmp, "d.tiff");
+  const tif = path.join(tmp, "e.tif");
+  await fs.writeFile(first, Buffer.from([1, 2, 3]));
+  await fs.writeFile(second, Buffer.from([4, 5, 6]));
+  await fs.writeFile(bmp, Buffer.from([7, 8, 9]));
+  await fs.writeFile(tiff, Buffer.from([10, 11, 12]));
+  await fs.writeFile(tif, Buffer.from([13, 14, 15]));
+
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const single = await generateImage(
+    "edit",
+    getDefaultModel(),
+    makeArgs({ referenceImages: [first] }),
+  );
+  assert.deepEqual([...single], [...PNG_BYTES]);
+  assert.equal(calls[0]!.url, "https://api.360.cn/v1/images/edits");
+  const singleBody = JSON.parse(String(calls[0]!.init.body));
+  assert.equal(typeof singleBody.extra_body.image, "string");
+  assert.match(singleBody.extra_body.image, /^data:image\/png;base64,/);
+
+  const multiple = await generateImage(
+    "edit",
+    getDefaultModel(),
+    makeArgs({ referenceImages: [first, second, bmp, tiff, tif] }),
+  );
+  assert.deepEqual([...multiple], [...PNG_BYTES]);
+  assert.equal(calls[1]!.url, "https://api.360.cn/v1/images/edits");
+  const multiBody = JSON.parse(String(calls[1]!.init.body));
+  assert.equal(Array.isArray(multiBody.extra_body.image), true);
+  assert.equal(multiBody.extra_body.image.length, 5);
+  assert.match(multiBody.extra_body.image[1], /^data:image\/jpeg;base64,/);
+  assert.match(multiBody.extra_body.image[2], /^data:image\/bmp;base64,/);
+  assert.match(multiBody.extra_body.image[3], /^data:image\/tiff;base64,/);
+  assert.match(multiBody.extra_body.image[4], /^data:image\/tiff;base64,/);
+});
+
+test("qihu360 single-image CLI rejects a JPG output before fetch and defaults an extensionless output to PNG", async (t) => {
+  const root = await makeTempDir("trainerai-imagine-single-output-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stub = await makeQihuStub(t);
+  const jpgPath = path.join(root, "cover.jpg");
+
+  const rejected = await runMainCli(
+    [
+      "--provider",
+      "qihu360",
+      "--model",
+      "bytedance/doubao-seedream-5.0-pro",
+      "--prompt",
+      "course cover",
+      "--image",
+      jpgPath,
+    ],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.notEqual(rejected.code, 0);
+  assert.match(rejected.stderr, /qihu360 supports only PNG output paths/);
+  assert.equal(stub.requestCount, 0);
+  await assert.rejects(fs.access(jpgPath));
+
+  const extensionlessPath = path.join(root, "cover");
+  const generated = await runMainCli(
+    [
+      "--provider",
+      "qihu360",
+      "--model",
+      "bytedance/doubao-seedream-5.0-pro",
+      "--prompt",
+      "course cover",
+      "--image",
+      extensionlessPath,
+    ],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.equal(generated.code, 0, generated.stderr);
+  assert.equal(stub.requestCount, 1);
+  const saved = await fs.readFile(`${extensionlessPath}.png`);
+  assert.deepEqual([...saved], [...PNG_BYTES]);
+});
+
+test("qihu360 batch CLI rejects a WebP output during preparation without fetching", async (t) => {
+  const root = await makeTempDir("trainerai-imagine-batch-output-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stub = await makeQihuStub(t);
+  const webpPath = path.join(root, "cover.webp");
+  const batchPath = path.join(root, "batch.json");
+  await fs.writeFile(batchPath, JSON.stringify({
+    tasks: [
+      {
+        id: "cover",
+        provider: "qihu360",
+        model: "bytedance/doubao-seedream-5.0-pro",
+        prompt: "course cover",
+        image: webpPath,
+      },
+    ],
+  }));
+
+  const result = await runMainCli(
+    ["--batchfile", batchPath, "--json"],
+    root,
+    stub.baseUrl,
+  );
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /qihu360 supports only PNG output paths/);
+  assert.equal(stub.requestCount, 0);
+  await assert.rejects(fs.access(webpPath));
 });
 
 test("batch worker and provider-rate-limit configuration prefer env over EXTEND config", (t) => {

@@ -4,13 +4,13 @@ Core canvas specifications and layout grids for Xiaohongshu infographics.
 
 ## Aspect Ratios
 
-| Name | Ratio | Pixels | Note |
-|------|-------|--------|------|
-| portrait-3-4 | 3:4 | 1242×1660 | Highest traffic on XHS (recommended) |
-| square | 1:1 | 1242×1242 | Second recommended |
-| portrait-2-3 | 2:3 | 1242×1863 | Taller format |
+| Name | Ratio | 360 2K Pixels | Note |
+|------|-------|---------------|------|
+| square | 1:1 | 2048×2048 | Default for image cards |
+| portrait-9-16 | 9:16 | 1152×2048 | Explicit vertical scenes |
+| landscape | 16:9 | 2048×1152 | Landscape scenes |
 
-**Default**: portrait-3-4 for maximum engagement.
+**Default**: square. Use portrait-9-16 only when the user explicitly needs a vertical card; keep the prompt ratio and backend `--ar` value identical.
 
 ## Safe Zones
 

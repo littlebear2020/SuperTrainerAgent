@@ -12,7 +12,7 @@ Hand-drawn educational infographic with slight line wobble, like a high-quality 
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | dual
 
 image_effects:
