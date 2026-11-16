@@ -60,4 +60,6 @@ python3 /mnt/skills/public/podcast-studio/scripts/podcast_studio.py validate --s
 
 ## 密钥纪律
 
-frontmatter 只声明 `VOLCENGINE_VOICE_ACCESS_KEY`。AUTOBIND 默认关闭；只有用户当场批准实际变量名集合后，才可在本地 Gateway 进程级临时开启 `DEER_FLOW_SKILL_SECRET_AUTOBIND=1`。它是所有带 bash Agent 的全局 bash 注入，不是 podcast 专属。不得修改 compose、`.env*`、Docker 或部署文档，不得在稿件、日志或交付物中记录密钥值。缺少授权或密钥时必须 fail-closed。
+frontmatter 只声明 `VOLCENGINE_VOICE_ACCESS_KEY`。当前 Agent 的 `available_skills` 包含本技能、本公共技能已启用且 Gateway 进程已有该值时，bash 默认按声明注入此键，无需开启 AUTOBIND；该默认通道在全平台也只允许 `QIHU_API_KEY` 与 `VOLCENGINE_VOICE_ACCESS_KEY`，active/request secrets 仍优先。extensions 配置读取或解析失败时默认通道零注入，正常无配置仍按公共技能默认启用处理。
+
+`DEER_FLOW_SKILL_SECRET_AUTOBIND=1` 仅是 runtime 没有 `available_skills` 时的 legacy 显式回退：它注入「全部启用技能的 required-secrets 声明并集（required/optional 均计入）∩ Gateway env」，不是 podcast 专属，也不是正常播客流程的必需项。只有用户当场批准实际变量名集合后才可临时开启。播客工作流不得为注入密钥修改 compose、`.env*`、Docker 或部署文档，不得在稿件、日志或交付物中记录密钥值。缺少授权或密钥时必须 fail-closed。

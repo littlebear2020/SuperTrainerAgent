@@ -626,6 +626,11 @@ class SubagentExecutor:
                 # Unset only when that method was replaced by a test double.
                 "recursion_limit": self._recursion_limit or self.config.max_turns,
             }
+            # 2026-11-16 Task 1：把子代理自己的有效技能白名单交给 bash 注入层，
+            # 宿主密钥只按这份白名单内的公共启用技能声明注入（None = 继承全部）。
+            run_config["metadata"] = {
+                "available_skills": sorted(self.config.skills) if self.config.skills is not None else None,
+            }
             context = {}
             if self.thread_id:
                 run_config["configurable"] = {"thread_id": self.thread_id}

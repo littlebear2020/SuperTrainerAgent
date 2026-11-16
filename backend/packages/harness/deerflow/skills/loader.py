@@ -24,7 +24,14 @@ def get_skills_root_path() -> Path:
     return skills_dir
 
 
-def load_skills(skills_path: Path | None = None, use_config: bool = True, enabled_only: bool = False, *, app_config: AppConfig | None = None) -> list[Skill]:
+def load_skills(
+    skills_path: Path | None = None,
+    use_config: bool = True,
+    enabled_only: bool = False,
+    *,
+    app_config: AppConfig | None = None,
+    strict_extensions_config: bool = False,
+) -> list[Skill]:
     """
     Load all skills from the skills directory.
 
@@ -37,6 +44,8 @@ def load_skills(skills_path: Path | None = None, use_config: bool = True, enable
                      Otherwise defaults to deer-flow/skills
         use_config: Whether to load skills path from config (default: True)
         enabled_only: If True, only return enabled skills (default: False)
+        strict_extensions_config: If True, propagate extensions config read/parse errors
+                     instead of falling back to the default enabled state
 
     Returns:
         List of Skill objects, sorted by name
@@ -92,8 +101,9 @@ def load_skills(skills_path: Path | None = None, use_config: bool = True, enable
         for skill in skills:
             skill.enabled = extensions_config.is_skill_enabled(skill.name, skill.category)
     except Exception as e:
-        # If config loading fails, default to all enabled
         logger.warning("Failed to load extensions config: %s", e)
+        if strict_extensions_config:
+            raise
 
     # Filter by enabled status if requested
     if enabled_only:

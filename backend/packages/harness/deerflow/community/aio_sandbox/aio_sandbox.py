@@ -98,6 +98,7 @@ class AioSandbox(Sandbox):
         self._base_url = base_url
         self._client = AioSandboxClient(base_url=base_url, timeout=600)
         self._home_dir = home_dir
+        self._bash_session_id: str | None = None
         self._lock = threading.Lock()
 
     @property
@@ -116,8 +117,9 @@ class AioSandbox(Sandbox):
         """评审二轮修复（H1 消费端）：经 bash.exec 通道按调用注入 env。
 
         bash.exec 与 shell.exec_command 是并列 API（独立会话空间），支持
-        ``env`` 参数——这正是上游 required-secrets 注入链的消费端。超时
-        双闸语义与主路径一致（hard=墙钟）；死亡打标复用同一指纹清单。
+        ``env`` 参数——这正是上游 required-secrets 注入链的消费端。首次调用
+        保存返回的 session_id，后续复用以保留 cwd；超时双闸语义与主路径一致
+        （hard=墙钟），死亡打标复用同一指纹清单。
 
         返回形状注意（2026-10-13 公司服务器实测修正）：bash.exec 的 data 是
         ``stdout``/``stderr``/``exit_code``——与 shell.exec_command 的
@@ -128,18 +130,28 @@ class AioSandbox(Sandbox):
         with self._lock:
             effective_timeout = _effective_command_timeout(timeout)
             try:
-                result = self._client.bash.exec(
-                    command=command,
-                    env=env,
-                    timeout=effective_timeout,
-                    hard_timeout=effective_timeout,
-                )
+                exec_kwargs = {
+                    "command": command,
+                    "env": env,
+                    "timeout": effective_timeout,
+                    "hard_timeout": effective_timeout,
+                }
+                if self._bash_session_id is not None:
+                    exec_kwargs["session_id"] = self._bash_session_id
+                result = self._client.bash.exec(**exec_kwargs)
                 parts: list[str] = []
+                exit_code = None
                 if result.data is not None:
+                    returned_session_id = getattr(result.data, "session_id", None)
+                    if returned_session_id:
+                        self._bash_session_id = returned_session_id
                     if result.data.stdout:
                         parts.append(result.data.stdout)
                     if result.data.stderr:
                         parts.append(result.data.stderr)
+                    exit_code = result.data.exit_code
+                if exit_code not in (None, 0):
+                    parts.append(f"Exit Code: {exit_code}")
                 return "\n".join(parts)
             except Exception as e:
                 logger.error(f"Failed to execute command with env in sandbox: {e}")
@@ -154,10 +166,9 @@ class AioSandbox(Sandbox):
         a per-command cap replacing the previously hardcoded 600s default.
 
         ``env``（评审二轮修复，2026-09-30）：非空时切换到 SDK 的 ``bash.exec``
-        单命令通道按调用注入环境变量——值不进命令串、不驻留容器 env
-        （`env` dump 不可见，仅本条命令可见）；为空走既有持久 shell 会话
-        路径（行为零变化）。带 env 的执行不经持久会话（无 cwd 续接），
-        技能脚本场景无会话依赖。
+        通道按调用注入环境变量——值不进命令串、不驻留容器 env（仅本条命令
+        可见）；为空走既有持久 shell 会话路径（行为零变化）。带 env 的执行
+        复用 bash.exec 返回的 session_id，保持该通道内的 cwd 续接。
 
         Uses a lock to serialize concurrent requests. The AIO sandbox
         container maintains a single persistent shell session that
