@@ -341,6 +341,31 @@ describe("AgentShowcase", () => {
     expect(pause).toHaveBeenCalled();
   });
 
+  it("renders both audio and non-audio cases for a mixed-media agent", async () => {
+    const videoAgent = showcaseFor("course-video")!;
+    const podcastAgent = showcaseFor("podcast-studio")!;
+    const mixedAgent = {
+      ...videoAgent,
+      cases: [videoAgent.cases[0]!, podcastAgent.cases[0]!],
+    };
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN">
+          <AgentShowcase
+            agent={mixedAgent}
+            disabled={false}
+            onUsePrompt={onUsePrompt}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    expect(container.querySelectorAll("article")).toHaveLength(2);
+    expect(element("showcase-open-video-hallucination")).not.toBeNull();
+    expect(element("showcase-play-podcast-context")).not.toBeNull();
+    expect(document.querySelectorAll("audio")).toHaveLength(1);
+  });
+
   it("cancels a pending dialog focus return when the showcase unmounts", async () => {
     vi.useFakeTimers();
     await renderShowcase();
