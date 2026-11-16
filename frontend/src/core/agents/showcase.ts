@@ -91,10 +91,10 @@ const infoQ: ShowcaseSource = {
 };
 const economicReference: ShowcaseSource = {
   label: text(
-    "经济参考报 2026-11-13",
-    "Economic Information Daily, Nov 13, 2026",
+    "经济参考报 / 新华网 2026-11-13",
+    "Economic Information Daily / Xinhua, Nov 13, 2026",
   ),
-  url: "http://dz.jjckb.cn/www/pages/webpage2009/html/2026-11/13/content_119841.htm",
+  url: "https://www.news.cn/liangzi/20261113/2388cc955dad4f059806ad95f3564694/c.html",
 };
 const kubeCon: ShowcaseSource = {
   label: text("KubeCon 2026 观察", "KubeCon 2026 observations"),
@@ -534,8 +534,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
             url: "https://english.news.cn/20260414/5b2a807212414d68a59b55911bb54427/c.html",
           },
           {
-            label: text("中国网 · 服装工厂", "China.org.cn · Garment factory"),
-            url: "http://www.china.org.cn/2026-07/25/content_118617360.shtml",
+            label: text("新华社 · 服装工厂", "Xinhua · Garment factory"),
+            url: "https://english.news.cn/20260724/7f92e0d48a124a98b66dee32c9759c2d/c.html",
           },
         ],
         transcript: [

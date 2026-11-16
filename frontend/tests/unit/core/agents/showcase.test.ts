@@ -187,4 +187,19 @@ describe("Agent showcase data and assets", () => {
       );
     }
   });
+
+  it("uses HTTPS for every external source", () => {
+    const sources = agentIds.flatMap((id) =>
+      agent(id).cases.flatMap((item) => {
+        if (item.kind === "video" || item.kind === "podcast") {
+          return item.sources ?? [];
+        }
+        return [];
+      }),
+    );
+    expect(sources.length).toBeGreaterThan(0);
+    for (const source of sources) {
+      expect(new URL(source.url).protocol, source.url).toBe("https:");
+    }
+  });
 });
