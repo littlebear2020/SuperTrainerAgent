@@ -508,10 +508,10 @@ export const zhCN: Translations = {
         cases: [
           {
             id: "knowledge-card",
-            title: "生成毛玻璃知识卡",
-            description: "三种主题，交付 SVG 静态图与 MP4 动画",
+            title: "做一套图片卡片",
+            description: "成组社交图片卡片，确认风格与张数后交付 PNG",
             prompt:
-              "请把[主题]整理为3个核心要点，制作毛玻璃风格知识卡。使用科技蓝、霓虹紫或翡翠绿三种主题之一，交付SVG静态图和MP4动画。",
+              "请把[主题]做成一套社交图片卡片，面向[受众]。先确认风格、布局和张数，再交付 PNG。",
           },
           {
             id: "course-poster",
@@ -662,10 +662,10 @@ export const zhCN: Translations = {
         },
         "creative-studio": {
           title: "课程海报",
-          description: "把主题与要点做成清晰、醒目的视觉海报",
+          description: "视觉生图：海报、信息图、图片卡片、漫画与封面",
           mediaAlt: "层次分明、全幅构图的海报设计配图",
           mediaLabel: "主题→视觉海报",
-          tags: ["要点变知识卡", "课程变竖版海报", "知识变连续漫画"],
+          tags: ["海报设计", "信息图", "图片卡片"],
         },
         "ppt-master": {
           title: "PPT课件",

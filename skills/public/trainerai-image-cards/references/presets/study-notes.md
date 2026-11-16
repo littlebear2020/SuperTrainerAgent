@@ -11,7 +11,7 @@ Realistic handwritten photo aesthetic - student notes style, dense and messy but
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single
 
 image_effects:

@@ -14,10 +14,9 @@ import {
 } from "./video-gen/video-gen-create-dialog";
 
 // 关键词 → Agent 映射（按优先级顺序匹配）。
-// 2026-09-22 工作台恢复：路由表同步收缩到现役 6 agent——course-ppt 关键词由
-// ppt-master 承接（09-11 退役）；card-poster/knowledge-extraction/design-specialist/
-// video-clip 关键词由 creative-studio 承接（09-09 五壳合并）；case-article 关键词
-// 由 co-writer 承接（专职写作入口）。无命中落 course-assistant 兜底。
+// 2026-11-16：creative-studio 收敛为视觉生图入口，剪辑与知识萃取关键词已移除
+// （不再路由到它）；ppt-master 承接 course-ppt 关键词（09-11 退役）；写作类由
+// co-writer 承接。无命中返回 null（2026-11-16.2 course-assistant 退役）。
 export const ROUTING_RULES: { agent: string; keywords: string[] }[] = [
   {
     agent: "course-video",
@@ -51,8 +50,7 @@ export const ROUTING_RULES: { agent: string; keywords: string[] }[] = [
     keywords: ["PPT", "课件", "幻灯片", "演示文稿"],
   },
   {
-    // 五壳合并承接（含 video-clip 的剪辑类关键词——creative-studio 的
-    // config.yaml skills 保留 video-clip，剪辑是其现役能力，不得落兜底）。
+    // 2026-11-16 收敛为视觉生图：只保留视觉关键词，剪辑/知识萃取不再命中本入口。
     agent: "creative-studio",
     keywords: [
       "知识卡片",
@@ -60,17 +58,8 @@ export const ROUTING_RULES: { agent: string; keywords: string[] }[] = [
       "宣传图",
       "信息图",
       "卡片设计",
-      "知识萃取",
-      "经验提炼",
-      "知识提取",
-      "提炼知识",
       "视觉设计",
       "品牌视觉",
-      "视频剪辑",
-      "剪辑视频",
-      "视频切片",
-      "提取精华",
-      "剪辑",
     ],
   },
   {

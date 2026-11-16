@@ -11,7 +11,7 @@ Clean, refreshing, natural aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | triptych
 
 image_effects:

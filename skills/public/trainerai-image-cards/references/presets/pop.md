@@ -11,7 +11,7 @@ Vibrant, energetic, eye-catching aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | quad
 
 image_effects:

@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { matchAgent } from "@/components/workspace/workspace-home";
 
-// 2026-09-22 工作台恢复：路由表随首页收缩到现役 6 agent——
-// course-ppt 关键词由 ppt-master 承接；五壳（card-poster/case-article/
-// design-specialist/knowledge-extraction/video-clip）中视觉与剪辑类归
-// creative-studio、写作类归 co-writer；无命中落 course-assistant 兜底。
+// 2026-11-16 收敛：creative-studio 只承接视觉生图关键词；剪辑与知识萃取
+// 不再路由到它（无命中返回 null）。
 
 describe("matchAgent — chat routing keywords", () => {
   it("routes story/narrative video requests to vimax-video (2026-07-15 split)", () => {
@@ -28,16 +26,18 @@ describe("matchAgent — chat routing keywords", () => {
     expect(matchAgent("帮我写演示文稿")).toBe("ppt-master");
   });
 
-  it("routes clip/editing requests to creative-studio (video-clip merged 09-09, not fallback)", () => {
-    expect(matchAgent("剪辑视频")).toBe("creative-studio");
-    expect(matchAgent("视频剪辑一下")).toBe("creative-studio");
-    expect(matchAgent("提取精华片段")).toBe("creative-studio");
+  it("no longer routes clip/editing or knowledge-extraction requests (2026-11-16 convergence)", () => {
+    expect(matchAgent("剪辑视频")).toBeNull();
+    expect(matchAgent("视频剪辑一下")).toBeNull();
+    expect(matchAgent("提取精华片段")).toBeNull();
+    expect(matchAgent("知识萃取这份访谈材料")).toBeNull();
+    expect(matchAgent("经验提炼")).toBeNull();
   });
 
-  it("routes visual/knowledge-extraction requests to creative-studio (五壳承接)", () => {
+  it("routes visual requests to creative-studio (视觉生图入口)", () => {
     expect(matchAgent("设计一张知识卡片")).toBe("creative-studio");
     expect(matchAgent("做一张宣传海报")).toBe("creative-studio");
-    expect(matchAgent("知识萃取这份访谈材料")).toBe("creative-studio");
+    expect(matchAgent("做一张信息图")).toBe("creative-studio");
   });
 
   it("routes case/article writing requests to co-writer", () => {
@@ -46,16 +46,15 @@ describe("matchAgent — chat routing keywords", () => {
   });
 
   it("多规则同时命中时按数组顺序取先（ROUTING_RULES 顺序即优先级）", () => {
-    // 「剪辑培训视频」同时命中 course-video 的「培训视频」（规则序 1）与
-    // creative-studio 的「剪辑」（规则序 4）——取先者。本用例钉扎顺序语义，
-    // 防止未来重排规则引入静默行为变化（review 2026-09-22 三-1）。
+    // 「剪辑培训视频」命中 course-video 的「培训视频」（规则序 1）；creative-studio
+    // 已移除「剪辑」关键词，本用例继续钉扎顺序语义，防止未来重排引入静默行为变化。
     expect(matchAgent("剪辑培训视频")).toBe("course-video");
     // 「把这份案例文章做成课件」同时命中 ppt-master 的「课件」（规则序 3）
     // 与 co-writer 的「案例文章」（规则序 5）——取先者。
     expect(matchAgent("把这份案例文章做成课件")).toBe("ppt-master");
   });
 
-  it("falls back to null (course-assistant) for unmatched input", () => {
+  it("falls back to null (course-assistant retired 2026-11-16.2) for unmatched input", () => {
     expect(matchAgent("随便聊聊")).toBeNull();
   });
 

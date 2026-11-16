@@ -11,7 +11,7 @@ High impact, attention-grabbing aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single | dual
 
 image_effects:

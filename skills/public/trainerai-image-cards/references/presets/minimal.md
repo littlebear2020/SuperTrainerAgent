@@ -11,7 +11,7 @@ Ultra-clean, sophisticated aesthetic.
 
 ```yaml
 canvas:
-  ratio: portrait-3-4
+  ratio: square
   grid: single
 
 image_effects:

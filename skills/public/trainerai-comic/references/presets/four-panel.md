@@ -9,9 +9,9 @@
 | Art Style | minimalist |
 | Tone | neutral |
 | Layout | four-panel (default) |
-| Aspect | 4:3 (landscape) |
+| Aspect | 16:9 (landscape) |
 
-Equivalent to: `--art minimalist --tone neutral --layout four-panel --aspect 4:3`
+Equivalent to: `--art minimalist --tone neutral --layout four-panel --aspect 16:9`
 
 ## Unique Rules
 

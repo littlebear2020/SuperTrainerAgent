@@ -64,9 +64,11 @@ references:
 | `--art` | ligne-claire (default), manga, realistic, ink-brush, chalk, minimalist | Art style / rendering technique |
 | `--tone` | neutral (default), warm, dramatic, romantic, energetic, vintage, action | Mood / atmosphere |
 | `--layout` | standard (default), cinematic, dense, splash, mixed, webtoon, four-panel | Panel arrangement |
-| `--aspect` | 3:4 (default, portrait), 4:3 (landscape), 16:9 (widescreen) | Page aspect ratio |
+| `--aspect` | 9:16 (default, portrait), 16:9 (landscape), 1:1 (square) | Page aspect ratio |
 | `--lang` | auto (default), zh, en, ja, etc. | Output language |
 | `--ref <files...>` | File paths | Reference images applied to every page for style / palette / scene guidance. See [Reference Images](#reference-images) above. |
+
+For 360 2K generation, page ratios map exactly as follows: `9:16` → `1152×2048`, `16:9` → `2048×1152`, `1:1` → `2048×2048`. Do not request other page ratios; panel-level composition ratios are independent.
 
 ### Partial Workflow Options
 
@@ -192,7 +194,7 @@ Input → [Config] → Analyze → [Check Existing?] → [Confirm: Style + Revie
 
 **Use `tsx /mnt/skills/public/trainerai-imagine/scripts/main.ts`** as the image generation backend. Read its SKILL.md for the documented interface before invoking it.
 
-**7.1 Character sheet** — generate it (to `characters/characters.png`, aspect `4:3`) when the comic is multi-page with recurring characters. Skip for simple presets (e.g., four-panel minimalist) or single-page comics. Compress to JPEG before use-as-`--ref` (`sips -s format jpeg -s formatOptions 80 …` on macOS, `pngquant --quality=65-80 …` elsewhere) to avoid payload failures. The prompt file at `characters/characters.md` must exist before invoking the backend.
+**7.1 Character sheet** — generate it (to `characters/characters.png`, aspect `16:9`) when the comic is multi-page with recurring characters. Skip for simple presets (e.g., four-panel minimalist) or single-page comics. Compress to JPEG before use-as-`--ref` (`sips -s format jpeg -s formatOptions 80 …` on macOS, `pngquant --quality=65-80 …` elsewhere) to avoid payload failures. The prompt file at `characters/characters.md` must exist before invoking the backend.
 
 **7.2 Pages** — each page's prompt MUST already be at `prompts/NN-{cover|page}-[slug].md` before invoking the backend; the file is the reproducibility record. Strategy depends on the character sheet:
 
@@ -202,7 +204,7 @@ Input → [Config] → Analyze → [Check Existing?] → [Confirm: Style + Revie
 | Exists | Not supported | Prepend character descriptions to every prompt file |
 | Skipped | — | All descriptions inline in prompt |
 
-**Backup rule**: existing `prompts/…md` and `…png` files → rename with `-backup-YYYYMMDD-HHMMSS` suffix before regenerating. Aspect ratio from storyboard (default `3:4`; preset may override).
+**Backup rule**: existing `prompts/…md` and `…png` files → rename with `-backup-YYYYMMDD-HHMMSS` suffix before regenerating. Aspect ratio from storyboard (default `9:16`; preset may override).
 
 **`--ref` failure recovery**: compress sheet → retry → still fails → drop `--ref` and embed character descriptions in the prompt text.
 

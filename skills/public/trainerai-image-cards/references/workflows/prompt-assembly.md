@@ -12,8 +12,8 @@ Create a Xiaohongshu (Little Red Book) style infographic following these guideli
 ## Image Specifications
 
 - **Type**: Infographic
-- **Orientation**: Portrait (vertical)
-- **Aspect Ratio**: 3:4
+- **Orientation**: Square
+- **Aspect Ratio**: 1:1
 - **Style**: Hand-drawn illustration
 
 ## Core Principles
@@ -255,7 +255,7 @@ When generating multiple images in a series:
 1. **Image 1 (cover)**: Generate without `--ref` — this establishes the visual anchor
 2. **Images 2+**: Always pass image 1 as `--ref` to the installed image generation skill.
    Read that skill's `SKILL.md` and use its documented interface rather than calling its scripts directly.
-   For each later image, use the assembled prompt file as input, set the output image path, keep aspect ratio `3:4`, use quality `2k`, and pass image 1 as the reference.
+   For each later image, use the assembled prompt file as input, set the output image path, keep aspect ratio `1:1`, use quality `2k`, and pass image 1 as the reference.
    This ensures the AI maintains the same character design, illustration style, and color rendering across the series.
 
 ### Step 6: Combine
@@ -270,8 +270,8 @@ Create a Xiaohongshu (Little Red Book) style infographic following these guideli
 ## Image Specifications
 
 - **Type**: Infographic
-- **Orientation**: Portrait (vertical)
-- **Aspect Ratio**: 3:4
+- **Orientation**: Square
+- **Aspect Ratio**: 1:1
 - **Style**: Hand-drawn illustration
 
 ## Core Principles

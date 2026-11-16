@@ -1,6 +1,6 @@
 """Seed pre-built agents from backend/seed/agents/ into the runtime .deer-flow/agents/ directory.
 
-This ensures that agents created by the development team (e.g. course-assistant)
+This ensures that agents created by the development team (e.g. creative-studio)
 are available on fresh deployments without requiring manual API calls.
 
 Version-stamped (P2-14): each seeded agent dir carries a ``.seed_version`` file
@@ -30,8 +30,8 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # co-writer/course-video 先后加入 seed。注意：seed 只增不删——退役壳的运行时
 # 目录不会随 reseed 消失，需手动清理（见计划文档第十节部署注意 2）。
 # 2026-09-11: ppt-master 6.3.0 升级——course-ppt 退役由 ppt-master 承接；
-# 现行 seed/agents = co-writer/course-assistant/course-video/creative-studio/
-# ppt-master/vimax-video 六个。
+# 当时 seed/agents = co-writer/course-assistant/course-video/creative-studio/
+# ppt-master/vimax-video 六个（course-assistant 已于 2026-11-16.2 退役）。
 # 2026-09-12: 缺陷批条目 26——course-assistant SOUL 路由表 course-ppt →
 # ppt-master（course-ppt 实体 09-11 已删，运行态副本陈旧须 reseed）。
 # 2026-09-22: course-assistant SOUL 工作原则新增两条——续作盘点（续作时先读
@@ -44,7 +44,9 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # 2026-11-12: 新增 podcast-studio（四模式来源/确认/固定音色 MP3）；标准全量
 # reseed 保留六个旧 Agent 备份与既有 memory.json，旧 Agent seed 内容不变。
 # 2026-11-16: course-video 收敛为 deep-research + auto-video-flow，SOUL 补固定文档读取。
-SEED_VERSION = "2026-11-16"
+# 2026-11-16.2: course-assistant 退役（整目录删除、不保留别名）；现行 seed/agents =
+# co-writer/course-video/creative-studio/ppt-master/podcast-studio/vimax-video 六个。
+SEED_VERSION = "2026-11-16.2"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 

@@ -3,6 +3,7 @@ import { join } from "path";
 
 import { describe, expect, it } from "vitest";
 
+import { HOME_COURSE_ITEMS } from "@/components/workspace/home-course-catalog";
 import { WORKFLOWS } from "@/components/workspace/workflow-grid";
 import { ROUTING_RULES } from "@/components/workspace/workspace-home";
 
@@ -29,14 +30,26 @@ describe("工作台卡片/路由与 seed 现役 agent 同步（R1 跨仓守卫�
     expect(cardTypes).toEqual(listSeedAgents());
   });
 
-  it("ROUTING_RULES 目标与兜底 agent 均在现役集合内", () => {
+  it("HOME_COURSE_ITEMS 实际 agent 卡片目标均在现役集合内，且不包含 course-assistant", () => {
+    const active = listSeedAgents();
+    const targets = HOME_COURSE_ITEMS.filter(
+      (item) => item.kind === "agent",
+    ).map((item) => item.agentName);
+
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      expect(active).toContain(target);
+    }
+    expect(targets).not.toContain("course-assistant");
+  });
+
+  it("ROUTING_RULES 目标 agent 均在现役集合内", () => {
     const active = listSeedAgents();
 
     for (const rule of ROUTING_RULES) {
       expect(active).toContain(rule.agent);
     }
-    // startFree 的兜底硬编码 course-assistant（非 ROUTING_RULES 成员），
-    // 同样必须在役。
-    expect(active).toContain("course-assistant");
+    // 2026-11-16.2: course-assistant 退役，无命中时 matchAgent 返回 null，
+    // 不再要求任何兜底 agent 在役。
   });
 });
