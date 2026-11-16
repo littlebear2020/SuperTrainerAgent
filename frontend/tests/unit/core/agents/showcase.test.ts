@@ -60,6 +60,9 @@ function expectLocalized(value: unknown): void {
         }
       } else {
         expect(entry).toEqual(expect.any(String));
+        if (typeof entry !== "string") {
+          throw new Error("Localized text must be a string or string array");
+        }
         expect(entry.trim()).not.toBe("");
       }
     }

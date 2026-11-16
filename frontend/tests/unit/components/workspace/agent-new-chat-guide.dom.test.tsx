@@ -8,6 +8,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { AgentNewChatGuide } from "@/components/workspace/agent-new-chat-guide";
 import type { AgentNewChatGuideId } from "@/core/agents/new-chat";
+import { showcaseFor } from "@/core/agents/showcase";
 import { I18nProvider, useI18nContext } from "@/core/i18n/context";
 import { enUS, zhCN } from "@/core/i18n/locales";
 
@@ -106,9 +107,15 @@ describe("AgentNewChatGuide", () => {
   function caseButtons(): HTMLButtonElement[] {
     return Array.from(
       container.querySelectorAll<HTMLButtonElement>(
-        "[data-testid='agent-guide-cases'] button",
+        "[data-testid='agent-guide-cases'] button[data-showcase-prompt], [data-testid='agent-guide-cases']:not([data-showcase]) button",
       ),
     );
+  }
+
+  function showcasePrompt(index: number): string {
+    const prompt = showcaseFor("course-video")?.cases[index]?.prompt;
+    if (!prompt) throw new Error(`showcase prompt ${index} not found`);
+    return prompt;
   }
 
   function composer(): HTMLTextAreaElement {
@@ -134,19 +141,20 @@ describe("AgentNewChatGuide", () => {
     });
   }
 
-  it("renders the task hero, four cases, composer and tips in document flow", async () => {
+  it("showcase renders the new hero, three videos, composer and tips in document flow", async () => {
     await renderGuide();
+    const showcase = showcaseFor("course-video")!;
 
     expect(container.querySelector("h1")?.textContent).toBe(
-      "把知识与素材做成视频课",
+      showcase.heroLine.zh.join(""),
     );
     expect(container.textContent).toContain("课程视频");
-    expect(caseButtons()).toHaveLength(4);
-    expect(caseButtons()[0]?.getAttribute("aria-label")).toBe(
-      "调研主题做知识科普",
-    );
-    expect(container.querySelector("svg.lucide-clapperboard")).not.toBeNull();
-    expect(container.querySelector("svg.lucide-bot")).toBeNull();
+    expect(container.textContent).not.toContain("把知识与素材做成视频课");
+    expect(caseButtons()).toHaveLength(3);
+    expect(
+      container.querySelector("[data-testid='showcase-open-video-hallucination']"),
+    ).not.toBeNull();
+    expect(container.querySelector("svg.lucide-clapperboard")).toBeNull();
 
     const guide = container.querySelector<HTMLElement>(
       "[data-testid='agent-new-chat-guide']",
@@ -157,14 +165,33 @@ describe("AgentNewChatGuide", () => {
     const cases = container.querySelector("[data-testid='agent-guide-cases']");
     const input = container.querySelector("textarea");
     const tips = container.querySelector("[data-testid='agent-guide-tips']");
+    expect(input?.compareDocumentPosition(cases!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(cases?.compareDocumentPosition(tips!)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(tips?.textContent).toContain(
+      "告诉我主题、目标学员和期望时长，或提供真实截图、数据与完整讲稿。",
+    );
+  });
+
+  it("legacy keeps the Co-writer header, four cases, composer and tips order", async () => {
+    await renderGuide({ agentName: "co-writer" });
+    const guide = zhCN.agents.newChatGuides["co-writer"];
+
+    expect(container.querySelector("h1")?.textContent).toBe(guide.title);
+    expect(container.textContent).toContain(guide.description);
+    expect(caseButtons()).toHaveLength(4);
+    expect(container.querySelector("svg.lucide-pen-line")).not.toBeNull();
+    const cases = container.querySelector("[data-testid='agent-guide-cases']");
+    const input = container.querySelector("textarea");
+    const tips = container.querySelector("[data-testid='agent-guide-tips']");
     expect(cases?.compareDocumentPosition(input!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(input?.compareDocumentPosition(tips!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(tips?.textContent).toContain(
-      "告诉我主题、目标学员和期望时长，或提供真实截图、数据与完整讲稿。",
     );
   });
 
@@ -198,7 +225,7 @@ describe("AgentNewChatGuide", () => {
   it("prefills and focuses an empty draft without submitting", async () => {
     const onSubmit = vi.fn();
     await renderGuide({ onSubmit });
-    const prompt = zhCN.agents.newChatGuides["course-video"].cases[0].prompt;
+    const prompt = showcasePrompt(0);
 
     await click(caseButtons()[0]!);
 
@@ -224,7 +251,7 @@ describe("AgentNewChatGuide", () => {
   it("replaces a draft only after confirmation and never submits", async () => {
     const onSubmit = vi.fn();
     await renderGuide({ initialInput: "我的草稿", onSubmit });
-    const prompt = zhCN.agents.newChatGuides["course-video"].cases[1].prompt;
+    const prompt = showcasePrompt(1);
 
     await click(caseButtons()[1]!);
     await click(button("替换"));
@@ -237,7 +264,7 @@ describe("AgentNewChatGuide", () => {
   it("appends a complete case prompt without discarding the draft", async () => {
     const onSubmit = vi.fn();
     await renderGuide({ initialInput: "我的草稿", onSubmit });
-    const prompt = zhCN.agents.newChatGuides["course-video"].cases[2].prompt;
+    const prompt = showcasePrompt(2);
 
     await click(caseButtons()[2]!);
     await click(button("追加"));
@@ -268,10 +295,9 @@ describe("AgentNewChatGuide", () => {
     expect(composer().value).toBe("handoff A");
   });
 
-  it("does not rewrite a filled draft when the locale changes", async () => {
+  it("showcase keeps prompts Chinese and does not rewrite a filled draft on locale change", async () => {
     await renderGuide({ showLocaleSwitch: true });
-    const zhPrompt = zhCN.agents.newChatGuides["course-video"].cases[0].prompt;
-    const enPrompt = enUS.agents.newChatGuides["course-video"].cases[0].prompt;
+    const zhPrompt = showcasePrompt(0);
 
     await click(caseButtons()[0]!);
     expect(composer().value).toBe(zhPrompt);
@@ -280,6 +306,22 @@ describe("AgentNewChatGuide", () => {
     );
     expect(composer().value).toBe(zhPrompt);
 
+    await click(caseButtons()[0]!);
+    await click(button("Replace"));
+    expect(composer().value).toBe(zhPrompt);
+  });
+
+  it("legacy Co-writer keeps localized English prompts", async () => {
+    await renderGuide({ agentName: "co-writer", showLocaleSwitch: true });
+    const zhPrompt = zhCN.agents.newChatGuides["co-writer"].cases[0].prompt;
+    const enPrompt = enUS.agents.newChatGuides["co-writer"].cases[0].prompt;
+
+    await click(caseButtons()[0]!);
+    expect(composer().value).toBe(zhPrompt);
+    await click(
+      container.querySelector<HTMLElement>("[data-testid='locale-switch']")!,
+    );
+    expect(composer().value).toBe(zhPrompt);
     await click(caseButtons()[0]!);
     await click(button("Replace"));
     expect(composer().value).toBe(enPrompt);

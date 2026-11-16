@@ -1,0 +1,17 @@
+.guideComposerFrame :global(.glass-input-box) {
+  border-radius: 28px;
+}
+
+.guideComposerFrame :global(.glass-input-box [data-slot='input-group']) {
+  border-radius: 28px;
+}
+
+@media (max-width: 639px) {
+  .guideComposerFrame :global(.glass-input-box) {
+    border-radius: 24px;
+  }
+
+  .guideComposerFrame :global(.glass-input-box [data-slot='input-group']) {
+    border-radius: 24px;
+  }
+}

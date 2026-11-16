@@ -1,9 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import {
-  AGENT_NEW_CHAT_GUIDE_IDS,
-  type AgentNewChatGuideId,
-} from "../../src/core/agents/new-chat";
+import { type AgentNewChatGuideId } from "../../src/core/agents/new-chat";
+import { showcaseFor } from "../../src/core/agents/showcase";
 import { enUS, zhCN } from "../../src/core/i18n/locales";
 
 import { pinEnglishLocale } from "./utils/locale";
@@ -85,8 +83,8 @@ test.describe("Agent new-chat task guides", () => {
     await expect(page.locator("textarea[name='message']")).toBeVisible();
   }
 
-  for (const agentName of AGENT_NEW_CHAT_GUIDE_IDS) {
-    test(`${agentName} renders four cases and prefills each without sending`, async ({
+  for (const agentName of ["co-writer"] as const) {
+    test(`legacy ${agentName} renders four cases and prefills each without sending`, async ({
       page,
     }) => {
       mockGuideAPI(page);
@@ -128,6 +126,71 @@ test.describe("Agent new-chat task guides", () => {
       ).toHaveCount(0);
     });
   }
+
+  test("course-video showcase plays real media, prefills prompts and keeps composer overlays usable", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    const calls = trackSending(page);
+    const showcase = showcaseFor("course-video")!;
+    await openGuide(page, "course-video");
+
+    await expect(page.getByTestId("showcase-hero")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: showcase.heroLine.zh.join(" "),
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: zhCN.agents.newChatGuides["course-video"].title,
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(3);
+
+    const frame = page.getByTestId("agent-guide-input");
+    const inputBox = frame.locator(".glass-input-box");
+    const inputGroup = inputBox.locator("[data-slot='input-group']").first();
+    expect((await inputBox.boundingBox())!.width).toBeGreaterThanOrEqual(900);
+    await expect(inputBox).toHaveCSS("border-radius", "28px");
+    await expect(inputGroup).toHaveCSS("border-radius", "28px");
+    expect(await frame.evaluate((element) => getComputedStyle(element).overflow)).not.toBe("hidden");
+
+    await frame.locator("[data-slot='dialog-trigger']").click();
+    await expect(page.getByRole("dialog", { name: "Model Selector" })).toBeVisible();
+    await expect(page.getByPlaceholder(zhCN.inputBox.searchModels)).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    const firstMedia = page.getByTestId("showcase-open-video-hallucination");
+    await firstMedia.click();
+    const video = page.locator("video");
+    await expect(video).toBeVisible();
+    expect(await video.evaluate((element: HTMLVideoElement) => element.autoplay)).toBe(false);
+    await video.evaluate((element: HTMLVideoElement) => element.play());
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0);
+    await page.getByTestId("showcase-dialog-close").click();
+    await expect(page.locator("video")).toHaveCount(0);
+    await expect(firstMedia).toBeFocused();
+
+    const textarea = page.locator("textarea[name='message']");
+    for (const [index, item] of showcase.cases.entries()) {
+      await page.getByTestId(`showcase-prompt-${item.id}`).click();
+      if (index > 0) {
+        await page
+          .getByRole("button", {
+            name: zhCN.agents.newChatGuide.draftConfirmReplace,
+            exact: true,
+          })
+          .click();
+      }
+      await expect(textarea).toHaveValue(item.prompt);
+      await expect(textarea).toBeFocused();
+    }
+    expect(calls).toEqual({ threads: 0, runs: 0 });
+  });
 
   test("podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
     page,
