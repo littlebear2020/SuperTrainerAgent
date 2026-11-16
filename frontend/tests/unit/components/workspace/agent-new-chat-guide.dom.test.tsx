@@ -197,6 +197,24 @@ describe("AgentNewChatGuide", () => {
     );
   });
 
+  it("closes showcase media and resets cases when the agent changes in place", async () => {
+    await renderGuide();
+    await click(
+      container.querySelector<HTMLElement>(
+        "[data-testid='showcase-open-video-hallucination']",
+      )!,
+    );
+    expect(document.querySelector("[role='dialog']")).not.toBeNull();
+
+    await renderGuide({ agentName: "ppt-master" });
+
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+    expect(caseButtons()).toHaveLength(3);
+    expect(
+      container.querySelector("[data-testid='showcase-open-ppt-quick']"),
+    ).not.toBeNull();
+  });
+
   it("disables cases until handoff is ready and when the page is disabled", async () => {
     await renderGuide({ handoffReady: false, initialInput: "保留草稿" });
     expect(caseButtons().every((item) => item.disabled)).toBe(true);
