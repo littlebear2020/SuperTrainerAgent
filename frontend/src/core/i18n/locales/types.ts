@@ -380,6 +380,37 @@ export interface Translations {
       draftConfirmAppend: string;
       draftConfirmReplace: string;
     };
+    showcase: {
+      howItWorks: string;
+      casesTitle: string;
+      casesDescription: string;
+      caseUnit: string;
+      itemUnit: string;
+      usePrompt: string;
+      openCase: string;
+      play: string;
+      pause: string;
+      listen: string;
+      transcript: string;
+      sources: string;
+      close: string;
+      download: string;
+      downloadOriginal: string;
+      downloadSvg: string;
+      downloadPptx: string;
+      downloadMp3: string;
+      slides: string;
+      previous: string;
+      next: string;
+      mediaUnavailable: string;
+      playbackError: string;
+      filterAll: string;
+      filterPoster: string;
+      filterCard: string;
+      filterComic: string;
+      filterInfographic: string;
+      filterDiagram: string;
+    };
     newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };
 
