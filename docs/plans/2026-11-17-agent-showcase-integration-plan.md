@@ -391,10 +391,10 @@ pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts \
 
 ### T3 PPT 与视觉案例扩展
 
-- [ ] 增加 deck card/dialog：缩略图、前后翻页、页码、边界禁用、切换 deck 重置第 1 页、PPTX 下载。
-- [ ] 增加 visual card/dialog：大图、原图/SVG 下载、5 类筛选、`aria-pressed`、媒体错误兜底。
-- [ ] 补齐这两类的响应式、暗色、键盘和 Dialog title/description；沿用 T2 的数据与展示容器，不改路由。
-- [ ] 在 `agent-showcase.dom.test.tsx` 增加 deck 翻页/重置/下载 href、visual 筛选/下载/Dialog 焦点等最小断言；E2E 各补一条代表路径，留到 T5 与整个相关文件一起跑。
+- [x] 增加 deck card/dialog：缩略图、前后翻页、页码、边界禁用、切换 deck 重置第 1 页、PPTX 下载。
+- [x] 增加 visual card/dialog：大图、原图/SVG 下载、5 类筛选、`aria-pressed`、媒体错误兜底。
+- [x] 补齐这两类的响应式、暗色、键盘和 Dialog title/description；沿用 T2 的数据与展示容器，不改路由。
+- [x] 在 `agent-showcase.dom.test.tsx` 增加 deck 翻页/重置/下载 href、visual 筛选/下载/Dialog 焦点等最小断言；E2E 各补一条代表路径，留到 T5 与整个相关文件一起跑。
 
 **定向验证**：`pnpm exec vitest run --project dom tests/unit/components/workspace/agent-showcase.dom.test.tsx`；不为 3 套 PPT、10 张图逐一跑浏览器测试。
 

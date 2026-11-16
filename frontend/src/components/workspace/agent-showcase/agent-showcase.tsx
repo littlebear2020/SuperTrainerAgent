@@ -3,11 +3,25 @@
 import { CheckCircle2 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import type { ShowcaseAgent, VideoCase } from "@/core/agents/showcase";
+import type {
+  DeckCase,
+  ShowcaseAgent,
+  VideoCase,
+  VisualCase,
+} from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 
-import { showcaseCardClass, VideoCard } from "./showcase-cards";
-import { VideoDialog } from "./showcase-dialogs";
+import {
+  DeckCard,
+  showcaseCardClass,
+  VideoCard,
+  VisualCard,
+} from "./showcase-cards";
+import {
+  DeckDialog,
+  VideoDialog,
+  VisualDialog,
+} from "./showcase-dialogs";
 import { localized, type ShowcaseLocale } from "./showcase-utils";
 
 export function AgentShowcase({
@@ -22,10 +36,31 @@ export function AgentShowcase({
   const { locale, t } = useI18n();
   const language: ShowcaseLocale = locale === "zh-CN" ? "zh" : "en";
   const [activeVideo, setActiveVideo] = useState<VideoCase | null>(null);
+  const [activeDeck, setActiveDeck] = useState<DeckCase | null>(null);
+  const [activeVisual, setActiveVisual] = useState<VisualCase | null>(null);
+  const [visualFilter, setVisualFilter] = useState<
+    VisualCase["category"] | "all"
+  >("all");
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const visibleCases = agent.cases.filter(
+    (item) =>
+      item.kind !== "visual" ||
+      visualFilter === "all" ||
+      item.category === visualFilter,
+  );
+  const visualFilters = [
+    ["all", t.agents.showcase.filterAll],
+    ["poster", t.agents.showcase.filterPoster],
+    ["card", t.agents.showcase.filterCard],
+    ["comic", t.agents.showcase.filterComic],
+    ["infographic", t.agents.showcase.filterInfographic],
+    ["diagram", t.agents.showcase.filterDiagram],
+  ] as const;
 
   const closeDialog = () => {
     setActiveVideo(null);
+    setActiveDeck(null);
+    setActiveVisual(null);
     setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
@@ -82,27 +117,81 @@ export function AgentShowcase({
           <p className="text-muted-foreground sr-only">
             {t.agents.showcase.casesDescription}
           </p>
+          {agent.id === "creative-studio" ? (
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label={t.agents.showcase.casesTitle}>
+              {visualFilters.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-testid={`showcase-filter-${value}`}
+                  aria-pressed={visualFilter === value}
+                  onClick={() => setVisualFilter(value)}
+                  className="min-h-9 shrink-0 rounded-full border border-border px-3 text-xs whitespace-nowrap transition hover:border-fuchsia-300 aria-pressed:border-fuchsia-500 aria-pressed:bg-fuchsia-50 aria-pressed:text-fuchsia-700 focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none dark:border-white/10 dark:aria-pressed:border-fuchsia-400 dark:aria-pressed:bg-fuchsia-400/10 dark:aria-pressed:text-fuchsia-300"
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="text-muted-foreground ml-auto shrink-0 self-center text-[11px] whitespace-nowrap">
+                {visibleCases.length} {t.agents.showcase.itemUnit}
+              </span>
+            </div>
+          ) : null}
           <div
             data-testid="agent-guide-cases"
             data-showcase
             className={showcaseCardClass(agent.id === "creative-studio" ? "three" : "two")}
           >
-            {agent.cases.map((item, index) =>
-              item.kind === "video" ? (
-                <VideoCard
-                  key={item.id}
-                  item={item}
-                  locale={language}
-                  eager={index === 0}
-                  disabled={disabled}
-                  onOpen={(video, trigger) => {
-                    triggerRef.current = trigger;
-                    setActiveVideo(video);
-                  }}
-                  onUsePrompt={onUsePrompt}
-                />
-              ) : null,
-            )}
+            {visibleCases.map((item, index) => {
+              if (item.kind === "video") {
+                return (
+                  <VideoCard
+                    key={item.id}
+                    item={item}
+                    locale={language}
+                    eager={index === 0}
+                    disabled={disabled}
+                    onOpen={(video, trigger) => {
+                      triggerRef.current = trigger;
+                      setActiveVideo(video);
+                    }}
+                    onUsePrompt={onUsePrompt}
+                  />
+                );
+              }
+              if (item.kind === "deck") {
+                return (
+                  <DeckCard
+                    key={item.id}
+                    item={item}
+                    locale={language}
+                    eager={index === 0}
+                    disabled={disabled}
+                    onOpen={(deck, trigger) => {
+                      triggerRef.current = trigger;
+                      setActiveDeck(deck);
+                    }}
+                    onUsePrompt={onUsePrompt}
+                  />
+                );
+              }
+              if (item.kind === "visual") {
+                return (
+                  <VisualCard
+                    key={item.id}
+                    item={item}
+                    locale={language}
+                    eager={index === 0}
+                    disabled={disabled}
+                    onOpen={(visual, trigger) => {
+                      triggerRef.current = trigger;
+                      setActiveVisual(visual);
+                    }}
+                    onUsePrompt={onUsePrompt}
+                  />
+                );
+              }
+              return null;
+            })}
           </div>
           <p className="text-muted-foreground mt-4 flex gap-2 text-[11px] leading-5">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
@@ -112,6 +201,12 @@ export function AgentShowcase({
       </section>
       {activeVideo ? (
         <VideoDialog item={activeVideo} locale={language} onClose={closeDialog} />
+      ) : null}
+      {activeDeck ? (
+        <DeckDialog item={activeDeck} locale={language} onClose={closeDialog} />
+      ) : null}
+      {activeVisual ? (
+        <VisualDialog item={activeVisual} locale={language} onClose={closeDialog} />
       ) : null}
     </>
   );
