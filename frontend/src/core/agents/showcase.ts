@@ -737,8 +737,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         styleLabel: text("深蓝瑞士风", "Deep-blue Swiss"),
         prompt:
           "[模式: 视觉创作]\n请为「大模型应用开发」设计一张竖版课程海报。深蓝底、瑞士网格、荧光绿与朱红的几何色块，标题排版要克制；输出 9:16 图片。",
-        preview: asset("visual/previews/poster-llm-light.webp"),
-        original: asset("visual/originals/poster-llm-light.jpg"),
+        preview: asset("visual/previews/poster-llm-deep-blue.webp"),
+        original: asset("visual/originals/poster-llm-deep-blue.jpg"),
         downloadName: "visual-poster-llm.jpg",
         width: 1152,
         height: 2048,
