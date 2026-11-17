@@ -171,7 +171,7 @@ export function DeckCard({
   onUsePrompt: (prompt: string) => void;
 }) {
   const { t } = useI18n();
-  const [failed, setFailed] = useState(false);
+  const [failedSlides, setFailedSlides] = useState<Set<number>>(new Set());
   const title = localized(item.title, locale);
   const previewCount = Math.min(4, item.slides.length);
   const remainingCount = Math.max(0, item.pageCount - previewCount);
@@ -182,13 +182,16 @@ export function DeckCard({
       className="showcase-card border-border grid min-w-0 overflow-hidden rounded-[15px] border transition duration-200 hover:border-amber-300 hover:shadow-md md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[286px_minmax(0,1fr)] dark:border-white/10 dark:hover:border-amber-400/50"
     >
       <div className="relative grid grid-cols-2 content-start gap-2 p-4 md:p-5">
-        {failed ? (
-          <span className="text-muted-foreground col-span-2 flex aspect-video flex-col items-center justify-center gap-2 rounded-lg bg-slate-100 text-xs dark:bg-white/5">
-            <ImageOff className="h-5 w-5" aria-hidden="true" />
-            {t.agents.showcase.mediaUnavailable}
-          </span>
-        ) : (
-          item.slides.slice(0, previewCount).map((slide, slideIndex) => (
+        {item.slides.slice(0, previewCount).map((slide, slideIndex) =>
+          failedSlides.has(slideIndex) ? (
+            <span
+              key={slide}
+              className="text-muted-foreground flex aspect-video flex-col items-center justify-center gap-1 rounded-lg bg-slate-100 p-2 text-center text-[10px] dark:bg-white/5"
+            >
+              <ImageOff className="h-4 w-4" aria-hidden="true" />
+              {t.agents.showcase.mediaUnavailable}
+            </span>
+          ) : (
             <button
               key={slide}
               type="button"
@@ -205,14 +208,16 @@ export function DeckCard({
                 loading={eager && slideIndex === 0 ? "eager" : "lazy"}
                 fetchPriority={eager && slideIndex === 0 ? "high" : "auto"}
                 decoding="async"
-                onError={() => setFailed(true)}
+                onError={() =>
+                  setFailedSlides((current) => new Set(current).add(slideIndex))
+                }
                 className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03] motion-reduce:group-hover:scale-100"
               />
               <span className="absolute right-1 bottom-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white tabular-nums">
                 {String(slideIndex + 1).padStart(2, "0")}
               </span>
             </button>
-          ))
+          ),
         )}
         {remainingCount > 0 ? (
           <span
