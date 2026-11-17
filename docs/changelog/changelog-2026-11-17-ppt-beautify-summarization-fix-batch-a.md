@@ -1,6 +1,6 @@
 # PPT 美化摘要修复 Batch A：上下文完整性
 
-> **状态**：执行中（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；经用户授权已制作并冻结新 7 页输入，待推送与真实冒烟，未合并）。
+> **状态**：部分执行（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；新 7 页输入已冻结，但 Git 推送仍超时且当前进程缺 `QIHU_API_KEY`，真实冒烟未开始，未合并）。
 > **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失；增加字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留及结构化日志；未做真实 qwen 复测、46 页回放、默认模型完整交付或部署。
 
 ## 变更记录
@@ -47,6 +47,8 @@
 - 两项 OCR 均已在原线程回复处理结果；评审修复代码 HEAD 为 `6e2f660b4385a21efb8f98647e8a47960671d670`。
 - `git push`（评审修复与阻塞记录）→ 300 秒后 `fatal: unable to access ...: SSL connection timeout`；远程 PR HEAD 保持 `fecaf8ae0784968f0f0094f87ab08c6480a4066e`，按停止纪律未重试。
 - 已在 PR #27 顶层评论记录输入与网络阻塞；PR 未合并，PR B 未开始。
+- 修订输入后 `git ls-remote` → `Empty reply from server`；随后一次实际 `git push` → `Recv failure: Operation timed out`。GitHub API 可同时正常响应，但不为绕过该故障改用其他推送通道。
+- 真实运行预检（仅加载配置，不调用模型）→ `ValueError: Environment variable QIHU_API_KEY not found for config value $QIHU_API_KEY`；当前 shell 的 `QIHU_API_KEY=UNSET`。未读取/复制 `.env`，未更换模型。
 
 ## 真实复测记录
 
