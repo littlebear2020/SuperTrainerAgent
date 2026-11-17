@@ -1238,10 +1238,9 @@ test.describe("Agent new-chat task guides", () => {
         height: imageBox!.height,
         headingX: headingBox!.x,
       });
-      // The eyebrow label duplicated the agent name above the headline.
-      await expect(
-        hero.getByText(showcaseFor(agentName)!.label.zh, { exact: true }),
-      ).toHaveCount(0);
+      // The eyebrow label (short line + agent name) is gone; the hero now only
+      // renders the character and the two-line headline.
+      await expect(hero.locator("p")).toHaveCount(0);
     }
 
     for (const item of geometry) {

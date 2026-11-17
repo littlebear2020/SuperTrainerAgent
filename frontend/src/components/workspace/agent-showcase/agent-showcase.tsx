@@ -80,11 +80,16 @@ export function AgentShowcase({
     .filter((value) => value === "all" || availableCategories.has(value))
     .map((value) => [value, filterLabels[value]] as const);
 
-  // The header count must agree with the filtered grid (and with the count at
-  // the right edge of the filter row); before this it always showed the total.
-  const headerCaseCount = hasVisualCases
-    ? visibleCases.length
-    : agent.cases.length;
+  // The header count follows the filtered grid (and the count at the right
+  // edge of the filter row); for non-visual agents the filter is always "all",
+  // so visibleCases already equals agent.cases.
+  const headerCaseCount = visibleCases.length;
+  // Filtered results are all visual cases today; only then may the masonry be
+  // replaced by the regular grid (mixed deck/video cards need their own layout).
+  const usesFilteredGrid =
+    visualFilter !== "all" &&
+    gridCases.length > 0 &&
+    gridCases.every((item) => item.kind === "visual");
 
   useEffect(() => {
     return () => {
@@ -199,11 +204,11 @@ export function AgentShowcase({
               data-testid="agent-guide-cases"
               data-showcase
               className={
-                hasVisualCases && visualFilter !== "all"
-                  ? // A filtered subset must fill the row: CSS multi-column packs
-                    // both remaining cards into column 1, leaving columns 2–3
-                    // empty and looking like a single result.
-                    "grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                // A filtered subset must fill the row: CSS multi-column packs
+                // both remaining cards into column 1, leaving columns 2–3 empty
+                // and looking like a single result.
+                usesFilteredGrid
+                  ? showcaseCardClass("video")
                   : showcaseCardClass(gridCases[0]?.kind ?? "video")
               }
             >
