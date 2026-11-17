@@ -69,7 +69,7 @@ required-secrets:
 > 8. 与上游的全部偏离清单见 `TRAINERAI_PATCHES.md`。
 > 9. **Chat 确认持久化（P20）**：Stage1/Stage2 在 chat 中获得用户明确确认后，立即将
 >    `stage`、确认值摘要、`confirmed_at` 写入 `<project>/confirm_state.json`。最终确认
->    （`stage: final` + `status: confirmed`）本身即禁止再发起 Stage 1/2——即使
+>    （`stage: final` + `status: confirmed`）本身即禁止重新发起已确认阶段（Stage 1/2）——即使
 >    `design_spec.md` / `spec_lock.md` 尚未写出，下一动作也是按恢复表补写缺失规格/锁或
 >    续写下一页，不得重问、不得重跑策划。恢复时以该文件与已存在的下游产物互证：只审计
 >    已写出的规格/锁，不因下游缺失而撤销确认，也不得由孤立 lock 反推规格；只有用户新的
