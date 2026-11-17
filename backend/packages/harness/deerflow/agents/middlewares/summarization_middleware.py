@@ -97,6 +97,14 @@ Messages to summarize:
 # (LoopDetection-style protection for the long-lived gateway process).
 _MAX_PENDING_CHECKPOINTS = 100
 _INVALID_SUMMARY_SENTINELS = frozenset({"Previous conversation was too long to summarize.", "No previous conversation history."})
+_FRAMEWORK_HUMAN_MESSAGE_NAMES = frozenset({"loop_warning", "summary", "skill_ledger", "todo_reminder", "subagent_limit_notice", "tool_protocol_recovery"})
+
+
+def _is_real_user_message(message: Any) -> bool:
+    if not isinstance(message, HumanMessage) or message.name in _FRAMEWORK_HUMAN_MESSAGE_NAMES:
+        return False
+    additional_kwargs = message.additional_kwargs or {}
+    return not additional_kwargs.get("hide_from_ui") and not additional_kwargs.get("dynamic_context_reminder")
 
 
 @dataclass(frozen=True)
@@ -317,20 +325,30 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         checkpoint = state.get("summarization_checkpoint")
         return checkpoint if isinstance(checkpoint, dict) else None
 
+    @staticmethod
+    def _read_usable_checkpoint_summary(checkpoint: dict[str, Any] | None) -> str | None:
+        if not checkpoint:
+            return None
+        summary = checkpoint.get("summary")
+        if not isinstance(summary, str):
+            return None
+        summary = summary.strip()
+        if not summary or summary in _INVALID_SUMMARY_SENTINELS:
+            return None
+        return summary
+
     def _can_reuse_checkpoint(self, checkpoint: dict[str, Any] | None, *, message_count: int, approx_tokens: int) -> bool:
         """Reuse the stored summary while BOTH growth deltas stay under their thresholds.
 
         Both knobs at 0 restores legacy behavior: always re-summarize (a single
         0 knob disables reuse too, since a non-negative delta is never < 0).
         """
-        if not checkpoint:
-            return False
         if self._resummarize_min_new_messages == 0 and self._resummarize_min_new_tokens == 0:
             return False
-        summary = checkpoint.get("summary")
-        prev_count = checkpoint.get("message_count")
-        prev_tokens = checkpoint.get("approx_tokens")
-        if not summary or not isinstance(prev_count, int) or not isinstance(prev_tokens, int):
+        summary = self._read_usable_checkpoint_summary(checkpoint)
+        prev_count = checkpoint.get("message_count") if checkpoint else None
+        prev_tokens = checkpoint.get("approx_tokens") if checkpoint else None
+        if summary is None or not isinstance(prev_count, int) or not isinstance(prev_tokens, int):
             return False
         return message_count - prev_count < self._resummarize_min_new_messages and approx_tokens - prev_tokens < self._resummarize_min_new_tokens
 
@@ -534,6 +552,29 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         """
         return [HumanMessage(content=f"Here is a summary of the conversation to date:\n\n{summary}", name="summary")]
 
+    def _preserve_latest_user_message(
+        self,
+        original_messages: list[AnyMessage],
+        messages_to_summarize: list[AnyMessage],
+        preserved_messages: list[AnyMessage],
+    ) -> tuple[list[AnyMessage], list[AnyMessage]]:
+        latest_index = next((index for index in range(len(original_messages) - 1, -1, -1) if _is_real_user_message(original_messages[index])), None)
+        if latest_index is None:
+            return messages_to_summarize, preserved_messages
+        latest_user = original_messages[latest_index]
+        if any(message is latest_user for message in preserved_messages):
+            return messages_to_summarize, preserved_messages
+
+        remaining = [message for message in messages_to_summarize if message is not latest_user]
+        identity_positions = {id(message): index for index, message in enumerate(original_messages)}
+        id_positions = {message.id: index for index, message in enumerate(original_messages) if message.id is not None}
+
+        def original_position(message: AnyMessage) -> int:
+            return identity_positions.get(id(message), id_positions.get(message.id, len(original_messages)))
+
+        insert_at = next((index for index, message in enumerate(preserved_messages) if original_position(message) > latest_index), len(preserved_messages))
+        return remaining, [*preserved_messages[:insert_at], latest_user, *preserved_messages[insert_at:]]
+
     def _partition_with_skill_rescue(
         self,
         messages: list[AnyMessage],
@@ -548,20 +589,20 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         to_summarize, preserved = self._preserve_dynamic_context_reminders(to_summarize, preserved)
 
         if self._preserve_recent_skill_count == 0 or self._preserve_recent_skill_tokens == 0 or not to_summarize:
-            return to_summarize, preserved
+            return self._preserve_latest_user_message(messages, to_summarize, preserved)
 
         try:
             bundles = self._find_skill_bundles(to_summarize, self._skills_container_path)
         except Exception:
             logger.exception("Skill-preserving summarization rescue failed; falling back to default partition")
-            return to_summarize, preserved
+            return self._preserve_latest_user_message(messages, to_summarize, preserved)
 
         if not bundles:
-            return to_summarize, preserved
+            return self._preserve_latest_user_message(messages, to_summarize, preserved)
 
         rescue_bundles = self._select_bundles_to_rescue(bundles)
         if not rescue_bundles:
-            return to_summarize, preserved
+            return self._preserve_latest_user_message(messages, to_summarize, preserved)
 
         bundles_by_ai_index = {bundle.ai_index: bundle for bundle in rescue_bundles}
         rescue_tool_indices = {idx for bundle in rescue_bundles for idx in bundle.skill_tool_indices}
@@ -585,7 +626,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
 
             remaining.append(msg)
 
-        return remaining, rescued + preserved
+        return self._preserve_latest_user_message(messages, remaining, rescued + preserved)
 
     def _assemble_window(
         self,

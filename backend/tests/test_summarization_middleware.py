@@ -1728,3 +1728,202 @@ async def test_atool_protocol_error_passes_through_and_clears_stash() -> None:
         await middleware.awrap_model_call(request, _handler)
 
     assert await middleware.aafter_model(state, runtime) is None
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint validity and latest real-user preservation
+# ---------------------------------------------------------------------------
+
+
+def _checkpoint_with_summary(summary: str) -> dict:
+    return {
+        "summary": summary,
+        "message_count": 4,
+        "approx_tokens": 4,
+        "cutoff_index": 2,
+        "created_at": "2026-11-17T00:00:00+00:00",
+    }
+
+
+@pytest.mark.parametrize("summary", ["", "Previous conversation was too long to summarize.", "No previous conversation history."])
+def test_invalid_checkpoint_is_not_reused(summary: str) -> None:
+    middleware = _middleware()
+    runtime = _runtime()
+    state = {"messages": _messages(), "summarization_checkpoint": _checkpoint_with_summary(summary)}
+
+    received = _run_wrap_and_after(middleware, state, runtime)
+
+    middleware._summary_model.invoke.assert_called_once()
+    assert received[0].messages[0].content.endswith("compressed summary")
+    assert state["summarization_checkpoint"]["summary"] == "compressed summary"
+
+
+@pytest.mark.parametrize("summary", ["", "Previous conversation was too long to summarize.", "No previous conversation history."])
+def test_invalid_checkpoint_failure_passes_through_and_never_reuses(summary: str) -> None:
+    middleware = _middleware()
+    middleware._summary_model.invoke.side_effect = RuntimeError("summary unavailable")
+    runtime = _runtime()
+    state = {"messages": _messages(), "summarization_checkpoint": _checkpoint_with_summary(summary)}
+
+    for _ in range(2):
+        request = _model_request(state["messages"], runtime=runtime, state=state)
+        handler, received = _recording_handler()
+        middleware.wrap_model_call(request, handler)
+        assert received == [request]
+        assert middleware.after_model(state, runtime) is None
+
+    assert middleware._summary_model.invoke.call_count == 2
+    assert state["summarization_checkpoint"]["summary"] == summary
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("summary", ["", "Previous conversation was too long to summarize.", "No previous conversation history."])
+async def test_ainvalid_checkpoint_is_not_reused(summary: str) -> None:
+    middleware = _middleware()
+    runtime = _runtime()
+    state = {"messages": _messages(), "summarization_checkpoint": _checkpoint_with_summary(summary)}
+
+    async def _handler(request):
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    await middleware.awrap_model_call(_model_request(state["messages"], runtime=runtime, state=state), _handler)
+    state.update(await middleware.aafter_model(state, runtime))
+
+    middleware._summary_model.ainvoke.assert_called_once()
+    assert state["summarization_checkpoint"]["summary"] == "compressed summary"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("summary", ["", "Previous conversation was too long to summarize.", "No previous conversation history."])
+async def test_ainvalid_checkpoint_failure_passes_through_and_never_reuses(summary: str) -> None:
+    middleware = _middleware()
+    middleware._summary_model.ainvoke = AsyncMock(side_effect=RuntimeError("summary unavailable"))
+    runtime = _runtime()
+    state = {"messages": _messages(), "summarization_checkpoint": _checkpoint_with_summary(summary)}
+
+    for _ in range(2):
+        request = _model_request(state["messages"], runtime=runtime, state=state)
+        received: list = []
+
+        async def _handler(request):
+            received.append(request)
+            return SimpleNamespace(result=[AIMessage(content="ok")])
+
+        await middleware.awrap_model_call(request, _handler)
+        assert received == [request]
+        assert await middleware.aafter_model(state, runtime) is None
+
+    assert middleware._summary_model.ainvoke.call_count == 2
+    assert state["summarization_checkpoint"]["summary"] == summary
+
+
+def _confirmation_conversation() -> list:
+    return [
+        HumanMessage(content="initial request"),
+        HumanMessage(content="FINAL_CONFIRMATION: proceed with direction B"),
+        AIMessage(content="", tool_calls=[{"name": "write_file", "id": "write-1", "args": {"path": "/tmp/p01.svg"}}]),
+        ToolMessage(content="P01 written", tool_call_id="write-1"),
+        AIMessage(content="working"),
+    ]
+
+
+def _assert_confirmation_window(window: list, confirmation: HumanMessage) -> None:
+    assert window[0].name == "summary"
+    assert "compressed summary" in window[0].content
+    assert sum(message is confirmation for message in window) == 1
+    assert not any(isinstance(message, ToolMessage) and not any(isinstance(peer, AIMessage) and message.tool_call_id in {call["id"] for call in peer.tool_calls} for peer in window) for message in window)
+
+
+def test_latest_real_user_is_preserved_in_fresh_and_reuse_windows() -> None:
+    middleware = _middleware(trigger=("messages", 5), keep=("messages", 1))
+    runtime = _runtime()
+    state = {"messages": _confirmation_conversation()}
+    original_messages = list(state["messages"])
+    confirmation = state["messages"][1]
+
+    fresh = _run_wrap_and_after(middleware, state, runtime)
+
+    _assert_confirmation_window(fresh[0].messages, confirmation)
+    assert len(state["messages"]) == len(original_messages)
+    assert all(current is original for current, original in zip(state["messages"], original_messages, strict=True))
+
+    state["messages"].append(AIMessage(content="continued after checkpoint"))
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    handler, received = _recording_handler()
+    middleware.wrap_model_call(request, handler)
+
+    _assert_confirmation_window(received[0].messages, confirmation)
+    assert middleware._summary_model.invoke.call_count == 1
+    assert middleware.after_model(state, runtime) is None
+
+
+@pytest.mark.anyio
+async def test_alatest_real_user_is_preserved_in_fresh_and_reuse_windows() -> None:
+    middleware = _middleware(trigger=("messages", 5), keep=("messages", 1))
+    runtime = _runtime()
+    state = {"messages": _confirmation_conversation()}
+    confirmation = state["messages"][1]
+    received: list = []
+
+    async def _handler(request):
+        received.append(request)
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    await middleware.awrap_model_call(_model_request(state["messages"], runtime=runtime, state=state), _handler)
+    state.update(await middleware.aafter_model(state, runtime))
+    state["messages"].append(AIMessage(content="continued after checkpoint"))
+    await middleware.awrap_model_call(_model_request(state["messages"], runtime=runtime, state=state), _handler)
+
+    _assert_confirmation_window(received[0].messages, confirmation)
+    _assert_confirmation_window(received[1].messages, confirmation)
+    assert middleware._summary_model.ainvoke.call_count == 1
+    assert await middleware.aafter_model(state, runtime) is None
+
+
+def test_latest_user_already_preserved_is_not_duplicated() -> None:
+    middleware = _middleware()
+    messages = _messages()
+    latest_user = messages[2]
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(_model_request(messages), handler)
+
+    assert sum(message is latest_user for message in received[0].messages) == 1
+
+
+def test_hidden_human_is_not_selected_as_latest_user() -> None:
+    middleware = _middleware(trigger=("messages", 3), keep=("messages", 1))
+    real_user = HumanMessage(content="real final confirmation")
+    hidden = HumanMessage(content="hidden framework context", additional_kwargs={"hide_from_ui": True})
+    messages = [real_user, hidden, AIMessage(content="working")]
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(_model_request(messages), handler)
+
+    assert sum(message is real_user for message in received[0].messages) == 1
+    assert all(message is not hidden for message in received[0].messages)
+
+
+def test_dynamic_context_user_peer_is_preserved_once() -> None:
+    middleware = _middleware(trigger=("messages", 4), keep=("messages", 1))
+    messages = [*_reminder_triplet(user_text="dynamic final confirmation"), AIMessage(content="working")]
+    user_peer = messages[2]
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(_model_request(messages), handler)
+
+    assert sum(message is user_peer for message in received[0].messages) == 1
+    assert {message.id for message in received[0].messages} >= {"m1", "m1__memory", "m1__user"}
+
+
+def test_latest_user_duplicate_content_uses_object_identity() -> None:
+    middleware = _middleware(trigger=("messages", 3), keep=("messages", 1))
+    earlier = HumanMessage(content="same confirmation")
+    latest = HumanMessage(content="same confirmation")
+    messages = [earlier, latest, AIMessage(content="working")]
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(_model_request(messages), handler)
+
+    assert sum(message is latest for message in received[0].messages) == 1
+    assert all(message is not earlier for message in received[0].messages)
