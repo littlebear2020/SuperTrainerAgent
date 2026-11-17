@@ -144,8 +144,9 @@ export function ShowcaseAudioPlayer({
             <article
               key={item.id}
               data-testid={`showcase-case-${item.id}`}
+              data-playing={isPlaying ? "true" : undefined}
               className={cn(
-                "showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col gap-3 rounded-[14px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50",
+                "showcase-card flex min-w-0 flex-col gap-3 rounded-[16px] p-4 transition duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
                 isPlaying &&
                   "border-indigo-300 shadow-[0_0_0_3px_rgb(99_102_241/0.08)] dark:border-indigo-400/60",
                 isPlaying && styles.isPlaying,
