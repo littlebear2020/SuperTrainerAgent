@@ -2016,3 +2016,52 @@ async def test_asummary_fresh_log_has_no_message_or_summary_content(caplog: pyte
     assert "mode=fresh" in caplog.text
     assert "ASYNC_SUMMARY_SECRET" not in caplog.text
     assert "ASYNC_USER_SECRET" not in caplog.text
+
+
+def test_summary_failure_preserves_exception_traceback(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+    middleware._summary_model.invoke.side_effect = RuntimeError("SYNTHETIC_SUMMARY_FAILURE")
+
+    with caplog.at_level("ERROR"):
+        middleware.wrap_model_call(_model_request(_messages()), _recording_handler()[0])
+
+    assert "Traceback (most recent call last)" in caplog.text
+    assert "RuntimeError: SYNTHETIC_SUMMARY_FAILURE" in caplog.text
+
+
+def test_tool_protocol_error_still_logs_fresh_window(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+    handler = MagicMock(side_effect=ToolProtocolError("terminal"))
+
+    with caplog.at_level("INFO"), pytest.raises(ToolProtocolError):
+        middleware.wrap_model_call(_model_request(_messages()), handler)
+
+    assert "mode=fresh" in caplog.text
+
+
+def test_tool_protocol_error_still_logs_reuse_window(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+    runtime = _runtime()
+    state = {"messages": _messages()}
+    _run_wrap_and_after(middleware, state, runtime)
+    state["messages"].append(AIMessage(content="continued"))
+    handler = MagicMock(side_effect=ToolProtocolError("terminal"))
+    caplog.clear()
+
+    with caplog.at_level("INFO"), pytest.raises(ToolProtocolError):
+        middleware.wrap_model_call(_model_request(state["messages"], runtime=runtime, state=state), handler)
+
+    assert "mode=reuse" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_atool_protocol_error_still_logs_fresh_window(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+
+    async def _handler(request):
+        raise ToolProtocolError("terminal")
+
+    with caplog.at_level("INFO"), pytest.raises(ToolProtocolError):
+        await middleware.awrap_model_call(_model_request(_messages()), _handler)
+
+    assert "mode=fresh" in caplog.text
