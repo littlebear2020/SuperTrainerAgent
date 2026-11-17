@@ -41,16 +41,24 @@
    批量生成/模板填充 SVG（generate-pptx Step 6 "hand-write" 强制条款）。跨页视觉
    一致性靠逐页手写 + 全局 spec_lock 保证。
 2. **禁子代理生成 SVG**——Executor 逐页 SVG 必须由你端到端完成，**禁止**委托给子代理。
-3. **逐页重读 spec_lock**——生成每一页 SVG **前**必读 `<project>/spec_lock.md`；
-   **每 5 页强制重读一次 spec_lock 锚定**（6.3.0 page-lock 纪律），所有颜色/字体/
-   图标/图来自此契约，不得凭记忆或即兴。这是抵抗长 deck 上下文漂移的命脉。
-4. **顺序逐页生成**——全局设计上下文确认后，逐页连续产出，**禁止**分批/分组并行。
+3. **有效上下文复用 spec_lock**——完整 Design Spec 与 `spec_lock.md` 通过 Gate 1/2 后才写
+   第一页 SVG；有效上下文内复用已载入的锁，**不逐页重读**；仅**每 5 页**（P05/P10/…）
+   及上下文失效、压缩、续写恢复时完整重读一次锚定（6.3.0 page-lock 纪律）。所有颜色/
+   字体/图标/图来自此契约，不得凭记忆或即兴。这是抵抗长 deck 上下文漂移的命脉。
+4. **同 thread 顺序续写**——全局设计上下文确认后，在同一对话内逐页连续产出；需要分段
+   （用户要求早期预览/交接、长 deck 或接近预算）时，可在 P05 early gate 及必要修复后报告
+   `P01–P05 / <total>` 并暂停，用户回复「继续」后从 P06 或首个缺失页顺序续写：不重跑
+   源解析、项目初始化或身份抽取，不重做前五页。**禁止**并行分组、子代理生成或脚本批量
+   生成。末页完成后直接进入 final gate 与导出，不再额外等待「继续」；final gate 的合法
+   修复不属于重做。
 5. **两段式确认闸门（chat）**——Strategist 的 Stage1（沟通契约+模板/free-design
    选择）与 Stage2（完整 deck 方案三选一）都是 `ask_clarification` 硬停确认点，
    确认后才进 Executor（**TrainerAI 恒走 chat 分支，禁 confirm_ui 页面**，见 SKILL.md
-   覆盖段 P12）；确认后即写 `<project>/confirm_state.json`，恢复时凭该文件与
-   planning artifacts 互证续跑。quick-generate 是唯一例外（无确认直通，但铁律 1-4
-   不豁免）。
+   覆盖段 P12）；确认后即写 `<project>/confirm_state.json`。**最终确认
+   （`stage: final` + `status: confirmed`）后禁止再重问 Stage 1/2**：即使 `design_spec.md` /
+   `spec_lock.md` 尚未写出，下一动作也是按恢复表补写缺失规格/锁或续写下一页，不得重问、
+   不得重跑策划；只有用户新的明确修改才能重开对应阶段，普通恢复或缺少下游文件不算修改。
+   quick-generate 是唯一例外（无确认直通，但铁律 1-4 不豁免）。
 6. **可编辑元素打 `data-element-id`**——你手写的每个可编辑 SVG 元素（`<text>`/
    `<image>`/`<g>` 图标）必须带 `data-element-id="<稳定id>"` 属性，供前端元素级
    编辑用 `querySelector` 定位。
@@ -96,4 +104,5 @@ visual-review 阶段（P13，预览走 artifacts PNG）；`generation_mode: spli
 - 用与用户一致的语言；`design_spec.md` 模板结构保持英文（字段名），内容值可用用户语言。
 - 每完成一步汇报进度；BLOCKING 点（Stage1/Stage2 确认、quick 之外的方案审批）用
   `ask_clarification` 等用户明确回复，不得替用户决策。
-- 长内容（>10 页）如接近 recursion/时长预算，主动建议用户分批（split 在本环境不可用）。
+- 长内容（>10 页）不要求跨会话 split（本环境不可用）；按 D3.4 在同一对话内 P05 后
+  暂停/继续，顺序写完，接近 recursion/时长预算时报告进度而非重读。

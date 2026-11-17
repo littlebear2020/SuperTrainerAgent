@@ -50,7 +50,9 @@ required-secrets:
 >    不运行，也不写 UI 分支的 receipts）。Default 与 Beautify（其 Step 4 复用 Default
 >    确认编排）同受约束；quick-generate / edit-native-pptx 本就不触 confirm_ui。
 >    `generation_mode: split` 与 `resume-execute` **禁用**（per-thread sandbox 跨会话
->    拿不到旧会话 project 目录，架构性失效）；长 deck 走连续模式。
+>    拿不到旧会话 project 目录，架构性失效）；长 deck 仍走同 thread 连续模式，可在
+>    P05 early gate 后暂停并按「继续」从 P06 顺序续写（见 generate-pptx Step 6），
+>    跨会话恢复与并行分组仍禁用。
 > 5. **禁 live-preview 自启动（P13）**：**禁止运行 `svg_editor/server.py`**——含
 >    generate-pptx Step 6 Mandatory 自启动、live-preview/visual-review 阶段的全部启动
 >    触点。live-preview URL 一律按"预览不可用"如实报告，不要静默跳过；页面/模板预览改走
@@ -60,14 +62,18 @@ required-secrets:
 > 6. **布尔形状/文字轮廓依赖**：Shape Boolean 与文字轮廓特性依赖 `skia-pathops`
 >    / `uharfbuzz`；沙箱镜像未安装这两个 C 扩展时，对应命令会友好报错——遇到即改用
 >    普通形状/文本组合表达，**不要反复重试**。
-> 7. **D3 执行铁律**：纯 Agent 逐页手写 SVG、禁子代理生成 SVG、逐页重读 spec_lock、
->    顺序逐页、大纲先批闸门、可编辑元素打 `data-element-id`——完整定义见 agent SOUL.md
->    （`backend/seed/agents/ppt-master/SOUL.md`）。
+> 7. **D3 执行铁律**：纯 Agent 逐页手写 SVG、禁子代理生成 SVG、有效上下文复用
+>    `spec_lock.md`（每 5 页及上下文失效/续写恢复时重读）、同 thread 顺序分批续写
+>    （禁并行分组）、大纲先批闸门、可编辑元素打 `data-element-id`——完整定义见
+>    agent SOUL.md（`backend/seed/agents/ppt-master/SOUL.md`）。
 > 8. 与上游的全部偏离清单见 `TRAINERAI_PATCHES.md`。
 > 9. **Chat 确认持久化（P20）**：Stage1/Stage2 在 chat 中获得用户明确确认后，立即将
->    `stage`、确认值摘要、`confirmed_at` 写入 `<project>/confirm_state.json`；恢复时以该
->    文件与 `design_spec.md` / `spec_lock.md` 互证，一致则按断点续跑，禁止重新发起已确认
->    阶段或重跑策划。
+>    `stage`、确认值摘要、`confirmed_at` 写入 `<project>/confirm_state.json`。最终确认
+>    （`stage: final` + `status: confirmed`）本身即禁止再发起 Stage 1/2——即使
+>    `design_spec.md` / `spec_lock.md` 尚未写出，下一动作也是按恢复表补写缺失规格/锁或
+>    续写下一页，不得重问、不得重跑策划。恢复时以该文件与已存在的下游产物互证：只审计
+>    已写出的规格/锁，不因下游缺失而撤销确认，也不得由孤立 lock 反推规格；只有用户新的
+>    明确修改才能重开对应阶段，普通恢复或缺少下游文件不算修改。
 > 10. **源图转写一次性落盘（P21）**：源文档图片内容需转写重建（表格截图→原生表格等）
 >    时，首次读准后立即写入 `<project>/analysis/source_image_transcriptions.md`，后续一律
 >    以该文本为准；单格存疑只复查该格（允许裁切单格），整图重读 ≤1 次；OCR 与目视冲突以
