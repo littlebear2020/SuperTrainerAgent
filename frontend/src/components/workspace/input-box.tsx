@@ -180,6 +180,7 @@ export function InputBox({
   agentSkills,
   agentSuggestionPrompts,
   showNewThreadSuggestions = true,
+  placeholder,
   onContextChange,
   onSubmit,
   onStop,
@@ -204,6 +205,8 @@ export function InputBox({
   agentSkills?: string[] | null;
   agentSuggestionPrompts?: { label: string; prompt: string }[] | null;
   showNewThreadSuggestions?: boolean;
+  /** Agent-specific composer prompt. Defaults to the global InputBox copy. */
+  placeholder?: string;
   onContextChange?: (
     context: Omit<
       AgentThreadContext,
@@ -514,7 +517,7 @@ export function InputBox({
                 : "text-slate-800 placeholder-slate-400",
             )}
             disabled={isDisabled}
-            placeholder={t.inputBox.placeholder}
+            placeholder={placeholder ?? t.inputBox.placeholder}
             autoFocus={autoFocus}
           />
         </PromptInputBody>

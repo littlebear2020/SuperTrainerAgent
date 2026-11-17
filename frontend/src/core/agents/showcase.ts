@@ -68,6 +68,7 @@ export type ShowcaseStep = {
 export type ShowcaseAgent = {
   id: ShowcaseAgentId;
   label: LocalizedText;
+  inputPlaceholder: LocalizedText;
   heroLine: { zh: [string, string]; en: [string, string] };
   character: string;
   howTitle: LocalizedText;
@@ -108,6 +109,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
     id: "course-video",
     label: text("课程视频", "COURSE VIDEO"),
+    inputPlaceholder: text(
+      "粘贴讲稿，或输入课程主题；也可以上传 docx、pdf、md 文稿",
+      "Paste a script or topic; upload DOCX, PDF, or MD.",
+    ),
     heroLine: {
       zh: ["上传讲稿或给出主题，", "生成一节可播放的讲解视频课。"],
       en: ["Upload a script or share a topic.", "Get a playable video lesson."],
@@ -223,6 +228,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "ppt-master": {
     id: "ppt-master",
     label: text("PPT 制作", "PPT CREATION"),
+    inputPlaceholder: text(
+      "输入 PPT 主题，或上传文档、现有 PPT",
+      "Enter a topic, or upload a document or existing PPT.",
+    ),
     heroLine: {
       zh: ["从主题、文档或现有 PPT，", "做出可继续编辑的课件。"],
       en: [
@@ -365,6 +374,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "podcast-studio": {
     id: "podcast-studio",
     label: text("播客制作", "PODCAST PRODUCTION"),
+    inputPlaceholder: text(
+      "输入主题、粘贴公开网页链接，或上传文档",
+      "Enter a topic, paste a public URL, or upload a document.",
+    ),
     heroLine: {
       zh: ["从文档、网页或主题调研，", "生成一期可收听的播客音频。"],
       en: [
@@ -655,6 +668,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "creative-studio": {
     id: "creative-studio",
     label: text("视觉设计", "VISUAL DESIGN"),
+    inputPlaceholder: text(
+      "输入课程主题、核心知识点和想要的风格",
+      "Enter a topic, key points, and desired style.",
+    ),
     heroLine: {
       zh: ["把课程内容做成可用于", "教学与传播的视觉作品。"],
       en: [

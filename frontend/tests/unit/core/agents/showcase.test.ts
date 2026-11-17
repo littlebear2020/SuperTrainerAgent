@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -150,6 +150,51 @@ describe("Agent showcase data and assets", () => {
       expect(item.slides).toHaveLength(7);
       expect(item.pageCount).toBe(7);
       expect(statSync(join(publicRoot, item.pptx)).size).toBe(item.pptxBytes);
+    }
+  });
+
+  it("gives every showcase agent a dedicated localized composer placeholder", () => {
+    const expected = {
+      "course-video": {
+        zh: "粘贴讲稿，或输入课程主题；也可以上传 docx、pdf、md 文稿",
+        en: "Paste a script or topic; upload DOCX, PDF, or MD.",
+      },
+      "ppt-master": {
+        zh: "输入 PPT 主题，或上传文档、现有 PPT",
+        en: "Enter a topic, or upload a document or existing PPT.",
+      },
+      "podcast-studio": {
+        zh: "输入主题、粘贴公开网页链接，或上传文档",
+        en: "Enter a topic, paste a public URL, or upload a document.",
+      },
+      "creative-studio": {
+        zh: "输入课程主题、核心知识点和想要的风格",
+        en: "Enter a topic, key points, and desired style.",
+      },
+    } as const;
+
+    for (const id of agentIds) {
+      const placeholder = agent(id).inputPlaceholder;
+      expect(placeholder, id).toEqual(expected[id]);
+      // Agent-specific copy must not regress to the global composer sentence.
+      expect(placeholder.zh, id).not.toContain("今天我能为你做些什么");
+      expect(placeholder.en, id).not.toContain("How can I assist you today");
+    }
+  });
+
+  it("ships hero art with a lossy alpha channel (corner alpha covered by E2E)", () => {
+    // Node has no WebP decoder; the four-corner alpha-0 / no-white-card checks
+    // run in the browser (tests/e2e/agent-new-chat-guide.spec.ts). Here we only
+    // guard the binary contract: every hero must be an alpha WebP, not an
+    // opaque rectangle re-exported as .webp.
+    for (const id of agentIds) {
+      const path = join(publicRoot, agent(id).character);
+      const bytes = readFileSync(path);
+      expect(bytes.subarray(0, 4).toString(), id).toBe("RIFF");
+      expect(bytes.subarray(8, 12).toString(), id).toBe("WEBP");
+      expect(bytes.includes(Buffer.from("VP8X")), id).toBe(true);
+      expect(bytes.includes(Buffer.from("ALPH")), id).toBe(true);
+      expect(statSync(path).size, id).toBeLessThanOrEqual(150_000);
     }
   });
 

@@ -157,6 +157,7 @@ import {
   PromptInputProvider,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
+import { showcaseFor } from "@/core/agents/showcase";
 import { I18nProvider } from "@/core/i18n/context";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -195,10 +196,11 @@ describe("AgentChatPage guide wiring", () => {
     container.remove();
   });
 
-  async function renderPage() {
+  async function renderPage(locale: "zh-CN" | "en-US" = "zh-CN") {
+    document.cookie = `locale=${locale}; path=/`;
     await act(async () => {
       root.render(
-        <I18nProvider initialLocale="zh-CN">
+        <I18nProvider initialLocale={locale}>
           <PromptInputProvider>
             <AgentChatPage />
             <PromptValue />
@@ -293,5 +295,29 @@ describe("AgentChatPage guide wiring", () => {
     await renderPage();
 
     expect(h.inputProps).toMatchObject({ disabled: true, autoFocus: false });
+  });
+
+  it("passes the localized showcase placeholder only to guided new chats", async () => {
+    await renderPage();
+    expect(h.inputProps?.placeholder).toBe(
+      showcaseFor("course-video")!.inputPlaceholder.zh,
+    );
+
+    h.agentName = "co-writer";
+    await renderPage();
+    expect(h.inputProps?.placeholder).toBeUndefined();
+
+    h.agentName = "course-video";
+    h.isNew = false;
+    h.threadId = "thread-1";
+    await renderPage();
+    expect(h.inputProps?.placeholder).toBeUndefined();
+  });
+
+  it("uses the active locale for the showcase placeholder", async () => {
+    await renderPage("en-US");
+    expect(h.inputProps?.placeholder).toBe(
+      showcaseFor("course-video")!.inputPlaceholder.en,
+    );
   });
 });
