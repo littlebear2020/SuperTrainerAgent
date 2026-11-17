@@ -1927,3 +1927,92 @@ def test_latest_user_duplicate_content_uses_object_identity() -> None:
 
     assert sum(message is latest for message in received[0].messages) == 1
     assert all(message is not earlier for message in received[0].messages)
+
+
+# ---------------------------------------------------------------------------
+# Structured, content-free observability
+# ---------------------------------------------------------------------------
+
+
+def test_summary_logs_fresh_and_reuse_without_message_content(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware(trigger=("messages", 5), keep=("messages", 1))
+    middleware._summary_model.invoke.return_value = SimpleNamespace(text="SUMMARY_SECRET")
+    runtime = _runtime(agent_name="ppt-master")
+    messages = _confirmation_conversation()
+    messages[0].content = "USER_SECRET"
+    messages[3].content = "TOOL_RESULT_SECRET"
+    state = {"messages": messages}
+
+    with caplog.at_level("INFO"):
+        _run_wrap_and_after(middleware, state, runtime)
+        state["messages"].append(AIMessage(content="AI_SECRET"))
+        middleware.wrap_model_call(_model_request(state["messages"], runtime=runtime, state=state), _recording_handler()[0])
+
+    assert "mode=fresh" in caplog.text
+    assert "mode=reuse" in caplog.text
+    assert "message_count=5" in caplog.text
+    assert "cutoff_index=4" in caplog.text
+    assert "approx_tokens=5" in caplog.text
+    assert "thread_id=thread-1" in caplog.text
+    assert "agent_name=ppt-master" in caplog.text
+    for secret in ("USER_SECRET", "TOOL_RESULT_SECRET", "SUMMARY_SECRET", "AI_SECRET"):
+        assert secret not in caplog.text
+
+
+def test_old_sentinel_rejection_is_logged_without_summary_text(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+    sentinel = "Previous conversation was too long to summarize."
+    state = {"messages": _messages(), "summarization_checkpoint": _checkpoint_with_summary(sentinel)}
+
+    with caplog.at_level("INFO"):
+        _run_wrap_and_after(middleware, state, _runtime())
+
+    assert "mode=checkpoint_rejected" in caplog.text
+    assert "mode=fresh" in caplog.text
+    assert sentinel not in caplog.text
+
+
+def test_character_fallback_is_logged_without_tool_content(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware(trigger=("messages", 4), keep=("messages", 1), token_counter=_character_token_counter, trim_tokens_to_summarize=64)
+
+    with caplog.at_level("INFO"):
+        middleware.wrap_model_call(_model_request(_single_line_tool_tail()), _recording_handler()[0])
+
+    assert "mode=character_tail_fallback" in caplog.text
+    assert "mode=fresh" in caplog.text
+    assert "SYNTHETIC_WORK_MARKER" not in caplog.text
+
+
+def test_summary_source_passthrough_logs_warning_without_system_content(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware(trigger=("messages", 2), keep=("messages", 1), token_counter=_character_token_counter, trim_tokens_to_summarize=8)
+    messages = [SystemMessage(content="SYSTEM_SECRET"), HumanMessage(content="preserved user")]
+    request = _model_request(messages)
+    handler, received = _recording_handler()
+
+    with caplog.at_level("INFO"):
+        middleware.wrap_model_call(request, handler)
+
+    assert received == [request]
+    pass_through = [record for record in caplog.records if "mode=pass_through" in record.getMessage()]
+    assert len(pass_through) == 1
+    assert pass_through[0].levelname == "WARNING"
+    assert "mode=character_tail_fallback" in caplog.text
+    assert "SYSTEM_SECRET" not in caplog.text
+
+
+@pytest.mark.anyio
+async def test_asummary_fresh_log_has_no_message_or_summary_content(caplog: pytest.LogCaptureFixture) -> None:
+    middleware = _middleware()
+    middleware._summary_model.ainvoke = AsyncMock(return_value=SimpleNamespace(text="ASYNC_SUMMARY_SECRET"))
+    messages = _messages()
+    messages[0].content = "ASYNC_USER_SECRET"
+
+    async def _handler(request):
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    with caplog.at_level("INFO"):
+        await middleware.awrap_model_call(_model_request(messages), _handler)
+
+    assert "mode=fresh" in caplog.text
+    assert "ASYNC_SUMMARY_SECRET" not in caplog.text
+    assert "ASYNC_USER_SECRET" not in caplog.text
