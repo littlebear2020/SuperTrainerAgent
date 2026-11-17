@@ -1,146 +1,143 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#07101F"/>
-      <stop offset="0.55" stop-color="#0A1528"/>
-      <stop offset="1" stop-color="#0B1220"/>
-    </linearGradient>
-    <linearGradient id="cyanLine" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>
-      <stop offset="0.5" stop-color="#22D3EE"/>
-      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#22D3EE" stop-opacity="0.22"/>
-      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
-    </radialGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#22D3EE" stroke-opacity="0.055" stroke-width="1"/>
-    </pattern>
-    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="18"/>
-    </filter>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#22D3EE" fill-opacity="0.7"/>
-    </marker>
-  </defs>
-  <rect width="1600" height="1000" fill="url(#bg)"/>
-  <rect width="1600" height="1000" fill="url(#grid)"/>
-  <ellipse cx="1180" cy="190" rx="420" ry="240" fill="url(#glow)"/>
-  <ellipse cx="310" cy="830" rx="380" ry="220" fill="#A78BFA" fill-opacity="0.06" filter="url(#soft)"/>
-
-  <g font-family="Noto Sans CJK SC, PingFang SC, sans-serif">
-    <text x="88" y="92" fill="#22D3EE" font-size="13" letter-spacing="5">TRAINER AI · KNOWLEDGE MAP</text>
-    <text x="88" y="172" fill="#F8FAFC" font-size="54" font-weight="700">AI Agent 技术栈</text>
-    <text x="90" y="212" fill="#94A3B8" font-size="18">从模型能力到业务落地：四层能力与它们之间的连接</text>
-    <line x1="88" y1="244" x2="1512" y2="244" stroke="#22D3EE" stroke-opacity="0.18"/>
-
-    <!-- Layered frame -->
-    <g>
-      <rect x="88" y="286" width="1424" height="600" rx="16" fill="#0B1729" fill-opacity="0.62" stroke="#22D3EE" stroke-opacity="0.14"/>
-      <line x1="88" y1="430" x2="1512" y2="430" stroke="#22D3EE" stroke-opacity="0.10" stroke-dasharray="6 8"/>
-      <line x1="88" y1="574" x2="1512" y2="574" stroke="#22D3EE" stroke-opacity="0.10" stroke-dasharray="6 8"/>
-      <line x1="88" y1="718" x2="1512" y2="718" stroke="#22D3EE" stroke-opacity="0.10" stroke-dasharray="6 8"/>
-    </g>
-
-    <!-- Layer labels -->
-    <g>
-      <text x="122" y="352" fill="#67E8F9" font-size="14" letter-spacing="3">L4</text>
-      <text x="160" y="352" fill="#E2E8F0" font-size="21" font-weight="600">应用层</text>
-      <text x="122" y="496" fill="#86EFAC" font-size="14" letter-spacing="3">L3</text>
-      <text x="160" y="496" fill="#E2E8F0" font-size="21" font-weight="600">编排层</text>
-      <text x="122" y="640" fill="#C4B5FD" font-size="14" letter-spacing="3">L2</text>
-      <text x="160" y="640" fill="#E2E8F0" font-size="21" font-weight="600">模型层</text>
-      <text x="122" y="784" fill="#FCD34D" font-size="14" letter-spacing="3">L1</text>
-      <text x="160" y="784" fill="#E2E8F0" font-size="21" font-weight="600">基础设施</text>
-    </g>
-
-    <!-- L4 application cards -->
-    <g>
-      <rect x="300" y="302" width="286" height="96" rx="10" fill="#083344" fill-opacity="0.55" stroke="#22D3EE" stroke-opacity="0.5"/>
-      <text x="326" y="342" fill="#F8FAFC" font-size="21" font-weight="600">课程助手</text>
-      <text x="326" y="373" fill="#94A3B8" font-size="13">答疑、陪练、学习路径</text>
-      <rect x="608" y="302" width="286" height="96" rx="10" fill="#083344" fill-opacity="0.55" stroke="#22D3EE" stroke-opacity="0.5"/>
-      <text x="634" y="342" fill="#F8FAFC" font-size="21" font-weight="600">内容生产</text>
-      <text x="634" y="373" fill="#94A3B8" font-size="13">课程视频、PPT、播客</text>
-      <rect x="916" y="302" width="286" height="96" rx="10" fill="#083344" fill-opacity="0.55" stroke="#22D3EE" stroke-opacity="0.5"/>
-      <text x="942" y="342" fill="#F8FAFC" font-size="21" font-weight="600">数据分析</text>
-      <text x="942" y="373" fill="#94A3B8" font-size="13">取数、洞察、报告</text>
-      <rect x="1224" y="302" width="250" height="96" rx="10" fill="#083344" fill-opacity="0.55" stroke="#22D3EE" stroke-opacity="0.5"/>
-      <text x="1250" y="342" fill="#F8FAFC" font-size="21" font-weight="600">客户服务</text>
-      <text x="1250" y="373" fill="#94A3B8" font-size="13">工单、知识库、回访</text>
-    </g>
-
-    <!-- L3 orchestration cards -->
-    <g>
-      <rect x="300" y="448" width="286" height="96" rx="10" fill="#052E2B" fill-opacity="0.55" stroke="#34D399" stroke-opacity="0.45"/>
-      <text x="326" y="488" fill="#F8FAFC" font-size="21" font-weight="600">规划</text>
-      <text x="326" y="519" fill="#94A3B8" font-size="13">拆解任务、安排步骤</text>
-      <rect x="608" y="448" width="286" height="96" rx="10" fill="#052E2B" fill-opacity="0.55" stroke="#34D399" stroke-opacity="0.45"/>
-      <text x="634" y="488" fill="#F8FAFC" font-size="21" font-weight="600">工具调用</text>
-      <text x="634" y="519" fill="#94A3B8" font-size="13">浏览器、代码、业务系统</text>
-      <rect x="916" y="448" width="286" height="96" rx="10" fill="#052E2B" fill-opacity="0.55" stroke="#34D399" stroke-opacity="0.45"/>
-      <text x="942" y="488" fill="#F8FAFC" font-size="21" font-weight="600">记忆</text>
-      <text x="942" y="519" fill="#94A3B8" font-size="13">会话、任务、长期知识</text>
-      <rect x="1224" y="448" width="250" height="96" rx="10" fill="#052E2B" fill-opacity="0.55" stroke="#34D399" stroke-opacity="0.45"/>
-      <text x="1250" y="488" fill="#F8FAFC" font-size="21" font-weight="600">多智能体</text>
-      <text x="1250" y="519" fill="#94A3B8" font-size="13">分工、协作、复核</text>
-    </g>
-
-    <!-- L2 model cards -->
-    <g>
-      <rect x="300" y="592" width="286" height="96" rx="10" fill="#1E1B4B" fill-opacity="0.6" stroke="#A78BFA" stroke-opacity="0.45"/>
-      <text x="326" y="632" fill="#F8FAFC" font-size="21" font-weight="600">通用大模型</text>
-      <text x="326" y="663" fill="#94A3B8" font-size="13">语言、推理、代码</text>
-      <rect x="608" y="592" width="286" height="96" rx="10" fill="#1E1B4B" fill-opacity="0.6" stroke="#A78BFA" stroke-opacity="0.45"/>
-      <text x="634" y="632" fill="#F8FAFC" font-size="21" font-weight="600">领域模型</text>
-      <text x="634" y="663" fill="#94A3B8" font-size="13">行业知识、专项任务</text>
-      <rect x="916" y="592" width="286" height="96" rx="10" fill="#1E1B4B" fill-opacity="0.6" stroke="#A78BFA" stroke-opacity="0.45"/>
-      <text x="942" y="632" fill="#F8FAFC" font-size="21" font-weight="600">多模态</text>
-      <text x="942" y="663" fill="#94A3B8" font-size="13">图像、语音、视频</text>
-      <rect x="1224" y="592" width="250" height="96" rx="10" fill="#1E1B4B" fill-opacity="0.6" stroke="#A78BFA" stroke-opacity="0.45"/>
-      <text x="1250" y="632" fill="#F8FAFC" font-size="21" font-weight="600">推理优化</text>
-      <text x="1250" y="663" fill="#94A3B8" font-size="13">延迟、成本、吞吐</text>
-    </g>
-
-    <!-- L1 infrastructure cards -->
-    <g>
-      <rect x="300" y="736" width="286" height="96" rx="10" fill="#2A1E07" fill-opacity="0.55" stroke="#FBBF24" stroke-opacity="0.42"/>
-      <text x="326" y="776" fill="#F8FAFC" font-size="21" font-weight="600">算力</text>
-      <text x="326" y="807" fill="#94A3B8" font-size="13">训练、推理、调度</text>
-      <rect x="608" y="736" width="286" height="96" rx="10" fill="#2A1E07" fill-opacity="0.55" stroke="#FBBF24" stroke-opacity="0.42"/>
-      <text x="634" y="776" fill="#F8FAFC" font-size="21" font-weight="600">向量库</text>
-      <text x="634" y="807" fill="#94A3B8" font-size="13">检索、索引、召回</text>
-      <rect x="916" y="736" width="286" height="96" rx="10" fill="#2A1E07" fill-opacity="0.55" stroke="#FBBF24" stroke-opacity="0.42"/>
-      <text x="942" y="776" fill="#F8FAFC" font-size="21" font-weight="600">评测</text>
-      <text x="942" y="807" fill="#94A3B8" font-size="13">基准、回归、人工复核</text>
-      <rect x="1224" y="736" width="250" height="96" rx="10" fill="#2A1E07" fill-opacity="0.55" stroke="#FBBF24" stroke-opacity="0.42"/>
-      <text x="1250" y="776" fill="#F8FAFC" font-size="21" font-weight="600">安全与权限</text>
-      <text x="1250" y="807" fill="#94A3B8" font-size="13">鉴权、审计、隔离</text>
-    </g>
-
-    <!-- Vertical connectors between layers -->
-    <g stroke="#22D3EE" stroke-opacity="0.35" stroke-dasharray="4 6">
-      <line x1="443" y1="398" x2="443" y2="448"/>
-      <line x1="751" y1="398" x2="751" y2="448"/>
-      <line x1="1059" y1="398" x2="1059" y2="448"/>
-      <line x1="1349" y1="398" x2="1349" y2="448"/>
-      <line x1="443" y1="544" x2="443" y2="592"/>
-      <line x1="751" y1="544" x2="751" y2="592"/>
-      <line x1="1059" y1="544" x2="1059" y2="592"/>
-      <line x1="1349" y1="544" x2="1349" y2="592"/>
-      <line x1="443" y1="688" x2="443" y2="736"/>
-      <line x1="751" y1="688" x2="751" y2="736"/>
-      <line x1="1059" y1="688" x2="1059" y2="736"/>
-      <line x1="1349" y1="688" x2="1349" y2="736"/>
-    </g>
-
-    <!-- Side annotation -->
-    <g>
-      <line x1="88" y1="908" x2="1512" y2="908" stroke="#22D3EE" stroke-opacity="0.18"/>
-      <circle cx="102" cy="944" r="4" fill="#22D3EE"/>
-      <text x="120" y="949" fill="#94A3B8" font-size="14">每一层都可以被替换或单独评测；真正决定体验的，是层与层之间的连接。</text>
-      <text x="1512" y="949" fill="#64748B" font-size="12" text-anchor="end" letter-spacing="2">AI AGENT STACK · 2026</text>
-    </g>
-  </g>
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+  <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.045" stroke-width="1"/>
+</pattern>
+<radialGradient id="glow" cx="50%" cy="40%" r="60%">
+  <stop offset="0%" stop-color="#1b2a5e" stop-opacity="0.55"/>
+  <stop offset="100%" stop-color="#070b18" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="g0" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0%" stop-color="#8B7BFF" stop-opacity="0.20"/>
+  <stop offset="55%" stop-color="#8B7BFF" stop-opacity="0.075"/>
+  <stop offset="100%" stop-color="#8B7BFF" stop-opacity="0.03"/>
+</linearGradient><linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0%" stop-color="#5AD8E8" stop-opacity="0.20"/>
+  <stop offset="55%" stop-color="#5AD8E8" stop-opacity="0.075"/>
+  <stop offset="100%" stop-color="#5AD8E8" stop-opacity="0.03"/>
+</linearGradient><linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0%" stop-color="#E8B05A" stop-opacity="0.20"/>
+  <stop offset="55%" stop-color="#E8B05A" stop-opacity="0.075"/>
+  <stop offset="100%" stop-color="#E8B05A" stop-opacity="0.03"/>
+</linearGradient><linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0%" stop-color="#4FD1A5" stop-opacity="0.20"/>
+  <stop offset="55%" stop-color="#4FD1A5" stop-opacity="0.075"/>
+  <stop offset="100%" stop-color="#4FD1A5" stop-opacity="0.03"/>
+</linearGradient>
+<marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+  <path d="M0,0 L6,3 L0,6 z" fill="#7d8ba5"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#070b18" stroke="none" stroke-width="1" opacity="1.0"/>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="url(#grid)" stroke="none" stroke-width="1" opacity="1.0"/>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="url(#glow)" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="60" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#8fa3c0" text-anchor="start" letter-spacing="3" opacity="1.0">SYSTEM DIAGRAM / 07</text>
+<text x="60" y="122" font-family="PingFang SC" font-size="52" font-weight="600" fill="#f4f7ff" text-anchor="start" letter-spacing="-1" opacity="1.0">AI Agent 技术栈</text>
+<text x="60" y="160" font-family="PingFang SC" font-size="18" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">四层能力，一条调用链。上层封装场景，下层提供资源。</text>
+<text x="1540" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#8fa3c0" text-anchor="end" letter-spacing="2" opacity="1.0">L4 → L1</text>
+<text x="1540" y="84" font-family="SF Mono" font-size="11" font-weight="400" fill="#5f7292" text-anchor="end" letter-spacing="2" opacity="1.0">TWELVE MODULES</text>
+<rect x="60" y="184" width="1480" height="1" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.12"/>
+<line x1="1532" y1="226" x2="1532" y2="872" stroke="#7d8ba5" stroke-width="1" stroke-dasharray="4 6" opacity="0.7"/>
+<line x1="1527" y1="368" x2="1537" y2="356" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<line x1="1537" y1="386" x2="1527" y2="398" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<line x1="1527" y1="538" x2="1537" y2="526" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<line x1="1537" y1="556" x2="1527" y2="568" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<line x1="1527" y1="708" x2="1537" y2="696" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<line x1="1537" y1="726" x2="1527" y2="738" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
+<text x="1540" y="118" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#8294b0" text-anchor="end" opacity="1.0">↑ 能力向上封装   ↓ 请求向下路由</text>
+<rect x="72" y="230" width="1440" height="148" rx="16" fill="#8B7BFF" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="220" width="1452" height="148" rx="16" fill="url(#g0)" stroke="#8B7BFF" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="234" width="4" height="120" rx="2" fill="#8B7BFF" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="260" font-family="SF Mono" font-size="13" font-weight="500" fill="#8B7BFF" text-anchor="start" letter-spacing="2" opacity="1.0">L4</text>
+<text x="84" y="304" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">应用层</text>
+<text x="84" y="332" font-family="SF Mono" font-size="11" font-weight="400" fill="#8B7BFF" text-anchor="start" letter-spacing="1.6" opacity="1.0">APPLICATION</text>
+<rect x="372" y="242" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
+<rect x="400" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="400" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<text x="422" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">课程助手</text>
+<text x="422" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">课程设计 · 讲义 · 评测</text>
+<text x="718" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<rect x="762" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="762" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<text x="784" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">内容生产</text>
+<text x="784" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">图文 · 视频 · 播客</text>
+<text x="1080" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<rect x="1124" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="1124" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<text x="1146" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">学习分析</text>
+<text x="1146" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">进度 · 掌握度 · 反馈</text>
+<text x="1442" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<rect x="72" y="400" width="1440" height="148" rx="16" fill="#5AD8E8" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="390" width="1452" height="148" rx="16" fill="url(#g1)" stroke="#5AD8E8" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="404" width="4" height="120" rx="2" fill="#5AD8E8" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="430" font-family="SF Mono" font-size="13" font-weight="500" fill="#5AD8E8" text-anchor="start" letter-spacing="2" opacity="1.0">L3</text>
+<text x="84" y="474" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">编排层</text>
+<text x="84" y="502" font-family="SF Mono" font-size="11" font-weight="400" fill="#5AD8E8" text-anchor="start" letter-spacing="1.6" opacity="1.0">ORCHESTRATION</text>
+<rect x="372" y="412" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
+<rect x="400" y="410" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="400" y="410" width="340" height="108" rx="10" fill="none" stroke="#5AD8E8" stroke-width="0.8" opacity="0.25"/>
+<text x="422" y="448" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">规划与编排</text>
+<text x="422" y="478" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">任务拆解 · 多步执行</text>
+<text x="718" y="436" font-family="SF Mono" font-size="10" font-weight="400" fill="#5AD8E8" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<rect x="762" y="410" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="762" y="410" width="340" height="108" rx="10" fill="none" stroke="#5AD8E8" stroke-width="0.8" opacity="0.25"/>
+<text x="784" y="448" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">工具调用</text>
+<text x="784" y="478" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">检索 · 代码 · 业务 API</text>
+<text x="1080" y="436" font-family="SF Mono" font-size="10" font-weight="400" fill="#5AD8E8" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<rect x="1124" y="410" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="1124" y="410" width="340" height="108" rx="10" fill="none" stroke="#5AD8E8" stroke-width="0.8" opacity="0.25"/>
+<text x="1146" y="448" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">记忆与状态</text>
+<text x="1146" y="478" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">会话 · 长期记忆 · 回滚</text>
+<text x="1442" y="436" font-family="SF Mono" font-size="10" font-weight="400" fill="#5AD8E8" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<rect x="72" y="570" width="1440" height="148" rx="16" fill="#E8B05A" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="560" width="1452" height="148" rx="16" fill="url(#g2)" stroke="#E8B05A" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="574" width="4" height="120" rx="2" fill="#E8B05A" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="600" font-family="SF Mono" font-size="13" font-weight="500" fill="#E8B05A" text-anchor="start" letter-spacing="2" opacity="1.0">L2</text>
+<text x="84" y="644" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">模型层</text>
+<text x="84" y="672" font-family="SF Mono" font-size="11" font-weight="400" fill="#E8B05A" text-anchor="start" letter-spacing="1.6" opacity="1.0">MODEL</text>
+<rect x="372" y="582" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
+<rect x="400" y="580" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="400" y="580" width="340" height="108" rx="10" fill="none" stroke="#E8B05A" stroke-width="0.8" opacity="0.25"/>
+<text x="422" y="618" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">通用大模型</text>
+<text x="422" y="648" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">推理 · 生成 · 多语言</text>
+<text x="718" y="606" font-family="SF Mono" font-size="10" font-weight="400" fill="#E8B05A" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<rect x="762" y="580" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="762" y="580" width="340" height="108" rx="10" fill="none" stroke="#E8B05A" stroke-width="0.8" opacity="0.25"/>
+<text x="784" y="618" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">领域微调</text>
+<text x="784" y="648" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">课程 · 学科 · 品牌语气</text>
+<text x="1080" y="606" font-family="SF Mono" font-size="10" font-weight="400" fill="#E8B05A" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<rect x="1124" y="580" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="1124" y="580" width="340" height="108" rx="10" fill="none" stroke="#E8B05A" stroke-width="0.8" opacity="0.25"/>
+<text x="1146" y="618" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">多模态</text>
+<text x="1146" y="648" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">图 · 视频 · 语音</text>
+<text x="1442" y="606" font-family="SF Mono" font-size="10" font-weight="400" fill="#E8B05A" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<rect x="72" y="740" width="1440" height="148" rx="16" fill="#4FD1A5" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="730" width="1452" height="148" rx="16" fill="url(#g3)" stroke="#4FD1A5" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="744" width="4" height="120" rx="2" fill="#4FD1A5" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="770" font-family="SF Mono" font-size="13" font-weight="500" fill="#4FD1A5" text-anchor="start" letter-spacing="2" opacity="1.0">L1</text>
+<text x="84" y="814" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">基础设施</text>
+<text x="84" y="842" font-family="SF Mono" font-size="11" font-weight="400" fill="#4FD1A5" text-anchor="start" letter-spacing="1.6" opacity="1.0">INFRASTRUCTURE</text>
+<rect x="372" y="752" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
+<rect x="400" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="400" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<text x="422" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">算力与推理</text>
+<text x="422" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">GPU · 批处理 · 弹性</text>
+<text x="718" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<rect x="762" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="762" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<text x="784" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">向量数据库</text>
+<text x="784" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">索引 · 检索 · 版本</text>
+<text x="1080" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<rect x="1124" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
+<rect x="1124" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<text x="1146" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">观测与安全</text>
+<text x="1146" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">日志 · 评测 · 权限</text>
+<text x="1442" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<rect x="60" y="918" width="1480" height="1" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.12"/>
+<text x="60" y="954" font-family="SF Mono" font-size="12" font-weight="500" fill="#c9d6e8" text-anchor="start" letter-spacing="2" opacity="1.0">4 LAYERS</text>
+<text x="170" y="954" font-family="PingFang SC" font-size="12" font-weight="400" fill="#5f7292" text-anchor="start" opacity="1.0">·</text>
+<text x="190" y="954" font-family="SF Mono" font-size="12" font-weight="500" fill="#c9d6e8" text-anchor="start" letter-spacing="2" opacity="1.0">12 MODULES</text>
+<text x="330" y="954" font-family="PingFang SC" font-size="12" font-weight="400" fill="#5f7292" text-anchor="start" opacity="1.0">·</text>
+<text x="350" y="954" font-family="SF Mono" font-size="12" font-weight="500" fill="#c9d6e8" text-anchor="start" letter-spacing="2" opacity="1.0">1 CALL PATH</text>
+<text x="1540" y="954" font-family="PingFang SC" font-size="12" font-weight="400" fill="#7f90aa" text-anchor="end" opacity="1.0">课程导论 / 方案讲解 / 技术评审</text>
 </svg>

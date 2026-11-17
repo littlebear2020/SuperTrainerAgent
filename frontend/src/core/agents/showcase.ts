@@ -294,12 +294,12 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         prompt:
           "快速生成一份 7 页课件《AI 提示词工程入门》，面向零基础学员，轻量科技风。走 Quick 流程，跳过 Stage 1/2 策略与方案确认，直接出稿，保持逐页可编辑并完成质量检查。",
         slides: slides("quick"),
-        pptx: asset("ppt/quick-prompt-v2.pptx"),
-        pptxBytes: 200540,
+        pptx: asset("ppt/quick-prompt-v3.pptx"),
+        pptxBytes: 236985,
         pageCount: 7,
         styleLabel: text(
-          "轻量科技 · 白底靛蓝",
-          "Light tech · White and indigo",
+          "轻量科技 · 暖纸钴蓝",
+          "Light tech · Warm paper and cobalt",
         ),
         features: [
           text("快速出稿", "Quick creation"),
@@ -322,8 +322,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         prompt:
           "按 Default 标准流程制作一份 7 页课件《大模型应用开发实战》，深色杂志风。先与我确认课程结构和设计方案，再逐页生成；要有课程地图、三层架构、RAG 流程、Agent 循环和评估页，交付原生可编辑 PPTX。",
         slides: slides("standard"),
-        pptx: asset("ppt/standard-llm-app-v2.pptx"),
-        pptxBytes: 308973,
+        pptx: asset("ppt/standard-llm-app-v3.pptx"),
+        pptxBytes: 437726,
         pageCount: 7,
         styleLabel: text(
           "深色杂志 · 琥珀与青",
@@ -344,14 +344,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "Native deck transformation · 360 template",
         ),
         description: text(
-          "7 页，保留原封面、页眉页脚和整体版式，把内容改写成通识课；未修改对象保持原样。",
-          "Seven slides rewritten as an introductory course while preserving the original cover, furniture, layout, and untouched objects.",
+          "7 页，保留 360 原封面、页眉标识与绿色视觉语言，把内容重排成通识课；未修改的封面与背景对象保持原样。",
+          "Seven slides rebuilt as an introductory course while preserving the 360 cover, header mark, and green visual language.",
         ),
         prompt:
           "我会上传 360 模板《模板.pptx》。请走 Edit Native 原生编辑，保留原封面、页眉页脚和整体版式设计，把内容改写成 7 页《生成式 AI 通识课》；未编辑对象不重建，未修改的对象保持原样，新增或改写页面沿用模板视觉语言，交付可编辑 PPTX。",
         slides: slides("template"),
-        pptx: asset("ppt/template-360-ai-v3.pptx"),
-        pptxBytes: 465113,
+        pptx: asset("ppt/template-360-ai-v4.pptx"),
+        pptxBytes: 467022,
         pageCount: 7,
         styleLabel: text(
           "360 模板 · 原生改造",
@@ -678,8 +678,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
     ),
     badge: text("产物已核验", "Verified output"),
     note: text(
-      "10 个案例覆盖 5 类作品，每类 2 种风格；海报、知识卡、漫画、信息图由生图模型生成，结构图由 SVG 绘图能力生成。",
-      "Ten designs across five categories and two styles each, using image generation for artwork and precise SVG for diagrams.",
+      "10 个案例覆盖 5 类作品，每类 2 种风格；海报、知识卡与信息图由精确排版生成，漫画由生图模型生成，结构图由 SVG 绘制。",
+      "Ten designs across five categories and two styles each, using precise layout for posters, cards, and infographics, image generation for comics, and SVG for diagrams.",
     ),
     steps: [
       {
@@ -731,12 +731,12 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         title: text("大模型应用开发", "LLM application development"),
         tag: text("课程海报 · 瑞士网格风", "Course poster · Swiss grid"),
         description: text(
-          "暖白纸感、橙色几何块和克制的网格排版。",
-          "Warm paper, orange geometric blocks, and a restrained grid.",
+          "暖白纸感、钴蓝与朱红的几何色块，以及克制的瑞士网格排版。",
+          "Warm paper, cobalt and vermilion geometric blocks, and a restrained Swiss grid.",
         ),
         styleLabel: text("瑞士网格风", "Swiss grid"),
         prompt:
-          "[模式: 视觉创作]\n请为「大模型应用开发」设计一张竖版课程海报。瑞士网格、暖白纸感、橙色几何色块，标题排版要克制；输出 9:16 图片。",
+          "[模式: 视觉创作]\n请为「大模型应用开发」设计一张竖版课程海报。瑞士网格、暖白纸感、钴蓝与朱红的几何色块，标题排版要克制；输出 9:16 图片。",
         preview: asset("visual/previews/poster-llm-light.webp"),
         original: asset("visual/originals/poster-llm-light.jpg"),
         downloadName: "visual-poster-llm.jpg",
@@ -748,14 +748,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         kind: "visual",
         category: "card",
         title: text("RAG：让模型先查再答", "RAG: retrieve before answering"),
-        tag: text("知识卡片 · 玻璃拟态", "Knowledge card · Glassmorphism"),
+        tag: text("知识卡片 · 霓虹玻璃拟态", "Knowledge card · Neon glass"),
         description: text(
-          "检索、增强、生成三步，一张卡讲清 RAG 的基本链路。",
-          "Explain retrieval, augmentation, and generation in one card.",
+          "深色玻璃卡片、荧光绿与青色高亮，把检索、增强、生成三步讲成一条链路。",
+          "A dark glass card with lime and cyan highlights, tracing retrieval, augmentation, and generation.",
         ),
         styleLabel: text("玻璃拟态", "Glassmorphism"),
         prompt:
-          "[模式: 视觉创作]\n请把「RAG：让模型先查再答」做成一张 16:9 知识卡片，三步：检索、增强、生成；深色玻璃拟态风格，中文要准确。",
+          "[模式: 视觉创作]\n请把「RAG：让模型先查再答」做成一张 16:9 知识卡片，三步：检索、增强、生成；深色玻璃拟态风格，荧光绿与青色高亮，中文要准确。",
         preview: asset("visual/previews/card-rag.webp"),
         original: asset("visual/originals/card-rag.jpg"),
         downloadName: "visual-card-rag.jpg",
@@ -767,17 +767,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         kind: "visual",
         category: "card",
         title: text("提示词的四个要素", "The four elements of a prompt"),
-        tag: text(
-          "知识卡片 · 手写笔记风",
-          "Knowledge card · Handwritten notes",
-        ),
+        tag: text("知识卡片 · 编辑笔记风", "Knowledge card · Editorial notes"),
         description: text(
-          "角色、任务、上下文、格式，用手写笔记和黄色高亮呈现。",
-          "Role, task, context, and format in handwritten notes with yellow highlights.",
+          "纸感卡片、荧光笔高亮，四色区分角色、任务、上下文与格式。",
+          "Paper cards and highlighter, with four colors for role, task, context, and format.",
         ),
-        styleLabel: text("手写笔记风", "Handwritten notes"),
+        styleLabel: text("编辑笔记风", "Editorial notes"),
         prompt:
-          "[模式: 视觉创作]\n请把「提示词的四个要素：角色、任务、上下文、格式」做成一张 16:9 手写笔记风知识卡片，蓝色笔迹、黄色高亮、红色批注。",
+          "[模式: 视觉创作]\n请把「提示词的四个要素：角色、任务、上下文、格式」做成一张 16:9 编辑笔记风知识卡片，纸感卡片、黄色荧光笔高亮，蓝、珊瑚、绿、琥珀四色标注。",
         preview: asset("visual/previews/card-prompt.webp"),
         original: asset("visual/originals/card-prompt.jpg"),
         downloadName: "visual-card-prompt.jpg",
@@ -827,14 +824,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         kind: "visual",
         category: "infographic",
         title: text("大模型训练全流程", "The complete LLM training pipeline"),
-        tag: text("信息图 · 等距科技风", "Infographic · Isometric tech"),
+        tag: text("信息图 · 编辑数据风", "Infographic · Editorial data"),
         description: text(
           "数据清洗、预训练、监督微调、对齐、推理部署，五个阶段一张图看完。",
           "Five stages from data cleaning through deployment in one infographic.",
         ),
-        styleLabel: text("等距科技风", "Isometric tech"),
+        styleLabel: text("编辑数据风", "Editorial data"),
         prompt:
-          "[模式: 视觉创作]\n请把「大模型训练全流程」做成一张 16:9 信息图，五个阶段：数据清洗、预训练、监督微调、对齐、推理部署；不要编造数字指标。",
+          "[模式: 视觉创作]\n请把「大模型训练全流程」做成一张 16:9 信息图，五个阶段：数据清洗、预训练、监督微调、对齐、推理部署；编辑数据风，五种颜色区分阶段，不要编造数字指标。",
         preview: asset("visual/previews/infographic-training.webp"),
         original: asset("visual/originals/infographic-training.jpg"),
         downloadName: "visual-infographic-training.jpg",
@@ -849,14 +846,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "企业 AI Agent 落地路线图",
           "Enterprise AI agent adoption roadmap",
         ),
-        tag: text("信息图 · 蓝图编辑风", "Infographic · Blueprint editorial"),
+        tag: text("信息图 · 暖调编辑风", "Infographic · Warm editorial"),
         description: text(
-          "评估、试点、扩展、治理四个阶段，用浅色蓝图风格讲清落地路径。",
-          "Assessment, pilots, scaling, and governance in a light blueprint style.",
+          "评估、试点、扩展、治理四个阶段，用赤陶、森林绿与赭黄讲清落地路径。",
+          "Assessment, pilots, scaling, and governance in terracotta, forest green, and ochre.",
         ),
-        styleLabel: text("蓝图编辑风", "Blueprint editorial"),
+        styleLabel: text("暖调编辑风", "Warm editorial"),
         prompt:
-          "[模式: 视觉创作]\n请把「企业 AI Agent 落地路线图」做成一张 16:9 信息图，四个阶段：评估、试点、扩展、治理；浅色蓝图风格，不要编造数字指标。",
+          "[模式: 视觉创作]\n请把「企业 AI Agent 落地路线图」做成一张 16:9 信息图，四个阶段：评估、试点、扩展、治理；暖调编辑风格，赤陶、森林绿与赭黄，不要编造数字指标。",
         preview: asset("visual/previews/infographic-roadmap.webp"),
         original: asset("visual/originals/infographic-roadmap.jpg"),
         downloadName: "visual-infographic-roadmap.jpg",
