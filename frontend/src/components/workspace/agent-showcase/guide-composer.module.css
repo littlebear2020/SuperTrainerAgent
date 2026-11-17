@@ -1,17 +1,28 @@
+/* Guide composer surface: override the glass tokens instead of fighting the
+ * inline glassStyle() with !important. glassStyle() resolves --glass-* on the
+ * element, so variables set on this wrapper cascade into every surface value. */
+.guideComposerFrame {
+  --glass-bg-from: rgb(255 255 255 / 0.82);
+  --glass-bg-to: rgb(255 255 255 / 0.6);
+  --glass-blur: 18px;
+  --glass-saturate: 115%;
+  --glass-border-light: rgb(226 232 240 / 0.9);
+  --glass-border-accent: rgb(226 232 240 / 0.9);
+  --glass-shadow:
+    0 34px 70px -38px rgb(49 46 129 / 0.5), 0 2px 10px rgb(15 23 42 / 0.06);
+}
+
+:global(.dark) .guideComposerFrame {
+  --glass-bg-from: rgb(20 26 45 / 0.72);
+  --glass-bg-to: rgb(12 17 32 / 0.58);
+  --glass-border-light: rgb(255 255 255 / 0.12);
+  --glass-border-accent: rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.65);
+}
+
 .guideComposerFrame :global(.glass-input-box) {
   min-height: 140px;
-  border: 1px solid rgb(226 232 240 / 0.9) !important;
   border-radius: 28px;
-  background: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 0.82),
-    rgb(255 255 255 / 0.6)
-  ) !important;
-  box-shadow:
-    0 34px 70px -38px rgb(49 46 129 / 0.5),
-    0 2px 10px rgb(15 23 42 / 0.06) !important;
-  backdrop-filter: blur(18px) saturate(1.15) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(1.15) !important;
 }
 
 .guideComposerFrame :global(.glass-input-box [data-slot="input-group"]) {
@@ -21,16 +32,6 @@
 .guideComposerFrame
   :global(.glass-input-box [data-slot="input-group-control"]) {
   min-height: 88px;
-}
-
-:global(.dark) .guideComposerFrame :global(.glass-input-box) {
-  border-color: rgb(255 255 255 / 0.12) !important;
-  background: linear-gradient(
-    180deg,
-    rgb(20 26 45 / 0.72),
-    rgb(12 17 32 / 0.58)
-  ) !important;
-  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.65) !important;
 }
 
 @media (max-width: 639px) {
