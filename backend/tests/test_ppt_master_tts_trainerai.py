@@ -229,6 +229,40 @@ def test_generate_wraps_http_error(mod, monkeypatch, tmp_path):
         mod.generate("hi", tmp_path / "a.mp3", api_key="test-key", voice_id="")
 
 
+def test_retry_rebuilds_request_id_without_changing_payload(mod, monkeypatch, tmp_path):
+    attempts = []
+
+    def fake_urlopen(req, timeout=0):
+        attempts.append({
+            "request_id": req.headers["X-api-request-id"],
+            "body": json.loads(req.data.decode("utf-8")),
+            "api_key": req.headers["X-api-key"],
+        })
+        if len(attempts) == 1:
+            raise urllib.error.URLError("temporary network failure")
+        return FakeStream(_sse([_audio_event(), _finish_event()]))
+
+    monkeypatch.setattr(mod, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mod.time, "sleep", lambda seconds: None)
+    output = tmp_path / "retry.mp3"
+
+    mod.generate(
+        "retry this exact text",
+        output,
+        api_key="test-key",
+        voice_id="zh_female_custom",
+    )
+
+    assert len(attempts) == 2
+    assert attempts[0]["request_id"]
+    assert attempts[1]["request_id"]
+    assert attempts[0]["request_id"] != attempts[1]["request_id"]
+    for attempt in attempts:
+        assert attempt["body"]["req_params"]["text"] == "retry this exact text"
+        assert attempt["body"]["req_params"]["speaker"] == "zh_female_custom"
+        assert attempt["api_key"] == "test-key"
+
+
 def test_generate_rejects_empty_api_key(mod, tmp_path):
     with pytest.raises(RuntimeError, match="API key|api_key"):
         mod.generate("hi", tmp_path / "a.mp3", api_key="", voice_id="")
@@ -239,7 +273,8 @@ def test_generate_chunks_long_notes_by_sentence_and_merges_with_ffmpeg(mod, monk
     requested_texts = []
     ffmpeg_calls = []
 
-    def fake_request(request):
+    def fake_request(request_factory):
+        request = request_factory()
         requested_texts.append(json.loads(request.data)["req_params"]["text"])
         return f"chunk-{len(requested_texts)}".encode()
 
@@ -275,7 +310,8 @@ def test_generate_does_not_publish_when_any_chunk_fails(mod, monkeypatch, tmp_pa
     monkeypatch.setattr(mod, "MAX_TEXT_CHARS", 20, raising=False)
     requested_texts = []
 
-    def fake_request(request):
+    def fake_request(request_factory):
+        request = request_factory()
         requested_texts.append(json.loads(request.data)["req_params"]["text"])
         if len(requested_texts) == 2:
             raise RuntimeError("second chunk failed")
@@ -299,7 +335,7 @@ def test_generate_does_not_publish_when_any_chunk_fails(mod, monkeypatch, tmp_pa
 
 def test_generate_does_not_publish_when_ffmpeg_merge_fails(mod, monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "MAX_TEXT_CHARS", 20, raising=False)
-    monkeypatch.setattr(mod, "_request_with_retry", lambda request: b"chunk")
+    monkeypatch.setattr(mod, "_request_with_retry", lambda request_factory: b"chunk")
 
     def failed_ffmpeg(command, **kwargs):
         return subprocess.CompletedProcess(command, 1, stdout=b"", stderr=b"invalid audio")
@@ -349,7 +385,8 @@ def test_generate_long_notes_produces_real_concatenated_mp3(mod, monkeypatch, tm
     monkeypatch.setattr(mod, "MAX_TEXT_CHARS", 20, raising=False)
     requested_texts = []
 
-    def fake_request(request):
+    def fake_request(request_factory):
+        request = request_factory()
         requested_texts.append(json.loads(request.data)["req_params"]["text"])
         return segment.read_bytes()
 

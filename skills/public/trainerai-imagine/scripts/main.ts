@@ -703,10 +703,11 @@ export function detectProvider(args: CliArgs): Provider {
   const modelProvider = inferProviderFromModel(args.model);
 
   if (modelProvider === "openai") {
-    if (!hasOpenai) {
-      throw new Error("Model looks like an OpenAI image model, but OPENAI_API_KEY is not set.");
-    }
-    return "openai";
+    if (hasOpenai) return "openai";
+    if (hasAzure) return "azure";
+    throw new Error(
+      "Model looks like an OpenAI image model, but neither OPENAI_API_KEY nor AZURE_OPENAI_API_KEY+AZURE_OPENAI_BASE_URL is configured."
+    );
   }
 
   if (modelProvider === "seedream") {

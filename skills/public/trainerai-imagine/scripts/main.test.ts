@@ -587,7 +587,17 @@ test("detectProvider infers OpenAI from an explicit gpt-image model instead of a
   );
 });
 
-test("detectProvider does not send an explicit gpt-image model to QIHU when OpenAI is unavailable", (t) => {
+test("detectProvider falls back to Azure for an explicit gpt-image model when OpenAI is unavailable", (t) => {
+  useProviderEnv(t, {
+    QIHU_API_KEY: "qihu-key",
+    AZURE_OPENAI_API_KEY: "azure-key",
+    AZURE_OPENAI_BASE_URL: "https://example.openai.azure.com",
+  });
+
+  assert.equal(detectProvider(makeArgs({ model: "gpt-image-2" })), "azure");
+});
+
+test("detectProvider does not send an explicit gpt-image model to QIHU when OpenAI and Azure are unavailable", (t) => {
   useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
 
   assert.throws(
@@ -1123,6 +1133,37 @@ test("qihu360 rejects local references over 10 MB before reading and uploading t
   await assert.rejects(
     generateImage("edit", getDefaultModel(), makeArgs({ referenceImages: [reference] })),
     /Reference image.*exceeds 10 MB/,
+  );
+  assert.equal(calls, 0);
+});
+
+test("qihu360 rejects local references whose combined size exceeds 20 MB before fetch", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const root = await makeTempDir("qihu-total-ref-size-");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const references: string[] = [];
+  for (let index = 0; index < 3; index++) {
+    const reference = path.join(root, `reference-${index}.png`);
+    await fs.writeFile(reference, "");
+    await fs.truncate(reference, 7 * 1024 * 1024);
+    references.push(reference);
+  }
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    generateImage("edit", getDefaultModel(), makeArgs({ referenceImages: references })),
+    /Reference images.*exceed 20 MB total/,
   );
   assert.equal(calls, 0);
 });
