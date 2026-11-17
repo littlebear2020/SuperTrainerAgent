@@ -432,9 +432,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 dropped, preserved = self._partition_with_skill_rescue(messages, frozen_cutoff)
                 new_messages = self._build_new_messages(checkpoint["summary"])
                 modified_request = request.override(messages=self._assemble_window(new_messages, dropped, preserved))
-                response = handler(modified_request)
                 self._log_summary_event(logging.INFO, mode="reuse", request=request, message_count=len(messages), cutoff_index=frozen_cutoff, approx_tokens=total_tokens)
-                return response
+                return handler(modified_request)
 
             if checkpoint is not None and self._read_usable_checkpoint_summary(checkpoint) is None:
                 self._log_summary_event(logging.INFO, mode="checkpoint_rejected", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
@@ -447,9 +446,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             new_messages = self._build_new_messages(summary)
 
             modified_request = request.override(messages=self._assemble_window(new_messages, messages_to_summarize, preserved))
-            response = handler(modified_request)
             self._log_summary_event(logging.INFO, mode="fresh", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
-            return response
+            return handler(modified_request)
         except ToolProtocolError:
             # 评审三轮（2026-10-15）：协议终断不是"摘要失败"——回落重调 handler 会把
             # 内层一次性弹消费的终止标志吞掉（模型带原始请求再被打一次）。放行，
@@ -459,7 +457,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             self._pop_pending_checkpoint(request.runtime)
             raise
         except Exception:
-            logger.error("Safe summarization failed; falling back to pass-through")
+            logger.exception("Safe summarization failed; falling back to pass-through")
             # Drop any summary stashed by this call so a later after_model
             # cannot persist a checkpoint for a window that never ran.
             self._pop_pending_checkpoint(request.runtime)
@@ -495,9 +493,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 dropped, preserved = self._partition_with_skill_rescue(messages, frozen_cutoff)
                 new_messages = self._build_new_messages(checkpoint["summary"])
                 modified_request = request.override(messages=self._assemble_window(new_messages, dropped, preserved))
-                response = await handler(modified_request)
                 self._log_summary_event(logging.INFO, mode="reuse", request=request, message_count=len(messages), cutoff_index=frozen_cutoff, approx_tokens=total_tokens)
-                return response
+                return await handler(modified_request)
 
             if checkpoint is not None and self._read_usable_checkpoint_summary(checkpoint) is None:
                 self._log_summary_event(logging.INFO, mode="checkpoint_rejected", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
@@ -510,9 +507,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             new_messages = self._build_new_messages(summary)
 
             modified_request = request.override(messages=self._assemble_window(new_messages, messages_to_summarize, preserved))
-            response = await handler(modified_request)
             self._log_summary_event(logging.INFO, mode="fresh", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
-            return response
+            return await handler(modified_request)
         except ToolProtocolError:
             # 评审三轮（2026-10-15）：协议终断不是"摘要失败"——回落重调 handler 会把
             # 内层一次性弹消费的终止标志吞掉（模型带原始请求再被打一次）。放行，
@@ -522,7 +518,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             self._pop_pending_checkpoint(request.runtime)
             raise
         except Exception:
-            logger.error("Safe summarization failed; falling back to pass-through")
+            logger.exception("Safe summarization failed; falling back to pass-through")
             # Drop any summary stashed by this call so a later after_model
             # cannot persist a checkpoint for a window that never ran.
             self._pop_pending_checkpoint(request.runtime)
