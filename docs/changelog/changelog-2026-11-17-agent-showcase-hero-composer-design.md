@@ -74,9 +74,9 @@
 
 - 参考 ListenHub：composer 与 how-it-works 之间需要更明确的呼吸区。
 - guide 顶部 padding 收紧：桌面 `sm:pt-6 → sm:pt-2`（-16px），移动 `py-4 → pt-2`（-8px），Hero+composer 整体上移。
-- composer→showcase 间距：桌面 16 → **48px**（`sm:mt-8`，按反馈在 32px 基础上再 +16），移动 16 → **24px**（`mt-2`）；showcase 随之间下移 16px，首屏仍在阈值内。
-- 实测：1440 首卡 top 544 / h3 bottom 767；1024 504 / 760；390 562 / 839，均保持原阈值内。
-- E2E 增加 1440 下 `showcase.y - composer.bottom ≥ 40` 断言。
+- composer→showcase 间距：桌面 16 → **64px**（`sm:mt-12`，两轮各 +16），移动 16 → **40px**（`mt-6`）；showcase 随之间下移，首屏仍在阈值内。
+- 实测：1440 首卡 top 515 / h3 bottom 738；1024 475 / 731；390 533 / 810，均保持原阈值内。
+- E2E 增加 1440 下 `showcase.y - composer.bottom ≥ 56` 断言。
 
 ## 八、追加：第八轮预览反馈（移除案例区标题）
 
