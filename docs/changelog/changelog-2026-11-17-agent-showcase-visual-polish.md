@@ -34,7 +34,7 @@
 
 ### 4. 去掉 tips / badge / note
 
-- 删除 `AgentNewChatGuide` 的 `data-testid="agent-guide-tips"` 整块（「开始之前」+ tips）。
+- 删除 `AgentNewChatGuide` 的 `data-testid="agent-guide-tips"` 整块（「开始之前」+ tips），并同步删除随之失效的 `agents.newChatGuide.tipsTitle` i18n key（types/zh/en）；guide 的数据字段 `tips` 保留但不再渲染。
 - 删除 `AgentShowcase` 案例头部的「产物已核验 / 原生可编辑 / MP3 可试听」badge。
 - 删除案例区底部 `agent.note` 段落；`CheckCircle2` 随之移除。
 - 数据层的 `badge` / `note` 字段保留（无渲染引用），避免无意义的数据迁移。
@@ -61,6 +61,7 @@
 ## 验收记录
 
 - `cd frontend && pnpm check` → `✖ ... (0 errors, ... warnings)`；`Checking formatting... All matched files use Prettier code style!`
+- `cd frontend && pnpm check:dead` + `node scripts/check_i18n_keys.mjs` → knip 无死导出；`i18n key 存活检测通过：631 个叶子全活`
 - `cd frontend && pnpm test` → `Test Files 266 passed (266)` / `Tests 1753 passed (1753)`
 - `cd frontend && pnpm test:e2e -- tests/e2e/agent-new-chat-guide.spec.ts` → `38 passed`
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过（...）`
