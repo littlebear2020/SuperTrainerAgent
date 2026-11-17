@@ -177,7 +177,7 @@ export function AgentNewChatGuide({
         data-testid="agent-new-chat-guide"
         data-agent={showcase?.id}
         className={cn(
-          "mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-6",
+          "mx-auto flex w-full flex-col gap-4 px-4 pt-2 pb-4 sm:gap-4 sm:px-6 sm:pt-2 sm:pb-6",
           showcase && showcaseStyles.showcaseGuide,
           showcase
             ? "relative isolate max-w-[1180px] bg-transparent"

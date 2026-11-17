@@ -1166,6 +1166,11 @@ test.describe("Agent new-chat task guides", () => {
         inputBox.locator("[data-slot='input-group']").first(),
       ).toHaveCSS("border-radius", radius);
       if (viewport.width === 1440) {
+        // The hero + composer block sits higher, leaving breathing room before
+        // the showcase section.
+        expect(showcase!.y - (input!.y + input!.height)).toBeGreaterThanOrEqual(
+          24,
+        );
         const inputWidth = (await inputBox.boundingBox())!.width;
         expect(inputWidth).toBeGreaterThanOrEqual(840);
         expect(inputWidth).toBeLessThanOrEqual(880);
