@@ -411,7 +411,6 @@ export const zhCN: Translations = {
     newChatGuide: {
       casesTitle: "从一个真实任务开始",
       casesDescription: "选择案例只会填入提示词，确认后由你发送。",
-      tipsTitle: "开始之前",
       loading: "正在加载创作助手…",
       loadFailed: "创作助手信息加载失败，请重试。",
       retry: "重试",

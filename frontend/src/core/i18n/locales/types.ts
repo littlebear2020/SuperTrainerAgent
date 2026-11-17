@@ -371,7 +371,6 @@ export interface Translations {
     newChatGuide: {
       casesTitle: string;
       casesDescription: string;
-      tipsTitle: string;
       loading: string;
       loadFailed: string;
       retry: string;

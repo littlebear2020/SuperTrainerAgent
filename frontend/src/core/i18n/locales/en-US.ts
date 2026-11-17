@@ -435,7 +435,6 @@ export const enUS: Translations = {
       casesTitle: "Start with a real task",
       casesDescription:
         "Choosing an example only fills the prompt. You decide when to send it.",
-      tipsTitle: "Before you start",
       loading: "Loading your creative assistant…",
       loadFailed: "Could not load the creative assistant. Please try again.",
       retry: "Retry",
