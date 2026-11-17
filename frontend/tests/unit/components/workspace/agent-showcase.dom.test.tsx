@@ -218,6 +218,31 @@ describe("AgentShowcase", () => {
     ).toContain("/quick/slide-3.webp");
   });
 
+  it("keeps healthy deck previews usable when one thumbnail fails", async () => {
+    await renderShowcase("ppt-master");
+    const failedImage = element("showcase-open-ppt-quick-1").querySelector(
+      "img",
+    );
+    if (!failedImage) throw new Error("thumbnail not found");
+
+    await act(async () => {
+      failedImage.dispatchEvent(new Event("error", { bubbles: true }));
+    });
+
+    expect(
+      container.querySelectorAll("[data-testid^='showcase-open-ppt-quick']"),
+    ).toHaveLength(3);
+    expect(container.textContent).toContain("媒体暂时无法显示");
+    await click(element("showcase-open-ppt-quick-2"));
+    expect(
+      document
+        .querySelector<HTMLImageElement>(
+          "[data-testid='showcase-deck-current']",
+        )
+        ?.getAttribute("src"),
+    ).toContain("/quick/slide-3.webp");
+  });
+
   it("navigates deck boundaries and resets to slide one when another deck opens", async () => {
     await renderShowcase("ppt-master");
     expect(container.querySelectorAll("article")).toHaveLength(3);
