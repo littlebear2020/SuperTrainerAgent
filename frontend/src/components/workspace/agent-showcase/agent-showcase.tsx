@@ -86,6 +86,10 @@ export function AgentShowcase({
   const headerCaseCount = visibleCases.length;
   // Filtered results are all visual cases today; only then may the masonry be
   // replaced by the regular grid (mixed deck/video cards need their own layout).
+  // Invariant: the visual filter row is only rendered for agents whose cases are
+  // all visual (creative-studio today). If a future agent mixes visual with
+  // deck/video, do not rely on this fallback — add an explicit mixed-kind
+  // layout instead, otherwise the masonry packs filtered cards into column 1.
   const usesFilteredGrid =
     visualFilter !== "all" &&
     gridCases.length > 0 &&
