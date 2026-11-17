@@ -32,7 +32,7 @@ from typing import Any, Protocol, override, runtime_checkable
 from langchain.agents import AgentState
 from langchain.agents.middleware import SummarizationMiddleware
 from langchain.agents.middleware.types import ModelCallResult, ModelRequest, ModelResponse
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage, get_buffer_string
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage, get_buffer_string, trim_messages
 from langgraph.config import get_config
 from langgraph.constants import TAG_NOSTREAM
 from langgraph.runtime import Runtime
@@ -96,6 +96,7 @@ Messages to summarize:
 # Upper bound on stashed per-thread checkpoints awaiting after_model persistence
 # (LoopDetection-style protection for the long-lived gateway process).
 _MAX_PENDING_CHECKPOINTS = 100
+_INVALID_SUMMARY_SENTINELS = frozenset({"Previous conversation was too long to summarize.", "No previous conversation history."})
 
 
 @dataclass(frozen=True)
@@ -473,26 +474,46 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             self._pop_pending_checkpoint(request.runtime)
             return await handler(request)
 
+    def _trim_messages_for_summary(self, messages: list[AnyMessage]) -> list[AnyMessage]:
+        trimmed_messages = super()._trim_messages_for_summary(messages)
+        if self.trim_tokens_to_summarize is None or any(not isinstance(message, SystemMessage) for message in trimmed_messages):
+            return trimmed_messages
+        return list(
+            trim_messages(
+                messages,
+                max_tokens=self.trim_tokens_to_summarize,
+                token_counter=self.token_counter,
+                strategy="last",
+                allow_partial=True,
+                include_system=True,
+                text_splitter=list,
+            )
+        )
+
+    def _build_summary_prompt(self, messages_to_summarize: list[AnyMessage]) -> str:
+        trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
+        if not any(not isinstance(message, SystemMessage) for message in trimmed_messages):
+            raise ValueError("Summary source contains no non-SystemMessage content")
+        return self.summary_prompt.format(messages=get_buffer_string(trimmed_messages)).rstrip()
+
+    @staticmethod
+    def _validated_summary_text(text: str) -> str:
+        summary = text.strip()
+        if not summary or summary in _INVALID_SUMMARY_SENTINELS:
+            raise ValueError("Summary model returned empty or placeholder content")
+        return summary
+
     def _create_summary(self, messages_to_summarize: list[AnyMessage]) -> str:
         """Generate summary using the nostream-tagged model.
 
         Raises on failure so the caller (wrap_model_call) can fall back to
         pass-through instead of injecting an error string into model context.
         """
-        if not messages_to_summarize:
-            return "No previous conversation history."
-
-        trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
-        if not trimmed_messages:
-            return "Previous conversation was too long to summarize."
-
-        formatted_messages = get_buffer_string(trimmed_messages)
-
         response = self._summary_model.invoke(
-            self.summary_prompt.format(messages=formatted_messages).rstrip(),
+            self._build_summary_prompt(messages_to_summarize),
             config={"metadata": {"lc_source": "summarization"}},
         )
-        return response.text.strip()
+        return self._validated_summary_text(response.text)
 
     async def _acreate_summary(self, messages_to_summarize: list[AnyMessage]) -> str:
         """Generate summary using the nostream-tagged model (async).
@@ -500,20 +521,11 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         Raises on failure so the caller (awrap_model_call) can fall back to
         pass-through instead of injecting an error string into model context.
         """
-        if not messages_to_summarize:
-            return "No previous conversation history."
-
-        trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
-        if not trimmed_messages:
-            return "Previous conversation was too long to summarize."
-
-        formatted_messages = get_buffer_string(trimmed_messages)
-
         response = await self._summary_model.ainvoke(
-            self.summary_prompt.format(messages=formatted_messages).rstrip(),
+            self._build_summary_prompt(messages_to_summarize),
             config={"metadata": {"lc_source": "summarization"}},
         )
-        return response.text.strip()
+        return self._validated_summary_text(response.text)
 
     @override
     def _build_new_messages(self, summary: str) -> list[HumanMessage]:

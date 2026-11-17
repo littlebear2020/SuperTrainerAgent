@@ -7,13 +7,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langgraph.constants import TAG_NOSTREAM
 from pydantic import ValidationError
 
 from deerflow.agents.memory.summarization_hook import memory_flush_hook
 from deerflow.agents.middlewares.summarization_middleware import DEERFLOW_DEFAULT_SUMMARY_PROMPT, DeerFlowSummarizationMiddleware, SummarizationEvent
+from deerflow.agents.middlewares.tool_call_protocol_middleware import ToolProtocolError
 from deerflow.agents.thread_state import ThreadState
 from deerflow.config.memory_config import MemoryConfig
 from deerflow.config.summarization_config import SummarizationConfig
@@ -54,6 +55,8 @@ def _middleware(
     resummarize_min_new_messages: int = 20,
     resummarize_min_new_tokens: int = 30_000,
     summary_prompt: str | None = None,
+    trim_tokens_to_summarize: int | None = 30_000,
+    token_counter=len,
 ) -> DeerFlowSummarizationMiddleware:
     model = MagicMock()
     # The middleware creates _summary_model = model.with_config(tags=...),
@@ -65,7 +68,7 @@ def _middleware(
         model=model,
         trigger=trigger,
         keep=keep,
-        token_counter=len,
+        token_counter=token_counter,
         before_summarization=before_summarization,
         skill_file_read_tool_names=skill_file_read_tool_names,
         preserve_recent_skill_count=preserve_recent_skill_count,
@@ -75,6 +78,7 @@ def _middleware(
         resummarize_min_new_messages=resummarize_min_new_messages,
         resummarize_min_new_tokens=resummarize_min_new_tokens,
         summary_prompt=summary_prompt,
+        trim_tokens_to_summarize=trim_tokens_to_summarize,
     )
 
 
@@ -1105,8 +1109,6 @@ async def test_async_summary_uses_nostream_model() -> None:
 # D-3 #3: dynamic-context reminders survive summarization
 # ---------------------------------------------------------------------------
 
-from langchain_core.messages import SystemMessage  # noqa: E402
-
 
 def _reminder_triplet(base_id: str = "m1", user_text: str = "first question") -> list:
     from deerflow.agents.middlewares.dynamic_context_middleware import _DYNAMIC_CONTEXT_REMINDER_KEY, _REMINDER_DATE_KEY
@@ -1531,3 +1533,198 @@ class TestSummarizationConfigKnobs:
             SummarizationConfig(resummarize_min_new_messages=-1)
         with pytest.raises(ValidationError):
             SummarizationConfig(resummarize_min_new_tokens=-1)
+
+
+# ---------------------------------------------------------------------------
+# Valid summary sources and placeholder rejection
+# ---------------------------------------------------------------------------
+
+
+def _character_token_counter(messages: list) -> int:
+    return sum(len(str(message.content)) for message in messages)
+
+
+def _single_line_tool_tail() -> list:
+    return [
+        HumanMessage(content="FINAL_CONFIRMATION: direction B"),
+        AIMessage(content="", tool_calls=[{"name": "read_file", "id": "tool-1", "args": {"path": "/tmp/synthetic.json"}}]),
+        ToolMessage(content='{"padding":"' + "x" * 160 + '","work_marker":"SYNTHETIC_WORK_MARKER"}', tool_call_id="tool-1"),
+        AIMessage(content="preserved tail"),
+    ]
+
+
+def test_trim_fallback_summarizes_single_line_tool_tail() -> None:
+    middleware = _middleware(
+        trigger=("messages", 4),
+        keep=("messages", 1),
+        token_counter=_character_token_counter,
+        trim_tokens_to_summarize=64,
+    )
+    runtime = _runtime()
+    state = {"messages": _single_line_tool_tail()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(request, handler)
+
+    middleware._summary_model.invoke.assert_called_once()
+    prompt = middleware._summary_model.invoke.call_args.args[0]
+    assert "SYNTHETIC_WORK_MARKER" in prompt
+    assert received[0] is not request
+    assert received[0].messages[0].content.endswith("compressed summary")
+    update = middleware.after_model(state, runtime)
+    assert update is not None
+    assert update["summarization_checkpoint"]["summary"] == "compressed summary"
+
+
+@pytest.mark.anyio
+async def test_atrim_fallback_summarizes_single_line_tool_tail() -> None:
+    middleware = _middleware(
+        trigger=("messages", 4),
+        keep=("messages", 1),
+        token_counter=_character_token_counter,
+        trim_tokens_to_summarize=64,
+    )
+    runtime = _runtime()
+    state = {"messages": _single_line_tool_tail()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    received: list = []
+
+    async def _handler(request):
+        received.append(request)
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    await middleware.awrap_model_call(request, _handler)
+
+    middleware._summary_model.ainvoke.assert_called_once()
+    prompt = middleware._summary_model.ainvoke.call_args.args[0]
+    assert "SYNTHETIC_WORK_MARKER" in prompt
+    assert received[0] is not request
+    assert received[0].messages[0].content.endswith("compressed summary")
+    update = await middleware.aafter_model(state, runtime)
+    assert update is not None
+    assert update["summarization_checkpoint"]["summary"] == "compressed summary"
+
+
+def test_trim_fallback_rejects_system_only_source() -> None:
+    middleware = _middleware(token_counter=_character_token_counter, trim_tokens_to_summarize=8)
+
+    with pytest.raises(ValueError):
+        middleware._create_summary([SystemMessage(content="system only source")])
+
+    middleware._summary_model.invoke.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_atrim_fallback_rejects_system_only_source() -> None:
+    middleware = _middleware(token_counter=_character_token_counter, trim_tokens_to_summarize=8)
+
+    with pytest.raises(ValueError):
+        await middleware._acreate_summary([SystemMessage(content="system only source")])
+
+    middleware._summary_model.ainvoke.assert_not_called()
+
+
+def test_summary_source_failure_passes_through_without_checkpoint() -> None:
+    middleware = _middleware(trigger=("messages", 2), keep=("messages", 1), token_counter=_character_token_counter, trim_tokens_to_summarize=8)
+    runtime = _runtime()
+    state = {"messages": [SystemMessage(content="system only source"), HumanMessage(content="preserved user")]}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(request, handler)
+
+    middleware._summary_model.invoke.assert_not_called()
+    assert received == [request]
+    assert middleware.after_model(state, runtime) is None
+
+
+@pytest.mark.anyio
+async def test_asummary_source_failure_passes_through_without_checkpoint() -> None:
+    middleware = _middleware(trigger=("messages", 2), keep=("messages", 1), token_counter=_character_token_counter, trim_tokens_to_summarize=8)
+    runtime = _runtime()
+    state = {"messages": [SystemMessage(content="system only source"), HumanMessage(content="preserved user")]}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    received: list = []
+
+    async def _handler(request):
+        received.append(request)
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    await middleware.awrap_model_call(request, _handler)
+
+    middleware._summary_model.ainvoke.assert_not_called()
+    assert received == [request]
+    assert await middleware.aafter_model(state, runtime) is None
+
+
+@pytest.mark.parametrize(
+    "response_text",
+    ["", "   ", "Previous conversation was too long to summarize.", "No previous conversation history."],
+)
+def test_summary_model_placeholder_response_is_not_persisted(response_text: str) -> None:
+    middleware = _middleware()
+    middleware._summary_model.invoke.return_value = SimpleNamespace(text=response_text)
+    runtime = _runtime()
+    state = {"messages": _messages()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    handler, received = _recording_handler()
+
+    middleware.wrap_model_call(request, handler)
+
+    middleware._summary_model.invoke.assert_called_once()
+    assert received == [request]
+    assert middleware.after_model(state, runtime) is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "response_text",
+    ["", "   ", "Previous conversation was too long to summarize.", "No previous conversation history."],
+)
+async def test_asummary_model_placeholder_response_is_not_persisted(response_text: str) -> None:
+    middleware = _middleware()
+    middleware._summary_model.ainvoke = AsyncMock(return_value=SimpleNamespace(text=response_text))
+    runtime = _runtime()
+    state = {"messages": _messages()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    received: list = []
+
+    async def _handler(request):
+        received.append(request)
+        return SimpleNamespace(result=[AIMessage(content="ok")])
+
+    await middleware.awrap_model_call(request, _handler)
+
+    middleware._summary_model.ainvoke.assert_called_once()
+    assert received == [request]
+    assert await middleware.aafter_model(state, runtime) is None
+
+
+def test_tool_protocol_error_passes_through_and_clears_stash() -> None:
+    middleware = _middleware()
+    runtime = _runtime()
+    state = {"messages": _messages()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+    handler = MagicMock(side_effect=ToolProtocolError("terminal protocol error"))
+
+    with pytest.raises(ToolProtocolError):
+        middleware.wrap_model_call(request, handler)
+
+    assert middleware.after_model(state, runtime) is None
+
+
+@pytest.mark.anyio
+async def test_atool_protocol_error_passes_through_and_clears_stash() -> None:
+    middleware = _middleware()
+    runtime = _runtime()
+    state = {"messages": _messages()}
+    request = _model_request(state["messages"], runtime=runtime, state=state)
+
+    async def _handler(request):
+        raise ToolProtocolError("terminal protocol error")
+
+    with pytest.raises(ToolProtocolError):
+        await middleware.awrap_model_call(request, _handler)
+
+    assert await middleware.aafter_model(state, runtime) is None
