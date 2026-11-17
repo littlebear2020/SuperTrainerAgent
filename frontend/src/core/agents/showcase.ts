@@ -67,7 +67,6 @@ export type ShowcaseStep = {
 
 export type ShowcaseAgent = {
   id: ShowcaseAgentId;
-  label: LocalizedText;
   inputPlaceholder: LocalizedText;
   heroLine: { zh: [string, string]; en: [string, string] };
   character: string;
@@ -108,7 +107,6 @@ const vivi = text("Vivi2.0（女声）", "Vivi 2.0 (female)");
 const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
     id: "course-video",
-    label: text("课程视频", "COURSE VIDEO"),
     inputPlaceholder: text(
       "粘贴讲稿，或输入课程主题；也可以上传 docx、pdf、md 文稿",
       "Paste a script or topic; upload DOCX, PDF, or MD.",
@@ -227,7 +225,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   },
   "ppt-master": {
     id: "ppt-master",
-    label: text("PPT 制作", "PPT CREATION"),
     inputPlaceholder: text(
       "输入 PPT 主题，或上传文档、现有 PPT",
       "Enter a topic, or upload a document or existing PPT.",
@@ -373,7 +370,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   },
   "podcast-studio": {
     id: "podcast-studio",
-    label: text("播客制作", "PODCAST PRODUCTION"),
     inputPlaceholder: text(
       "输入主题、粘贴公开网页链接，或上传文档",
       "Enter a topic, paste a public URL, or upload a document.",
@@ -667,7 +663,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   },
   "creative-studio": {
     id: "creative-studio",
-    label: text("课程海报", "COURSE POSTER"),
     inputPlaceholder: text(
       "输入课程主题、核心知识点和想要的风格",
       "Enter a topic, key points, and desired style.",

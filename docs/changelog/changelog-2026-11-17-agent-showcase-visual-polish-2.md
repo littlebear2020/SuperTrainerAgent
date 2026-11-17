@@ -17,7 +17,7 @@
 ## 二、改动
 
 1. **固定人物列**：图片列固定 `w-[140px] sm:w-[160px] xl:w-[180px]`，图片 `w-full h-[160/178/188px] object-contain object-center`；四个 Agent 的图片盒、标题起点完全一致（1440 下均 180px 列、标题 x 相同）。
-2. **删除 hero 标签**：去掉短线 + Agent 名称 eyebrow，Hero 只保留两行主标题；`showcase.label` 数据保留但不再渲染。
+2. **删除 hero 标签**：去掉短线 + Agent 名称 eyebrow，Hero 只保留两行主标题；同时删除已无消费方的 `ShowcaseAgent.label` 字段与四条 Agent 定义（避免死数据）。
 3. **统一强调色**：删除 CSS Module 的按 Agent accent（含暗色覆盖），全部使用 indigo（浅色 `#3f4fd1`/`#eef1ff`，暗色 `#a5b4fc`/12% indigo）；卡片 hover、focus ring、PPT 下载、播客播放/波形、筛选 focus 全部统一为 indigo。
 4. **更名**：creative-studio 的 `displayName` 中文 `视觉设计 → 课程海报`、英文 `Visual design → Course poster`；`showcase.label` 同步为 `课程海报 / COURSE POSTER`。
 5. **筛选逻辑**：
@@ -45,7 +45,13 @@
 - `cd frontend && pnpm test:e2e -- tests/e2e/agent-new-chat-guide.spec.ts` → `41 passed`
 - `python3 scripts/check_docs_convention.py` → OK
 
-## 四、说明
+## 四、AI review 修复
 
-- 本批不涉及后端/数据/媒体；`showcase.label`、`badge`、`note` 等字段保留（当前无渲染引用），避免数据迁移。
+- 删除死字段 `ShowcaseAgent.label`（含四条 Agent 定义），并把 E2E 的“无标签”断言改为 hero 内无 `<p>`；
+- 筛选态 grid 复用 `showcaseCardClass("video")`，并仅当筛选结果全部为 visual 时启用（防止未来 deck/video 混排被套三列窄栅格）；
+- `headerCaseCount` 简化为 `visibleCases.length`（无 visual case 时两者恒等）。
+
+## 五、说明
+
+- 本批不涉及后端/数据/媒体；`badge`、`note` 等字段保留（当前无渲染引用），避免数据迁移；`label` 因已无消费方按 review 建议删除。
 - 若后续希望保留各 Agent 的差异化强调色，需同时改回 CSS accent 变量与 E2E 配色断言。
