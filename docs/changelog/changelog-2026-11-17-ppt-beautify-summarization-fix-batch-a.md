@@ -1,6 +1,6 @@
 # PPT 美化摘要修复 Batch A：上下文完整性
 
-> **状态**：部分执行（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；真实冒烟因同一 7 页输入缺失而阻塞，未合并）。
+> **状态**：部分执行（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；真实冒烟因同一 7 页输入缺失而阻塞，评审修复推送又遇 SSL 超时，未合并）。
 > **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失；增加字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留及结构化日志；未做真实 qwen 复测、46 页回放、默认模型完整交付或部署。
 
 ## 变更记录
@@ -44,6 +44,9 @@
 - 初始远程检查：`backend-unit-tests`、`quick-checks`、AI Code Review 均为 `pass`。
 - OCR medium（traceback / 异常时窗口日志）：新增 4 个回归在修复前 `4 failed, 113 deselected`；将 fresh/reuse 决策日志移到 handler 前并恢复 sync/async `logger.exception` 后，`117 passed, 2 warnings`。
 - OCR medium（唯一用户被保留后来源为空）：不接受恢复 sentinel 的建议，因为计划硬条件要求无有效原始来源时透传且不推进 checkpoint。合成探针实际输出：`handler_received_original=True`、`summary_model_calls=0`、`new_checkpoint=None`、`latest_user_present_in_passthrough=True`；已在原 OCR 线程回复。
+- 两项 OCR 均已在原线程回复处理结果；评审修复代码 HEAD 为 `6e2f660b4385a21efb8f98647e8a47960671d670`。
+- `git push`（评审修复与阻塞记录）→ 300 秒后 `fatal: unable to access ...: SSL connection timeout`；远程 PR HEAD 保持 `fecaf8ae0784968f0f0094f87ab08c6480a4066e`，按停止纪律未重试。
+- 已在 PR #27 顶层评论记录输入与网络阻塞；PR 未合并，PR B 未开始。
 
 ## 真实复测记录
 
