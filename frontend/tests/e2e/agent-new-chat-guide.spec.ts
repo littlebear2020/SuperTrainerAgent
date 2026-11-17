@@ -449,6 +449,95 @@ test.describe("Agent new-chat task guides", () => {
     expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(titleBox!.y);
   });
 
+  test("hero art is a transparent cut-out without card chrome", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+
+    for (const agentName of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ] as const) {
+      await openGuide(page, agentName);
+      const image = page.getByTestId("showcase-hero").locator("img");
+      await expect(image, agentName).toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
+      await expect(image, agentName).toHaveCSS("border-top-width", "0px");
+      await expect(image, agentName).toHaveCSS("border-radius", "0px");
+      await expect(image, agentName).toHaveCSS("box-shadow", "none");
+
+      const report = await page.evaluate(async () => {
+        const image = document.querySelector<HTMLImageElement>(
+          "[data-testid='showcase-hero'] img",
+        );
+        if (!image) throw new Error("hero image missing");
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("canvas unavailable");
+        context.drawImage(image, 0, 0);
+        const { data, width, height } = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+        const alphaAt = (x: number, y: number) =>
+          data[(y * width + x) * 4 + 3]!;
+        const corners = [
+          alphaAt(0, 0),
+          alphaAt(width - 1, 0),
+          alphaAt(0, height - 1),
+          alphaAt(width - 1, height - 1),
+        ];
+        const band = 12;
+        let edgeAlpha = 0;
+        for (let y = 0; y < band; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            edgeAlpha = Math.max(edgeAlpha, alphaAt(x, y));
+          }
+        }
+        let opaque = 0;
+        let light = 0;
+        for (let index = 0; index < data.length; index += 4) {
+          const alpha = data[index + 3]!;
+          if (alpha <= 200) continue;
+          opaque += 1;
+          if (
+            data[index]! > 238 &&
+            data[index + 1]! > 238 &&
+            data[index + 2]! > 238
+          ) {
+            light += 1;
+          }
+        }
+        return {
+          width,
+          height,
+          corners,
+          edgeAlpha,
+          lightRatio: light / Math.max(1, opaque),
+        };
+      });
+
+      // Corners and the top/left/right bands must be fully transparent: a
+      // rounded-rect card also yields transparent corners, so the edge bands
+      // are what distinguishes a cut-out from a re-carded rectangle.
+      expect(report.corners, agentName).toEqual([0, 0, 0, 0]);
+      expect(report.edgeAlpha, agentName).toBe(0);
+      // A baked light card would make most opaque pixels near-white; real
+      // clothing highlights stay far below the threshold.
+      expect(report.lightRatio, agentName).toBeLessThan(0.15);
+    }
+  });
+
   test("podcast waveform animates only on the card that is playing", async ({
     page,
   }) => {
@@ -730,6 +819,10 @@ test.describe("Agent new-chat task guides", () => {
       page.getByText("Response in thread Existing lesson"),
     ).toBeVisible();
     await expect(page.getByTestId("agent-new-chat-guide")).toHaveCount(0);
+    await expect(page.locator("textarea[name='message']")).toHaveAttribute(
+      "placeholder",
+      zhCN.inputBox.placeholder,
+    );
   });
 
   test("shared retired aliases resolve to their approved guide", async ({
@@ -986,9 +1079,9 @@ test.describe("Agent new-chat task guides", () => {
   });
 
   for (const viewport of [
-    { width: 1440, height: 900, firstCardTop: 820 },
-    { width: 1024, height: 768, cardTitleBottom: 768 },
-    { width: 390, height: 844, firstCardTop: 764 },
+    { width: 1440, height: 900, firstCardTop: 581 },
+    { width: 1024, height: 768, firstCardTop: 545 },
+    { width: 390, height: 844, firstCardTop: 618 },
   ]) {
     test(`showcase viewport ${viewport.width}x${viewport.height} preserves the first screen without overflow`, async ({
       page,
@@ -1007,6 +1100,7 @@ test.describe("Agent new-chat task guides", () => {
 
       const hero = await page.getByTestId("showcase-hero").boundingBox();
       const input = await page.getByTestId("agent-guide-input").boundingBox();
+      const showcase = await page.getByTestId("agent-showcase").boundingBox();
       const cases = await page.getByTestId("agent-guide-cases").boundingBox();
       const casesTitle = await page
         .getByRole("heading", {
@@ -1015,30 +1109,42 @@ test.describe("Agent new-chat task guides", () => {
         .boundingBox();
       const firstCard = page.locator("[data-testid^='showcase-case-']").first();
       const firstCardBox = await firstCard.boundingBox();
+      const firstCardTitle = await firstCard.locator("h3").boundingBox();
       expect(hero).not.toBeNull();
       expect(input).not.toBeNull();
+      expect(showcase).not.toBeNull();
       expect(cases).not.toBeNull();
       expect(casesTitle).not.toBeNull();
       expect(firstCardBox).not.toBeNull();
+      expect(firstCardTitle).not.toBeNull();
       expect(hero!.y + hero!.height).toBeLessThanOrEqual(viewport.height);
       expect(input!.y + input!.height).toBeLessThanOrEqual(viewport.height);
       expect(casesTitle!.y + casesTitle!.height).toBeLessThanOrEqual(
         viewport.height,
       );
       expect(input!.y + input!.height).toBeLessThanOrEqual(cases!.y);
-      if ("firstCardTop" in viewport) {
-        expect(firstCardBox!.y).toBeLessThanOrEqual(viewport.firstCardTop!);
-      } else {
-        const title = await firstCard.locator("h3").boundingBox();
-        expect(title!.y + title!.height).toBeLessThanOrEqual(
-          viewport.cardTitleBottom,
-        );
-      }
+      expect(firstCardBox!.y).toBeLessThanOrEqual(viewport.firstCardTop);
+      // Hard first-screen gate: the first card's title must be visible, not
+      // only its poster. Baseline (PR #13) + 30px, see plan §P1-2.
+      expect(firstCardTitle!.y + firstCardTitle!.height).toBeLessThanOrEqual(
+        viewport.height,
+      );
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
         ),
       ).toBe(true);
+
+      // Single 1180 shell: hero, composer frame and showcase root share the
+      // same left/right edges (the case grid sits inside the showcase column).
+      const lefts = [hero!.x, input!.x, showcase!.x];
+      const rights = [
+        hero!.x + hero!.width,
+        input!.x + input!.width,
+        showcase!.x + showcase!.width,
+      ];
+      expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(8);
+      expect(Math.max(...rights) - Math.min(...rights)).toBeLessThanOrEqual(8);
 
       const radius = viewport.width < 640 ? "24px" : "28px";
       const inputBox = page.locator(".glass-input-box");
@@ -1053,6 +1159,70 @@ test.describe("Agent new-chat task guides", () => {
       }
     });
   }
+
+  test("showcase new chats use agent-specific placeholders while other surfaces keep the global one", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    const textarea = page.locator("textarea[name='message']");
+
+    for (const agentName of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ] as const) {
+      await openGuide(page, agentName);
+      await expect(textarea, agentName).toHaveAttribute(
+        "placeholder",
+        showcaseFor(agentName)!.inputPlaceholder.zh,
+      );
+      await expect(textarea, agentName).not.toHaveAttribute(
+        "placeholder",
+        zhCN.inputBox.placeholder,
+      );
+    }
+
+    await openGuide(page, "co-writer");
+    await expect(textarea).toHaveAttribute(
+      "placeholder",
+      zhCN.inputBox.placeholder,
+    );
+  });
+
+  test("390 long showcase placeholder wraps inside the composer without toolbar overlap", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    mockGuideAPI(page);
+    await openGuide(page, "course-video");
+    const textarea = page.locator("textarea[name='message']");
+    await expect(textarea).toHaveAttribute(
+      "placeholder",
+      showcaseFor("course-video")!.inputPlaceholder.zh,
+    );
+
+    const inputBox = page.locator(".glass-input-box");
+    const inputBoxBox = await inputBox.boundingBox();
+    const textareaBox = await textarea.boundingBox();
+    const toolbar = inputBox.locator("[data-slot='input-group-addon']").first();
+    const toolbarBox = await toolbar.boundingBox();
+    expect(inputBoxBox).not.toBeNull();
+    expect(textareaBox).not.toBeNull();
+    expect(toolbarBox).not.toBeNull();
+    // Wrapping the long placeholder may add one text line, never an oversized
+    // composer; the text must stay above the toolbar.
+    expect(inputBoxBox!.height).toBeLessThanOrEqual(132);
+    expect(textareaBox!.y + textareaBox!.height).toBeLessThanOrEqual(
+      toolbarBox!.y + 0.5,
+    );
+    expect(
+      await textarea.evaluate(
+        (element) => element.scrollHeight <= element.clientHeight + 1,
+      ),
+    ).toBe(true);
+  });
 
   test("shared keyboard opens and closes media then refills the real composer", async ({
     page,
@@ -1092,6 +1262,10 @@ test.describe("Agent new-chat task guides", () => {
         exact: true,
       }),
     ).toBeVisible();
+    await expect(page.locator("textarea[name='message']")).toHaveAttribute(
+      "placeholder",
+      showcase.inputPlaceholder.en,
+    );
     const guide = page.getByTestId("agent-new-chat-guide");
     expect(await guide.innerText()).not.toMatch(/[一-鿿]/);
     await expect(

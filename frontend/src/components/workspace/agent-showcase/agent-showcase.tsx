@@ -103,7 +103,10 @@ export function AgentShowcase({
 
   return (
     <>
-      <section className="border-border/80 grid min-w-0 gap-7 border-t pt-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10 dark:border-white/10">
+      <section
+        data-testid="agent-showcase"
+        className="border-border/80 grid w-full min-w-0 gap-7 border-t pt-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10 dark:border-white/10"
+      >
         <div className="order-2 lg:sticky lg:top-6 lg:order-1 lg:self-start">
           <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.2em]">
             {t.agents.showcase.howItWorks}
@@ -134,7 +137,7 @@ export function AgentShowcase({
         </div>
 
         <div className="order-1 min-w-0 lg:order-2">
-          <div className="border-border/80 mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
+          <div className="border-border/80 mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
             <h2 className="text-foreground text-[15px] font-semibold">
               {localized(agent.caseLabel, language)}
               <span className="text-muted-foreground ml-2 text-xs font-normal">

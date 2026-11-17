@@ -99,11 +99,7 @@ export function AgentNewChatGuide({
   const inputBox = (
     <div
       data-testid="agent-guide-input"
-      className={
-        showcase
-          ? cn(styles.guideComposerFrame, "mx-auto w-full max-w-5xl")
-          : undefined
-      }
+      className={showcase ? cn(styles.guideComposerFrame, "w-full") : undefined}
     >
       {children}
     </div>
@@ -170,10 +166,10 @@ export function AgentNewChatGuide({
         data-testid="agent-new-chat-guide"
         data-agent={showcase?.id}
         className={cn(
-          "mx-auto flex w-full flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8",
+          "mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6",
           showcase && showcaseStyles.showcaseGuide,
           showcase
-            ? "max-w-7xl sm:px-8 sm:py-6 lg:gap-5 xl:gap-6 xl:py-8"
+            ? "max-w-[1180px] bg-transparent lg:gap-4 xl:gap-5"
             : "max-w-4xl",
         )}
       >

@@ -26,6 +26,7 @@ import {
   resolveAgentName,
   useAgent,
 } from "@/core/agents";
+import { showcaseFor } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 import { useModels } from "@/core/models/hooks";
 import { useNotification } from "@/core/notification/hooks";
@@ -38,7 +39,7 @@ import { readPendingPrompt } from "@/lib/pending-prompt";
 import { cn } from "@/lib/utils";
 
 export default function AgentChatPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
 
   const { agent_name: agentNameParam } = useParams<{
@@ -54,6 +55,9 @@ export default function AgentChatPage() {
   const { threadId, setThreadId, isNewThread, setIsNewThread } =
     useThreadChat();
   const showGuidedNewChat = isNewThread && guideAgentName !== null;
+  const showcase = showcaseFor(agent_name);
+  const guideShowcase = showGuidedNewChat ? showcase : null;
+  const showcaseLanguage = locale === "zh-CN" ? "zh" : "en";
   const {
     agent,
     isLoading: agentLoading,
@@ -177,6 +181,11 @@ export default function AgentChatPage() {
       agentSkills={agent?.skills}
       agentSuggestionPrompts={agent?.suggestion_prompts ?? null}
       showNewThreadSuggestions={!showGuidedNewChat}
+      placeholder={
+        guideShowcase
+          ? guideShowcase.inputPlaceholder[showcaseLanguage]
+          : undefined
+      }
       disabled={demoMode || (showGuidedNewChat && guideStatus !== "ready")}
       onContextChange={(context) => setSettings("context", context)}
       onSubmit={handleSubmit}
