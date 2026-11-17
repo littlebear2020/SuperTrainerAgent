@@ -854,12 +854,12 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         ),
         tag: text("信息图 · 深绿路线图", "Infographic · Emerald roadmap"),
         description: text(
-          "深绿时间线上，一条 S 形路径串起评估、试点、扩展、治理四个阶段与停条件。",
+          "深绿时间线上，一条 S 形路径串起评估、试点、扩展、治理四个阶段与停止条件。",
           "An S-curve on a deep-green timeline links assessment, pilot, scale, and governance, with stop conditions.",
         ),
         styleLabel: text("深绿路线图", "Emerald roadmap"),
         prompt:
-          "[模式: 视觉创作]\n请把「企业 AI Agent 落地路线图」做成一张 16:9 信息图，四个阶段：评估、试点、扩展、治理；深绿时间线，一条 S 形路径串起四个阶段与停条件，不要编造数字指标。",
+          "[模式: 视觉创作]\n请把「企业 AI Agent 落地路线图」做成一张 16:9 信息图，四个阶段：评估、试点、扩展、治理；深绿时间线，一条 S 形路径串起四个阶段与停止条件，不要编造数字指标。",
         preview: asset("visual/previews/infographic-roadmap.webp"),
         original: asset("visual/originals/infographic-roadmap.jpg"),
         downloadName: "visual-infographic-roadmap.jpg",
