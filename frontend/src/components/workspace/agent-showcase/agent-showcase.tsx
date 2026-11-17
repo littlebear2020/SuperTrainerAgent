@@ -117,7 +117,7 @@ export function AgentShowcase({
     <>
       <section
         data-testid="agent-showcase"
-        className="border-border/70 grid w-full min-w-0 gap-7 border-t pt-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-10 dark:border-white/10"
+        className="border-border/70 mt-2 grid w-full min-w-0 gap-7 border-t pt-4 sm:mt-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-10 dark:border-white/10"
       >
         <div className="order-2 lg:sticky lg:top-6 lg:order-1 lg:self-start">
           <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.16em]">

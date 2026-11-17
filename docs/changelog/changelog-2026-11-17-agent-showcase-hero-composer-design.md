@@ -70,6 +70,14 @@
 - 顺带修复遗留的 `lg:gap-4 xl:gap-5`：此前 1440 的 shell gap 实际是 20px 而非 16px，导致负 margin 后仍有 2px 间隙；统一为 `gap-4` 后 1440/1060 均为 2px 覆盖。
 - E2E 增加 `input.y <= hero.bottom`（≥640）断言，锁定“人物站在对话框上沿”。
 
+## 七、追加：第七轮预览反馈（整体上移 + 下方留白）
+
+- 参考 ListenHub：composer 与 how-it-works 之间需要更明确的呼吸区。
+- guide 顶部 padding 收紧：桌面 `sm:pt-6 → sm:pt-2`（-16px），移动 `py-4 → pt-2`（-8px），Hero+composer 整体上移。
+- composer→showcase 间距：桌面 16 → **32px**（`sm:mt-4`），移动 16 → **24px**（`mt-2`）；showcase 绝对位置保持不变（上移量与下方留白相互抵消），不牺牲首屏。
+- 实测：1440 首卡 top 528 / h3 bottom 751；1024 488 / 744；390 562 / 839，均保持原阈值内。
+- E2E 增加 1440 下 `showcase.y - composer.bottom ≥ 24` 断言。
+
 ## 验收记录
 
 - `cd frontend && pnpm check` → 0 error；prettier 通过
