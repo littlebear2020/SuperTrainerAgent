@@ -233,11 +233,13 @@ def test_retry_rebuilds_request_id_without_changing_payload(mod, monkeypatch, tm
     attempts = []
 
     def fake_urlopen(req, timeout=0):
-        attempts.append({
-            "request_id": req.headers["X-api-request-id"],
-            "body": json.loads(req.data.decode("utf-8")),
-            "api_key": req.headers["X-api-key"],
-        })
+        attempts.append(
+            {
+                "request_id": req.headers["X-api-request-id"],
+                "body": json.loads(req.data.decode("utf-8")),
+                "api_key": req.headers["X-api-key"],
+            }
+        )
         if len(attempts) == 1:
             raise urllib.error.URLError("temporary network failure")
         return FakeStream(_sse([_audio_event(), _finish_event()]))
