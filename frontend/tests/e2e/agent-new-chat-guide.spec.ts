@@ -85,6 +85,34 @@ test.describe("Agent new-chat task guides", () => {
     return calls;
   }
 
+  function contrastRatio(foreground: string, background: string) {
+    const channels = (color: string) => {
+      if (/^#[\da-f]{6}$/i.test(color)) {
+        return [1, 3, 5].map((offset) =>
+          parseInt(color.slice(offset, offset + 2), 16),
+        );
+      }
+      return (
+        color
+          .match(/[\d.]+/g)
+          ?.slice(0, 3)
+          .map(Number) ?? []
+      );
+    };
+    const luminance = (color: string) => {
+      const [r = 0, g = 0, b = 0] = channels(color).map((value) => {
+        const channel = value / 255;
+        return channel <= 0.03928
+          ? channel / 12.92
+          : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const first = luminance(foreground);
+    const second = luminance(background);
+    return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+  }
+
   async function openGuide(page: Page, agentName: AgentNewChatGuideId) {
     await page.goto(`/workspace/agents/${agentName}/chats/new`);
     await expect(page.locator("textarea[name='message']")).toBeVisible();
@@ -434,6 +462,18 @@ test.describe("Agent new-chat task guides", () => {
         .first()
         .evaluate((element) => getComputedStyle(element).animationName);
     expect(await animationName("podcast-context")).not.toBe("none");
+    expect(await animationName("podcast-agent2026")).toBe("none");
+
+    await page.getByTestId("showcase-play-podcast-agent2026").click();
+    await expect
+      .poll(() =>
+        audio.evaluate((element: HTMLAudioElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0);
+    expect(await animationName("podcast-context")).toBe("none");
+    expect(await animationName("podcast-agent2026")).not.toBe("none");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
     expect(await animationName("podcast-agent2026")).toBe("none");
   });
 
@@ -816,6 +856,61 @@ test.describe("Agent new-chat task guides", () => {
       releaseAgent?.();
     }
     await expect(page.getByTestId("agent-guide-cases")).toBeVisible();
+  });
+
+  test("showcase accent tags keep at least 4.5:1 text contrast", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    for (const agentName of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ] as const) {
+      await openGuide(page, agentName);
+      const tag = page
+        .locator("[data-testid='agent-guide-cases'] .showcase-tag")
+        .first();
+      await expect(tag).toBeVisible();
+      const colors = await tag.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { foreground: style.color, background: style.backgroundColor };
+      });
+      expect(
+        contrastRatio(colors.foreground, colors.background),
+        agentName,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test("PPT download action keeps accessible contrast in default and hover states", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await openGuide(page, "ppt-master");
+    await page.getByTestId("showcase-open-ppt-quick").click();
+    const download = page.getByTestId("showcase-download-pptx");
+    const readContrast = async () => {
+      const colors = await download.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const context = document.createElement("canvas").getContext("2d");
+        if (!context) throw new Error("Canvas colors unavailable");
+        const normalize = (color: string) => {
+          context.fillStyle = color;
+          return context.fillStyle;
+        };
+        return {
+          foreground: normalize(style.color),
+          background: normalize(style.backgroundColor),
+        };
+      });
+      return contrastRatio(colors.foreground, colors.background);
+    };
+
+    expect(await readContrast()).toBeGreaterThanOrEqual(4.5);
+    await download.hover();
+    expect(await readContrast()).toBeGreaterThanOrEqual(4.5);
   });
 
   test("dark mode keeps the guide hero readable", async ({ page }) => {

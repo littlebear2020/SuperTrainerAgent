@@ -1,5 +1,6 @@
 .showcaseGuide {
   --showcase-accent: #4f6bff;
+  --showcase-accent-text: #3f4fd1;
   --showcase-accent-soft: #eef1ff;
   background: var(--background);
   box-shadow: 0 0 0 100vmax var(--background);
@@ -8,25 +9,28 @@
 
 .showcaseGuide[data-agent="ppt-master"] {
   --showcase-accent: #d98324;
+  --showcase-accent-text: #9a520a;
   --showcase-accent-soft: #fff7e8;
 }
 
 .showcaseGuide[data-agent="podcast-studio"] {
   --showcase-accent: #8b5cf6;
+  --showcase-accent-text: #6d28d9;
   --showcase-accent-soft: #f3efff;
 }
 
 .showcaseGuide[data-agent="creative-studio"] {
   --showcase-accent: #e05d7a;
+  --showcase-accent-text: #be123c;
   --showcase-accent-soft: #fff0f3;
 }
 
 .showcaseGuide :global(.showcase-accent-text) {
-  color: var(--showcase-accent);
+  color: var(--showcase-accent-text);
 }
 
 .showcaseGuide :global(.showcase-tag) {
-  color: var(--showcase-accent);
+  color: var(--showcase-accent-text);
   background: var(--showcase-accent-soft);
 }
 
@@ -36,28 +40,32 @@
 }
 
 .showcaseGuide :global(.showcase-prompt):hover {
-  color: var(--showcase-accent);
-  border-color: var(--showcase-accent);
+  color: var(--showcase-accent-text);
+  border-color: var(--showcase-accent-text);
   background: var(--showcase-accent-soft);
 }
 
 :global(.dark) .showcaseGuide {
   --showcase-accent: #a5b4fc;
+  --showcase-accent-text: #a5b4fc;
   --showcase-accent-soft: rgb(99 102 241 / 0.12);
 }
 
 :global(.dark) .showcaseGuide[data-agent="ppt-master"] {
   --showcase-accent: #fbbf24;
+  --showcase-accent-text: #fbbf24;
   --showcase-accent-soft: rgb(217 131 36 / 0.12);
 }
 
 :global(.dark) .showcaseGuide[data-agent="podcast-studio"] {
   --showcase-accent: #c4b5fd;
+  --showcase-accent-text: #c4b5fd;
   --showcase-accent-soft: rgb(139 92 246 / 0.12);
 }
 
 :global(.dark) .showcaseGuide[data-agent="creative-studio"] {
   --showcase-accent: #fda4af;
+  --showcase-accent-text: #fda4af;
   --showcase-accent-soft: rgb(224 93 122 / 0.12);
 }
 

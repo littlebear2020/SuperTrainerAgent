@@ -144,15 +144,61 @@ describe("AgentShowcase", () => {
       container.querySelectorAll("[data-testid^='showcase-open-ppt-quick']"),
     ).toHaveLength(4);
 
-    await click(element("showcase-open-ppt-quick-2"));
+    for (const slideIndex of [0, 1, 2, 3]) {
+      if (slideIndex > 0) await click(element("showcase-dialog-close"));
+      const testId = `showcase-open-ppt-quick${slideIndex === 0 ? "" : `-${slideIndex}`}`;
+      await click(element(testId));
+      expect(
+        document
+          .querySelector<HTMLImageElement>(
+            "[data-testid='showcase-deck-current']",
+          )
+          ?.getAttribute("src"),
+      ).toContain(`/quick/slide-${slideIndex + 1}.webp`);
+    }
+  });
 
-    expect(
-      document
-        .querySelector<HTMLImageElement>(
-          "[data-testid='showcase-deck-current']",
-        )
-        ?.getAttribute("src"),
-    ).toContain("/quick/slide-3.webp");
+  it.each([3, 4])(
+    "omits a remaining-slide badge for a %i-page deck",
+    async (pageCount) => {
+      const agent = showcaseFor("ppt-master")!;
+      const deck = agent.cases[0]!;
+      if (deck.kind !== "deck") throw new Error("deck not found");
+      await act(async () => {
+        root.render(
+          <I18nProvider initialLocale="zh-CN">
+            <AgentShowcase
+              agent={{
+                ...agent,
+                cases: [
+                  {
+                    ...deck,
+                    slides: deck.slides.slice(0, pageCount),
+                    pageCount,
+                  },
+                ],
+              }}
+              disabled={false}
+              onUsePrompt={onUsePrompt}
+            />
+          </I18nProvider>,
+        );
+      });
+
+      expect(element("showcase-case-ppt-quick").textContent).not.toMatch(
+        /[+-]\d+\s*页/,
+      );
+    },
+  );
+
+  it("keeps the remaining-slide badge out of the thumbnail hit area", async () => {
+    await renderShowcase("ppt-master");
+    const badge = Array.from(
+      element("showcase-case-ppt-quick").querySelectorAll("span"),
+    ).find((item) => item.textContent?.includes("+3"));
+
+    expect(badge).toBeDefined();
+    expect(badge?.className).toContain("pointer-events-none");
   });
 
   it("reopens the same deck at the newly selected preview after closing", async () => {
@@ -212,6 +258,17 @@ describe("AgentShowcase", () => {
       "/agent-showcase/ppt/standard-llm-app-v2.pptx",
     );
     expect(download?.download).toBe("ppt-standard.pptx");
+  });
+
+  it("reserves the intrinsic image ratio before visual previews load", async () => {
+    await renderShowcase("creative-studio");
+
+    expect(element("showcase-open-visual-poster-agent").style.aspectRatio).toBe(
+      "1152 / 2048",
+    );
+    expect(element("showcase-open-visual-card-rag").style.aspectRatio).toBe(
+      "2048 / 1152",
+    );
   });
 
   it("filters visual cases with aria state and opens original and SVG downloads", async () => {
