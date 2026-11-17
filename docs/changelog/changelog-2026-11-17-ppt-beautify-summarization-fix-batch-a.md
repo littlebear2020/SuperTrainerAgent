@@ -1,7 +1,7 @@
 # PPT 美化摘要修复 Batch A：上下文完整性
 
-> **状态**：执行中（Task 1/2 与结构化日志已完成定向验证；完整门禁、PR 评审与真实冒烟未完成）。
-> **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失；增加字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留及无正文日志；尚未做 46 页回放、默认模型完整交付或部署。
+> **状态**：部分执行（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；真实冒烟因同一 7 页输入缺失而阻塞，未合并）。
+> **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失；增加字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留及结构化日志；未做真实 qwen 复测、46 页回放、默认模型完整交付或部署。
 
 ## 变更记录
 
@@ -11,7 +11,7 @@
 - `_create_summary` / `_acreate_summary` 共用来源校验、prompt 构建与空/精确占位响应校验；失败由既有外层透传，不 stash 新 checkpoint。
 - 空/两个精确历史 sentinel checkpoint 立即失去复用资格；fresh 成功才覆盖，失败保持透传且下次仍不得复用旧值。
 - 统一 partition 末尾直接保留最新真实用户消息，按对象身份去重并维持原始相对顺序；隐藏、动态 reminder、summary/skill ledger 等框架 Human 不作为用户指令选取。
-- fresh/reuse/checkpoint 拒绝记录 `mode`、消息数、cutoff、近似 token 与 thread/agent；字符级重试和最终透传记 WARNING，不记录正文、工具结果、摘要全文或异常 traceback。
+- fresh/reuse/checkpoint 拒绝记录 `mode`、消息数、cutoff、近似 token 与 thread/agent；字符级重试和最终透传记 WARNING，结构化记录不含正文、工具结果或摘要全文；保留既有异常 traceback 诊断。
 - 更新 `backend/docs/summarization.md`，明确有效源、透传不推进 cutoff 与日志口径；token 统计口径疑点仅登记 backlog，不在本批修改。
 
 ## 验收记录
@@ -33,7 +33,23 @@
 - 根 `make check`（首次）→ 后端 lint 与前端检查通过，计划状态头“执行中”触发 docs convention 唯一违例；改为约定的 `未执行（执行中…）` 后，根 `make check` 复验退出 `0`，最终输出 `OK 仓库治理约定全过`。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - `git diff --check` → 无输出，退出 `0`。
+- OCR 修复后 `cd backend && PYTHONPATH=. uv run pytest tests/test_summarization_middleware.py tests/test_dynamic_context_middleware.py tests/test_view_image_middleware.py tests/test_tool_call_protocol_middleware.py -q` → `224 passed, 2 warnings in 2.53s`。
+- OCR 修复后 `cd backend && make test` → `10079 passed, 89 skipped, 431 warnings in 148.12s`。
+- OCR 修复后 `cd backend && make lint` → `All checks passed!`；`1317 files already formatted`。
+- OCR 修复后根 `make check` → 退出 `0`；docs convention 输出 `OK 仓库治理约定全过`。
+
+## PR 与评审记录
+
+- PR A：`#27`，初始代码/文档 HEAD `fecaf8ae0784968f0f0094f87ab08c6480a4066e`。
+- 初始远程检查：`backend-unit-tests`、`quick-checks`、AI Code Review 均为 `pass`。
+- OCR medium（traceback / 异常时窗口日志）：新增 4 个回归在修复前 `4 failed, 113 deselected`；将 fresh/reuse 决策日志移到 handler 前并恢复 sync/async `logger.exception` 后，`117 passed, 2 warnings`。
+- OCR medium（唯一用户被保留后来源为空）：不接受恢复 sentinel 的建议，因为计划硬条件要求无有效原始来源时透传且不推进 checkpoint。合成探针实际输出：`handler_received_original=True`、`summary_model_calls=0`、`new_checkpoint=None`、`latest_user_present_in_passthrough=True`；已在原 OCR 线程回复。
 
 ## 真实复测记录
 
-尚未执行。输入 hash、代码 HEAD、thread、压缩统计与 P01 结果将在 Task 4 按事实回填；本批不交付最终 PPTX，最终交付路径由 Batch B 记录。
+当前阻塞于同一输入缺失，尚未启动 qwen 付费调用。计划指定的 `temp/ppt-beautify-7p/qwen-retest-result.md`、`qwen-turn-05.log` 与 `店长招聘与汰换-7页代表页.pptx` 在原工作区及已知并列 worktree 均不存在；只找到 46 页原稿与既有 Doubao 交付，二者均不得替代同一 7 页输入。
+
+- 代码 HEAD：`6e2f660b4385a21efb8f98647e8a47960671d670`（含 OCR 第一轮修复；后续文档 HEAD 另行记录于 PR）。
+- 输入 SHA-256 / thread / 起止时间 / 压缩统计 / P01 结果：未产生（未运行）。
+- 最终 PPTX：Batch A 不交付；Batch B 尚未开始。
+- 未覆盖或删除既有 Doubao 交付，未做 46 页回放或部署。

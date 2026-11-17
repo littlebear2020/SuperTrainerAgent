@@ -1,6 +1,6 @@
 # PPT 美化长链路上下文压缩修复实施计划
 
-> **状态**：未执行（执行中：2026-11-17 开始；基线 `origin/main=35338212`；PR A Task 1/2 已提交至 `9a359b46`，Task 3 进行中；不授权部署或 46 页付费回放）。
+> **状态**：未执行（部分执行：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；Task 4 因同一 7 页输入缺失而阻塞，PR B 未开始；不授权部署或 46 页付费回放）。
 > **TL;DR**：先修 DeerFlow 空/退化摘要、旧占位 checkpoint 复用和最新用户消息丢失，再补跨代摘要连续性；ppt-master 保持 P29 不变，用同一 qwen、同一 7 页输入做单变量复测。影响面仅限 summarization 中间件、测试与文档；不实施 P30、不改 seed/config、不宣称 46 页长链已验证。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 两个 PR 必须串行，禁止并行改动同一中间件。
@@ -136,7 +136,7 @@
 - [x] **Step 3：登记范围外 token 疑点。** 只在 `docs/findings-backlog.md` 增加一行：核对 qwen/Doubao `usage_metadata`、流式累计和近似 token 的口径，指针到 `token_attention_middleware.py:107-143` 与 `runtime/journal.py:379-388`；本批不修 provider/token 统计。
 - [x] **Step 4：写 Batch A changelog。** 必含 ≤5 行 TL;DR、RED→GREEN 证据和 `## 验收记录`；逐行采用“命令 → 实际关键输出”，明确尚未做 46 页与默认模型完整交付。
 - [x] **Step 5：跑提交前门禁。** 定向/相邻测试后，依次以后台任务运行 `cd backend && make test`、`cd backend && make lint` 与根 `make check`，前一项完成且输入未变再启动下一项；再跑 `python3 scripts/check_docs_convention.py` 和 `git diff --check`。全部通过才可 push；不设置 `RUN_LIVE=1`。
-- [ ] **Step 6：提交并开 PR A。** 分支 `ppt-beautify-summarization-context-integrity`，文档提交可用 `docs(summarization): 记录上下文完整性与复测边界`。显式设置 `GH_REPO` 为 origin 仓库，PR 正文链接本计划与 Batch A changelog，等待 AI/OCR + CI；Critical/Important 必须先修。
+- [x] **Step 6：提交并开 PR A。** 分支 `ppt-beautify-summarization-context-integrity`，文档提交可用 `docs(summarization): 记录上下文完整性与复测边界`。显式设置 `GH_REPO` 为 origin 仓库，PR 正文链接本计划与 Batch A changelog，等待 AI/OCR + CI；Critical/Important 必须先修。
 - [ ] **Step 7：完成 Task 4 冒烟后再决定合并。** 新占位、确认仍从重建窗口消失或 checkpoint 误推进 = 修复未成立，禁止合并；仅 qwen  authoring 行为失败不掩盖框架修复，可合入已证明正确的代码，但计划状态只能写“部分执行/默认模型未通过”。
 
 ### Task 4：PR A 单变量 qwen 冒烟，只验证到 P01
