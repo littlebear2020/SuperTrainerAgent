@@ -1133,6 +1133,10 @@ test.describe("Agent new-chat task guides", () => {
         viewport.height,
       );
       expect(input!.y + input!.height).toBeLessThanOrEqual(cases!.y);
+      if (viewport.width >= 640) {
+        // The character's bottom sits on the composer's top edge (2px overlap).
+        expect(input!.y).toBeLessThanOrEqual(hero!.y + hero!.height);
+      }
       expect(firstCardBox!.y).toBeLessThanOrEqual(viewport.firstCardTop);
       // Hard first-screen gate: the first card's title must be visible, not
       // only its poster. Baseline (PR #13) + 30px, see plan §P1-2.
