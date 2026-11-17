@@ -255,7 +255,7 @@ export function DeckDialog({
             data-testid="showcase-download-pptx"
             href={item.pptx}
             download={`${item.id}.pptx`}
-            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-600 px-4 text-xs font-medium text-white hover:bg-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-700 px-4 text-xs font-medium text-white hover:bg-amber-800 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             {t.agents.showcase.downloadPptx}

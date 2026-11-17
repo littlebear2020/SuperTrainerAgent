@@ -15,7 +15,7 @@
 
 ## 评审修正
 
-- 将装饰色与文字色分离，四个 Agent 的浅色标签均达到至少 4.5:1 对比度；PPT 下载按钮默认与悬停态经 Canvas 规范化颜色验证均达标。
+- 将装饰色与文字色分离，四个 Agent 的浅色标签均达到至少 4.5:1 对比度；PPT 下载按钮使用 amber-700/amber-800，测试通过浏览器相对颜色转换与 `color(srgb)` 通道解析验证默认/悬停均 ≥4.5:1。
 - 剩余页角标按实际预览数计算，无剩余页时不渲染，并设为 `pointer-events-none`，不再遮挡第 4 页点击区域。
 - 视觉预览在加载前按素材原始宽高比占位，保留完整画面并避免懒加载布局跳动。
 - 四个 PPT 预览索引、同 deck 关闭重开、音波切换与减少动态效果均有行为断言。
@@ -24,7 +24,7 @@
 ## 验收记录
 
 - `pnpm exec vitest run tests/unit/core/agents/showcase.test.ts tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx tests/unit/components/workspace/agent-showcase.dom.test.tsx` → `Test Files 3 passed (3)`，`Tests 39 passed (39)`。
-- `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts` → `33 passed (23.5s)`；覆盖四类媒体、草稿/显式提交、co-writer、暗色、英文、三视口与新增视觉行为断言。
+- `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts` → `33 passed (21.9s)`；覆盖四类媒体、草稿/显式提交、co-writer、暗色、英文、三视口与新增视觉行为断言。
 - 新增浏览器断言确认：1440px 三个视频同排；海报实际宽高比约 `0.5625`；移动人物完整且位于标题上方；只有正在播放的卡片音波运行动画。
 - `make -C frontend check` → ESLint 0 errors（121 个既有 warnings）、TypeScript 通过、Prettier 通过、knip 通过、`i18n key 存活检测通过：632 个叶子全活。`
 - `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 node --experimental-strip-types /Users/littlebear/Documents/SuperTrainerAgent-home-plan/.screenshots/agent-showcase/refinement/capture-verification.mjs` → `status: passed`、`errors: []`；真实 MP4 播放/关闭卸载、PPT 第 3 页直达、PPTX/JPG/SVG/MP3 下载、三视口、英文、暗色、草稿取消与显式提交全部通过。

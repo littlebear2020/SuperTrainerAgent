@@ -87,6 +87,13 @@ test.describe("Agent new-chat task guides", () => {
 
   function contrastRatio(foreground: string, background: string) {
     const channels = (color: string) => {
+      const srgb = /^color\(srgb\s+(.+)\)$/.exec(color);
+      if (srgb?.[1]) {
+        return srgb[1]
+          .split(/\s+/)
+          .slice(0, 3)
+          .map((value) => Math.max(0, Math.min(1, Number(value))) * 255);
+      }
       if (/^#[\da-f]{6}$/i.test(color)) {
         return [1, 3, 5].map((offset) =>
           parseInt(color.slice(offset, offset + 2), 16),
@@ -894,11 +901,13 @@ test.describe("Agent new-chat task guides", () => {
     const readContrast = async () => {
       const colors = await download.evaluate((element) => {
         const style = getComputedStyle(element);
-        const context = document.createElement("canvas").getContext("2d");
-        if (!context) throw new Error("Canvas colors unavailable");
         const normalize = (color: string) => {
-          context.fillStyle = color;
-          return context.fillStyle;
+          const probe = document.createElement("span");
+          probe.style.color = `rgb(from ${color} r g b)`;
+          element.append(probe);
+          const normalized = getComputedStyle(probe).color;
+          probe.remove();
+          return normalized;
         };
         return {
           foreground: normalize(style.color),
