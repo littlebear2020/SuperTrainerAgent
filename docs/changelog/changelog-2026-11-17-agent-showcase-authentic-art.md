@@ -12,7 +12,7 @@
 
 ## 二、改动
 
-- `poster-llm-light`：深蓝底瑞士网格，荧光绿/朱红数据块，白字；不再用暖白纸。
+- `poster-llm-deep-blue`：深蓝底瑞士网格，荧光绿/朱红数据块，白字；不再用暖白纸。
 - `card-prompt`：深色终端底 + 完整 Prompt 手稿 + 四段批注，真实“提示词卡”形态。
 - `infographic-training`：冷白数据管线，五节点横线、INPUT/OUTPUT 与连续箭头，取消纸雕。
 - `infographic-roadmap`：深绿时间线，S 形路径串起四阶段与停止条件，取消四列卡片。

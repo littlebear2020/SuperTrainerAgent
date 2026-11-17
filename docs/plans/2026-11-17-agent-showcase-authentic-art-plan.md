@@ -13,7 +13,7 @@
 
 | 素材 | 类型 | 做法 |
 |---|---|---|
-| poster-llm-light | 课程海报 | 深蓝底瑞士网格，荧光绿/朱红数据块，白字 |
+| poster-llm-deep-blue | 课程海报 | 深蓝底瑞士网格，荧光绿/朱红数据块，白字 |
 | card-prompt | 知识卡 | 深色 Prompt 手稿 + 四段批注，完整占位符文本 |
 | infographic-training | 信息图 | 冷白数据管线：五节点横线 + INPUT/OUTPUT，无纸雕 |
 | infographic-roadmap | 信息图 | 深绿时间线：S 形路径 + 四个阶段 + 停止条件 |
