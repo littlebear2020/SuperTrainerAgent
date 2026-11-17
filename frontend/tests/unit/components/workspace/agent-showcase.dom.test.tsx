@@ -311,8 +311,7 @@ describe("AgentShowcase", () => {
     expect(element("showcase-filter-all").getAttribute("aria-pressed")).toBe(
       "false",
     );
-    // Header and right-edge counts must follow the filtered grid.
-    expect(container.textContent).toContain("2 个可核验案例");
+    // The right-edge count follows the filtered grid.
     expect(container.textContent).toContain("2 / 10 件");
 
     const trigger = element("showcase-open-visual-card-rag");
@@ -351,7 +350,6 @@ describe("AgentShowcase", () => {
     expect(element("showcase-filter-all").getAttribute("aria-pressed")).toBe(
       "true",
     );
-    expect(container.textContent).toContain("10 个可核验案例");
   });
 
   it("gives each podcast a visible 32-bar waveform", async () => {

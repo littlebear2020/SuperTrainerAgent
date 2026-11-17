@@ -72,7 +72,6 @@ export type ShowcaseAgent = {
   character: string;
   howTitle: LocalizedText;
   howDescription: LocalizedText;
-  caseLabel: LocalizedText;
   badge: LocalizedText;
   note: LocalizedText;
   steps: ShowcaseStep[];
@@ -121,7 +120,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       "先核对讲稿和画面，再配音、渲染、交付 MP4。",
       "Review the script and visuals before narration, rendering, and MP4 delivery.",
     ),
-    caseLabel: text("真实成片", "REAL VIDEOS"),
     badge: text("产物已核验", "Verified output"),
     note: text(
       "3 个案例均为真实成片，前两个按上传讲稿模式制作，第三个先联网调研再制作，均不含真人角色或剧情镜头。",
@@ -242,7 +240,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       "按需求走快速出稿、标准制作或现有 PPT 改造，交付原生可编辑 PPTX。",
       "Choose quick creation, the standard workflow, or native editing, and receive an editable PPTX.",
     ),
-    caseLabel: text("真实 PPTX", "REAL PPTX FILES"),
     badge: text("原生可编辑", "Natively editable"),
     note: text(
       "3 个案例均为真实 PPTX，分别是快速出稿、标准流程和现有 PPT 改造。第三份基于用户授权的 360 模板做原生改造。",
@@ -387,7 +384,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       "先确定来源和节目形式，再核对口播稿，最后合成 MP3。",
       "Choose sources and a format, review the script, then synthesize an MP3.",
     ),
-    caseLabel: text("真实节目", "REAL EPISODES"),
     badge: text("MP3 可试听", "Playable MP3"),
     note: text(
       "4 期节目均为真实 MP3，使用豆包 TTS 的男声/女声双音色，无背景音乐、无声音克隆。",
@@ -680,7 +676,6 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       "先理解用途和内容，再决定生成或排版方式，最后审校导出。",
       "Understand the purpose and content, choose generation or layout, then review and export.",
     ),
-    caseLabel: text("真实作品", "REAL DESIGNS"),
     badge: text("产物已核验", "Verified output"),
     note: text(
       "10 个案例覆盖 5 类作品，每类 2 种风格；海报、知识卡、漫画、信息图由生图模型生成，结构图由 SVG 绘图能力生成。",

@@ -383,7 +383,6 @@ export interface Translations {
       howItWorks: string;
       casesTitle: string;
       casesDescription: string;
-      caseUnit: string;
       itemUnit: string;
       usePrompt: string;
       openCase: string;
