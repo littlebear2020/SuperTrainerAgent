@@ -63,6 +63,13 @@
    - en：Supplied scripts stay verbatim; topic-only briefs get a drafted narration and scene plan for your review.
 3. **回归**：`showcase.test.ts` 新增第 2 步双分支断言；E2E 新增按钮 `white-space: nowrap` 与高度 ≤40 断言。
 
+## 六、追加：第六轮预览反馈（人物站在对话框上沿）
+
+- 参考其他产品截图，人物底部需要**刚好落在对话框上沿**，而不是悬在上方。
+- `agent-guide-input` 在 `sm` 以上使用 `-mt-[18px]`（抵消 16px shell gap + 2px 覆盖）并加 `relative z-20`，让 composer 盖住人物裁切边；移动端保持原有间距（人物在标题上方）。
+- 顺带修复遗留的 `lg:gap-4 xl:gap-5`：此前 1440 的 shell gap 实际是 20px 而非 16px，导致负 margin 后仍有 2px 间隙；统一为 `gap-4` 后 1440/1060 均为 2px 覆盖。
+- E2E 增加 `input.y <= hero.bottom`（≥640）断言，锁定“人物站在对话框上沿”。
+
 ## 验收记录
 
 - `cd frontend && pnpm check` → 0 error；prettier 通过

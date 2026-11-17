@@ -101,7 +101,14 @@ export function AgentNewChatGuide({
       data-testid="agent-guide-input"
       className={
         showcase
-          ? cn(styles.guideComposerFrame, "mx-auto w-full max-w-[860px]")
+          ? cn(
+              styles.guideComposerFrame,
+              // Sit the character exactly on the composer's top edge: cancel the
+              // 16px shell gap and overlap 2px so the cut edge is hidden by the
+              // dialog surface (mobile keeps the normal gap because the
+              // character stacks above the headline).
+              "relative z-20 mx-auto w-full max-w-[860px] sm:-mt-[18px]",
+            )
           : undefined
       }
     >
@@ -173,7 +180,7 @@ export function AgentNewChatGuide({
           "mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-6",
           showcase && showcaseStyles.showcaseGuide,
           showcase
-            ? "relative isolate max-w-[1180px] bg-transparent lg:gap-4 xl:gap-5"
+            ? "relative isolate max-w-[1180px] bg-transparent"
             : "max-w-4xl",
         )}
       >
