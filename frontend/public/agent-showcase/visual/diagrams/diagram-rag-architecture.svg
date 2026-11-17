@@ -13,101 +13,101 @@
   <path d="M0,0 L6,3 L0,6 z" fill="#137c6b"/>
 </marker>
 </defs>
-<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#f6f1e6" stroke="none" stroke-width="1" opacity="1.0"/>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#e7e2f8" stroke="none" stroke-width="1" opacity="1.0"/>
 <rect x="0" y="0" width="1600" height="1000" rx="0" fill="url(#grid)" stroke="none" stroke-width="1" opacity="1.0"/>
-<text x="60" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#6c7484" text-anchor="start" letter-spacing="3" opacity="1.0">SYSTEM DIAGRAM / 08</text>
+<text x="60" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#6b6f86" text-anchor="start" letter-spacing="3" opacity="1.0">SYSTEM DIAGRAM / 08</text>
 <text x="60" y="122" font-family="PingFang SC" font-size="52" font-weight="600" fill="#16213a" text-anchor="start" letter-spacing="-1" opacity="1.0">RAG 系统架构</text>
 <text x="60" y="160" font-family="PingFang SC" font-size="18" font-weight="400" fill="#4f586b" text-anchor="start" opacity="1.0">离线建索引，在线做检索；生成必须带证据，评估贯穿全链路。</text>
-<text x="1540" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#6c7484" text-anchor="end" letter-spacing="2" opacity="1.0">OFFLINE + ONLINE</text>
+<text x="1540" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#6b6f86" text-anchor="end" letter-spacing="2" opacity="1.0">OFFLINE + ONLINE</text>
 <text x="1540" y="84" font-family="SF Mono" font-size="11" font-weight="500" fill="#d9553c" text-anchor="end" letter-spacing="2" opacity="1.0">GROUNDED ANSWER</text>
 <rect x="60" y="184" width="1480" height="1" rx="0" fill="#16213a" stroke="none" stroke-width="1" opacity="0.2"/>
-<rect x="60" y="208" width="1480" height="202" rx="6" fill="#ffffff" stroke="#2646d6" stroke-width="1" opacity="0.35" stroke-dasharray="5 6"/>
+<rect x="60" y="208" width="1480" height="202" rx="6" fill="#ffffff" stroke="#2646d6" stroke-width="1" opacity="0.42" stroke-dasharray="5 6"/>
 <text x="80" y="236" font-family="SF Mono" font-size="11.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="2" opacity="1.0">OFFLINE INDEXING / 离线索引</text>
-<text x="1500" y="236" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="end" opacity="1.0">一次性构建，可重复更新</text>
-<rect x="80" y="258" width="320" height="110" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="1500" y="236" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="end" opacity="1.0">一次性构建，可重复更新</text>
+<rect x="80" y="258" width="320" height="110" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="80" y="258" width="4" height="110" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="98" y="283" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">01</text>
 <text x="98" y="316" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">文档源</text>
-<text x="98" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">PDF · 网页 · DOCX</text>
-<rect x="440" y="258" width="320" height="110" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="98" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">PDF · 网页 · DOCX</text>
+<rect x="440" y="258" width="320" height="110" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="440" y="258" width="4" height="110" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="458" y="283" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">02</text>
 <text x="458" y="316" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">解析与切分</text>
-<text x="458" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">清洗 · chunk · metadata</text>
-<rect x="800" y="258" width="320" height="110" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="458" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">清洗 · chunk · metadata</text>
+<rect x="800" y="258" width="320" height="110" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="800" y="258" width="4" height="110" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="818" y="283" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">03</text>
 <text x="818" y="316" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">向量化</text>
-<text x="818" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">embedding model</text>
-<rect x="1160" y="258" width="320" height="110" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="818" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">embedding model</text>
+<rect x="1160" y="258" width="320" height="110" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="1160" y="258" width="4" height="110" rx="2" fill="#137c6b" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="1178" y="283" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#137c6b" text-anchor="start" letter-spacing="1.2" opacity="1.0">04</text>
 <text x="1178" y="316" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">向量库</text>
-<text x="1178" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">index · version</text>
+<text x="1178" y="342" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">index · version</text>
 <line x1="406" y1="313" x2="430" y2="313" stroke="#2646d6" stroke-width="1.4" marker-end="url(#arrow-2646d6)"/>
-<text x="418" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">抽取</text>
+<text x="418" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">抽取</text>
 <line x1="766" y1="313" x2="790" y2="313" stroke="#2646d6" stroke-width="1.4" marker-end="url(#arrow-2646d6)"/>
-<text x="778" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">清洗</text>
+<text x="778" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">清洗</text>
 <line x1="1126" y1="313" x2="1150" y2="313" stroke="#2646d6" stroke-width="1.4" marker-end="url(#arrow-2646d6)"/>
-<text x="1138" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">索引</text>
-<rect x="60" y="440" width="1480" height="250" rx="6" fill="#ffffff" stroke="#137c6b" stroke-width="1" opacity="0.35" stroke-dasharray="5 6"/>
+<text x="1138" y="300" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">索引</text>
+<rect x="60" y="440" width="1480" height="250" rx="6" fill="#ffffff" stroke="#137c6b" stroke-width="1" opacity="0.42" stroke-dasharray="5 6"/>
 <text x="80" y="468" font-family="SF Mono" font-size="11.5" font-weight="500" fill="#137c6b" text-anchor="start" letter-spacing="2" opacity="1.0">ONLINE QUERY / 在线检索与生成</text>
-<text x="1500" y="468" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="end" opacity="1.0">每次请求实时执行</text>
-<rect x="80" y="500" width="250" height="130" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="1500" y="468" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="end" opacity="1.0">每次请求实时执行</text>
+<rect x="80" y="500" width="250" height="130" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="80" y="500" width="4" height="130" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="98" y="525" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">Q1</text>
 <text x="98" y="558" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">用户问题</text>
-<text x="98" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">query</text>
-<rect x="390" y="500" width="300" height="130" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="98" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">query</text>
+<rect x="390" y="500" width="300" height="130" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="390" y="500" width="4" height="130" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="408" y="525" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">Q2</text>
 <text x="408" y="558" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">检索器</text>
-<text x="408" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">top-k · filter</text>
-<rect x="750" y="500" width="240" height="130" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="408" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">top-k · filter</text>
+<rect x="750" y="500" width="240" height="130" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="750" y="500" width="4" height="130" rx="2" fill="#2646d6" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="768" y="525" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#2646d6" text-anchor="start" letter-spacing="1.2" opacity="1.0">Q3</text>
 <text x="768" y="558" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">重排</text>
-<text x="768" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">cross-encoder</text>
-<rect x="1050" y="500" width="250" height="130" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="768" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">cross-encoder</text>
+<rect x="1050" y="500" width="250" height="130" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="1050" y="500" width="4" height="130" rx="2" fill="#d9553c" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="1068" y="525" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#d9553c" text-anchor="start" letter-spacing="1.2" opacity="1.0">Q4</text>
 <text x="1068" y="558" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">生成模型</text>
-<text x="1068" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">grounded prompt</text>
-<rect x="1360" y="500" width="160" height="130" rx="5" fill="#fffdf8" stroke="#16213a" stroke-width="1" opacity="0.92"/>
+<text x="1068" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">grounded prompt</text>
+<rect x="1360" y="500" width="160" height="130" rx="5" fill="#ffffff" stroke="#16213a" stroke-width="1" opacity="0.92"/>
 <rect x="1360" y="500" width="4" height="130" rx="2" fill="#d9553c" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="1378" y="525" font-family="SF Mono" font-size="9.5" font-weight="500" fill="#d9553c" text-anchor="start" letter-spacing="1.2" opacity="1.0">Q5</text>
 <text x="1378" y="558" font-family="PingFang SC" font-size="20" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">答案 + 引用</text>
-<text x="1378" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">citation</text>
+<text x="1378" y="584" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">citation</text>
 <line x1="336" y1="565" x2="378" y2="565" stroke="#2646d6" stroke-width="1.4" marker-end="url(#arrow-2646d6)"/>
 <line x1="696" y1="565" x2="738" y2="565" stroke="#2646d6" stroke-width="1.4" marker-end="url(#arrow-2646d6)"/>
 <line x1="996" y1="565" x2="1038" y2="565" stroke="#d9553c" stroke-width="1.4" marker-end="url(#arrow-d9553c)"/>
 <line x1="1306" y1="565" x2="1348" y2="565" stroke="#d9553c" stroke-width="1.4" marker-end="url(#arrow-d9553c)"/>
-<text x="357" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">top-k</text>
-<text x="717" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">重排</text>
-<text x="1017" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">prompt</text>
-<text x="1327" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6c7484" text-anchor="middle" letter-spacing="0.6" opacity="1.0">引用</text>
+<text x="357" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">top-k</text>
+<text x="717" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">重排</text>
+<text x="1017" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">prompt</text>
+<text x="1327" y="552" font-family="SF Mono" font-size="9.5" font-weight="400" fill="#6b6f86" text-anchor="middle" letter-spacing="0.6" opacity="1.0">引用</text>
 <path d="M1320 368 L1320 420 L540 420 L540 488" fill="none" stroke="#137c6b" stroke-width="1.4" marker-end="url(#arrow-137c6b)"/>
 <text x="930" y="410" font-family="SF Mono" font-size="10.5" font-weight="500" fill="#137c6b" text-anchor="middle" letter-spacing="0.8" opacity="1.0">索引 / 向量（一次写入，多次读取）</text>
-<rect x="60" y="730" width="1480" height="128" rx="4" fill="#efe7d8" stroke="#16213a" stroke-width="1" opacity="0.9"/>
+<rect x="60" y="730" width="1480" height="128" rx="4" fill="#dcd6f0" stroke="#16213a" stroke-width="1" opacity="0.9"/>
 <text x="80" y="760" font-family="SF Mono" font-size="11.5" font-weight="600" fill="#16213a" text-anchor="start" letter-spacing="2" opacity="1.0">EVALUATION &amp; OBSERVABILITY / 评估与观测</text>
-<rect x="80" y="782" width="320" height="54" rx="3" fill="#fffdf8" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
+<rect x="80" y="782" width="320" height="54" rx="3" fill="#ffffff" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
 <text x="96" y="805" font-family="PingFang SC" font-size="15" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">召回率</text>
-<text x="96" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">检索是否找全</text>
-<rect x="440" y="782" width="320" height="54" rx="3" fill="#fffdf8" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
+<text x="96" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">检索是否找全</text>
+<rect x="440" y="782" width="320" height="54" rx="3" fill="#ffffff" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
 <text x="456" y="805" font-family="PingFang SC" font-size="15" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">忠实度</text>
-<text x="456" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">回答是否有据</text>
-<rect x="800" y="782" width="320" height="54" rx="3" fill="#fffdf8" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
+<text x="456" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">回答是否有据</text>
+<rect x="800" y="782" width="320" height="54" rx="3" fill="#ffffff" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
 <text x="816" y="805" font-family="PingFang SC" font-size="15" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">延迟</text>
-<text x="816" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">链路是否可用</text>
-<rect x="1160" y="782" width="320" height="54" rx="3" fill="#fffdf8" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
+<text x="816" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">链路是否可用</text>
+<rect x="1160" y="782" width="320" height="54" rx="3" fill="#ffffff" stroke="#16213a" stroke-width="0.8" opacity="0.8"/>
 <text x="1176" y="805" font-family="PingFang SC" font-size="15" font-weight="600" fill="#16213a" text-anchor="start" opacity="1.0">成本</text>
-<text x="1176" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">调用是否可持续</text>
+<text x="1176" y="825" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">调用是否可持续</text>
 <text x="1540" y="888" font-family="PingFang SC" font-size="11.5" font-weight="500" fill="#d9553c" text-anchor="end" opacity="1.0">没有评估，就没有可上线的 RAG。</text>
 <rect x="60" y="900" width="1480" height="1" rx="0" fill="#16213a" stroke="none" stroke-width="1" opacity="0.2"/>
 <text x="60" y="936" font-family="SF Mono" font-size="11.5" font-weight="500" fill="#16213a" text-anchor="start" letter-spacing="1.6" opacity="1.0">4 INGESTION STEPS</text>
-<text x="270" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">·</text>
+<text x="270" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">·</text>
 <text x="290" y="936" font-family="SF Mono" font-size="11.5" font-weight="500" fill="#16213a" text-anchor="start" letter-spacing="1.6" opacity="1.0">5 QUERY STEPS</text>
-<text x="460" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="start" opacity="1.0">·</text>
+<text x="460" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="start" opacity="1.0">·</text>
 <text x="480" y="936" font-family="SF Mono" font-size="11.5" font-weight="500" fill="#16213a" text-anchor="start" letter-spacing="1.6" opacity="1.0">1 EVALUATION LAYER</text>
-<text x="1540" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6c7484" text-anchor="end" opacity="1.0">课程设计 / 技术评审 / 方案讲解</text>
+<text x="1540" y="936" font-family="PingFang SC" font-size="11.5" font-weight="400" fill="#6b6f86" text-anchor="end" opacity="1.0">课程设计 / 技术评审 / 方案讲解</text>
 </svg>
