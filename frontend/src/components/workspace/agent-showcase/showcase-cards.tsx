@@ -81,7 +81,7 @@ export function VideoCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border flex min-w-0 flex-col overflow-hidden rounded-[15px] border transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:hover:border-indigo-400/50"
+      className="showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col overflow-hidden rounded-[14px] border transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
     >
       <button
         type="button"
@@ -120,17 +120,17 @@ export function VideoCard({
         </span>
       </button>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[10px] font-medium">
+        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[11px] font-medium">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-[15px] leading-6 font-semibold">
+        <h3 className="text-foreground text-[18px] leading-7 font-semibold">
           {title}
         </h3>
-        <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
+        <p className="text-muted-foreground line-clamp-3 text-[13px] leading-[1.7]">
           {localized(item.description, locale)}
         </p>
         <div className="border-border mt-auto flex items-end justify-between gap-3 border-t pt-3">
-          <div className="text-muted-foreground min-w-0 text-[10px] leading-5">
+          <div className="text-muted-foreground min-w-0 text-[10.5px] leading-5">
             <span className="block truncate">
               {localized(item.voice, locale)}
             </span>
@@ -179,7 +179,7 @@ export function DeckCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border grid min-w-0 overflow-hidden rounded-[15px] border transition duration-200 hover:border-amber-300 hover:shadow-md md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[286px_minmax(0,1fr)] dark:border-white/10 dark:hover:border-amber-400/50"
+      className="showcase-card border-border/70 bg-card/70 grid min-w-0 overflow-hidden rounded-[14px] border transition duration-200 hover:border-amber-300 hover:shadow-md md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)] dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-amber-400/50"
     >
       <div className="relative grid grid-cols-2 content-start gap-2 p-4 md:p-5">
         {item.slides.slice(0, previewCount).map((slide, slideIndex) =>
@@ -198,7 +198,7 @@ export function DeckCard({
               data-testid={`showcase-open-${item.id}${slideIndex === 0 ? "" : `-${slideIndex}`}`}
               aria-label={`${t.agents.showcase.openCase}: ${title} · ${slideIndex + 1} / ${item.pageCount}`}
               onClick={(event) => onOpen(item, event.currentTarget, slideIndex)}
-              className="group border-border relative block aspect-video overflow-hidden rounded-lg border bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+              className="group border-border/60 relative block aspect-video overflow-hidden rounded-[10px] border bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
             >
               <img
                 src={slide}
@@ -231,24 +231,24 @@ export function DeckCard({
       </div>
       <div className="flex min-w-0 flex-col gap-2 p-5 pt-0 md:pt-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="showcase-tag rounded px-2 py-1 text-[10px] font-medium">
+          <span className="showcase-tag rounded px-2 py-1 text-[11px] font-medium">
             {localized(item.tag, locale)}
           </span>
-          <span className="text-muted-foreground text-[10px]">
+          <span className="text-muted-foreground text-[10.5px]">
             {localized(item.styleLabel, locale)}
           </span>
         </div>
-        <h3 className="text-foreground text-lg leading-7 font-bold tracking-tight">
+        <h3 className="text-foreground text-[19px] leading-[1.4] font-bold tracking-tight">
           {title}
         </h3>
-        <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
+        <p className="text-muted-foreground line-clamp-3 text-[13px] leading-6">
           {localized(item.description, locale)}
         </p>
         <div className="flex flex-wrap gap-1.5 pt-1">
           {item.features.map((feature) => (
             <span
               key={feature.en}
-              className="text-muted-foreground border-border inline-flex items-center gap-1 rounded border px-1.5 py-1 text-[10px]"
+              className="text-muted-foreground border-border/70 inline-flex items-center gap-1 rounded border px-1.5 py-1 text-[11px]"
             >
               <FileCheck2
                 className="h-3 w-3 text-amber-600 dark:text-amber-300"
@@ -285,7 +285,7 @@ export function DeckCard({
             onUsePrompt={onUsePrompt}
           />
         </div>
-        <span className="text-muted-foreground pt-1 text-[10px]">
+        <span className="text-muted-foreground pt-1 text-[10.5px]">
           {item.pageCount} {t.agents.showcase.slides} ·{" "}
           {formatBytes(item.pptxBytes, locale)}
         </span>
@@ -316,7 +316,7 @@ export function VisualCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-rose-300 hover:shadow-md dark:border-white/10 dark:hover:border-rose-400/50"
+      className="showcase-card border-border/70 bg-card/70 mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-rose-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-rose-400/50"
     >
       <button
         type="button"
@@ -355,13 +355,16 @@ export function VisualCard({
         ) : null}
       </button>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[10px] font-medium">
+        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[11px] font-medium">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-[13px] leading-5 font-semibold">
+        <h3 className="text-foreground text-[15px] leading-6 font-semibold">
           {title}
         </h3>
-        <div className="text-muted-foreground text-[10px]">
+        <p className="text-muted-foreground line-clamp-2 text-[13px] leading-5">
+          {localized(item.description, locale)}
+        </p>
+        <div className="text-muted-foreground text-[10.5px]">
           {item.width} × {item.height} · {localized(item.styleLabel, locale)}
         </div>
         <div className="mt-auto pt-1 [&_[data-showcase-prompt]]:w-full">

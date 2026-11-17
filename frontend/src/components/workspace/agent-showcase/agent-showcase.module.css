@@ -44,11 +44,6 @@
   background: var(--showcase-accent-soft);
 }
 
-.showcaseGuide :global(.showcase-card) {
-  background: var(--card);
-  backdrop-filter: none;
-}
-
 .showcaseGuide :global(.showcase-prompt):hover {
   color: var(--showcase-accent-text);
   border-color: var(--showcase-accent-text);
@@ -77,10 +72,6 @@
   --showcase-accent: #fda4af;
   --showcase-accent-text: #fda4af;
   --showcase-accent-soft: rgb(224 93 122 / 0.12);
-}
-
-:global(.dark) .showcaseGuide :global(.showcase-card) {
-  background: rgb(255 255 255 / 0.035);
 }
 
 .waveformBars {
