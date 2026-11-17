@@ -145,14 +145,14 @@ export function ShowcaseAudioPlayer({
               key={item.id}
               data-testid={`showcase-case-${item.id}`}
               className={cn(
-                "showcase-card border-border flex min-w-0 flex-col gap-3 rounded-[15px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:hover:border-violet-400/50",
+                "showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col gap-3 rounded-[14px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-violet-400/50",
                 isPlaying &&
                   "border-violet-300 shadow-[0_0_0_3px_rgb(139_92_246/0.08)] dark:border-violet-400/60",
                 isPlaying && styles.isPlaying,
               )}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="showcase-tag rounded px-2 py-1 text-[10px] font-medium">
+                <span className="showcase-tag rounded px-2 py-1 text-[11px] font-medium">
                   {localized(item.tag, locale)}
                 </span>
                 <span className="text-muted-foreground text-[11px] tabular-nums">
@@ -160,10 +160,10 @@ export function ShowcaseAudioPlayer({
                 </span>
               </div>
               <div>
-                <h3 className="text-foreground text-[15px] leading-6 font-semibold">
+                <h3 className="text-foreground text-[16px] leading-6 font-semibold">
                   {title}
                 </h3>
-                <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-5">
+                <p className="text-muted-foreground mt-1 line-clamp-3 text-[13px] leading-5">
                   {localized(item.description, locale)}
                 </p>
               </div>
@@ -226,7 +226,7 @@ export function ShowcaseAudioPlayer({
                 {item.voices.map((voice) => (
                   <span
                     key={voice.en}
-                    className="text-muted-foreground border-border inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px]"
+                    className="text-muted-foreground border-border/70 inline-flex items-center gap-1 rounded border px-2 py-1 text-[10.5px]"
                   >
                     <AudioLines className="h-3 w-3" aria-hidden="true" />
                     {localized(voice, locale)}
@@ -259,7 +259,7 @@ export function ShowcaseAudioPlayer({
                   onUsePrompt={onUsePrompt}
                 />
               </div>
-              <p className="text-muted-foreground flex items-start gap-1.5 pt-1 text-[10px] leading-4">
+              <p className="text-muted-foreground flex items-start gap-1.5 pt-1 text-[10.5px] leading-4">
                 <CheckCircle2
                   className="showcase-accent-text mt-0.5 h-3 w-3 shrink-0"
                   aria-hidden="true"

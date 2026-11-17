@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { type AgentNewChatGuideId } from "../../src/core/agents/new-chat";
 import { showcaseFor } from "../../src/core/agents/showcase";
@@ -1222,6 +1222,57 @@ test.describe("Agent new-chat task guides", () => {
         (element) => element.scrollHeight <= element.clientHeight + 1,
       ),
     ).toBe(true);
+  });
+
+  test("showcase cards keep the P1 type scale", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    const fontSize = async (locator: Locator) =>
+      Number.parseFloat(
+        await locator.evaluate((element) => getComputedStyle(element).fontSize),
+      );
+
+    await openGuide(page, "course-video");
+    const videoCard = page.getByTestId("showcase-case-video-hallucination");
+    expect(await fontSize(videoCard.locator("h3"))).toBeGreaterThanOrEqual(18);
+    expect(
+      await fontSize(videoCard.locator("p").first()),
+    ).toBeGreaterThanOrEqual(13);
+    expect(
+      await fontSize(videoCard.locator(".showcase-tag")),
+    ).toBeGreaterThanOrEqual(10.5);
+    await expect(videoCard).toHaveCSS("background-color", /.+/);
+    expect(
+      await videoCard.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      ),
+    ).not.toBe("rgba(0, 0, 0, 0)");
+
+    await openGuide(page, "ppt-master");
+    const deckCard = page.getByTestId("showcase-case-ppt-quick");
+    expect(await fontSize(deckCard.locator("h3"))).toBeGreaterThanOrEqual(19);
+    expect(
+      await fontSize(deckCard.locator("p").first()),
+    ).toBeGreaterThanOrEqual(13);
+    expect(
+      await fontSize(deckCard.locator(".showcase-tag")),
+    ).toBeGreaterThanOrEqual(10.5);
+
+    await openGuide(page, "creative-studio");
+    const visualCard = page.getByTestId("showcase-case-visual-poster-agent");
+    expect(await fontSize(visualCard.locator("h3"))).toBeGreaterThanOrEqual(15);
+    expect(
+      await fontSize(visualCard.locator(".showcase-tag")),
+    ).toBeGreaterThanOrEqual(10.5);
+
+    await openGuide(page, "podcast-studio");
+    const podcastCard = page.getByTestId("showcase-case-podcast-context");
+    expect(await fontSize(podcastCard.locator("h3"))).toBeGreaterThanOrEqual(
+      15,
+    );
+    expect(
+      await fontSize(podcastCard.locator("p").first()),
+    ).toBeGreaterThanOrEqual(13);
   });
 
   test("shared keyboard opens and closes media then refills the real composer", async ({

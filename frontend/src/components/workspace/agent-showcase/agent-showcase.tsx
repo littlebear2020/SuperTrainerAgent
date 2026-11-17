@@ -105,29 +105,29 @@ export function AgentShowcase({
     <>
       <section
         data-testid="agent-showcase"
-        className="border-border/80 grid w-full min-w-0 gap-7 border-t pt-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10 dark:border-white/10"
+        className="border-border/70 grid w-full min-w-0 gap-7 border-t pt-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[280px_minmax(0,1fr)] xl:gap-10 dark:border-white/10"
       >
         <div className="order-2 lg:sticky lg:top-6 lg:order-1 lg:self-start">
-          <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.2em]">
+          <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.16em]">
             {t.agents.showcase.howItWorks}
           </p>
-          <h2 className="text-foreground mt-3 text-[26px] leading-[1.25] font-bold tracking-[-0.035em]">
+          <h2 className="text-foreground mt-3 text-[27px] leading-[1.25] font-bold tracking-[-0.035em]">
             {localized(agent.howTitle, language)}
           </h2>
           <p className="text-muted-foreground mt-3 text-[13px] leading-6">
             {localized(agent.howDescription, language)}
           </p>
-          <ol className="mt-7 grid gap-5 sm:grid-cols-3 lg:grid-cols-1">
+          <ol className="mt-6 grid gap-5 sm:grid-cols-3 lg:grid-cols-1">
             {agent.steps.map((step, index) => (
               <li key={step.title.en} className="flex gap-3">
                 <span className="text-muted-foreground pt-0.5 font-mono text-[11px] tabular-nums">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h3 className="text-foreground text-[13px] font-semibold">
+                  <h3 className="text-foreground text-[13.5px] font-semibold">
                     {localized(step.title, language)}
                   </h3>
-                  <p className="text-muted-foreground mt-1.5 text-xs leading-5">
+                  <p className="text-muted-foreground mt-1.5 text-[13px] leading-5">
                     {localized(step.description, language)}
                   </p>
                 </div>
@@ -137,14 +137,14 @@ export function AgentShowcase({
         </div>
 
         <div className="order-1 min-w-0 lg:order-2">
-          <div className="border-border/80 mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
-            <h2 className="text-foreground text-[15px] font-semibold">
+          <div className="border-border/70 mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
+            <h2 className="text-foreground text-[16px] font-semibold">
               {localized(agent.caseLabel, language)}
               <span className="text-muted-foreground ml-2 text-xs font-normal">
                 {agent.cases.length} {t.agents.showcase.caseUnit}
               </span>
             </h2>
-            <span className="showcase-tag inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium">
+            <span className="showcase-tag inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-medium">
               <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
               {localized(agent.badge, language)}
             </span>
