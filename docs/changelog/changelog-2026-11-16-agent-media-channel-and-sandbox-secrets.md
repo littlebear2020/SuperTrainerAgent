@@ -38,7 +38,7 @@
 - 真实 360 Seedream：一张 1:1 极简图标 → PNG `3,527,027 bytes`、`2048x2048`；首次暴露双字段 b64 优先级问题，修复后复验通过；未输出签名 URL 或密钥值。
 - 后端全量：`cd backend && uv run pytest tests/ -q` → `10035 passed, 89 skipped`、`exit=0`。
 - 静态门禁：根 `make check` → `exit=0`；backend ruff、frontend ESLint/TypeScript/Prettier/knip/i18n、docs convention 全过。
-- PR 结果：待评审与 CI 完成后记录。
+- PR 结果：[PR #11](https://github.com/littlebear2020/SuperTrainerAgent/pull/11) 一轮 CI 全绿、评审修复完成后，于 **2026-11-16T11:23:04Z** rebase merge 合入 main（合入动作发生在执行会话结束之后，故当时未及回写本行与计划状态，2026-11-17 补录）。
 
 ## PR #11 评审修复
 
@@ -54,3 +54,16 @@
 - 真实供应商验收覆盖字节单句 TTS 和 360 generations；edits、多语言音色及长文供应商调用使用 mock/本地 ffmpeg 验证，未逐项 live。
 - `appearance.ts`/`constants.ts` 的历史图标与默认名按本批范围保留，不是现役卡片或 seed 入口。
 - 本批按全新部署口径不写退役别名、不迁移历史会话；未修改 `.env`、根 `config.yaml`、compose、Docker，未触碰另一工作未跟踪的 live 测试。
+
+## 收尾补遗（2026-11-17，PR #26）
+
+执行会话中断时 worktree 中遗留 114 行未提交修复，经核验 main 均缺失，已补提交：
+
+- **TTS 重试重建请求**：`_request_with_retry` 改收 request factory，每次尝试重建请求（新 `X-api-request-id`、同 payload），避免重放 id 被供应商拒绝导致重试必败；同步适配 5 处旧测试签名并新增重试不变量测试。
+- **gpt-image 显式模型 Azure 回退**：`OPENAI_API_KEY` 缺席且 `AZURE_OPENAI_API_KEY`+`AZURE_OPENAI_BASE_URL` 配置时回退 azure，两者皆无才报错（原为直接报错；默认 provider 链的 Azure 回退此前已有，此分支缺失）。
+- **360 参考图总量上限**：单文件 10 MB 之外新增参考图合计 20 MB 上限，超限在 fetch 前失败并拒绝请求。
+
+验收（命令 → 关键输出）：
+
+- `cd backend && uv run pytest tests/test_ppt_master_tts_trainerai.py -q` → `26 passed, 1 warning`。
+- `cd skills/public/trainerai-imagine && npx --no-install tsx --test scripts/main.test.ts` → `tests 51 / pass 51 / fail 0`（含 2 个新增测试）。

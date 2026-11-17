@@ -1,6 +1,6 @@
 # Agent 媒体通道、课程助理退役与沙箱密钥注入
 
-> **状态**：未执行（2026-11-16；Task 1–6 已执行，Task 7 评审修复收尾中，待最终验收与 PR 合入。执行记录：`docs/changelog/changelog-2026-11-16-agent-media-channel-and-sandbox-secrets.md`）。
+> **状态**：已执行（2026-11-17 闭环；Task 1–7 全部完成。最终门禁（后端 10035 passed / 前端 1717 passed / make check / 真实 TTS 与 360 冒烟）与独立评审于 2026-11-16 通过，[PR #11](https://github.com/littlebear2020/SuperTrainerAgent/pull/11) 于 2026-11-16T11:23:04Z rebase merge 合入 main；执行会话中断遗留的三簇收尾修复（TTS 重试重建请求、gpt-image Azure 回退、360 参考图总量上限）经 [PR #26](https://github.com/littlebear2020/SuperTrainerAgent/pull/26) 于 2026-11-17 补入。执行记录：`docs/changelog/changelog-2026-11-16-agent-media-channel-and-sandbox-secrets.md`）。
 > **TL;DR**：只允许 `QIHU_API_KEY`、`VOLCENGINE_VOICE_ACCESS_KEY` 按 Agent 技能白名单做沙箱 per-call 注入；PPT 与创意生图默认走 360 Seedream，PPT 旁白改字节 TTS；创意工作收成 7 项视觉技能；课程助理直接退役。全新部署，不做历史兼容，不部署。
 
 > **For agentic workers：** 按 Task 1→6 串行执行并勾选。`skills/`、`backend/seed/agents/` 和沙箱代码是核心路径，推送走分支 + PR。本计划不授权自动 push，不授权部署。
@@ -177,4 +177,4 @@ Task 7 评审修复追加允许路径：
 - [x] 测试与文档：隔离宿主 provider 环境，真实首页卡片纳入 seed 守卫，同步播客/部署文档、PPT CLI 帮助和 vendored 记录。
 - [x] 真实字节 TTS 验收：一句 MP3 通过，未输出密钥值；具体探针结果写入 changelog。
 - [x] 真实 360 一张 PNG 复验：2048×2048、3,527,027 bytes，URL 优先下载成功。
-- [ ] 最终后端/前端门禁、静态检查、独立评审、提交及 PR 合入 main。
+- [x] 最终后端/前端门禁、静态检查、独立评审、提交及 PR 合入 main。
