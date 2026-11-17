@@ -1,17 +1,17 @@
 # PPT 美化长链路上下文压缩修复实施计划
 
-> **状态**：未执行（部分执行：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；Task 4 因同一 7 页输入缺失而阻塞，评审修复推送遇 SSL 超时，PR A 未合并、PR B 未开始；不授权部署或 46 页付费回放）。
-> **TL;DR**：先修 DeerFlow 空/退化摘要、旧占位 checkpoint 复用和最新用户消息丢失，再补跨代摘要连续性；ppt-master 保持 P29 不变，用同一 qwen、同一 7 页输入做单变量复测。影响面仅限 summarization 中间件、测试与文档；不实施 P30、不改 seed/config、不宣称 46 页长链已验证。
+> **状态**：未执行（执行中：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；经用户 2026-11-17 明确授权，改用从 46 页原稿一次性制作并冻结的新 7 页输入，hash=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；PR A 未合并、PR B 未开始；不授权部署或 46 页付费回放）。
+> **TL;DR**：先修 DeerFlow 空/退化摘要、旧占位 checkpoint 复用和最新用户消息丢失，再补跨代摘要连续性；ppt-master 保持 P29 不变，用同一 qwen、同一冻结的新 7 页输入做单变量复测。影响面仅限 summarization 中间件、测试与文档；不实施 P30、不改 seed/config、不宣称 46 页长链已验证。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 两个 PR 必须串行，禁止并行改动同一中间件。
 
-**Goal：** 消除长工具链压缩后“占位摘要替代真实历史、最终确认离开推理窗口、模型反复重读而不写页”的框架级缺陷，并用默认模型干净交付同一份 7 页可编辑 PPTX 验证最终组合代码。
+**Goal：** 消除长工具链压缩后“占位摘要替代真实历史、最终确认离开推理窗口、模型反复重读而不写页”的框架级缺陷，并用默认模型干净交付同一份经修订授权冻结的 7 页可编辑 PPTX 验证最终组合代码。
 
 **Architecture：** 保留现有“完整 state/checkpoint 不改写，只替换单次推理窗口”的架构和 frozen-cutoff 复用机制。PR A 在统一 partition/摘要输入层增加有效源校验、有界字符级尾部重试、最新真实用户消息保留、旧占位 checkpoint 失效与无正文日志；PR B 只在 fresh 摘要中携带有效的上一代摘要。任何摘要失败都沿用现有透传语义，不持久化无信息 checkpoint，不新增通用 guardrail 或状态字段。
 
 **Tech Stack：** Python 3.12、`langchain 1.2.15` / `langchain-core 1.4.8`、LangGraph checkpoint、pytest、Ruff、现有 ppt-master P29、qwen3.8-flash、`python-pptx` / `ppt_to_md.py` / LibreOffice。
 
-**Spec：** `docs/2026-11-16-ppt-beautify-long-deck-research-brief.md`（早期判断，需用本文证据修正）、`docs/plans/2026-11-16-ppt-beautify-long-deck-quick-delivery-plan.md`、`docs/changelog/changelog-2026-11-16-ppt-beautify-long-deck-quick-delivery.md`，以及本地只读证据 `temp/ppt-beautify-7p/qwen-retest-result.md`、`temp/ppt-beautify-7p/qwen-turn-05.log`。`/tmp/pptan/` 脚本仅是探针，不是正式测试或长期依赖。
+**Spec：** `docs/2026-11-16-ppt-beautify-long-deck-research-brief.md`（早期判断，需用本文证据修正）、`docs/plans/2026-11-16-ppt-beautify-long-deck-quick-delivery-plan.md`、`docs/changelog/changelog-2026-11-16-ppt-beautify-long-deck-quick-delivery.md`。旧本地证据 `temp/ppt-beautify-7p/qwen-retest-result.md`、`qwen-turn-05.log` 与原 7 页副本在执行时已缺失，仅保留本文已核实的历史计数作背景，不作为新验收证据。`/tmp/pptan/` 脚本仅是探针，不是正式测试或长期依赖。
 
 ## 1. 已核实的根因与证据边界
 
@@ -51,6 +51,7 @@
 | 只改 prompt、直接 guardrail 或换模型 | **先修代码。**通用“无产出停止”只能省钱，不能恢复上下文；换模型也不能消除占位路径。二者均不进入本批。 |
 | SEED_VERSION / P30 / config_version | 本批不动 ppt-master，故 **不 bump `SEED_VERSION`、不 reseed、不登记 P30**；不新增配置结构，故 **不递增 `config_version`**。P30 编号还可能与其他计划冲突，后续不得默认占用。 |
 | 兼容与评审 | 中间件命中核心路径，两个 PR 均须 AI/OCR + CI；旧占位/空 checkpoint 精确识别为不可复用，无数据库迁移；生产生效需另授权重建 gateway 镜像并重启。 |
+| 7 页输入缺失（2026-11-17 用户修订授权） | 允许从现存 46 页原稿一次性制作新输入，选原页 `[1, 7, 10, 20, 24, 36, 46]`，冻结 SHA-256=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；两轮复测共用该新输入。输入准备后不得再删页、补字或改版；不宣称恢复原输入或做 46 页回放。 |
 
 ## 3. 全局约束与不变量
 
@@ -63,7 +64,7 @@
 - 保留 AI/Tool 配对、动态上下文三元组、技能 rescue、before-summarization hook、TAG_NOSTREAM、ToolProtocolError 穿透及 stash 清理语义。
 - sync/async 共用裁剪、校验和 prompt 构建逻辑；只允许模型调用本身分别使用 `invoke` / `ainvoke`。
 - 日志只记模式、计数、cutoff、近似 token、thread/agent 标识和布尔值；不得记录用户正文、工具结果、摘要全文或配置秘密。
-- 真实复测只允许正常 Stage 1/2 与 P05 后“继续”；不删页、不补字、不改版、不纠正工具顺序。人工验收和目检可以存在，但任何人工修复都使“干净自主交付”失败。
+- 输入准备阶段按上述修订授权一次性从 46 页原稿选取 7 页并冻结 hash；真实复测只允许正常 Stage 1/2 与 P05 后“继续”，不得再删页、补字、改版或纠正工具顺序。人工验收和目检可以存在，但任何人工修复都使“干净自主交付”失败。
 - 两轮真实 qwen 复测是执行期的显式 opt-in 付费验证；额度、401、网络、沙箱故障归类为基础设施结果，不作模型行为结论。
 - 不部署、不做 46 页回放、不改模型、token budget、recursion、seed、技能或前端；本计划完成也不等于 46 页已验证。
 
@@ -141,7 +142,7 @@
 
 ### Task 4：PR A 单变量 qwen 冒烟，只验证到 P01
 
-- [ ] **Step 1：冻结对照条件。** 从旧证据目录将同一 `temp/ppt-beautify-7p/店长招聘与汰换-7页代表页.pptx` 复制到新 worktree 的 `temp/`，验证复制前后 SHA-256 一致并记录；固定同一 qwen3.8-flash、P29 / `.4` SOUL 与技能、相同确认回复、`token_budget.enabled=false`、`recursion_limit=2400`。使用全新 `DEER_FLOW_HOME=temp/qwen-summary-pr1-home`、thread、project、sandbox 前缀；不得复用旧 stub checkpoint。
+- [ ] **Step 1：冻结对照条件。** 按修订授权从 46 页原稿选取 `[1, 7, 10, 20, 24, 36, 46]`，一次性生成并冻结 `temp/ppt-beautify-7p/店长招聘与汰换-7页代表页.pptx`；验证 7 页、P03 原生表格与 SHA-256=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`。固定同一 qwen3.8-flash、P29 / `.4` SOUL 与技能、相同确认回复、`token_budget.enabled=false`、`recursion_limit=2400`。使用全新 `DEER_FLOW_HOME=temp/qwen-summary-pr1-home`、thread、project、sandbox 前缀；不得复用旧 stub checkpoint。
 - [ ] **Step 2：只改变 PR A。** 不改 P30、prompt、模型、skill rescue 参数或参考文档。运行期间冻结代码与配置输入，保存日志和 checkpoint 于 `temp/`，不入库。
 - [ ] **Step 3：按真实事件外部硬停。** 最终确认后出现任何一个新占位/空摘要 checkpoint、再次询问 Stage 1/2、或 100 次真实工具调用仍无 `svg_output/p01.svg`，立即停止并保存证据；另设 20 分钟无新产物的纯成本安全兜底，但不把超时本身归为模型根因。调用数从真实消息/tool call 还原，不用流式行数。
 - [ ] **Step 4：判定是否命中目标路径。** 若出现字符级 fallback WARNING 且随后生成非占位 checkpoint、重建窗口保留最终确认并写出 P01，记 `PASS + EXERCISED`；若未触发 fallback 但 P01 正常出现，记 `PASS + NOT_EXERCISED`，只能声称行为冒烟通过，确定性回归才是 bug 修复证据。不得为追求命中反复烧 token。
@@ -220,7 +221,7 @@
 
 ## Assumptions
 
-- 用户本轮只要求计划，未授权直接实施；执行方法在评审后选择。
-- 执行时能取得同一 7 页源副本并有 qwen 额度；若不可用，记录基础设施阻塞，不改用 Doubao 冒充对照。
+- 用户已明确授权执行、两轮 qwen 复测及 2026-11-17 的新输入修订；执行中仍受各停止条件约束。
+- 原 7 页副本不可恢复时，使用修订授权制作并冻结的新 7 页输入；若 qwen 额度或基础设施不可用，记录阻塞，不改用 Doubao 冒充对照。
 - 调研中的 Git 基线会漂移；执行以最新 main 为准，但必须确认 P29 和 PR A/B 的实际祖先关系。
 - 46 页是否回放、是否部署以及复测失败后是否进入 prompt/skill-cap 实验，均由后续明确决策开启。
