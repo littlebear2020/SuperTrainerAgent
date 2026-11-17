@@ -1,6 +1,6 @@
 # PPT 美化长链路上下文压缩修复实施计划
 
-> **状态**：未执行（执行中：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；经用户 2026-11-17 明确授权，改用从 46 页原稿一次性制作并冻结的新 7 页输入，hash=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；PR A 未合并、PR B 未开始；不授权部署或 46 页付费回放）。
+> **状态**：未执行（部分执行：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；新 7 页输入已按修订授权冻结，hash=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；Git 推送仍超时，当前进程缺 `QIHU_API_KEY`，PR A 未合并、PR B 未开始；不授权部署或 46 页付费回放）。
 > **TL;DR**：先修 DeerFlow 空/退化摘要、旧占位 checkpoint 复用和最新用户消息丢失，再补跨代摘要连续性；ppt-master 保持 P29 不变，用同一 qwen、同一冻结的新 7 页输入做单变量复测。影响面仅限 summarization 中间件、测试与文档；不实施 P30、不改 seed/config、不宣称 46 页长链已验证。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 两个 PR 必须串行，禁止并行改动同一中间件。
