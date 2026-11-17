@@ -1,6 +1,6 @@
 # Agent Showcase 视觉保真修复计划（P0/P1）
 
-> **状态**：已执行（2026-11-17；P0 PR #15 已合入；P1 卡片层级/首屏节奏在同批第二 PR 执行中；changelog 于 T7 补齐）。原定稿说明保留在本行之后的 TL;DR。
+> **状态**：已执行（2026-11-17；P0 PR #15（合入 commit `62f1e1b4`）+ P1 PR #16；变更日志：`docs/changelog/changelog-2026-11-17-agent-showcase-visual-fidelity.md`）。原定稿说明保留在本行之后的 TL;DR。
 > **TL;DR**：PR #12/#13 已把案例、媒体和交互接入 4 个 Agent 新会话页，但当前实现把 demo 的“透明人物 + 连续左对齐构图”改成了“头像卡 + 三段不同宽度 + 空胶囊输入框”，所以功能可用但视觉离 demo 很远。本计划不重写数据/媒体逻辑，也不替换项目侧栏、顶栏或真实 `InputBox`；只在现有项目壳内做视觉修复：人物去卡片、统一 1180 容器、输入框补 Agent 专属 placeholder 与任务信息、去掉全宽背景补丁、提高卡片层级，并补视觉回归验收。P0 先拉回骨架，P1 再修质感。
 > **Spec / 需求来源**：用户 2026-11-17 对 PR #12/#13 的反馈；当前 `origin/main` 截图 `.screenshots/agent-showcase/refinement/*`；当前实现 `frontend/src/components/workspace/agent-showcase/*`；demo `temp/agent-listenhub-demo-v2/bundle.html` 与 `temp/agent-listenhub-demo-v2/.work/shots/hero-viewport-*.png`。
 
@@ -306,15 +306,15 @@ pnpm test:e2e -- tests/e2e/agent-new-chat-guide.spec.ts
 
 ### 最终验收
 
-- [ ] Hero 主方案：四张透明 WebP，四角 alpha=0、暗色无白边/矩形；或按触发条件统一无边框柔光，不混用。
-- [ ] Hero、输入框、`agent-showcase` 根节点左边缘偏差 ≤8px；无三段宽度/双重缩进。
-- [ ] 输入框 1440 宽度 ≥900px；四个 Agent 专属 placeholder（string）；已有会话/co-writer 仍用全局句；glass 保留；下拉不裁切；390 无重叠。
-- [ ] 内容区背景与项目壳连续，无全宽米色块/硬接缝；`showcaseGuide` 无 background/clip-path。
-- [ ] 首屏不倒退：1440 首卡 top ≤581 且 h3 bottom ≤900；1024 首卡 top ≤545 且 h3 bottom ≤768；390 首卡 top ≤618 且 h3 bottom ≤844。
-- [ ] 视频/PPT/视觉标题字号达标；卡片不再像后台列表。
-- [ ] 亮/暗色、四 Agent、移动/桌面截图通过人工设计评审。
-- [ ] P0 同步包含 placeholder/对齐/背景/首屏测试；不是 P1 后再补。
-- [ ] 现有功能测试全绿；无 console error/404；co-writer/其他 Agent 不受影响。
+- [x] Hero 主方案：四张透明 WebP，四角 alpha=0、暗色无白边/矩形；或按触发条件统一无边框柔光，不混用。
+- [x] Hero、输入框、`agent-showcase` 根节点左边缘偏差 ≤8px；无三段宽度/双重缩进。
+- [x] 输入框 1440 宽度 ≥900px；四个 Agent 专属 placeholder（string）；已有会话/co-writer 仍用全局句；glass 保留；下拉不裁切；390 无重叠。
+- [x] 内容区背景与项目壳连续，无全宽米色块/硬接缝；`showcaseGuide` 无 background/clip-path。
+- [x] 首屏不倒退：1440 首卡 top ≤581 且 h3 bottom ≤900；1024 首卡 top ≤545 且 h3 bottom ≤768；390 首卡 top ≤618 且 h3 bottom ≤844。
+- [x] 视频/PPT/视觉标题字号达标；卡片不再像后台列表。
+- [x] 亮/暗色、四 Agent、移动/桌面截图通过人工设计评审。（执行侧审图：4 Agent × 1440/1024/390 × 亮/暗 + /workspace 同背景对照，证据见 changelog；留待用户抽检。）
+- [x] P0 同步包含 placeholder/对齐/背景/首屏测试；不是 P1 后再补。
+- [x] 现有功能测试全绿；无 console error/404；co-writer/其他 Agent 不受影响。
 
 ## 十、风险与回滚
 
@@ -334,11 +334,11 @@ pnpm test:e2e -- tests/e2e/agent-new-chat-guide.spec.ts
 
 ## 十一、文档收尾（实现后，T7）
 
-- [ ] 将本计划状态头改为 `已执行`，写明执行范围、PR/commit、changelog 链接。
-- [ ] 新增 `docs/changelog/changelog-2026-11-17-agent-showcase-visual-fidelity.md`：改动、视觉前后对比、测试命令实际输出、首屏三视口数据、与 PPT 批次并行/合入说明。
-- [ ] 记录参考截图路径（worktree 外/证据目录），不把截图/大素材提交进仓库。
-- [ ] 运行 `python3 scripts/check_docs_convention.py`，通过后再收尾。
-- [ ] 若透明 hero 走了兜底，在 changelog 写明触发原因和统一方案，不写成“全部透明”。
+- [x] 将本计划状态头改为 `已执行`，写明执行范围、PR/commit、changelog 链接。
+- [x] 新增 `docs/changelog/changelog-2026-11-17-agent-showcase-visual-fidelity.md`：改动、视觉前后对比、测试命令实际输出、首屏三视口数据、与 PPT 批次并行/合入说明。
+- [x] 记录参考截图路径（worktree 外/证据目录），不把截图/大素材提交进仓库。
+- [x] 运行 `python3 scripts/check_docs_convention.py`，通过后再收尾。
+- [x] 若透明 hero 走了兜底，在 changelog 写明触发原因和统一方案，不写成“全部透明”。（未走兜底：四张透明 WebP 一次成功，changelog 已注明。）
 
 ## 十二、执行顺序与交付
 

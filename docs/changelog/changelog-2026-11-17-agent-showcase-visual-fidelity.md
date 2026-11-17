@@ -2,7 +2,7 @@
 
 > **TL;DR**：把 4 个 Agent 新会话页从“头像卡 + 三段宽度 + 空胶囊输入框”拉回 demo 的“透明人物 + 连续左对齐 + 案例墙”构图；关键决策 = 只改视觉层与可选 placeholder prop，不重写数据/媒体/路由，也不替换项目侧栏、顶栏和真实 `InputBox`；影响面 = 仅 `frontend/src/components/workspace/agent-showcase/**`、`agent-new-chat-guide.tsx`、`input-box.tsx`、agent chat page、`core/agents/showcase.ts`、hero 资产与对应测试，不动 backend/skills/其他前端批次。
 
-> **状态**：已执行（P0 PR #15 + P1 PR `<P1_PR>`；计划 `docs/plans/2026-11-17-agent-showcase-visual-fidelity-plan.md`）。
+> **状态**：已执行（P0 PR #15 + P1 PR #16；计划 `docs/plans/2026-11-17-agent-showcase-visual-fidelity-plan.md`；P0 合入 commit `62f1e1b4`）。
 
 ## 一、执行范围
 
@@ -11,9 +11,11 @@
 | 阶段 | 内容 | PR |
 |---|---|---|
 | P0 | Hero 透明去卡片、统一 1180 容器、Agent 专属 placeholder、去全宽背景补丁；测试同步 | #15 |
-| P1 | 卡片层级/字号/单一卡片背景来源、左栏 280px、首屏节奏 | `<P1_PR>` |
+| P1 | 卡片层级/字号/单一卡片背景来源、左栏 280px、首屏节奏 | #16 |
 
-从 `origin/main`（`41b724c2`）新建干净 worktree `SuperTrainerAgent-showcase-fidelity`；与 PPT-master 批次（backend/skills/docs）路径重叠为空，独立 worktree 并行，PR 串行合入。
+从 `origin/main`（`41b724c2`）新建干净 worktree `SuperTrainerAgent-showcase-fidelity`；与 PPT-master 批次（backend/skills/docs）路径重叠为空，独立 worktree 并行，PR 串行合入（#15 先合、#16 rebase 后合）。
+
+P1 补充：视觉卡片补回 2 行 13px 正文（数据本就有 `description`，仅恢复渲染），使“视觉标题 15px / 正文 12.5–13px”规格可被 E2E 字号断言覆盖。
 
 ## 二、改动
 
@@ -57,7 +59,7 @@
 - PR 串行合入：P0（#15）合入后 P1 rebase 新 main 再合，禁止双 PR 同时抢 main。
 - 透明资产主方案一次成功，未触发“统一无边框柔光”兜底。
 
-## 六、验收记录
+## 验收记录
 
 - `cd frontend && pnpm check` → `✖ 121 problems (0 errors, 121 warnings)`；`Checking formatting... All matched files use Prettier code style!`
 - `cd frontend && pnpm test` → `Test Files 266 passed (266)` / `Tests 1753 passed (1753)`
