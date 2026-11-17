@@ -173,6 +173,8 @@ export function DeckCard({
   const { t } = useI18n();
   const [failed, setFailed] = useState(false);
   const title = localized(item.title, locale);
+  const previewCount = Math.min(4, item.slides.length);
+  const remainingCount = Math.max(0, item.pageCount - previewCount);
 
   return (
     <article
@@ -186,7 +188,7 @@ export function DeckCard({
             {t.agents.showcase.mediaUnavailable}
           </span>
         ) : (
-          item.slides.slice(0, 4).map((slide, slideIndex) => (
+          item.slides.slice(0, previewCount).map((slide, slideIndex) => (
             <button
               key={slide}
               type="button"
@@ -212,10 +214,15 @@ export function DeckCard({
             </button>
           ))
         )}
-        <span className="absolute right-6 bottom-6 inline-flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-[10px] text-white">
-          <Presentation className="h-3 w-3" aria-hidden="true" />+
-          {item.pageCount - 4} {t.agents.showcase.slides}
-        </span>
+        {remainingCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-6 bottom-6 inline-flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-[10px] text-white"
+          >
+            <Presentation className="h-3 w-3" aria-hidden="true" />+
+            {remainingCount} {t.agents.showcase.slides}
+          </span>
+        ) : null}
       </div>
       <div className="flex min-w-0 flex-col gap-2 p-5 pt-0 md:pt-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -311,6 +318,7 @@ export function VisualCard({
         data-testid={`showcase-open-${item.id}`}
         aria-label={`${t.agents.showcase.openCase}: ${title}`}
         onClick={(event) => onOpen(item, event.currentTarget)}
+        style={{ aspectRatio: `${item.width} / ${item.height}` }}
         className="group relative block w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
       >
         {failed ? (
