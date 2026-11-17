@@ -58,7 +58,12 @@ export function AgentShowcase({
   const podcastCases = agent.cases.filter(
     (item): item is PodcastCase => item.kind === "podcast",
   );
-  const hasVisualCases = agent.cases.some((item) => item.kind === "visual");
+  // The filter row is only meaningful when every case is visual. Mixed agents
+  // would otherwise expose filters but fall back to the masonry layout, whose
+  // column packing puts filtered cards all in column 1.
+  const isVisualOnly =
+    agent.cases.length > 0 &&
+    agent.cases.every((item) => item.kind === "visual");
   const hasPodcastCases = podcastCases.length > 0;
   const gridCases = visibleCases.filter((item) => item.kind !== "podcast");
   const filterLabels: Record<VisualCase["category"] | "all", string> = {
@@ -84,16 +89,9 @@ export function AgentShowcase({
   // edge of the filter row); for non-visual agents the filter is always "all",
   // so visibleCases already equals agent.cases.
   const headerCaseCount = visibleCases.length;
-  // Filtered results are all visual cases today; only then may the masonry be
+  // Filtered results are all visual cases; only then may the masonry be
   // replaced by the regular grid (mixed deck/video cards need their own layout).
-  // Invariant: the visual filter row is only rendered for agents whose cases are
-  // all visual (creative-studio today). If a future agent mixes visual with
-  // deck/video, do not rely on this fallback — add an explicit mixed-kind
-  // layout instead, otherwise the masonry packs filtered cards into column 1.
-  const usesFilteredGrid =
-    visualFilter !== "all" &&
-    gridCases.length > 0 &&
-    gridCases.every((item) => item.kind === "visual");
+  const usesFilteredGrid = visualFilter !== "all" && isVisualOnly;
 
   useEffect(() => {
     return () => {
@@ -162,7 +160,7 @@ export function AgentShowcase({
           <p className="text-muted-foreground sr-only">
             {t.agents.showcase.casesDescription}
           </p>
-          {hasVisualCases ? (
+          {isVisualOnly ? (
             <div
               className="mb-4 flex gap-2 overflow-x-auto pb-1"
               aria-label={t.agents.showcase.casesTitle}

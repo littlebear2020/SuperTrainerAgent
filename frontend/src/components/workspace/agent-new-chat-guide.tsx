@@ -170,15 +170,18 @@ export function AgentNewChatGuide({
         data-testid="agent-new-chat-guide"
         data-agent={showcase?.id}
         className={cn(
-          "mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6",
+          "mx-auto flex w-full flex-col gap-4 px-4 py-4 sm:gap-4 sm:px-6 sm:py-6",
           showcase && showcaseStyles.showcaseGuide,
           showcase
-            ? "max-w-[1180px] bg-transparent lg:gap-4 xl:gap-5"
+            ? "relative isolate max-w-[1180px] bg-transparent lg:gap-4 xl:gap-5"
             : "max-w-4xl",
         )}
       >
         {showcase ? (
-          <ShowcaseHero agent={showcase} />
+          <>
+            <div aria-hidden="true" className={showcaseStyles.guideAmbient} />
+            <ShowcaseHero agent={showcase} />
+          </>
         ) : (
           <div className="flex flex-col items-center gap-3 text-center">
             <span
