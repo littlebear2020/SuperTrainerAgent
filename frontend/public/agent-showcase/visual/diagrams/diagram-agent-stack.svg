@@ -4,36 +4,36 @@
   <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.045" stroke-width="1"/>
 </pattern>
 <radialGradient id="glow" cx="50%" cy="40%" r="60%">
-  <stop offset="0%" stop-color="#1b2a5e" stop-opacity="0.55"/>
-  <stop offset="100%" stop-color="#070b18" stop-opacity="0"/>
+  <stop offset="0%" stop-color="#0d5a54" stop-opacity="0.62"/>
+  <stop offset="100%" stop-color="#04262b" stop-opacity="0"/>
 </radialGradient>
 <linearGradient id="g0" x1="0" y1="0" x2="1" y2="0">
-  <stop offset="0%" stop-color="#8B7BFF" stop-opacity="0.20"/>
-  <stop offset="55%" stop-color="#8B7BFF" stop-opacity="0.075"/>
-  <stop offset="100%" stop-color="#8B7BFF" stop-opacity="0.03"/>
+  <stop offset="0%" stop-color="#9B8CFF" stop-opacity="0.50"/>
+  <stop offset="55%" stop-color="#9B8CFF" stop-opacity="0.22"/>
+  <stop offset="100%" stop-color="#9B8CFF" stop-opacity="0.07"/>
 </linearGradient><linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
-  <stop offset="0%" stop-color="#5AD8E8" stop-opacity="0.20"/>
-  <stop offset="55%" stop-color="#5AD8E8" stop-opacity="0.075"/>
-  <stop offset="100%" stop-color="#5AD8E8" stop-opacity="0.03"/>
+  <stop offset="0%" stop-color="#5AD8E8" stop-opacity="0.50"/>
+  <stop offset="55%" stop-color="#5AD8E8" stop-opacity="0.22"/>
+  <stop offset="100%" stop-color="#5AD8E8" stop-opacity="0.07"/>
 </linearGradient><linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
-  <stop offset="0%" stop-color="#E8B05A" stop-opacity="0.20"/>
-  <stop offset="55%" stop-color="#E8B05A" stop-opacity="0.075"/>
-  <stop offset="100%" stop-color="#E8B05A" stop-opacity="0.03"/>
+  <stop offset="0%" stop-color="#E8B05A" stop-opacity="0.50"/>
+  <stop offset="55%" stop-color="#E8B05A" stop-opacity="0.22"/>
+  <stop offset="100%" stop-color="#E8B05A" stop-opacity="0.07"/>
 </linearGradient><linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
-  <stop offset="0%" stop-color="#4FD1A5" stop-opacity="0.20"/>
-  <stop offset="55%" stop-color="#4FD1A5" stop-opacity="0.075"/>
-  <stop offset="100%" stop-color="#4FD1A5" stop-opacity="0.03"/>
+  <stop offset="0%" stop-color="#A8E063" stop-opacity="0.50"/>
+  <stop offset="55%" stop-color="#A8E063" stop-opacity="0.22"/>
+  <stop offset="100%" stop-color="#A8E063" stop-opacity="0.07"/>
 </linearGradient>
 <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
   <path d="M0,0 L6,3 L0,6 z" fill="#7d8ba5"/>
 </marker>
 </defs>
-<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#070b18" stroke="none" stroke-width="1" opacity="1.0"/>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#04262b" stroke="none" stroke-width="1" opacity="1.0"/>
 <rect x="0" y="0" width="1600" height="1000" rx="0" fill="url(#grid)" stroke="none" stroke-width="1" opacity="1.0"/>
 <rect x="0" y="0" width="1600" height="1000" rx="0" fill="url(#glow)" stroke="none" stroke-width="1" opacity="1.0"/>
 <text x="60" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#8fa3c0" text-anchor="start" letter-spacing="3" opacity="1.0">SYSTEM DIAGRAM / 07</text>
 <text x="60" y="122" font-family="PingFang SC" font-size="52" font-weight="600" fill="#f4f7ff" text-anchor="start" letter-spacing="-1" opacity="1.0">AI Agent 技术栈</text>
-<text x="60" y="160" font-family="PingFang SC" font-size="18" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">四层能力，一条调用链。上层封装场景，下层提供资源。</text>
+<text x="60" y="160" font-family="PingFang SC" font-size="18" font-weight="400" fill="#a8c9c4" text-anchor="start" opacity="1.0">四层能力，一条调用链。上层封装场景，下层提供资源。</text>
 <text x="1540" y="62" font-family="SF Mono" font-size="12" font-weight="400" fill="#8fa3c0" text-anchor="end" letter-spacing="2" opacity="1.0">L4 → L1</text>
 <text x="1540" y="84" font-family="SF Mono" font-size="11" font-weight="400" fill="#5f7292" text-anchor="end" letter-spacing="2" opacity="1.0">TWELVE MODULES</text>
 <rect x="60" y="184" width="1480" height="1" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.12"/>
@@ -45,28 +45,28 @@
 <line x1="1527" y1="708" x2="1537" y2="696" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
 <line x1="1537" y1="726" x2="1527" y2="738" stroke="#7d8ba5" stroke-width="1.2" marker-end="url(#arrow)" opacity="0.85"/>
 <text x="1540" y="118" font-family="PingFang SC" font-size="10.5" font-weight="400" fill="#8294b0" text-anchor="end" opacity="1.0">↑ 能力向上封装   ↓ 请求向下路由</text>
-<rect x="72" y="230" width="1440" height="148" rx="16" fill="#8B7BFF" stroke="none" stroke-width="1" opacity="0.05"/>
-<rect x="60" y="220" width="1452" height="148" rx="16" fill="url(#g0)" stroke="#8B7BFF" stroke-width="1.2" opacity="0.95"/>
-<rect x="60" y="234" width="4" height="120" rx="2" fill="#8B7BFF" stroke="none" stroke-width="1" opacity="1.0"/>
-<text x="84" y="260" font-family="SF Mono" font-size="13" font-weight="500" fill="#8B7BFF" text-anchor="start" letter-spacing="2" opacity="1.0">L4</text>
+<rect x="72" y="230" width="1440" height="148" rx="16" fill="#9B8CFF" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="220" width="1452" height="148" rx="16" fill="url(#g0)" stroke="#9B8CFF" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="234" width="4" height="120" rx="2" fill="#9B8CFF" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="260" font-family="SF Mono" font-size="13" font-weight="500" fill="#9B8CFF" text-anchor="start" letter-spacing="2" opacity="1.0">L4</text>
 <text x="84" y="304" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">应用层</text>
-<text x="84" y="332" font-family="SF Mono" font-size="11" font-weight="400" fill="#8B7BFF" text-anchor="start" letter-spacing="1.6" opacity="1.0">APPLICATION</text>
+<text x="84" y="332" font-family="SF Mono" font-size="11" font-weight="400" fill="#9B8CFF" text-anchor="start" letter-spacing="1.6" opacity="1.0">APPLICATION</text>
 <rect x="372" y="242" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
 <rect x="400" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="400" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<rect x="400" y="240" width="340" height="108" rx="10" fill="none" stroke="#9B8CFF" stroke-width="0.8" opacity="0.25"/>
 <text x="422" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">课程助手</text>
 <text x="422" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">课程设计 · 讲义 · 评测</text>
-<text x="718" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<text x="718" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#9B8CFF" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
 <rect x="762" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="762" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<rect x="762" y="240" width="340" height="108" rx="10" fill="none" stroke="#9B8CFF" stroke-width="0.8" opacity="0.25"/>
 <text x="784" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">内容生产</text>
 <text x="784" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">图文 · 视频 · 播客</text>
-<text x="1080" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<text x="1080" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#9B8CFF" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
 <rect x="1124" y="240" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="1124" y="240" width="340" height="108" rx="10" fill="none" stroke="#8B7BFF" stroke-width="0.8" opacity="0.25"/>
+<rect x="1124" y="240" width="340" height="108" rx="10" fill="none" stroke="#9B8CFF" stroke-width="0.8" opacity="0.25"/>
 <text x="1146" y="278" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">学习分析</text>
 <text x="1146" y="308" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">进度 · 掌握度 · 反馈</text>
-<text x="1442" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#8B7BFF" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<text x="1442" y="266" font-family="SF Mono" font-size="10" font-weight="400" fill="#9B8CFF" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
 <rect x="72" y="400" width="1440" height="148" rx="16" fill="#5AD8E8" stroke="none" stroke-width="1" opacity="0.05"/>
 <rect x="60" y="390" width="1452" height="148" rx="16" fill="url(#g1)" stroke="#5AD8E8" stroke-width="1.2" opacity="0.95"/>
 <rect x="60" y="404" width="4" height="120" rx="2" fill="#5AD8E8" stroke="none" stroke-width="1" opacity="1.0"/>
@@ -111,28 +111,28 @@
 <text x="1146" y="618" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">多模态</text>
 <text x="1146" y="648" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">图 · 视频 · 语音</text>
 <text x="1442" y="606" font-family="SF Mono" font-size="10" font-weight="400" fill="#E8B05A" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
-<rect x="72" y="740" width="1440" height="148" rx="16" fill="#4FD1A5" stroke="none" stroke-width="1" opacity="0.05"/>
-<rect x="60" y="730" width="1452" height="148" rx="16" fill="url(#g3)" stroke="#4FD1A5" stroke-width="1.2" opacity="0.95"/>
-<rect x="60" y="744" width="4" height="120" rx="2" fill="#4FD1A5" stroke="none" stroke-width="1" opacity="1.0"/>
-<text x="84" y="770" font-family="SF Mono" font-size="13" font-weight="500" fill="#4FD1A5" text-anchor="start" letter-spacing="2" opacity="1.0">L1</text>
+<rect x="72" y="740" width="1440" height="148" rx="16" fill="#A8E063" stroke="none" stroke-width="1" opacity="0.05"/>
+<rect x="60" y="730" width="1452" height="148" rx="16" fill="url(#g3)" stroke="#A8E063" stroke-width="1.2" opacity="0.95"/>
+<rect x="60" y="744" width="4" height="120" rx="2" fill="#A8E063" stroke="none" stroke-width="1" opacity="1.0"/>
+<text x="84" y="770" font-family="SF Mono" font-size="13" font-weight="500" fill="#A8E063" text-anchor="start" letter-spacing="2" opacity="1.0">L1</text>
 <text x="84" y="814" font-family="PingFang SC" font-size="30" font-weight="600" fill="#f4f7ff" text-anchor="start" opacity="1.0">基础设施</text>
-<text x="84" y="842" font-family="SF Mono" font-size="11" font-weight="400" fill="#4FD1A5" text-anchor="start" letter-spacing="1.6" opacity="1.0">INFRASTRUCTURE</text>
+<text x="84" y="842" font-family="SF Mono" font-size="11" font-weight="400" fill="#A8E063" text-anchor="start" letter-spacing="1.6" opacity="1.0">INFRASTRUCTURE</text>
 <rect x="372" y="752" width="1" height="104" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.1"/>
 <rect x="400" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="400" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<rect x="400" y="750" width="340" height="108" rx="10" fill="none" stroke="#A8E063" stroke-width="0.8" opacity="0.25"/>
 <text x="422" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">算力与推理</text>
 <text x="422" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">GPU · 批处理 · 弹性</text>
-<text x="718" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
+<text x="718" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#A8E063" text-anchor="end" letter-spacing="1" opacity="0.7">01</text>
 <rect x="762" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="762" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<rect x="762" y="750" width="340" height="108" rx="10" fill="none" stroke="#A8E063" stroke-width="0.8" opacity="0.25"/>
 <text x="784" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">向量数据库</text>
 <text x="784" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">索引 · 检索 · 版本</text>
-<text x="1080" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
+<text x="1080" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#A8E063" text-anchor="end" letter-spacing="1" opacity="0.7">02</text>
 <rect x="1124" y="750" width="340" height="108" rx="10" fill="#ffffff" stroke="#ffffff" stroke-width="0.6" opacity="0.045"/>
-<rect x="1124" y="750" width="340" height="108" rx="10" fill="none" stroke="#4FD1A5" stroke-width="0.8" opacity="0.25"/>
+<rect x="1124" y="750" width="340" height="108" rx="10" fill="none" stroke="#A8E063" stroke-width="0.8" opacity="0.25"/>
 <text x="1146" y="788" font-family="PingFang SC" font-size="19" font-weight="500" fill="#eef3ff" text-anchor="start" opacity="1.0">观测与安全</text>
 <text x="1146" y="818" font-family="PingFang SC" font-size="12.5" font-weight="400" fill="#9fb0c9" text-anchor="start" opacity="1.0">日志 · 评测 · 权限</text>
-<text x="1442" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#4FD1A5" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
+<text x="1442" y="776" font-family="SF Mono" font-size="10" font-weight="400" fill="#A8E063" text-anchor="end" letter-spacing="1" opacity="0.7">03</text>
 <rect x="60" y="918" width="1480" height="1" rx="0" fill="#ffffff" stroke="none" stroke-width="1" opacity="0.12"/>
 <text x="60" y="954" font-family="SF Mono" font-size="12" font-weight="500" fill="#c9d6e8" text-anchor="start" letter-spacing="2" opacity="1.0">4 LAYERS</text>
 <text x="170" y="954" font-family="PingFang SC" font-size="12" font-weight="400" fill="#5f7292" text-anchor="start" opacity="1.0">·</text>
