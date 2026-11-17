@@ -14,8 +14,9 @@ thresholds (``resummarize_min_new_messages`` / ``resummarize_min_new_tokens``;
 both 0 restores legacy always-resummarize behavior). Reuse freezes the cutoff
 C0 recorded at summarization time: the window is [summary covering
 messages[:C0]] + messages[C0:], so the preserved tail grows — bounded by the
-reuse thresholds — until the next fresh summary, and no message silently
-leaves the model's view during reuse.
+reuse thresholds — until the next fresh summary. Messages since C0 and the
+latest genuine user message stay directly visible; earlier content is carried
+by the summary rather than promised verbatim in the inference window.
 """
 
 from __future__ import annotations
@@ -326,6 +327,28 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return checkpoint if isinstance(checkpoint, dict) else None
 
     @staticmethod
+    def _log_summary_event(
+        level: int,
+        *,
+        mode: str,
+        request: ModelRequest | None,
+        message_count: int,
+        cutoff_index: int | None,
+        approx_tokens: int,
+    ) -> None:
+        runtime = request.runtime if request is not None else None
+        logger.log(
+            level,
+            "Summarization mode=%s message_count=%d cutoff_index=%s approx_tokens=%d thread_id=%s agent_name=%s",
+            mode,
+            message_count,
+            cutoff_index,
+            approx_tokens,
+            _resolve_thread_id(runtime) if runtime is not None else None,
+            _resolve_agent_name(runtime) if runtime is not None else None,
+        )
+
+    @staticmethod
     def _read_usable_checkpoint_summary(checkpoint: dict[str, Any] | None) -> str | None:
         if not checkpoint:
             return None
@@ -386,8 +409,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         stored summary is reused with its FROZEN cutoff C0: the window is
         [summary covering messages[:C0]] + messages[C0:] (plus skill/dynamic
         context rescued from messages[:C0] on the current state), so the tail
-        grows — bounded by the reuse thresholds — until the next fresh summary,
-        and no message silently leaves the model's view during reuse. On any
+        grows — bounded by the reuse thresholds — until the next fresh summary.
+        The latest genuine user message is also preserved directly. On any
         failure, falls through to the original request so the agent continues
         functioning (model receives the full message list).
         """
@@ -409,8 +432,12 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 dropped, preserved = self._partition_with_skill_rescue(messages, frozen_cutoff)
                 new_messages = self._build_new_messages(checkpoint["summary"])
                 modified_request = request.override(messages=self._assemble_window(new_messages, dropped, preserved))
-                return handler(modified_request)
+                response = handler(modified_request)
+                self._log_summary_event(logging.INFO, mode="reuse", request=request, message_count=len(messages), cutoff_index=frozen_cutoff, approx_tokens=total_tokens)
+                return response
 
+            if checkpoint is not None and self._read_usable_checkpoint_summary(checkpoint) is None:
+                self._log_summary_event(logging.INFO, mode="checkpoint_rejected", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
             messages_to_summarize, preserved = self._partition_with_skill_rescue(messages, cutoff_index)
             if request.runtime is not None:
                 self._fire_hooks(messages_to_summarize, preserved, request.runtime)
@@ -420,7 +447,9 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             new_messages = self._build_new_messages(summary)
 
             modified_request = request.override(messages=self._assemble_window(new_messages, messages_to_summarize, preserved))
-            return handler(modified_request)
+            response = handler(modified_request)
+            self._log_summary_event(logging.INFO, mode="fresh", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
+            return response
         except ToolProtocolError:
             # 评审三轮（2026-10-15）：协议终断不是"摘要失败"——回落重调 handler 会把
             # 内层一次性弹消费的终止标志吞掉（模型带原始请求再被打一次）。放行，
@@ -430,10 +459,11 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             self._pop_pending_checkpoint(request.runtime)
             raise
         except Exception:
-            logger.exception("Safe summarization failed; falling back to pass-through")
+            logger.error("Safe summarization failed; falling back to pass-through")
             # Drop any summary stashed by this call so a later after_model
             # cannot persist a checkpoint for a window that never ran.
             self._pop_pending_checkpoint(request.runtime)
+            self._log_summary_event(logging.WARNING, mode="pass_through", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
             return handler(request)
 
     @override
@@ -465,8 +495,12 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 dropped, preserved = self._partition_with_skill_rescue(messages, frozen_cutoff)
                 new_messages = self._build_new_messages(checkpoint["summary"])
                 modified_request = request.override(messages=self._assemble_window(new_messages, dropped, preserved))
-                return await handler(modified_request)
+                response = await handler(modified_request)
+                self._log_summary_event(logging.INFO, mode="reuse", request=request, message_count=len(messages), cutoff_index=frozen_cutoff, approx_tokens=total_tokens)
+                return response
 
+            if checkpoint is not None and self._read_usable_checkpoint_summary(checkpoint) is None:
+                self._log_summary_event(logging.INFO, mode="checkpoint_rejected", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
             messages_to_summarize, preserved = self._partition_with_skill_rescue(messages, cutoff_index)
             if request.runtime is not None:
                 self._fire_hooks(messages_to_summarize, preserved, request.runtime)
@@ -476,7 +510,9 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             new_messages = self._build_new_messages(summary)
 
             modified_request = request.override(messages=self._assemble_window(new_messages, messages_to_summarize, preserved))
-            return await handler(modified_request)
+            response = await handler(modified_request)
+            self._log_summary_event(logging.INFO, mode="fresh", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
+            return response
         except ToolProtocolError:
             # 评审三轮（2026-10-15）：协议终断不是"摘要失败"——回落重调 handler 会把
             # 内层一次性弹消费的终止标志吞掉（模型带原始请求再被打一次）。放行，
@@ -486,16 +522,25 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             self._pop_pending_checkpoint(request.runtime)
             raise
         except Exception:
-            logger.exception("Safe summarization failed; falling back to pass-through")
+            logger.error("Safe summarization failed; falling back to pass-through")
             # Drop any summary stashed by this call so a later after_model
             # cannot persist a checkpoint for a window that never ran.
             self._pop_pending_checkpoint(request.runtime)
+            self._log_summary_event(logging.WARNING, mode="pass_through", request=request, message_count=len(messages), cutoff_index=cutoff_index, approx_tokens=total_tokens)
             return await handler(request)
 
     def _trim_messages_for_summary(self, messages: list[AnyMessage]) -> list[AnyMessage]:
         trimmed_messages = super()._trim_messages_for_summary(messages)
         if self.trim_tokens_to_summarize is None or any(not isinstance(message, SystemMessage) for message in trimmed_messages):
             return trimmed_messages
+        self._log_summary_event(
+            logging.WARNING,
+            mode="character_tail_fallback",
+            request=None,
+            message_count=len(messages),
+            cutoff_index=None,
+            approx_tokens=self.token_counter(messages),
+        )
         return list(
             trim_messages(
                 messages,
