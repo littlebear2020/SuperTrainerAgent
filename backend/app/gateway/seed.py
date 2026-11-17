@@ -46,7 +46,12 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # 2026-11-16: course-video 收敛为 deep-research + auto-video-flow，SOUL 补固定文档读取。
 # 2026-11-16.2: course-assistant 退役（整目录删除、不保留别名）；现行 seed/agents =
 # co-writer/course-video/creative-studio/ppt-master/podcast-studio/vimax-video 六个。
-SEED_VERSION = "2026-11-16.2"
+# 2026-11-16.3: ppt-master 规则收敛——最终确认后禁止重问 Stage 1/2（缺规格/锁直接
+# 补写）、spec_lock 改为有效上下文复用/每 5 页及恢复时重读、长 deck 允许同 thread
+# P05 early gate 后暂停并从 P06 顺序续写；SOUL D3.3/D3.4/D3.5 同步。
+# 2026-11-16.4: 评审小修——统一“只有用户新的明确修改才能重开已确认阶段”的例外
+# （P20/SOUL/failure-recovery/Beautify），并保持本批仅验证 P05 一次暂停的口径。
+SEED_VERSION = "2026-11-16.4"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 

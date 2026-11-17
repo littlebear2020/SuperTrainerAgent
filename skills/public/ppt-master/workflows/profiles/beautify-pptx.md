@@ -87,6 +87,8 @@ Do not run the Default confirmation flow. Apply the same inventory interpretatio
 
 ### Default branch — Recommend & Confirm
 
+**Short-circuit — persisted final confirmation**: when `confirm_state.json` already records `stage: final` + `status: confirmed` and the user has issued no newer modification, skip the recommendation/wait below entirely. Do not re-present the Stage 1/2 options, do not ask for confirmation again, and do not reopen the visual re-confirm; go straight to authoring the missing `design_spec.md` / `spec_lock.md` from the confirmed values (or resume the recorded breakpoint). The persisted final confirmation is sufficient authority even when the planning artifacts do not exist yet. Only a newer explicit user modification may reopen the affected confirmed decision; ordinary recovery or a missing downstream artifact never does.
+
 ⛔ **BLOCKING**: recommend each item from what the deck actually contains, present the plan, and wait for the user to confirm or adjust before writing any spec. The **visual re-confirm** goes through Generate Step 4's selected surface with the full field set seeded from the source — every field pre-filled with the inherited default and left editable (recommend keeping identity, never remove the place to override). The **structural scope** stays in chat:
 
 | Plan item | Recommend from | Default lean |
