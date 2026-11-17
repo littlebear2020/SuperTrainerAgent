@@ -2,7 +2,7 @@
 
 > **TL;DR**：按用户本地预览反馈收尾：Hero 人物按 `/workspace` 首页比例缩小（188/178/160px）、composer 改为 demo 的 `max-width: 860px` 居中、移除 guide 底部「开始之前」tips 与案例区「产物已核验」badge/案例 note；关键决策 = 用户预览反馈覆盖原计划 §3 的 Hero 230–250px 与输入框 100% 规格，Hero/案例区仍共享 1180 容器、composer 独立按 demo 尺寸居中；影响面 = 仅 showcase/guide 前端组件与对应测试、文档，不动数据/媒体/后端。
 
-> **状态**：已执行（follow-up PR `<PR>`；主计划 `docs/plans/2026-11-17-agent-showcase-visual-fidelity-plan.md`）。
+> **状态**：已执行（follow-up PR #17；主计划 `docs/plans/2026-11-17-agent-showcase-visual-fidelity-plan.md`）。
 
 ## 一、触发
 
