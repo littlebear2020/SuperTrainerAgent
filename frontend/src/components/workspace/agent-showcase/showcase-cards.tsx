@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ChevronRight,
+  Download,
   FileCheck2,
   ImageOff,
   Maximize2,
@@ -49,7 +51,7 @@ export function PromptButton({
       aria-label={`${t.agents.showcase.usePrompt}: ${localized(title, locale)}`}
       disabled={disabled}
       onClick={() => onUsePrompt(item.prompt)}
-      className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-indigo-200/80 px-3 text-xs font-medium text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-400/20 dark:text-indigo-300 dark:hover:bg-indigo-400/10"
+      className="showcase-prompt border-border bg-card text-muted-foreground inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-medium transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
       {t.agents.showcase.usePrompt}
@@ -79,7 +81,7 @@ export function VideoCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="bg-card/70 border-border flex min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/50"
+      className="showcase-card border-border flex min-w-0 flex-col overflow-hidden rounded-[15px] border transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:hover:border-indigo-400/50"
     >
       <button
         type="button"
@@ -118,17 +120,17 @@ export function VideoCard({
         </span>
       </button>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-300">
+        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[10px] font-medium">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">
+        <h3 className="text-foreground text-[15px] leading-6 font-semibold">
           {title}
         </h3>
         <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
           {localized(item.description, locale)}
         </p>
-        <div className="mt-auto flex items-end justify-between gap-3 pt-2">
-          <div className="text-muted-foreground min-w-0 text-[11px] leading-5">
+        <div className="border-border mt-auto flex items-end justify-between gap-3 border-t pt-3">
+          <div className="text-muted-foreground min-w-0 text-[10px] leading-5">
             <span className="block truncate">
               {localized(item.voice, locale)}
             </span>
@@ -161,7 +163,11 @@ export function DeckCard({
   locale: ShowcaseLocale;
   eager: boolean;
   disabled: boolean;
-  onOpen: (item: DeckCase, trigger: HTMLButtonElement) => void;
+  onOpen: (
+    item: DeckCase,
+    trigger: HTMLButtonElement,
+    slideIndex?: number,
+  ) => void;
   onUsePrompt: (prompt: string) => void;
 }) {
   const { t } = useI18n();
@@ -171,67 +177,94 @@ export function DeckCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="bg-card/70 border-border flex min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/5 dark:hover:border-teal-400/50"
+      className="showcase-card border-border grid min-w-0 overflow-hidden rounded-[15px] border transition duration-200 hover:border-amber-300 hover:shadow-md md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[286px_minmax(0,1fr)] dark:border-white/10 dark:hover:border-amber-400/50"
     >
-      <button
-        type="button"
-        data-testid={`showcase-open-${item.id}`}
-        aria-label={`${t.agents.showcase.openCase}: ${title}`}
-        onClick={(event) => onOpen(item, event.currentTarget)}
-        className="group relative block aspect-video w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none"
-      >
+      <div className="relative grid grid-cols-2 content-start gap-2 p-4 md:p-5">
         {failed ? (
-          <span className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 bg-slate-100 text-xs dark:bg-white/5">
+          <span className="text-muted-foreground col-span-2 flex aspect-video flex-col items-center justify-center gap-2 rounded-lg bg-slate-100 text-xs dark:bg-white/5">
             <ImageOff className="h-5 w-5" aria-hidden="true" />
             {t.agents.showcase.mediaUnavailable}
           </span>
         ) : (
-          <img
-            src={item.slides[0]}
-            alt={`${title} · 1 / ${item.pageCount}`}
-            width={1280}
-            height={720}
-            loading={eager ? "eager" : "lazy"}
-            fetchPriority={eager ? "high" : "auto"}
-            decoding="async"
-            onError={() => setFailed(true)}
-            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] motion-reduce:group-hover:scale-100"
-          />
+          item.slides.slice(0, 4).map((slide, slideIndex) => (
+            <button
+              key={slide}
+              type="button"
+              data-testid={`showcase-open-${item.id}${slideIndex === 0 ? "" : `-${slideIndex}`}`}
+              aria-label={`${t.agents.showcase.openCase}: ${title} · ${slideIndex + 1} / ${item.pageCount}`}
+              onClick={(event) => onOpen(item, event.currentTarget, slideIndex)}
+              className="group border-border relative block aspect-video overflow-hidden rounded-lg border bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+            >
+              <img
+                src={slide}
+                alt={`${title} · ${slideIndex + 1} / ${item.pageCount}`}
+                width={1280}
+                height={720}
+                loading={eager && slideIndex === 0 ? "eager" : "lazy"}
+                fetchPriority={eager && slideIndex === 0 ? "high" : "auto"}
+                decoding="async"
+                onError={() => setFailed(true)}
+                className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.03] motion-reduce:group-hover:scale-100"
+              />
+              <span className="absolute right-1 bottom-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] text-white tabular-nums">
+                {String(slideIndex + 1).padStart(2, "0")}
+              </span>
+            </button>
+          ))
         )}
-        <span className="absolute right-3 bottom-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-medium text-white">
-          <Presentation className="h-3 w-3" aria-hidden="true" />
-          {item.pageCount} {t.agents.showcase.slides}
+        <span className="absolute right-6 bottom-6 inline-flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-[10px] text-white">
+          <Presentation className="h-3 w-3" aria-hidden="true" />+
+          {item.pageCount - 4} {t.agents.showcase.slides}
         </span>
-      </button>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <span className="text-[11px] font-medium text-teal-700 dark:text-teal-300">
-          {localized(item.tag, locale)}
-        </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 p-5 pt-0 md:pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="showcase-tag rounded px-2 py-1 text-[10px] font-medium">
+            {localized(item.tag, locale)}
+          </span>
+          <span className="text-muted-foreground text-[10px]">
+            {localized(item.styleLabel, locale)}
+          </span>
+        </div>
+        <h3 className="text-foreground text-lg leading-7 font-bold tracking-tight">
           {title}
         </h3>
         <p className="text-muted-foreground line-clamp-3 text-xs leading-5">
           {localized(item.description, locale)}
         </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
+        <div className="flex flex-wrap gap-1.5 pt-1">
           {item.features.map((feature) => (
             <span
               key={feature.en}
-              className="text-muted-foreground inline-flex items-center gap-1 text-[10px]"
+              className="text-muted-foreground border-border inline-flex items-center gap-1 rounded border px-1.5 py-1 text-[10px]"
             >
               <FileCheck2
-                className="h-3 w-3 text-teal-600 dark:text-teal-300"
+                className="h-3 w-3 text-amber-600 dark:text-amber-300"
                 aria-hidden="true"
               />
               {localized(feature, locale)}
             </span>
           ))}
         </div>
-        <div className="mt-auto flex items-end justify-between gap-3 pt-2">
-          <span className="text-muted-foreground text-[11px]">
-            {localized(item.styleLabel, locale)} ·{" "}
-            {formatBytes(item.pptxBytes, locale)}
-          </span>
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+          <button
+            type="button"
+            data-testid={`showcase-open-all-${item.id}`}
+            onClick={(event) => onOpen(item, event.currentTarget, 0)}
+            className="inline-flex min-h-9 items-center gap-1 rounded-md bg-neutral-900 px-3 text-xs font-medium text-white hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900"
+          >
+            {t.agents.showcase.openCase}
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <a
+            data-testid={`showcase-card-download-${item.id}`}
+            href={item.pptx}
+            download={`${item.id}.pptx`}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-medium text-amber-700 hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            {t.agents.showcase.downloadPptx}
+          </a>
           <PromptButton
             item={item}
             title={item.title}
@@ -240,6 +273,10 @@ export function DeckCard({
             onUsePrompt={onUsePrompt}
           />
         </div>
+        <span className="text-muted-foreground pt-1 text-[10px]">
+          {item.pageCount} {t.agents.showcase.slides} ·{" "}
+          {formatBytes(item.pptxBytes, locale)}
+        </span>
       </div>
     </article>
   );
@@ -267,17 +304,14 @@ export function VisualCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="bg-card/70 border-border flex min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/5 dark:hover:border-fuchsia-400/50"
+      className="showcase-card border-border mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-rose-300 hover:shadow-md dark:border-white/10 dark:hover:border-rose-400/50"
     >
       <button
         type="button"
         data-testid={`showcase-open-${item.id}`}
         aria-label={`${t.agents.showcase.openCase}: ${title}`}
         onClick={(event) => onOpen(item, event.currentTarget)}
-        className={cn(
-          "group relative block w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none",
-          item.category === "poster" ? "aspect-[4/5]" : "aspect-video",
-        )}
+        className="group relative block w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
       >
         {failed ? (
           <span className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 bg-slate-100 text-xs dark:bg-white/5">
@@ -294,7 +328,7 @@ export function VisualCard({
             fetchPriority={eager ? "high" : "auto"}
             decoding="async"
             onError={() => setFailed(true)}
-            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] motion-reduce:group-hover:scale-100"
+            className="h-auto w-full object-contain transition duration-200 group-hover:scale-[1.01] motion-reduce:group-hover:scale-100"
           />
         )}
         <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/60 py-2 text-[10px] text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -307,20 +341,17 @@ export function VisualCard({
           </span>
         ) : null}
       </button>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <span className="text-[11px] font-medium text-fuchsia-700 dark:text-fuchsia-300">
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <span className="showcase-tag inline-flex self-start rounded px-2 py-1 text-[10px] font-medium">
           {localized(item.tag, locale)}
         </span>
-        <h3 className="text-foreground text-sm leading-6 font-semibold">
+        <h3 className="text-foreground text-[13px] leading-5 font-semibold">
           {title}
         </h3>
-        <p className="text-muted-foreground line-clamp-2 text-xs leading-5">
-          {localized(item.description, locale)}
-        </p>
         <div className="text-muted-foreground text-[10px]">
           {item.width} × {item.height} · {localized(item.styleLabel, locale)}
         </div>
-        <div className="mt-auto flex justify-end pt-1">
+        <div className="mt-auto pt-1 [&_[data-showcase-prompt]]:w-full">
           <PromptButton
             item={item}
             title={item.title}
@@ -334,9 +365,10 @@ export function VisualCard({
   );
 }
 
-export function showcaseCardClass(columns: "two" | "three") {
+export function showcaseCardClass(kind: "video" | "visual" | "deck") {
   return cn(
-    "grid gap-4",
-    columns === "two" ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3",
+    kind === "deck" && "flex flex-col gap-4",
+    kind === "video" && "grid gap-4 sm:grid-cols-2 xl:grid-cols-3",
+    kind === "visual" && "columns-1 gap-4 sm:columns-2 xl:columns-3",
   );
 }

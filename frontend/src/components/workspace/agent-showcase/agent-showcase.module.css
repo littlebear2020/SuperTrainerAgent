@@ -1,0 +1,103 @@
+.showcaseGuide {
+  --showcase-accent: #4f6bff;
+  --showcase-accent-soft: #eef1ff;
+  background: var(--background);
+  box-shadow: 0 0 0 100vmax var(--background);
+  clip-path: inset(0 -100vmax);
+}
+
+.showcaseGuide[data-agent="ppt-master"] {
+  --showcase-accent: #d98324;
+  --showcase-accent-soft: #fff7e8;
+}
+
+.showcaseGuide[data-agent="podcast-studio"] {
+  --showcase-accent: #8b5cf6;
+  --showcase-accent-soft: #f3efff;
+}
+
+.showcaseGuide[data-agent="creative-studio"] {
+  --showcase-accent: #e05d7a;
+  --showcase-accent-soft: #fff0f3;
+}
+
+.showcaseGuide :global(.showcase-accent-text) {
+  color: var(--showcase-accent);
+}
+
+.showcaseGuide :global(.showcase-tag) {
+  color: var(--showcase-accent);
+  background: var(--showcase-accent-soft);
+}
+
+.showcaseGuide :global(.showcase-card) {
+  background: var(--card);
+  backdrop-filter: none;
+}
+
+.showcaseGuide :global(.showcase-prompt):hover {
+  color: var(--showcase-accent);
+  border-color: var(--showcase-accent);
+  background: var(--showcase-accent-soft);
+}
+
+:global(.dark) .showcaseGuide {
+  --showcase-accent: #a5b4fc;
+  --showcase-accent-soft: rgb(99 102 241 / 0.12);
+}
+
+:global(.dark) .showcaseGuide[data-agent="ppt-master"] {
+  --showcase-accent: #fbbf24;
+  --showcase-accent-soft: rgb(217 131 36 / 0.12);
+}
+
+:global(.dark) .showcaseGuide[data-agent="podcast-studio"] {
+  --showcase-accent: #c4b5fd;
+  --showcase-accent-soft: rgb(139 92 246 / 0.12);
+}
+
+:global(.dark) .showcaseGuide[data-agent="creative-studio"] {
+  --showcase-accent: #fda4af;
+  --showcase-accent-soft: rgb(224 93 122 / 0.12);
+}
+
+:global(.dark) .showcaseGuide :global(.showcase-card) {
+  background: rgb(255 255 255 / 0.035);
+}
+
+.waveformBars {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 2px;
+}
+
+.waveformBars i {
+  display: block;
+  width: 2.5px;
+  min-height: 5px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--border);
+  transform-origin: center;
+}
+
+.isPlaying .waveformBars i {
+  background: #a78bfa;
+  animation: showcase-wave 900ms ease-in-out infinite alternate;
+}
+
+@keyframes showcase-wave {
+  from {
+    transform: scaleY(0.62);
+  }
+  to {
+    transform: scaleY(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .isPlaying .waveformBars i {
+    animation: none;
+  }
+}
