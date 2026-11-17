@@ -201,6 +201,14 @@ test.describe("Agent new-chat task guides", () => {
     const composerWidth = (await inputBox.boundingBox())!.width;
     expect(composerWidth).toBeGreaterThanOrEqual(840);
     expect(composerWidth).toBeLessThanOrEqual(880);
+
+    // Prompt action labels must not wrap under narrow card widths.
+    const promptButton = page.getByTestId(
+      "showcase-prompt-video-hallucination",
+    );
+    await expect(promptButton).toHaveCSS("white-space", "nowrap");
+    const promptBox = await promptButton.boundingBox();
+    expect(promptBox!.height).toBeLessThanOrEqual(40);
     await expect(inputBox).toHaveCSS("border-radius", "28px");
     await expect(inputGroup).toHaveCSS("border-radius", "28px");
     expect(
