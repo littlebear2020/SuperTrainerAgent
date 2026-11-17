@@ -138,8 +138,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       {
         title: text("核对讲稿与分镜", "Review script and storyboard"),
         description: text(
-          "agent 给出口播稿和逐场景设计；上传讲稿按原文使用，不改写、不扩写。",
-          "Review narration and scene designs. Supplied scripts stay verbatim without rewrites or expansion.",
+          "若你提供讲稿，按原文使用、不改写不扩写；若只给主题，agent 先写出口播稿与逐场景设计，交你核对。",
+          "Supplied scripts stay verbatim; topic-only briefs get a drafted narration and scene plan for your review.",
         ),
       },
       {

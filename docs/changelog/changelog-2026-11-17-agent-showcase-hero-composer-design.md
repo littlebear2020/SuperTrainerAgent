@@ -1,6 +1,6 @@
 # Agent Showcase Hero / Composer 设计优化 changelog（2026-11-17）
 
-> **TL;DR**：按第三/四轮预览反馈重做顶部构图与卡片质感：Hero 收窄到与 composer 相同的 860px 中心列（原来 hero 1132 / composer 860 导致人物、标题、输入框三条轴线错位），人物改为 240/200/190px 并在亮色下做底部柔化、加顶部局部 ambient wash；composer 加高到 140px（移动 132）并改为更清晰的玻璃卡片（边框/阴影/内高）。同时去掉顶部 48px 阴影带、人物底部虚化，并把四类案例卡统一成与 composer 一致的玻璃卡质感；处理 #18 review 的两条建议（筛选不变量强制、accent 对齐 indigo-500）。
+> **TL;DR**：按第三/四轮预览反馈重做顶部构图与卡片质感：Hero 收窄到与 composer 相同的 860px 中心列（原来 hero 1132 / composer 860 导致人物、标题、输入框三条轴线错位），人物改为 240/200/190px 并在亮色下做底部柔化、加顶部局部 ambient wash；composer 加高到 140px（移动 132）并改为更清晰的玻璃卡片（边框/阴影/内高）。同时去掉顶部 48px 阴影带、人物底部虚化，把四类案例卡统一成与 composer 一致的玻璃卡质感，并修复「用此提示词」按钮换行与课程视频第 2 步文案逻辑；处理 #18 review 的两条建议（筛选不变量强制、accent 对齐 indigo-500）。
 
 > **状态**：已执行（follow-up PR #19；前置 #15/#16/#17/#18）。
 
@@ -55,10 +55,18 @@
 - 首屏、placeholder、alpha、字号、筛选计数/分列等既有门禁保留。
 - 单测无需改（无文案/结构断言变化）。
 
+## 五、追加：第五轮预览反馈
+
+1. **「用此提示词」按钮串行**：`PromptButton` 补 `shrink-0` + `whitespace-nowrap`，不再被左侧元信息挤压换行；PPT「打开案例 / 下载 PPTX」与播客「查看文稿」按钮同步加 `whitespace-nowrap`。实测 1440/1024/390 按钮均 36px 高、单行。
+2. **课程视频第 2 步文案逻辑**：原文案 “agent 给出口播稿和逐场景设计；上传讲稿按原文使用，不改写、不扩写。” 把“agent 出稿”和“上传讲稿”并置，逻辑冲突。改为分支表述：
+   - zh：若你提供讲稿，按原文使用、不改写不扩写；若只给主题，agent 先写出口播稿与逐场景设计，交你核对。
+   - en：Supplied scripts stay verbatim; topic-only briefs get a drafted narration and scene plan for your review.
+3. **回归**：`showcase.test.ts` 新增第 2 步双分支断言；E2E 新增按钮 `white-space: nowrap` 与高度 ≤40 断言。
+
 ## 验收记录
 
 - `cd frontend && pnpm check` → 0 error；prettier 通过
-- `cd frontend && pnpm test` → 266 files / 1753 tests passed
+- `cd frontend && pnpm test` → 266 files / 1754 tests passed
 - `cd frontend && pnpm test:e2e -- tests/e2e/agent-new-chat-guide.spec.ts` → **41 passed**
 - `cd frontend && pnpm check:dead` → 通过；`node scripts/check_i18n_keys.mjs` → 631 叶子全活
 - `python3 scripts/check_docs_convention.py` → OK

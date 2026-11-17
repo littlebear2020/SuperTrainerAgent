@@ -198,6 +198,15 @@ describe("Agent showcase data and assets", () => {
     }
   });
 
+  it("keeps the course-video review step logic explicit", () => {
+    const step = agent("course-video").steps[1]!;
+    expect(step.description.zh).toContain("若你提供讲稿");
+    expect(step.description.zh).toContain("若只给主题");
+    expect(step.description.zh).toContain("不改写不扩写");
+    expect(step.description.en).toContain("Supplied scripts stay verbatim");
+    expect(step.description.en).toContain("topic-only briefs");
+  });
+
   it("preserves the agent workflow markers and confirmation boundaries", () => {
     for (const item of agent("course-video").cases) {
       expect(item.prompt).toContain("auto-video-flow");

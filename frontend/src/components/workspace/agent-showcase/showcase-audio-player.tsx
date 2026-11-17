@@ -247,7 +247,7 @@ export function ShowcaseAudioPlayer({
                   type="button"
                   data-testid={`showcase-transcript-${item.id}`}
                   onClick={(event) => onTranscript(item, event.currentTarget)}
-                  className="showcase-accent-text inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:hover:bg-indigo-400/10"
+                  className="showcase-accent-text inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs whitespace-nowrap hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:hover:bg-indigo-400/10"
                 >
                   <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                   {t.agents.showcase.transcript}

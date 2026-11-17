@@ -51,7 +51,7 @@ export function PromptButton({
       aria-label={`${t.agents.showcase.usePrompt}: ${localized(title, locale)}`}
       disabled={disabled}
       onClick={() => onUsePrompt(item.prompt)}
-      className="showcase-prompt border-border bg-card text-muted-foreground inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-medium transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10"
+      className="showcase-prompt border-border bg-card text-muted-foreground inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-medium whitespace-nowrap transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
       {t.agents.showcase.usePrompt}
@@ -263,7 +263,7 @@ export function DeckCard({
             type="button"
             data-testid={`showcase-open-all-${item.id}`}
             onClick={(event) => onOpen(item, event.currentTarget, 0)}
-            className="inline-flex min-h-9 items-center gap-1 rounded-md bg-neutral-900 px-3 text-xs font-medium text-white hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900"
+            className="inline-flex min-h-9 items-center gap-1 rounded-md bg-neutral-900 px-3 text-xs font-medium whitespace-nowrap text-white hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900"
           >
             {t.agents.showcase.openCase}
             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -272,7 +272,7 @@ export function DeckCard({
             data-testid={`showcase-card-download-${item.id}`}
             href={item.pptx}
             download={`${item.id}.pptx`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium whitespace-nowrap text-indigo-700 hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300"
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
             {t.agents.showcase.downloadPptx}
