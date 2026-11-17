@@ -155,6 +155,23 @@ describe("AgentShowcase", () => {
     ).toContain("/quick/slide-3.webp");
   });
 
+  it("reopens the same deck at the newly selected preview after closing", async () => {
+    await renderShowcase("ppt-master");
+    await click(element("showcase-open-ppt-quick"));
+    await click(element("showcase-deck-next"));
+    await click(element("showcase-dialog-close"));
+
+    await click(element("showcase-open-ppt-quick-2"));
+
+    expect(
+      document
+        .querySelector<HTMLImageElement>(
+          "[data-testid='showcase-deck-current']",
+        )
+        ?.getAttribute("src"),
+    ).toContain("/quick/slide-3.webp");
+  });
+
   it("navigates deck boundaries and resets to slide one when another deck opens", async () => {
     await renderShowcase("ppt-master");
     expect(container.querySelectorAll("article")).toHaveLength(3);

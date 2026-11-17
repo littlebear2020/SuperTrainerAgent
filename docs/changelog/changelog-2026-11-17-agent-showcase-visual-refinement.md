@@ -15,7 +15,7 @@
 
 ## 验收记录
 
-- `pnpm exec vitest run tests/unit/core/agents/showcase.test.ts tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx tests/unit/components/workspace/agent-showcase.dom.test.tsx` → `Test Files 3 passed (3)`，`Tests 34 passed (34)`。
+- `pnpm exec vitest run tests/unit/core/agents/showcase.test.ts tests/unit/components/workspace/agent-new-chat-guide.dom.test.tsx tests/unit/components/workspace/agent-showcase.dom.test.tsx` → `Test Files 3 passed (3)`，`Tests 35 passed (35)`。
 - `E2E_PORT=3177 E2E_GATEWAY_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts` → `31 passed (22.2s)`；覆盖四类媒体、草稿/显式提交、co-writer、暗色、英文、三视口与新增视觉行为断言。
 - 新增浏览器断言确认：1440px 三个视频同排；海报实际宽高比约 `0.5625`；移动人物完整且位于标题上方；只有正在播放的卡片音波运行动画。
 - `make -C frontend check` → ESLint 0 errors（121 个既有 warnings）、TypeScript 通过、Prettier 通过、knip 通过、`i18n key 存活检测通过：632 个叶子全活。`
