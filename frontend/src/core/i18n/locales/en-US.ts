@@ -563,7 +563,7 @@ export const enUS: Translations = {
         ],
       },
       "creative-studio": {
-        displayName: "Visual design",
+        displayName: "Course poster",
         title: "Turn knowledge into beautiful images",
         description:
           "Transform key ideas, course content, and brand information into clear visual assets.",

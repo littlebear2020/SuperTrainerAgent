@@ -80,6 +80,12 @@ export function AgentShowcase({
     .filter((value) => value === "all" || availableCategories.has(value))
     .map((value) => [value, filterLabels[value]] as const);
 
+  // The header count must agree with the filtered grid (and with the count at
+  // the right edge of the filter row); before this it always showed the total.
+  const headerCaseCount = hasVisualCases
+    ? visibleCases.length
+    : agent.cases.length;
+
   useEffect(() => {
     return () => {
       if (focusTimeoutRef.current !== null) {
@@ -140,7 +146,7 @@ export function AgentShowcase({
             <h2 className="text-foreground text-[16px] font-semibold">
               {localized(agent.caseLabel, language)}
               <span className="text-muted-foreground ml-2 text-xs font-normal">
-                {agent.cases.length} {t.agents.showcase.caseUnit}
+                {headerCaseCount} {t.agents.showcase.caseUnit}
               </span>
             </h2>
           </div>
@@ -158,14 +164,21 @@ export function AgentShowcase({
                   type="button"
                   data-testid={`showcase-filter-${value}`}
                   aria-pressed={visualFilter === value}
-                  onClick={() => setVisualFilter(value)}
-                  className="border-border min-h-9 shrink-0 rounded-full border px-3 text-xs whitespace-nowrap transition hover:border-neutral-400 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white dark:border-white/10 dark:aria-pressed:border-neutral-100 dark:aria-pressed:bg-neutral-100 dark:aria-pressed:text-neutral-900"
+                  onClick={() =>
+                    setVisualFilter(
+                      visualFilter === value && value !== "all" ? "all" : value,
+                    )
+                  }
+                  className="border-border min-h-9 shrink-0 cursor-pointer rounded-full border px-3 text-xs whitespace-nowrap transition hover:border-neutral-400 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white dark:border-white/10 dark:aria-pressed:border-neutral-100 dark:aria-pressed:bg-neutral-100 dark:aria-pressed:text-neutral-900"
                 >
                   {label}
                 </button>
               ))}
               <span className="text-muted-foreground ml-auto shrink-0 self-center text-[11px] whitespace-nowrap">
-                {visibleCases.length} {t.agents.showcase.itemUnit}
+                {visualFilter === "all"
+                  ? visibleCases.length
+                  : `${visibleCases.length} / ${agent.cases.length}`}{" "}
+                {t.agents.showcase.itemUnit}
               </span>
             </div>
           ) : null}
@@ -185,7 +198,14 @@ export function AgentShowcase({
             <div
               data-testid="agent-guide-cases"
               data-showcase
-              className={showcaseCardClass(gridCases[0]?.kind ?? "video")}
+              className={
+                hasVisualCases && visualFilter !== "all"
+                  ? // A filtered subset must fill the row: CSS multi-column packs
+                    // both remaining cards into column 1, leaving columns 2–3
+                    // empty and looking like a single result.
+                    "grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                  : showcaseCardClass(gridCases[0]?.kind ?? "video")
+              }
             >
               {gridCases.map((item, index) => {
                 if (item.kind === "video") {

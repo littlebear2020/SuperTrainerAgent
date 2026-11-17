@@ -179,7 +179,7 @@ export function DeckCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border/70 bg-card/70 grid min-w-0 overflow-hidden rounded-[14px] border transition duration-200 hover:border-amber-300 hover:shadow-md md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)] dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-amber-400/50"
+      className="showcase-card border-border/70 bg-card/70 grid min-w-0 overflow-hidden rounded-[14px] border transition duration-200 hover:border-indigo-300 hover:shadow-md md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)] dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
     >
       <div className="relative grid grid-cols-2 content-start gap-2 p-4 md:p-5">
         {item.slides.slice(0, previewCount).map((slide, slideIndex) =>
@@ -198,7 +198,7 @@ export function DeckCard({
               data-testid={`showcase-open-${item.id}${slideIndex === 0 ? "" : `-${slideIndex}`}`}
               aria-label={`${t.agents.showcase.openCase}: ${title} · ${slideIndex + 1} / ${item.pageCount}`}
               onClick={(event) => onOpen(item, event.currentTarget, slideIndex)}
-              className="group border-border/60 relative block aspect-video overflow-hidden rounded-[10px] border bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+              className="group border-border/60 relative block aspect-video overflow-hidden rounded-[10px] border bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
             >
               <img
                 src={slide}
@@ -251,7 +251,7 @@ export function DeckCard({
               className="text-muted-foreground border-border/70 inline-flex items-center gap-1 rounded border px-1.5 py-1 text-[11px]"
             >
               <FileCheck2
-                className="h-3 w-3 text-amber-600 dark:text-amber-300"
+                className="h-3 w-3 text-indigo-600 dark:text-indigo-300"
                 aria-hidden="true"
               />
               {localized(feature, locale)}
@@ -263,7 +263,7 @@ export function DeckCard({
             type="button"
             data-testid={`showcase-open-all-${item.id}`}
             onClick={(event) => onOpen(item, event.currentTarget, 0)}
-            className="inline-flex min-h-9 items-center gap-1 rounded-md bg-neutral-900 px-3 text-xs font-medium text-white hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900"
+            className="inline-flex min-h-9 items-center gap-1 rounded-md bg-neutral-900 px-3 text-xs font-medium text-white hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900"
           >
             {t.agents.showcase.openCase}
             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -272,7 +272,7 @@ export function DeckCard({
             data-testid={`showcase-card-download-${item.id}`}
             href={item.pptx}
             download={`${item.id}.pptx`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-medium text-amber-700 hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300"
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
             {t.agents.showcase.downloadPptx}
@@ -316,7 +316,7 @@ export function VisualCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border/70 bg-card/70 mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-rose-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-rose-400/50"
+      className="showcase-card border-border/70 bg-card/70 mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-indigo-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
     >
       <button
         type="button"
@@ -324,7 +324,7 @@ export function VisualCard({
         aria-label={`${t.agents.showcase.openCase}: ${title}`}
         onClick={(event) => onOpen(item, event.currentTarget)}
         style={{ aspectRatio: `${item.width} / ${item.height}` }}
-        className="group relative block w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+        className="group relative block w-full overflow-hidden bg-neutral-950 text-left focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
       >
         {failed ? (
           <span className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 bg-slate-100 text-xs dark:bg-white/5">

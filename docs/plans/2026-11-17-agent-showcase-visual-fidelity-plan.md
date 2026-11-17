@@ -1,6 +1,6 @@
 # Agent Showcase 视觉保真修复计划（P0/P1）
 
-> **状态**：已执行（2026-11-17；P0 PR #15（合入 commit `62f1e1b4`）+ P1 PR #16；变更日志：`docs/changelog/changelog-2026-11-17-agent-showcase-visual-fidelity.md`）。追加：2026-11-17 用户本地预览反馈后执行 polish 批次（Hero 按首页比例缩小、composer 按 demo 860px、移除 tips/badge/note），见 `docs/changelog/changelog-2026-11-17-agent-showcase-visual-polish.md`。原定稿说明保留在本行之后的 TL;DR。
+> **状态**：已执行（2026-11-17；P0 PR #15（合入 commit `62f1e1b4`）+ P1 PR #16；变更日志：`docs/changelog/changelog-2026-11-17-agent-showcase-visual-fidelity.md`）。追加：2026-11-17 用户本地预览反馈后执行 polish 批次（Hero 按首页比例缩小、composer 按 demo 860px、移除 tips/badge/note），见 `docs/changelog/changelog-2026-11-17-agent-showcase-visual-polish.md`；2026-11-17 第二轮预览反馈（人物列固定 180px、删除 hero 标签、统一 indigo 强调色、creative-studio 更名「课程海报」、筛选计数同步/再点回全部）见 `docs/changelog/changelog-2026-11-17-agent-showcase-visual-polish-2.md`。原定稿说明保留在本行之后的 TL;DR。
 > **TL;DR**：PR #12/#13 已把案例、媒体和交互接入 4 个 Agent 新会话页，但当前实现把 demo 的“透明人物 + 连续左对齐构图”改成了“头像卡 + 三段不同宽度 + 空胶囊输入框”，所以功能可用但视觉离 demo 很远。本计划不重写数据/媒体逻辑，也不替换项目侧栏、顶栏或真实 `InputBox`；只在现有项目壳内做视觉修复：人物去卡片、统一 1180 容器、输入框补 Agent 专属 placeholder 与任务信息、去掉全宽背景补丁、提高卡片层级，并补视觉回归验收。P0 先拉回骨架，P1 再修质感。
 > **Spec / 需求来源**：用户 2026-11-17 对 PR #12/#13 的反馈；当前 `origin/main` 截图 `.screenshots/agent-showcase/refinement/*`；当前实现 `frontend/src/components/workspace/agent-showcase/*`；demo `temp/agent-listenhub-demo-v2/bundle.html` 与 `temp/agent-listenhub-demo-v2/.work/shots/hero-viewport-*.png`。
 
