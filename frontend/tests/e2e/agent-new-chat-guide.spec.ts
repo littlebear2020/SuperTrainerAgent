@@ -1137,12 +1137,15 @@ test.describe("Agent new-chat task guides", () => {
         ),
       ).toBe(true);
 
-      // Hero and showcase share the single 1180 shell; the composer follows
-      // the demo and is capped at 860px, centered under that shell.
-      const lefts = [hero!.x, showcase!.x];
-      const rights = [hero!.x + hero!.width, showcase!.x + showcase!.width];
-      expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(8);
-      expect(Math.max(...rights) - Math.min(...rights)).toBeLessThanOrEqual(8);
+      // 2026-11-17 design pass: hero and composer form one centered 860px
+      // column; the showcase keeps the wider 1180 shell below it.
+      expect(Math.abs(hero!.x - input!.x)).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(hero!.x + hero!.width - (input!.x + input!.width)),
+      ).toBeLessThanOrEqual(1);
+      const heroCenter = hero!.x + hero!.width / 2;
+      const showcaseCenter = showcase!.x + showcase!.width / 2;
+      expect(Math.abs(heroCenter - showcaseCenter)).toBeLessThanOrEqual(4);
 
       const radius = viewport.width < 640 ? "24px" : "28px";
       const inputBox = page.locator(".glass-input-box");
@@ -1249,7 +1252,7 @@ test.describe("Agent new-chat task guides", () => {
       expect(item.height).toBeCloseTo(geometry[0]!.height, 1);
       expect(item.headingX).toBeCloseTo(geometry[0]!.headingX, 1);
     }
-    expect(geometry[0]!.width).toBe(180);
+    expect(geometry[0]!.width).toBe(230);
   });
 
   test("all four agents share one showcase accent palette and creative-studio is named course poster", async ({

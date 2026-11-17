@@ -14,9 +14,9 @@ export function ShowcaseHero({ agent }: { agent: ShowcaseAgent }) {
   return (
     <div
       data-testid="showcase-hero"
-      className="flex w-full flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:justify-start sm:gap-9 sm:text-left"
+      className="mx-auto flex w-full max-w-[860px] flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:justify-start sm:gap-9 sm:text-left"
     >
-      <div className="relative flex w-[140px] shrink-0 items-end justify-center sm:w-[160px] xl:w-[180px]">
+      <div className="relative flex w-[175px] shrink-0 items-end justify-center sm:w-[205px] xl:w-[230px]">
         <span aria-hidden="true" className={styles.heroGlow} />
         <img
           src={agent.character}
@@ -26,11 +26,11 @@ export function ShowcaseHero({ agent }: { agent: ShowcaseAgent }) {
           loading="eager"
           fetchPriority="high"
           decoding="async"
-          className="relative z-10 h-[160px] w-full object-contain object-center sm:h-[178px] xl:h-[188px]"
+          className="relative z-10 h-[190px] w-full [mask-image:linear-gradient(to_bottom,#000_96.5%,transparent_100%)] object-contain object-center sm:h-[200px] xl:h-[240px] dark:[mask-image:none]"
         />
       </div>
       <div className="min-w-0">
-        <h1 className="text-foreground text-[25px] leading-[1.36] font-bold tracking-[-0.035em] sm:text-[30px] lg:text-[33px]">
+        <h1 className="text-foreground text-[26px] leading-[1.34] font-bold tracking-[-0.04em] sm:text-[31px] lg:text-[34px]">
           {agent.heroLine[language][0]}
           <br />
           {agent.heroLine[language][1]}

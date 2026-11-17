@@ -1,5 +1,7 @@
 .showcaseGuide {
-  --showcase-accent: #4f6bff;
+  /* indigo-500, aligned with the Tailwind accent classes used by cards/tags. */
+  --showcase-accent: #6366f1;
+  /* darker contrast-safe indigo for text on the soft background */
   --showcase-accent-text: #3f4fd1;
   --showcase-accent-soft: #eef1ff;
 }
@@ -15,6 +17,29 @@
     transparent 72%
   );
   filter: blur(40px);
+}
+
+.guideAmbient {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 460px;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgb(255 255 255 / 0.88) 0%,
+    rgb(255 255 255 / 0.32) 46%,
+    transparent 72%
+  );
+}
+
+:global(.dark) .guideAmbient {
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgb(99 102 241 / 0.16) 0%,
+    rgb(99 102 241 / 0.06) 46%,
+    transparent 72%
+  );
 }
 
 .showcaseGuide :global(.showcase-accent-text) {
