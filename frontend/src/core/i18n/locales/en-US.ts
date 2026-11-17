@@ -449,7 +449,6 @@ export const enUS: Translations = {
       casesTitle: "Real examples",
       casesDescription:
         "Open real outputs or fill a matching prompt and keep editing.",
-      caseUnit: "verifiable examples",
       itemUnit: "items",
       usePrompt: "Use this prompt",
       openCase: "Open example",

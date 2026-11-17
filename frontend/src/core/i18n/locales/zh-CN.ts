@@ -423,7 +423,6 @@ export const zhCN: Translations = {
       howItWorks: "HOW IT WORKS",
       casesTitle: "真实案例",
       casesDescription: "打开真实产物，或填入匹配提示词后继续修改。",
-      caseUnit: "个可核验案例",
       itemUnit: "件",
       usePrompt: "用此提示词",
       openCase: "打开案例",

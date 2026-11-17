@@ -85,10 +85,6 @@ export function AgentShowcase({
     .filter((value) => value === "all" || availableCategories.has(value))
     .map((value) => [value, filterLabels[value]] as const);
 
-  // The header count follows the filtered grid (and the count at the right
-  // edge of the filter row); for non-visual agents the filter is always "all",
-  // so visibleCases already equals agent.cases.
-  const headerCaseCount = visibleCases.length;
   // Filtered results are all visual cases; only then may the masonry be
   // replaced by the regular grid (mixed deck/video cards need their own layout).
   const usesFilteredGrid = visualFilter !== "all" && isVisualOnly;
@@ -149,14 +145,6 @@ export function AgentShowcase({
         </div>
 
         <div className="order-1 min-w-0 lg:order-2">
-          <div className="border-border/70 mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
-            <h2 className="text-foreground text-[16px] font-semibold">
-              {localized(agent.caseLabel, language)}
-              <span className="text-muted-foreground ml-2 text-xs font-normal">
-                {headerCaseCount} {t.agents.showcase.caseUnit}
-              </span>
-            </h2>
-          </div>
           <p className="text-muted-foreground sr-only">
             {t.agents.showcase.casesDescription}
           </p>

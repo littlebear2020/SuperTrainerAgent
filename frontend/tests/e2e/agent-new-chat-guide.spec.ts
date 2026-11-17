@@ -1112,11 +1112,6 @@ test.describe("Agent new-chat task guides", () => {
       const input = await page.getByTestId("agent-guide-input").boundingBox();
       const showcase = await page.getByTestId("agent-showcase").boundingBox();
       const cases = await page.getByTestId("agent-guide-cases").boundingBox();
-      const casesTitle = await page
-        .getByRole("heading", {
-          name: new RegExp(`^${showcaseFor("course-video")!.caseLabel.zh}`),
-        })
-        .boundingBox();
       const firstCard = page.locator("[data-testid^='showcase-case-']").first();
       const firstCardBox = await firstCard.boundingBox();
       const firstCardTitle = await firstCard.locator("h3").boundingBox();
@@ -1124,14 +1119,10 @@ test.describe("Agent new-chat task guides", () => {
       expect(input).not.toBeNull();
       expect(showcase).not.toBeNull();
       expect(cases).not.toBeNull();
-      expect(casesTitle).not.toBeNull();
       expect(firstCardBox).not.toBeNull();
       expect(firstCardTitle).not.toBeNull();
       expect(hero!.y + hero!.height).toBeLessThanOrEqual(viewport.height);
       expect(input!.y + input!.height).toBeLessThanOrEqual(viewport.height);
-      expect(casesTitle!.y + casesTitle!.height).toBeLessThanOrEqual(
-        viewport.height,
-      );
       expect(input!.y + input!.height).toBeLessThanOrEqual(cases!.y);
       if (viewport.width >= 640) {
         // The character's bottom sits on the composer's top edge (2px overlap).
@@ -1315,10 +1306,8 @@ test.describe("Agent new-chat task guides", () => {
     mockGuideAPI(page);
     await openGuide(page, "creative-studio");
     const cards = page.locator("[data-testid^='showcase-case-']");
-    const caseHeading = page.getByRole("heading", { name: /^真实作品/ });
 
     await expect(cards).toHaveCount(10);
-    await expect(caseHeading).toContainText("10 个可核验案例");
     await expect(page.getByText("10 件", { exact: true })).toBeVisible();
 
     for (const filter of [
@@ -1340,7 +1329,6 @@ test.describe("Agent new-chat task guides", () => {
         ),
       );
       expect(new Set(filteredColumns).size, filter).toBe(2);
-      await expect(caseHeading, filter).toContainText("2 个可核验案例");
       await expect(page.getByText("2 / 10 件", { exact: true })).toBeVisible();
     }
 
@@ -1355,7 +1343,6 @@ test.describe("Agent new-chat task guides", () => {
       "aria-pressed",
       "true",
     );
-    await expect(caseHeading).toContainText("10 个可核验案例");
     await expect(page.getByText("10 件", { exact: true })).toBeVisible();
   });
 
