@@ -16,7 +16,7 @@
 | poster-llm-light | 课程海报 | 深蓝底瑞士网格，荧光绿/朱红数据块，白字 |
 | card-prompt | 知识卡 | 深色 Prompt 手稿 + 四段批注，完整占位符文本 |
 | infographic-training | 信息图 | 冷白数据管线：五节点横线 + INPUT/OUTPUT，无纸雕 |
-| infographic-roadmap | 信息图 | 深绿时间线：S 形路径 + 四个阶段 + 停条件 |
+| infographic-roadmap | 信息图 | 深绿时间线：S 形路径 + 四个阶段 + 停止条件 |
 | diagram-agent-stack | 结构图 | 石墨黑底四层结构，蓝/青/琥珀/黄绿 |
 | diagram-rag-architecture | 结构图 | 冷白蓝图，靛蓝/珊瑚/青绿三区 |
 | comic-gradient | 漫画 | 原水墨四格重着色为靛蓝水墨，去掉米黄纸底 |
@@ -28,7 +28,7 @@
 - [x] 重做 6 件 HTML/SVG 版式，替换对应 original/preview。
 - [x] 靛蓝水墨重着色 comic-gradient，保留原四格构图与文案。
 - [x] 更新 `showcase.ts` 的 tag/style/description/prompt/agent note。
-- [x] 更新素材 README 的来源与总量（17,140,182 bytes）。
+- [x] 更新素材 README 的来源与总量（17,140,894 bytes）。
 - [x] 定向 vitest、全量 vitest、目标 E2E、`pnpm check`、docs 门禁。
 - [x] 本地 production build 预览确认无奶油底、四种信息图版式可读。
 
@@ -38,7 +38,7 @@
 - 定向 vitest → 7 passed；`pnpm test` → 266 files / 1754 tests passed。
 - `E2E_PORT=3187 pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts` → `41 passed (47.1s)`。
 - `python3 scripts/check_docs_convention.py` → 全过。
-- 素材总量 17,140,182 bytes（<20MB）；首屏媒体预算 ≤1.5MB。
+- 素材总量 17,140,894 bytes（<20MB）；首屏媒体预算 ≤1.5MB。
 - 浏览器预览无 console error / 404。
 
 ## 五、说明

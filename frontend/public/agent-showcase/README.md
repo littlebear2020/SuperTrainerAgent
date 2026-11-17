@@ -14,7 +14,7 @@
 
 ## 文件与压缩口径
 
-- 本目录共 54 个案例媒体 + 4 个人物，实际媒体总量 **17,140,182 bytes（17.14 MB，16.35 MiB）**，58 个文件；`README.md` 不计入媒体清单。未迁移 `visual/test-*`、旧版 `poster-agent-dark.jpg`、结构图 PNG、`ppt-art/`、Remotion 工程或 `bundle.html`。
+- 本目录共 54 个案例媒体 + 4 个人物，实际媒体总量 **17,140,894 bytes（17.14 MB，16.35 MiB）**，58 个文件；`README.md` 不计入媒体清单。未迁移 `visual/test-*`、旧版 `poster-agent-dark.jpg`、结构图 PNG、`ppt-art/`、Remotion 工程或 `bundle.html`。
 - 视频保留来源 H.264/AAC MP4，1280×720；海报与预览使用 WebP。
 - 视觉预览使用 WebP；原图 JPG 与结构图 SVG 仅在用户打开或下载时加载。
 - PPTX 分别为 236,985 / 437,726 / 467,022 bytes，按十进制 KB/MB 展示；逐页预览为 1920×1080 WebP。
