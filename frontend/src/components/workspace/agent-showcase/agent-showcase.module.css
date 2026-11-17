@@ -21,9 +21,11 @@
 
 .guideAmbient {
   position: absolute;
-  inset: 0 0 auto;
+  /* Cover the 48px header padding of the scroll container too, otherwise the
+   * page background above the section reads as a shadow band under the header. */
+  inset: -48px 0 auto;
   z-index: -1;
-  height: 460px;
+  height: 508px;
   pointer-events: none;
   background: radial-gradient(
     120% 90% at 50% 0%,
@@ -44,6 +46,53 @@
 
 .showcaseGuide :global(.showcase-accent-text) {
   color: var(--showcase-accent-text);
+}
+
+.showcaseGuide :global(.showcase-card) {
+  border: 1px solid rgb(226 232 240 / 0.85);
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.72)
+  );
+  box-shadow:
+    0 24px 50px -34px rgb(49 46 129 / 0.38),
+    0 2px 8px rgb(15 23 42 / 0.04),
+    inset 0 1px 0 rgb(255 255 255 / 0.65);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.showcaseGuide :global(.showcase-card:hover) {
+  border-color: rgb(199 210 254 / 0.95);
+  box-shadow:
+    0 30px 60px -30px rgb(49 46 129 / 0.5),
+    0 4px 14px rgb(15 23 42 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+}
+
+.showcaseGuide :global(.showcase-card[data-playing="true"]) {
+  border-color: rgb(165 180 252 / 0.95);
+  box-shadow:
+    0 26px 55px -30px rgb(79 70 229 / 0.45),
+    0 0 0 3px rgb(99 102 241 / 0.08);
+}
+
+:global(.dark) .showcaseGuide :global(.showcase-card) {
+  border-color: rgb(255 255 255 / 0.1);
+  background: linear-gradient(
+    180deg,
+    rgb(22 29 48 / 0.72),
+    rgb(12 17 30 / 0.58)
+  );
+  box-shadow:
+    0 24px 50px -30px rgb(0 0 0 / 0.62),
+    0 2px 8px rgb(0 0 0 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+:global(.dark) .showcaseGuide :global(.showcase-card:hover) {
+  border-color: rgb(99 102 241 / 0.45);
 }
 
 .showcaseGuide :global(.showcase-tag) {

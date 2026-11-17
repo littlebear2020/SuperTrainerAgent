@@ -1392,12 +1392,13 @@ test.describe("Agent new-chat task guides", () => {
     expect(
       await fontSize(videoCard.locator(".showcase-tag")),
     ).toBeGreaterThanOrEqual(10.5);
-    await expect(videoCard).toHaveCSS("background-color", /.+/);
-    expect(
-      await videoCard.evaluate(
-        (element) => getComputedStyle(element).backgroundColor,
-      ),
-    ).not.toBe("rgba(0, 0, 0, 0)");
+    // Cards now use a glass gradient surface (not a flat background color).
+    const cardSurface = await videoCard.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { image: style.backgroundImage, color: style.backgroundColor };
+    });
+    expect(cardSurface.image).toContain("gradient");
+    expect(cardSurface.image).not.toBe("none");
 
     await openGuide(page, "ppt-master");
     const deckCard = page.getByTestId("showcase-case-ppt-quick");

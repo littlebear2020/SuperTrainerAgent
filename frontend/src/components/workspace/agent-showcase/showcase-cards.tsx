@@ -81,7 +81,7 @@ export function VideoCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col overflow-hidden rounded-[14px] border transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
+      className="showcase-card flex min-w-0 flex-col overflow-hidden rounded-[16px] transition duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0"
     >
       <button
         type="button"
@@ -179,7 +179,7 @@ export function DeckCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border/70 bg-card/70 grid min-w-0 overflow-hidden rounded-[14px] border transition duration-200 hover:border-indigo-300 hover:shadow-md md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)] dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
+      className="showcase-card grid min-w-0 overflow-hidden rounded-[16px] transition duration-200 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)]"
     >
       <div className="relative grid grid-cols-2 content-start gap-2 p-4 md:p-5">
         {item.slides.slice(0, previewCount).map((slide, slideIndex) =>
@@ -316,7 +316,7 @@ export function VisualCard({
   return (
     <article
       data-testid={`showcase-case-${item.id}`}
-      className="showcase-card border-border/70 bg-card/70 mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[13px] border transition duration-200 hover:border-indigo-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50"
+      className="showcase-card mb-4 inline-flex w-full min-w-0 break-inside-avoid flex-col overflow-hidden rounded-[16px] transition duration-200"
     >
       <button
         type="button"

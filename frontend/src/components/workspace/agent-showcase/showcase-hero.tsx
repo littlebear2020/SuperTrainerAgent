@@ -26,7 +26,7 @@ export function ShowcaseHero({ agent }: { agent: ShowcaseAgent }) {
           loading="eager"
           fetchPriority="high"
           decoding="async"
-          className="relative z-10 h-[190px] w-full [mask-image:linear-gradient(to_bottom,#000_96.5%,transparent_100%)] object-contain object-center sm:h-[200px] xl:h-[240px] dark:[mask-image:none]"
+          className="relative z-10 h-[190px] w-full object-contain object-center sm:h-[200px] xl:h-[240px]"
         />
       </div>
       <div className="min-w-0">
