@@ -135,15 +135,17 @@ export function VideoDialog({
 
 export function DeckDialog({
   item,
+  initialSlide,
   locale,
   onClose,
 }: {
   item: DeckCase;
+  initialSlide: number;
   locale: ShowcaseLocale;
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialSlide);
   const title = localized(item.title, locale);
 
   return (
@@ -176,7 +178,7 @@ export function DeckDialog({
             type="button"
             data-testid="showcase-dialog-close"
             aria-label={t.agents.showcase.close}
-            className="text-muted-foreground hover:bg-accent hover:text-foreground absolute top-4 right-4 rounded-full p-2 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground absolute top-4 right-4 rounded-full p-2 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -230,7 +232,7 @@ export function DeckDialog({
               aria-label={`${slideIndex + 1} / ${item.pageCount}`}
               aria-pressed={slideIndex === index}
               onClick={() => setIndex(slideIndex)}
-              className={`overflow-hidden rounded-md border-2 transition ${slideIndex === index ? "border-teal-500" : "border-transparent opacity-65 hover:opacity-100"}`}
+              className={`overflow-hidden rounded-md border-2 transition ${slideIndex === index ? "border-amber-500" : "border-transparent opacity-65 hover:opacity-100"}`}
             >
               <img
                 src={slide}
@@ -253,7 +255,7 @@ export function DeckDialog({
             data-testid="showcase-download-pptx"
             href={item.pptx}
             download={`${item.id}.pptx`}
-            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-teal-600 px-4 text-xs font-medium text-white hover:bg-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none"
+            className="inline-flex min-h-9 items-center gap-2 rounded-full bg-amber-600 px-4 text-xs font-medium text-white hover:bg-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             {t.agents.showcase.downloadPptx}

@@ -138,6 +138,23 @@ describe("AgentShowcase", () => {
     ).toBe(false);
   });
 
+  it("opens four deck previews directly at their selected slide", async () => {
+    await renderShowcase("ppt-master");
+    expect(
+      container.querySelectorAll("[data-testid^='showcase-open-ppt-quick']"),
+    ).toHaveLength(4);
+
+    await click(element("showcase-open-ppt-quick-2"));
+
+    expect(
+      document
+        .querySelector<HTMLImageElement>(
+          "[data-testid='showcase-deck-current']",
+        )
+        ?.getAttribute("src"),
+    ).toContain("/quick/slide-3.webp");
+  });
+
   it("navigates deck boundaries and resets to slide one when another deck opens", async () => {
     await renderShowcase("ppt-master");
     expect(container.querySelectorAll("article")).toHaveLength(3);
@@ -225,6 +242,28 @@ describe("AgentShowcase", () => {
       "/visual/diagrams/diagram-rag-architecture.svg",
     );
     expect(svg?.download).toBe("visual-diagram-rag.svg");
+  });
+
+  it("gives each podcast a visible 32-bar waveform", async () => {
+    await renderShowcase("podcast-studio");
+
+    expect(
+      element("showcase-waveform-podcast-context").querySelectorAll("i"),
+    ).toHaveLength(32);
+    expect(
+      element("showcase-waveform-podcast-agent2026").querySelectorAll("i"),
+    ).toHaveLength(32);
+  });
+
+  it("shows concise source provenance on podcast cards", async () => {
+    await renderShowcase("podcast-studio");
+
+    expect(element("showcase-case-podcast-context").textContent).toContain(
+      "原创技术笔记（未改写原文）",
+    );
+    expect(element("showcase-case-podcast-agent2026").textContent).toContain(
+      "InfoQ · 经济参考报 · KubeCon 2026",
+    );
   });
 
   it("plays podcasts through one shared audio element with progress and exclusive switching", async () => {

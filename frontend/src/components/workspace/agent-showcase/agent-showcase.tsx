@@ -39,7 +39,10 @@ export function AgentShowcase({
   const { locale, t } = useI18n();
   const language: ShowcaseLocale = locale === "zh-CN" ? "zh" : "en";
   const [activeVideo, setActiveVideo] = useState<VideoCase | null>(null);
-  const [activeDeck, setActiveDeck] = useState<DeckCase | null>(null);
+  const [activeDeck, setActiveDeck] = useState<{
+    item: DeckCase;
+    initialSlide: number;
+  } | null>(null);
   const [activeVisual, setActiveVisual] = useState<VisualCase | null>(null);
   const [activePodcast, setActivePodcast] = useState<PodcastCase | null>(null);
   const [visualFilter, setVisualFilter] = useState<
@@ -100,28 +103,28 @@ export function AgentShowcase({
 
   return (
     <>
-      <section className="grid min-w-0 gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-8">
-        <div className="order-2 lg:order-1">
-          <p className="text-[10px] font-semibold tracking-[0.2em] text-indigo-500 dark:text-indigo-300">
+      <section className="border-border/80 grid min-w-0 gap-7 border-t pt-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10 dark:border-white/10">
+        <div className="order-2 lg:sticky lg:top-6 lg:order-1 lg:self-start">
+          <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.2em]">
             {t.agents.showcase.howItWorks}
           </p>
-          <h2 className="text-foreground mt-2 text-lg font-semibold tracking-tight">
+          <h2 className="text-foreground mt-3 text-[26px] leading-[1.25] font-bold tracking-[-0.035em]">
             {localized(agent.howTitle, language)}
           </h2>
-          <p className="text-muted-foreground mt-2 text-xs leading-5">
+          <p className="text-muted-foreground mt-3 text-[13px] leading-6">
             {localized(agent.howDescription, language)}
           </p>
-          <ol className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <ol className="mt-7 grid gap-5 sm:grid-cols-3 lg:grid-cols-1">
             {agent.steps.map((step, index) => (
               <li key={step.title.en} className="flex gap-3">
-                <span className="text-xs font-semibold text-indigo-500 tabular-nums dark:text-indigo-300">
+                <span className="text-muted-foreground pt-0.5 font-mono text-[11px] tabular-nums">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h3 className="text-foreground text-xs font-semibold">
+                  <h3 className="text-foreground text-[13px] font-semibold">
                     {localized(step.title, language)}
                   </h3>
-                  <p className="text-muted-foreground mt-1 text-[11px] leading-5">
+                  <p className="text-muted-foreground mt-1.5 text-xs leading-5">
                     {localized(step.description, language)}
                   </p>
                 </div>
@@ -131,19 +134,14 @@ export function AgentShowcase({
         </div>
 
         <div className="order-1 min-w-0 lg:order-2">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-indigo-500 uppercase dark:text-indigo-300">
-                {localized(agent.caseLabel, language)}
+          <div className="border-border/80 mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 dark:border-white/10">
+            <h2 className="text-foreground text-[15px] font-semibold">
+              {localized(agent.caseLabel, language)}
+              <span className="text-muted-foreground ml-2 text-xs font-normal">
+                {agent.cases.length} {t.agents.showcase.caseUnit}
               </span>
-              <h2 className="text-foreground mt-1 text-lg font-semibold">
-                {t.agents.showcase.casesTitle}
-                <span className="text-muted-foreground ml-2 text-xs font-normal">
-                  {agent.cases.length} {t.agents.showcase.caseUnit}
-                </span>
-              </h2>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/70 bg-emerald-50/70 px-2.5 py-1 text-[10px] font-medium text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300">
+            </h2>
+            <span className="showcase-tag inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium">
               <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
               {localized(agent.badge, language)}
             </span>
@@ -163,7 +161,7 @@ export function AgentShowcase({
                   data-testid={`showcase-filter-${value}`}
                   aria-pressed={visualFilter === value}
                   onClick={() => setVisualFilter(value)}
-                  className="border-border min-h-9 shrink-0 rounded-full border px-3 text-xs whitespace-nowrap transition hover:border-fuchsia-300 focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:outline-none aria-pressed:border-fuchsia-500 aria-pressed:bg-fuchsia-50 aria-pressed:text-fuchsia-700 dark:border-white/10 dark:aria-pressed:border-fuchsia-400 dark:aria-pressed:bg-fuchsia-400/10 dark:aria-pressed:text-fuchsia-300"
+                  className="border-border min-h-9 shrink-0 rounded-full border px-3 text-xs whitespace-nowrap transition hover:border-neutral-400 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white dark:border-white/10 dark:aria-pressed:border-neutral-100 dark:aria-pressed:bg-neutral-100 dark:aria-pressed:text-neutral-900"
                 >
                   {label}
                 </button>
@@ -189,7 +187,7 @@ export function AgentShowcase({
             <div
               data-testid="agent-guide-cases"
               data-showcase
-              className={showcaseCardClass(hasVisualCases ? "three" : "two")}
+              className={showcaseCardClass(gridCases[0]?.kind ?? "video")}
             >
               {gridCases.map((item, index) => {
                 if (item.kind === "video") {
@@ -216,9 +214,9 @@ export function AgentShowcase({
                       locale={language}
                       eager={index === 0}
                       disabled={disabled}
-                      onOpen={(deck, trigger) => {
+                      onOpen={(deck, trigger, slideIndex = 0) => {
                         triggerRef.current = trigger;
-                        setActiveDeck(deck);
+                        setActiveDeck({ item: deck, initialSlide: slideIndex });
                       }}
                       onUsePrompt={onUsePrompt}
                     />
@@ -261,7 +259,13 @@ export function AgentShowcase({
         />
       ) : null}
       {activeDeck ? (
-        <DeckDialog item={activeDeck} locale={language} onClose={closeDialog} />
+        <DeckDialog
+          key={activeDeck.item.id}
+          item={activeDeck.item}
+          initialSlide={activeDeck.initialSlide}
+          locale={language}
+          onClose={closeDialog}
+        />
       ) : null}
       {activeVisual ? (
         <VisualDialog

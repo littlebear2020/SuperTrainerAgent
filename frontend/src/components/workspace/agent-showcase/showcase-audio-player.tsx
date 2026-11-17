@@ -1,10 +1,11 @@
 "use client";
 
-import { AudioLines, FileText, Pause, Play } from "lucide-react";
+import { AudioLines, CheckCircle2, FileText, Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { PodcastCase } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
+import { cn } from "@/lib/utils";
 
 import { PromptButton } from "./showcase-cards";
 import {
@@ -12,6 +13,13 @@ import {
   localized,
   type ShowcaseLocale,
 } from "./showcase-utils";
+
+import styles from "./agent-showcase.module.css";
+
+const waveHeights = [
+  8, 14, 10, 23, 16, 30, 12, 21, 34, 17, 27, 13, 31, 19, 10, 24, 15, 28, 12, 21,
+  8, 17, 11, 25, 15, 29, 9, 18, 13, 26, 10, 22,
+];
 
 export function ShowcaseAudioPlayer({
   items,
@@ -136,10 +144,15 @@ export function ShowcaseAudioPlayer({
             <article
               key={item.id}
               data-testid={`showcase-case-${item.id}`}
-              className="bg-card/70 border-border flex min-w-0 flex-col gap-3 rounded-2xl border p-4 shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/5 dark:hover:border-cyan-400/50"
+              className={cn(
+                "showcase-card border-border flex min-w-0 flex-col gap-3 rounded-[15px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/10 dark:hover:border-violet-400/50",
+                isPlaying &&
+                  "border-violet-300 shadow-[0_0_0_3px_rgb(139_92_246/0.08)] dark:border-violet-400/60",
+                isPlaying && styles.isPlaying,
+              )}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[11px] font-medium text-cyan-700 dark:text-cyan-300">
+                <span className="showcase-tag rounded px-2 py-1 text-[10px] font-medium">
                   {localized(item.tag, locale)}
                 </span>
                 <span className="text-muted-foreground text-[11px] tabular-nums">
@@ -147,7 +160,7 @@ export function ShowcaseAudioPlayer({
                 </span>
               </div>
               <div>
-                <h3 className="text-foreground text-sm leading-6 font-semibold">
+                <h3 className="text-foreground text-[15px] leading-6 font-semibold">
                   {title}
                 </h3>
                 <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-5">
@@ -160,7 +173,10 @@ export function ShowcaseAudioPlayer({
                   data-testid={`showcase-play-${item.id}`}
                   aria-label={`${isPlaying ? t.agents.showcase.pause : t.agents.showcase.play} ${title}`}
                   onClick={() => void toggle(item)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-white shadow-sm transition hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none"
+                  className={cn(
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white shadow-sm transition hover:bg-violet-600 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900",
+                    isPlaying && "bg-violet-600 dark:bg-violet-500",
+                  )}
                 >
                   {isPlaying ? (
                     <Pause
@@ -176,25 +192,41 @@ export function ShowcaseAudioPlayer({
                     />
                   )}
                 </button>
-                <div className="min-w-0 flex-1">
+                <div className="relative min-w-0 flex-1">
+                  <div
+                    data-testid={`showcase-waveform-${item.id}`}
+                    aria-hidden="true"
+                    className={styles.waveformBars}
+                  >
+                    {waveHeights.map((height, index) => (
+                      <i
+                        key={index}
+                        style={{
+                          height,
+                          animationDelay: `${index * 35}ms`,
+                        }}
+                      />
+                    ))}
+                  </div>
                   <progress
                     data-testid={`showcase-progress-${item.id}`}
                     aria-label={`${t.agents.showcase.listen}: ${title}`}
                     max={item.durationSeconds}
                     value={progress}
-                    className="h-1.5 w-full accent-cyan-600"
+                    className="absolute inset-x-0 bottom-0 h-0.5 w-full accent-violet-600"
                   />
-                  <div className="text-muted-foreground mt-1 flex justify-between text-[10px] tabular-nums">
-                    <span>{formatDuration(progress)}</span>
-                    <span>{formatDuration(item.durationSeconds)}</span>
-                  </div>
                 </div>
+                <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
+                  {formatDuration(
+                    progress > 0 ? progress : item.durationSeconds,
+                  )}
+                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {item.voices.map((voice) => (
                   <span
                     key={voice.en}
-                    className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-1 text-[10px] text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-200"
+                    className="text-muted-foreground border-border inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px]"
                   >
                     <AudioLines className="h-3 w-3" aria-hidden="true" />
                     {localized(voice, locale)}
@@ -209,12 +241,12 @@ export function ShowcaseAudioPlayer({
                   {t.agents.showcase.playbackError}
                 </p>
               ) : null}
-              <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+              <div className="border-border/80 mt-auto flex items-center justify-between gap-3 border-t pt-1">
                 <button
                   type="button"
                   data-testid={`showcase-transcript-${item.id}`}
                   onClick={(event) => onTranscript(item, event.currentTarget)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2 text-xs text-cyan-700 hover:bg-cyan-50 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:outline-none dark:text-cyan-300 dark:hover:bg-cyan-400/10"
+                  className="showcase-accent-text inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs hover:bg-violet-50 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none dark:hover:bg-violet-400/10"
                 >
                   <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                   {t.agents.showcase.transcript}
@@ -227,6 +259,13 @@ export function ShowcaseAudioPlayer({
                   onUsePrompt={onUsePrompt}
                 />
               </div>
+              <p className="text-muted-foreground flex items-start gap-1.5 pt-1 text-[10px] leading-4">
+                <CheckCircle2
+                  className="showcase-accent-text mt-0.5 h-3 w-3 shrink-0"
+                  aria-hidden="true"
+                />
+                {localized(item.source, locale)}
+              </p>
             </article>
           );
         })}

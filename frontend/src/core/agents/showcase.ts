@@ -53,6 +53,7 @@ export type PodcastCase = ShowcaseCaseBase & {
   audio: string;
   durationSeconds: number;
   voices: LocalizedText[];
+  source: LocalizedText;
   sources: ShowcaseSource[];
   transcript: { speaker: LocalizedText; text: string }[];
 };
@@ -427,6 +428,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         audio: asset("podcast/ep1.mp3"),
         durationSeconds: 48.816,
         voices: [yunzhou],
+        source: text(
+          "原创技术笔记（未改写原文）",
+          "Original technical note · Read without rewriting",
+        ),
         sources: [],
         transcript: [
           { speaker: yunzhou, text: "上下文工程：比提示词更重要的三件事。" },
@@ -469,6 +474,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         audio: asset("podcast/ep2.mp3"),
         durationSeconds: 87.792,
         voices: [yunzhou],
+        source: text(
+          "InfoQ · 经济参考报 · KubeCon 2026",
+          "InfoQ · Economic Reference · KubeCon 2026",
+        ),
         sources: [infoQ, economicReference, kubeCon],
         transcript: [
           {
@@ -525,6 +534,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         audio: asset("podcast/ep3.mp3"),
         durationSeconds: 86.304,
         voices: [yunzhou, vivi],
+        source: text("新华社 · 工厂真实案例", "Xinhua · Real factory cases"),
         sources: [
           {
             label: text(
@@ -591,6 +601,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         audio: asset("podcast/ep4.mp3"),
         durationSeconds: 114.24,
         voices: [yunzhou, vivi],
+        source: text(
+          "Mozilla 报告 · 公开基准观察",
+          "Mozilla research · Public benchmark observations",
+        ),
         sources: [
           {
             label: text("Mozilla 报告解读", "Mozilla report analysis"),

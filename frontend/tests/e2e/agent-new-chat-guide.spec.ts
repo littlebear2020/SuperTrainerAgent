@@ -358,6 +358,85 @@ test.describe("Agent new-chat task guides", () => {
     expect(calls).toEqual({ threads: 0, runs: 0 });
   });
 
+  test("wide video showcase keeps all three styles in the first row", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    await openGuide(page, "course-video");
+
+    const tops = await page
+      .locator("[data-testid^='showcase-case-']")
+      .evaluateAll((cards) =>
+        cards.map((card) => card.getBoundingClientRect().top),
+      );
+    expect(tops).toHaveLength(3);
+    expect(tops[1]).toBeCloseTo(tops[0]!, 0);
+    expect(tops[2]).toBeCloseTo(tops[0]!, 0);
+  });
+
+  test("visual showcase preserves the full portrait instead of cropping it to a card ratio", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    await openGuide(page, "creative-studio");
+    const image = page
+      .getByTestId("showcase-open-visual-poster-agent")
+      .locator("img");
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+
+    const ratio = await image.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width / bounds.height;
+    });
+    expect(ratio).toBeCloseTo(9 / 16, 2);
+    await expect(image).toHaveCSS("object-fit", "contain");
+  });
+
+  test("mobile hero keeps the full character above the headline", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    mockGuideAPI(page);
+    await openGuide(page, "course-video");
+    const image = page.getByTestId("showcase-hero").locator("img");
+    const title = page.getByTestId("showcase-hero").getByRole("heading");
+    const imageBox = await image.boundingBox();
+    const titleBox = await title.boundingBox();
+
+    await expect(image).toHaveCSS("object-fit", "contain");
+    expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(titleBox!.y);
+  });
+
+  test("podcast waveform animates only on the card that is playing", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await openGuide(page, "podcast-studio");
+    await page.getByTestId("showcase-play-podcast-context").click();
+    const audio = page.locator("audio");
+    await expect
+      .poll(() =>
+        audio.evaluate((element: HTMLAudioElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0);
+
+    const animationName = (id: string) =>
+      page
+        .getByTestId(`showcase-waveform-${id}`)
+        .locator("i")
+        .first()
+        .evaluate((element) => getComputedStyle(element).animationName);
+    expect(await animationName("podcast-context")).not.toBe("none");
+    expect(await animationName("podcast-agent2026")).toBe("none");
+  });
+
   test("shared podcast case only prefills and explicit submit creates one run with podcast assistant", async ({
     page,
   }) => {
@@ -813,13 +892,21 @@ test.describe("Agent new-chat task guides", () => {
       await page.setViewportSize(viewport);
       mockGuideAPI(page);
       await openGuide(page, "course-video");
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await Promise.all(
+          document
+            .getAnimations()
+            .map((animation) => animation.finished.catch(() => undefined)),
+        );
+      });
 
       const hero = await page.getByTestId("showcase-hero").boundingBox();
       const input = await page.getByTestId("agent-guide-input").boundingBox();
       const cases = await page.getByTestId("agent-guide-cases").boundingBox();
       const casesTitle = await page
         .getByRole("heading", {
-          name: new RegExp(`^${zhCN.agents.showcase.casesTitle}`),
+          name: new RegExp(`^${showcaseFor("course-video")!.caseLabel.zh}`),
         })
         .boundingBox();
       const firstCard = page.locator("[data-testid^='showcase-case-']").first();

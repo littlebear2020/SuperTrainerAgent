@@ -20,6 +20,7 @@ import { showcaseFor } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
+import showcaseStyles from "./agent-showcase/agent-showcase.module.css";
 import styles from "./agent-showcase/guide-composer.module.css";
 
 export function AgentNewChatGuide({
@@ -167,9 +168,13 @@ export function AgentNewChatGuide({
     <>
       <section
         data-testid="agent-new-chat-guide"
+        data-agent={showcase?.id}
         className={cn(
           "mx-auto flex w-full flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8",
-          showcase ? "max-w-6xl" : "max-w-4xl",
+          showcase && showcaseStyles.showcaseGuide,
+          showcase
+            ? "max-w-7xl sm:px-8 sm:py-6 lg:gap-5 xl:gap-6 xl:py-8"
+            : "max-w-4xl",
         )}
       >
         {showcase ? (
