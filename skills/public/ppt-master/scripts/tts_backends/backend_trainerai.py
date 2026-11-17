@@ -39,6 +39,7 @@ import tempfile
 import time
 import urllib.error
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -149,12 +150,12 @@ def _build_request(text: str, speaker: str, api_key: str) -> Request:
     return Request(ENDPOINT, data=payload, headers=headers, method="POST")
 
 
-def _request_with_retry(request: Request) -> bytes:
-    """Run the SSE request with one exponential-backoff retry on transient errors."""
+def _request_with_retry(request_factory: Callable[[], Request]) -> bytes:
+    """Build a fresh request for each attempt and retry transient errors once."""
     delay = _RETRY_BASE_DELAY
     for attempt in range(_MAX_ATTEMPTS):
         try:
-            return _synthesize_once(request)
+            return _synthesize_once(request_factory())
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:500]
             if (exc.code == 429 or exc.code >= 500) and attempt < _MAX_ATTEMPTS - 1:
@@ -294,7 +295,9 @@ def generate(text: str, output_path: Path, *, api_key: str, voice_id: str) -> No
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if len(text_chunks) == 1:
-        audio = _request_with_retry(_build_request(text_chunks[0], speaker, key))
+        audio = _request_with_retry(
+            lambda: _build_request(text_chunks[0], speaker, key)
+        )
         publish_audio_bytes(audio, output_path)
         return
 
@@ -305,7 +308,9 @@ def generate(text: str, output_path: Path, *, api_key: str, voice_id: str) -> No
         work_dir = Path(temporary_dir)
         chunk_paths: list[Path] = []
         for index, text_chunk in enumerate(text_chunks):
-            audio = _request_with_retry(_build_request(text_chunk, speaker, key))
+            audio = _request_with_retry(
+                lambda: _build_request(text_chunk, speaker, key)
+            )
             chunk_path = work_dir / f"chunk-{index:04d}.mp3"
             chunk_path.write_bytes(audio)
             chunk_paths.append(chunk_path)

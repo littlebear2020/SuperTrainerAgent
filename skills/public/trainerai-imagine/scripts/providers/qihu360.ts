@@ -138,6 +138,7 @@ function guessMimeType(filePath: string): string {
 }
 
 const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_REFERENCE_IMAGE_BYTES = 20 * 1024 * 1024;
 
 async function referenceToDataUri(reference: string): Promise<string> {
   if (/^(https?:|data:)/i.test(reference)) return reference;
@@ -151,6 +152,20 @@ async function referenceToDataUri(reference: string): Promise<string> {
   }
   const bytes = await readFile(fullPath);
   return `data:${mimeType};base64,${bytes.toString("base64")}`;
+}
+
+async function validateTotalReferenceSize(references: string[]): Promise<void> {
+  const localReferences = references.filter((reference) => !/^(https?:|data:)/i.test(reference));
+  const sizes = await Promise.all(localReferences.map(async (reference) => {
+    const metadata = await stat(path.resolve(reference));
+    return metadata.size;
+  }));
+  const totalBytes = sizes.reduce((total, size) => total + size, 0);
+  if (totalBytes > MAX_TOTAL_REFERENCE_IMAGE_BYTES) {
+    throw new Error(
+      `Reference images exceed 20 MB total (${totalBytes} bytes). Reduce the local reference images before uploading.`
+    );
+  }
 }
 
 export async function generateImage(
@@ -173,6 +188,7 @@ export async function generateImage(
 
   if (args.referenceImages.length > 0) {
     // 参考图（单图字符串 / 多图数组）走 /v1/images/edits 的 extra_body.image。
+    await validateTotalReferenceSize(args.referenceImages);
     const references = await Promise.all(args.referenceImages.map(referenceToDataUri));
     extraBody.image = references.length === 1 ? references[0] : references;
     endpoint = `${baseUrl}/v1/images/edits`;
