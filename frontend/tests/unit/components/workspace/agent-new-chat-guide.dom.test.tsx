@@ -148,7 +148,7 @@ describe("AgentNewChatGuide", () => {
     expect(container.querySelector("h1")?.textContent).toBe(
       showcase.heroLine.zh.join(""),
     );
-    expect(container.textContent).toContain("课程视频");
+    expect(container.textContent).not.toContain("课程视频");
     expect(container.textContent).not.toContain("把知识与素材做成视频课");
     expect(caseButtons()).toHaveLength(3);
     expect(

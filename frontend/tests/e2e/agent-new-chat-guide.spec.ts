@@ -1205,6 +1205,141 @@ test.describe("Agent new-chat task guides", () => {
     ).toHaveCount(0);
   });
 
+  test("hero uses one fixed character column and drops the agent label across all four agents", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    const geometry: {
+      x: number;
+      width: number;
+      height: number;
+      headingX: number;
+    }[] = [];
+
+    for (const agentName of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ] as const) {
+      await openGuide(page, agentName);
+      const hero = page.getByTestId("showcase-hero");
+      const image = hero.locator("img");
+      const heading = hero.getByRole("heading");
+      await expect(image).toBeVisible();
+      const imageBox = await image.boundingBox();
+      const headingBox = await heading.boundingBox();
+      expect(imageBox, agentName).not.toBeNull();
+      expect(headingBox, agentName).not.toBeNull();
+      geometry.push({
+        x: imageBox!.x,
+        width: imageBox!.width,
+        height: imageBox!.height,
+        headingX: headingBox!.x,
+      });
+      // The eyebrow label duplicated the agent name above the headline.
+      await expect(
+        hero.getByText(showcaseFor(agentName)!.label.zh, { exact: true }),
+      ).toHaveCount(0);
+    }
+
+    for (const item of geometry) {
+      expect(item.x).toBeCloseTo(geometry[0]!.x, 1);
+      expect(item.width).toBeCloseTo(geometry[0]!.width, 1);
+      expect(item.height).toBeCloseTo(geometry[0]!.height, 1);
+      expect(item.headingX).toBeCloseTo(geometry[0]!.headingX, 1);
+    }
+    expect(geometry[0]!.width).toBe(180);
+  });
+
+  test("all four agents share one showcase accent palette and creative-studio is named course poster", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    const palettes: { color: string; background: string }[] = [];
+
+    for (const agentName of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ] as const) {
+      await openGuide(page, agentName);
+      const tag = page
+        .locator("[data-testid='agent-guide-cases'] .showcase-tag")
+        .first();
+      await expect(tag, agentName).toBeVisible();
+      palettes.push(
+        await tag.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { color: style.color, background: style.backgroundColor };
+        }),
+      );
+    }
+
+    for (const palette of palettes) {
+      expect(palette.color).toBe("rgb(63, 79, 209)");
+      expect(palette.background).toBe("rgb(238, 241, 255)");
+    }
+
+    await openGuide(page, "creative-studio");
+    await expect(agentHeader(page)).toContainText("课程海报");
+    await expect(agentHeader(page)).not.toContainText("视觉设计");
+  });
+
+  test("visual filters keep counts in sync and toggle back to all", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    mockGuideAPI(page);
+    await openGuide(page, "creative-studio");
+    const cards = page.locator("[data-testid^='showcase-case-']");
+    const caseHeading = page.getByRole("heading", { name: /^真实作品/ });
+
+    await expect(cards).toHaveCount(10);
+    await expect(caseHeading).toContainText("10 个可核验案例");
+    await expect(page.getByText("10 件", { exact: true })).toBeVisible();
+
+    for (const filter of [
+      "poster",
+      "card",
+      "comic",
+      "infographic",
+      "diagram",
+    ] as const) {
+      await page.getByTestId(`showcase-filter-${filter}`).click();
+      await expect(cards, filter).toHaveCount(2);
+      await expect(
+        page.getByTestId(`showcase-filter-${filter}`),
+      ).toHaveAttribute("aria-pressed", "true");
+      // Filtered cards must fill columns instead of stacking in column 1.
+      const filteredColumns = await cards.evaluateAll((elements) =>
+        elements.map((element) =>
+          Math.round(element.getBoundingClientRect().x),
+        ),
+      );
+      expect(new Set(filteredColumns).size, filter).toBe(2);
+      await expect(caseHeading, filter).toContainText("2 个可核验案例");
+      await expect(page.getByText("2 / 10 件", { exact: true })).toBeVisible();
+    }
+
+    await expect(
+      page.locator("[data-testid^='showcase-case-'] h3").first(),
+    ).toHaveText("AI Agent 技术栈");
+
+    // Re-clicking the active category returns to the full list.
+    await page.getByTestId("showcase-filter-diagram").click();
+    await expect(cards).toHaveCount(10);
+    await expect(page.getByTestId("showcase-filter-all")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(caseHeading).toContainText("10 个可核验案例");
+    await expect(page.getByText("10 件", { exact: true })).toBeVisible();
+  });
+
   test("390 long showcase placeholder wraps inside the composer without toolbar overlap", async ({
     page,
   }) => {

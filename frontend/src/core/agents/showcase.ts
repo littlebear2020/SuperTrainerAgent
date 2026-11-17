@@ -667,7 +667,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   },
   "creative-studio": {
     id: "creative-studio",
-    label: text("视觉设计", "VISUAL DESIGN"),
+    label: text("课程海报", "COURSE POSTER"),
     inputPlaceholder: text(
       "输入课程主题、核心知识点和想要的风格",
       "Enter a topic, key points, and desired style.",

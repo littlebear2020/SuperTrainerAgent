@@ -145,9 +145,9 @@ export function ShowcaseAudioPlayer({
               key={item.id}
               data-testid={`showcase-case-${item.id}`}
               className={cn(
-                "showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col gap-3 rounded-[14px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-violet-400/50",
+                "showcase-card border-border/70 bg-card/70 flex min-w-0 flex-col gap-3 rounded-[14px] border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-white/[0.08] dark:bg-white/5 dark:hover:border-indigo-400/50",
                 isPlaying &&
-                  "border-violet-300 shadow-[0_0_0_3px_rgb(139_92_246/0.08)] dark:border-violet-400/60",
+                  "border-indigo-300 shadow-[0_0_0_3px_rgb(99_102_241/0.08)] dark:border-indigo-400/60",
                 isPlaying && styles.isPlaying,
               )}
             >
@@ -174,8 +174,8 @@ export function ShowcaseAudioPlayer({
                   aria-label={`${isPlaying ? t.agents.showcase.pause : t.agents.showcase.play} ${title}`}
                   onClick={() => void toggle(item)}
                   className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white shadow-sm transition hover:bg-violet-600 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900",
-                    isPlaying && "bg-violet-600 dark:bg-violet-500",
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white shadow-sm transition hover:bg-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:bg-neutral-100 dark:text-neutral-900",
+                    isPlaying && "bg-indigo-600 dark:bg-indigo-500",
                   )}
                 >
                   {isPlaying ? (
@@ -213,7 +213,7 @@ export function ShowcaseAudioPlayer({
                     aria-label={`${t.agents.showcase.listen}: ${title}`}
                     max={item.durationSeconds}
                     value={progress}
-                    className="absolute inset-x-0 bottom-0 h-0.5 w-full accent-violet-600"
+                    className="absolute inset-x-0 bottom-0 h-0.5 w-full accent-indigo-600"
                   />
                 </div>
                 <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
@@ -246,7 +246,7 @@ export function ShowcaseAudioPlayer({
                   type="button"
                   data-testid={`showcase-transcript-${item.id}`}
                   onClick={(event) => onTranscript(item, event.currentTarget)}
-                  className="showcase-accent-text inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs hover:bg-violet-50 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none dark:hover:bg-violet-400/10"
+                  className="showcase-accent-text inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none dark:hover:bg-indigo-400/10"
                 >
                   <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                   {t.agents.showcase.transcript}

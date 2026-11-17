@@ -531,7 +531,7 @@ export const zhCN: Translations = {
         ],
       },
       "creative-studio": {
-        displayName: "视觉设计",
+        displayName: "课程海报",
         title: "让知识成为好看的图片",
         description: "把要点、课程内容与品牌信息做成清楚、美观的视觉作品。",
         cases: [
