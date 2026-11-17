@@ -280,7 +280,7 @@ describe("AgentShowcase", () => {
       "[data-testid='showcase-download-pptx']",
     );
     expect(download?.href).toContain(
-      "/agent-showcase/ppt/standard-llm-app-v2.pptx",
+      "/agent-showcase/ppt/standard-llm-app-v3.pptx",
     );
     expect(download?.download).toBe("ppt-standard.pptx");
   });
