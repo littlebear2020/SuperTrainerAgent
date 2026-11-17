@@ -1,6 +1,5 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type {
@@ -144,10 +143,6 @@ export function AgentShowcase({
                 {agent.cases.length} {t.agents.showcase.caseUnit}
               </span>
             </h2>
-            <span className="showcase-tag inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-medium">
-              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-              {localized(agent.badge, language)}
-            </span>
           </div>
           <p className="text-muted-foreground sr-only">
             {t.agents.showcase.casesDescription}
@@ -245,13 +240,6 @@ export function AgentShowcase({
               })}
             </div>
           ) : null}
-          <p className="text-muted-foreground mt-4 flex gap-2 text-[11px] leading-5">
-            <CheckCircle2
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500"
-              aria-hidden="true"
-            />
-            {localized(agent.note, language)}
-          </p>
         </div>
       </section>
       {activeVideo ? (

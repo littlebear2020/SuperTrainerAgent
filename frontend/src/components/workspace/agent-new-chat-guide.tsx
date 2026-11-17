@@ -99,7 +99,11 @@ export function AgentNewChatGuide({
   const inputBox = (
     <div
       data-testid="agent-guide-input"
-      className={showcase ? cn(styles.guideComposerFrame, "w-full") : undefined}
+      className={
+        showcase
+          ? cn(styles.guideComposerFrame, "mx-auto w-full max-w-[860px]")
+          : undefined
+      }
     >
       {children}
     </div>
@@ -219,25 +223,6 @@ export function AgentNewChatGuide({
             {inputBox}
           </>
         )}
-
-        <section
-          data-testid="agent-guide-tips"
-          className="rounded-2xl border border-white/70 bg-white/45 px-5 py-4 dark:border-white/10 dark:bg-white/5"
-        >
-          <h2 className="text-foreground text-xs font-semibold">
-            {shared.tipsTitle}
-          </h2>
-          <ul className="text-muted-foreground mt-2 grid gap-2 text-xs leading-5 sm:grid-cols-3">
-            {guide.tips.map((tip) => (
-              <li key={tip} className="flex gap-2">
-                <span aria-hidden="true" className="text-indigo-400">
-                  •
-                </span>
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
       </section>
 
       <Dialog
