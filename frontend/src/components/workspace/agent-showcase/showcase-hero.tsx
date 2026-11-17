@@ -26,7 +26,7 @@ export function ShowcaseHero({ agent }: { agent: ShowcaseAgent }) {
           loading="eager"
           fetchPriority="high"
           decoding="async"
-          className="relative z-10 h-[170px] w-auto max-w-[220px] object-contain object-bottom sm:h-[210px] sm:max-w-[240px] xl:h-[242px] xl:max-w-[260px]"
+          className="relative z-10 h-[160px] w-auto max-w-[200px] object-contain object-bottom sm:h-[178px] sm:max-w-[220px] xl:h-[188px] xl:max-w-[230px]"
         />
       </div>
       <div className="min-w-0 space-y-2 sm:space-y-3">

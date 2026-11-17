@@ -141,7 +141,7 @@ describe("AgentNewChatGuide", () => {
     });
   }
 
-  it("showcase renders the new hero, three videos, composer and tips in document flow", async () => {
+  it("showcase renders the new hero, three videos and composer in document flow", async () => {
     await renderGuide();
     const showcase = showcaseFor("course-video")!;
 
@@ -166,19 +166,15 @@ describe("AgentNewChatGuide", () => {
 
     const cases = container.querySelector("[data-testid='agent-guide-cases']");
     const input = container.querySelector("textarea");
-    const tips = container.querySelector("[data-testid='agent-guide-tips']");
     expect(input?.compareDocumentPosition(cases!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(cases?.compareDocumentPosition(tips!)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(tips?.textContent).toContain(
-      "告诉我主题、目标学员和期望时长，或提供真实截图、数据与完整讲稿。",
-    );
+    expect(
+      container.querySelector("[data-testid='agent-guide-tips']"),
+    ).toBeNull();
   });
 
-  it("legacy keeps the Co-writer header, four cases, composer and tips order", async () => {
+  it("legacy keeps the Co-writer header, four cases and composer order", async () => {
     await renderGuide({ agentName: "co-writer" });
     const guide = zhCN.agents.newChatGuides["co-writer"];
 
@@ -188,13 +184,12 @@ describe("AgentNewChatGuide", () => {
     expect(container.querySelector("svg.lucide-pen-line")).not.toBeNull();
     const cases = container.querySelector("[data-testid='agent-guide-cases']");
     const input = container.querySelector("textarea");
-    const tips = container.querySelector("[data-testid='agent-guide-tips']");
     expect(cases?.compareDocumentPosition(input!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(input?.compareDocumentPosition(tips!)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(
+      container.querySelector("[data-testid='agent-guide-tips']"),
+    ).toBeNull();
   });
 
   it("closes showcase media and resets cases when the agent changes in place", async () => {

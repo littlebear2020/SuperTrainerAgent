@@ -198,7 +198,9 @@ test.describe("Agent new-chat task guides", () => {
     const frame = page.getByTestId("agent-guide-input");
     const inputBox = frame.locator(".glass-input-box");
     const inputGroup = inputBox.locator("[data-slot='input-group']").first();
-    expect((await inputBox.boundingBox())!.width).toBeGreaterThanOrEqual(900);
+    const composerWidth = (await inputBox.boundingBox())!.width;
+    expect(composerWidth).toBeGreaterThanOrEqual(840);
+    expect(composerWidth).toBeLessThanOrEqual(880);
     await expect(inputBox).toHaveCSS("border-radius", "28px");
     await expect(inputGroup).toHaveCSS("border-radius", "28px");
     expect(
@@ -1135,14 +1137,10 @@ test.describe("Agent new-chat task guides", () => {
         ),
       ).toBe(true);
 
-      // Single 1180 shell: hero, composer frame and showcase root share the
-      // same left/right edges (the case grid sits inside the showcase column).
-      const lefts = [hero!.x, input!.x, showcase!.x];
-      const rights = [
-        hero!.x + hero!.width,
-        input!.x + input!.width,
-        showcase!.x + showcase!.width,
-      ];
+      // Hero and showcase share the single 1180 shell; the composer follows
+      // the demo and is capped at 860px, centered under that shell.
+      const lefts = [hero!.x, showcase!.x];
+      const rights = [hero!.x + hero!.width, showcase!.x + showcase!.width];
       expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(8);
       expect(Math.max(...rights) - Math.min(...rights)).toBeLessThanOrEqual(8);
 
@@ -1153,9 +1151,12 @@ test.describe("Agent new-chat task guides", () => {
         inputBox.locator("[data-slot='input-group']").first(),
       ).toHaveCSS("border-radius", radius);
       if (viewport.width === 1440) {
-        expect((await inputBox.boundingBox())!.width).toBeGreaterThanOrEqual(
-          900,
-        );
+        const inputWidth = (await inputBox.boundingBox())!.width;
+        expect(inputWidth).toBeGreaterThanOrEqual(840);
+        expect(inputWidth).toBeLessThanOrEqual(880);
+        const inputCenter = input!.x + input!.width / 2;
+        const shellCenter = hero!.x + hero!.width / 2;
+        expect(Math.abs(inputCenter - shellCenter)).toBeLessThanOrEqual(4);
       }
     });
   }
@@ -1189,6 +1190,19 @@ test.describe("Agent new-chat task guides", () => {
       "placeholder",
       zhCN.inputBox.placeholder,
     );
+  });
+
+  test("showcase guide omits verification badge, case note and tips block", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    const showcase = showcaseFor("course-video")!;
+    await openGuide(page, "course-video");
+    await expect(page.getByTestId("agent-guide-tips")).toHaveCount(0);
+    await expect(page.getByText("产物已核验", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(showcase.note.zh, { exact: false }),
+    ).toHaveCount(0);
   });
 
   test("390 long showcase placeholder wraps inside the composer without toolbar overlap", async ({
