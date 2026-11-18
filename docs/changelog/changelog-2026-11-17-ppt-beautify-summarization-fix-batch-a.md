@@ -1,7 +1,7 @@
 # PPT 美化摘要修复 Batch A：上下文完整性
 
-> **状态**：部分执行（PR A 实现、首轮远程评审及评审修复后的本地完整门禁已完成；新 7 页输入已冻结，但 Git 推送仍超时且当前进程缺 `QIHU_API_KEY`，真实冒烟未开始，未合并）。
-> **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失；增加字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留及结构化日志；未做真实 qwen 复测、46 页回放、默认模型完整交付或部署。
+> **状态**：部分执行（PR A 实现 + 评审修复 + 本地完整门禁 + 推送完成，新 HEAD `c17df653` 的 quick-checks/backend-unit-tests/AI+OCR 全绿、OCR 增量 0 发现；qwen P01 冒烟已运行：框架修复在真实重压下证明正确，但 authoring read-heavy 致 P01 未产出（FAIL+EXERCISED）；经用户决策 PR A 保持未合并、PR B 未开始，authoring 另开 §6 单变量计划；不授权部署或 46 页回放）。
+> **TL;DR**：修复无效摘要源、旧占位 checkpoint 复用与最新用户消息丢失（字符级尾部重试、精确 sentinel 校验、fresh/reuse 直接用户保留、结构化日志）；qwen 冒烟证实零占位 checkpoint/确认保留/fallback 行使/无重问，但 P01 因 executor-base/shared-standards-core 重读未产出（独立 authoring 问题）；未做 46 页回放、默认模型完整交付或部署。
 
 ## 变更记录
 
@@ -55,7 +55,13 @@
 原 7 页副本与旧 qwen 日志在执行时缺失。用户于 2026-11-17 明确授权修订：允许从现存 46 页原稿一次性制作并冻结新 7 页输入，以新 hash 完成两轮 qwen 验收；不再要求恢复原输入。
 
 - 输入准备命令：`python-pptx` 从 46 页源选取 `[1, 7, 10, 20, 24, 36, 46]` 并保存到 `temp/ppt-beautify-7p/店长招聘与汰换-7页代表页.pptx` → 源 `slides=46, sha256=e2cc3fc95e6696253b9e73f41aeb7a0736408d4c34cb30929d16abb62b875754`；新输入 `slides=7, bytes=7351912, sha256=16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`，`p03_native_table=True`。
-- 代码 HEAD：`6e2f660b4385a21efb8f98647e8a47960671d670`（含 OCR 第一轮修复；最终 PR HEAD 待推送后记录）。
-- qwen thread / 起止时间 / 压缩统计 / P01 结果：尚未产生（未运行）。
-- 最终 PPTX：Batch A 不交付；Batch B 尚未开始。
-- 新输入位于 git-ignored `temp/`；未覆盖或删除既有 Doubao 交付，未做 46 页回放或部署。
+- 代码 HEAD：`c17df653c85977695946905f9a97722fa8edff73`（PR A 最终 HEAD，含 OCR 修复 `6e2f660b`；已推送，远程三项检查全绿，OCR 增量 `0 finding(s) across 1 selected item(s)`）。
+- 驱动方式：进程内 `DeerFlowClient`（与网关共用同一 `create_agent`/`_build_middlewares` 工厂，含 `_create_summarization_middleware`），显式 `SqliteSaver` 落盘 `temp/qwen-summary-pr1-home/data/checkpoints.db`；`DEER_FLOW_CONFIG_PATH` 原样引用项目 config（`token_budget.enabled=false`、`max_recursion_limit=2500`、`qwen/qwen3.8-flash`、summarization trigger 32000/trim 30000/keep 10）；fresh home/thread/project/sandbox，seed `SEED_VERSION=2026-11-16.4`。半交互式同一 thread 多轮 = 一次冒烟。
+- qwen thread：`abf69dab-4db6-4133-80bb-315db8a5cc8f`。起止（UTC）：turn1 美化请求约 03:01–03:11（596s，33 调用）→ Stage 1 澄清；turn2 Stage 1 确认约 03:13–03:22（537.6s，58 捕获=33 回放+25 新）→ Stage 2 三选一（推荐 B）；turn3 最终确认 B 真实 authoring 约 03:36–04:29（3012s，100 新调用）。
+- 压缩统计（累计实时日志 + checkpoint 审计）：`character_tail_fallback=16`、`fresh=17`、`reuse=125`、`pass_through=2`；1798 checkpoint、17 个有效摘要 checkpoint、**bad_count=0（零占位/空）**；最新摘要有效（`## SESSION INTENT Re-layout/beautify…`），cutoff_index=284/message_count=294/approx_tokens=360392 随 fresh 正常推进；`exercised=true`。
+- 确认保留：最新真实用户消息（排除 `<uploaded_files>`/`<workspace_files>` 框架包装）= 「确认方案 B…」，`latest_real_user_is_B=True`；17 次压缩/100 次调用**全程无重问 Stage 1/2**（行为级证明）。
+- P01 结果：**未产出**。turn3 硬停 `TOOL_LIMIT_100_NO_P01`（100 次真实调用=49 read_file/45 bash/6 write_file，6 次 write 全为 design_spec/spec_lock/confirm_state/recommendations，无 SVG）。重读目标（全态 65 次 read_file）：`executor-base.md`×8、`spec_lock.md`×6、`generate-pptx.md`×5、`design_spec.md`×5、源 md×4、`shared-standards-core.md`×4、native-data-interface×3、style/mode refs 各×2。
+- 判定：**FAIL+EXERCISED**。框架修复（PR A）证明正确；失败属 ppt-master read-heavy authoring（计划 §6「摘要健康…P01 仍因 executor-base/shared-standards-core 重读而失败」分支），独立于框架 bug，本批不改 prompt/5000 skill cap。
+- 处置（用户决策）：PR A 保持未合并（handoff「P01 通过才合并」门槛）、PR B 未开始、未增加付费复测；authoring 另开 §6 单变量计划。证据保留 git-ignored `temp/qwen-smoke/`（turn-01~04/audit/result/checkpoints.json）与 `temp/qwen-summary-pr1-home/`；本批沙箱容器已停，无孤儿进程。
+- 驱动 note：turn3 首次尝试因 `client.stream` values 模式 resume 回放历史（client.py:648-676）被监控误判 REASK（零模型调用）；修复为按 turn 前消息 ID 过滤回放后重发 B 真实运行（非付费复测）。usage `output_tokens` 异常偏低为已知 qwen token 口径问题（findings-backlog），非行为信号；权威调用数以 checkpoint 消息为准。
+- 最终 PPTX：Batch A 不交付；Batch B 尚未开始。新输入位于 git-ignored `temp/`；未覆盖或删除既有 Doubao 交付，未做 46 页回放或部署。

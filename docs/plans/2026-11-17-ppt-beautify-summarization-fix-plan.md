@@ -1,6 +1,6 @@
 # PPT 美化长链路上下文压缩修复实施计划
 
-> **状态**：未执行（部分执行：PR A 已开 `#27`，Task 1/2 与 Task 3 Step 1–6 已完成；新 7 页输入已按修订授权冻结，hash=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；Git 推送仍超时，当前进程缺 `QIHU_API_KEY`，PR A 未合并、PR B 未开始；不授权部署或 46 页付费回放）。
+> **状态**：未执行（部分执行：PR A `#27` 已推送至 `c17df653`，远程 quick-checks/backend-unit-tests/AI+OCR 全绿、OCR 增量 0 发现；Task 1/2/3 与 Task 4 冒烟已完成——qwen P01 冒烟 FAIL+EXERCISED：框架修复证明正确（零占位 checkpoint/确认保留/fallback 行使/无重问），但 authoring read-heavy 致 P01 未产出（§6 分支）；经用户决策 PR A 保持未合并、PR B 未开始、未增加付费复测，authoring 另开 §6 单变量计划；新 7 页输入 hash=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`；不授权部署或 46 页付费回放）。
 > **TL;DR**：先修 DeerFlow 空/退化摘要、旧占位 checkpoint 复用和最新用户消息丢失，再补跨代摘要连续性；ppt-master 保持 P29 不变，用同一 qwen、同一冻结的新 7 页输入做单变量复测。影响面仅限 summarization 中间件、测试与文档；不实施 P30、不改 seed/config、不宣称 46 页长链已验证。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 两个 PR 必须串行，禁止并行改动同一中间件。
@@ -138,16 +138,16 @@
 - [x] **Step 4：写 Batch A changelog。** 必含 ≤5 行 TL;DR、RED→GREEN 证据和 `## 验收记录`；逐行采用“命令 → 实际关键输出”，明确尚未做 46 页与默认模型完整交付。
 - [x] **Step 5：跑提交前门禁。** 定向/相邻测试后，依次以后台任务运行 `cd backend && make test`、`cd backend && make lint` 与根 `make check`，前一项完成且输入未变再启动下一项；再跑 `python3 scripts/check_docs_convention.py` 和 `git diff --check`。全部通过才可 push；不设置 `RUN_LIVE=1`。
 - [x] **Step 6：提交并开 PR A。** 分支 `ppt-beautify-summarization-context-integrity`，文档提交可用 `docs(summarization): 记录上下文完整性与复测边界`。显式设置 `GH_REPO` 为 origin 仓库，PR 正文链接本计划与 Batch A changelog，等待 AI/OCR + CI；Critical/Important 必须先修。
-- [ ] **Step 7：完成 Task 4 冒烟后再决定合并。** 新占位、确认仍从重建窗口消失或 checkpoint 误推进 = 修复未成立，禁止合并；仅 qwen  authoring 行为失败不掩盖框架修复，可合入已证明正确的代码，但计划状态只能写“部分执行/默认模型未通过”。
+- [x] **Step 7：完成 Task 4 冒烟后再决定合并。** 新占位、确认仍从重建窗口消失或 checkpoint 误推进 = 修复未成立，禁止合并；仅 qwen  authoring 行为失败不掩盖框架修复，可合入已证明正确的代码，但计划状态只能写“部分执行/默认模型未通过”。
 
 ### Task 4：PR A 单变量 qwen 冒烟，只验证到 P01
 
-- [ ] **Step 1：冻结对照条件。** 按修订授权从 46 页原稿选取 `[1, 7, 10, 20, 24, 36, 46]`，一次性生成并冻结 `temp/ppt-beautify-7p/店长招聘与汰换-7页代表页.pptx`；验证 7 页、P03 原生表格与 SHA-256=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`。固定同一 qwen3.8-flash、P29 / `.4` SOUL 与技能、相同确认回复、`token_budget.enabled=false`、`recursion_limit=2400`。使用全新 `DEER_FLOW_HOME=temp/qwen-summary-pr1-home`、thread、project、sandbox 前缀；不得复用旧 stub checkpoint。
-- [ ] **Step 2：只改变 PR A。** 不改 P30、prompt、模型、skill rescue 参数或参考文档。运行期间冻结代码与配置输入，保存日志和 checkpoint 于 `temp/`，不入库。
-- [ ] **Step 3：按真实事件外部硬停。** 最终确认后出现任何一个新占位/空摘要 checkpoint、再次询问 Stage 1/2、或 100 次真实工具调用仍无 `svg_output/p01.svg`，立即停止并保存证据；另设 20 分钟无新产物的纯成本安全兜底，但不把超时本身归为模型根因。调用数从真实消息/tool call 还原，不用流式行数。
-- [ ] **Step 4：判定是否命中目标路径。** 若出现字符级 fallback WARNING 且随后生成非占位 checkpoint、重建窗口保留最终确认并写出 P01，记 `PASS + EXERCISED`；若未触发 fallback 但 P01 正常出现，记 `PASS + NOT_EXERCISED`，只能声称行为冒烟通过，确定性回归才是 bug 修复证据。不得为追求命中反复烧 token。
-- [ ] **Step 5：P01 后即停并分类。** 本冒烟不要求 PPTX。若摘要健康、确认/规格/锁可见但仍反复重读，记录实际文件和 checkpoint，不在本 PR 加 prompt 或调 5000 skill cap，并暂停在进入 Batch B 之前按 §6 决策；若仍有占位/确认丢失，返回 Task 1/2。只有 P01 冒烟通过才默认进入 PR B。
-- [ ] **Step 6：回填 changelog 与计划。** 记录输入 hash、代码 commit、thread、起止时间、压缩/占位数、是否 EXERCISED、真实调用数、P01 结果和停止原因；更新 PR A，满足 Task 3 Step 7 后 `gh pr merge --rebase`。不部署。
+- [x] **Step 1：冻结对照条件。** 按修订授权从 46 页原稿选取 `[1, 7, 10, 20, 24, 36, 46]`，一次性生成并冻结 `temp/ppt-beautify-7p/店长招聘与汰换-7页代表页.pptx`；验证 7 页、P03 原生表格与 SHA-256=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`。固定同一 qwen3.8-flash、P29 / `.4` SOUL 与技能、相同确认回复、`token_budget.enabled=false`、`recursion_limit=2400`。使用全新 `DEER_FLOW_HOME=temp/qwen-summary-pr1-home`、thread、project、sandbox 前缀；不得复用旧 stub checkpoint。
+- [x] **Step 2：只改变 PR A。** 不改 P30、prompt、模型、skill rescue 参数或参考文档。运行期间冻结代码与配置输入，保存日志和 checkpoint 于 `temp/`，不入库。
+- [x] **Step 3：按真实事件外部硬停。** 最终确认后出现任何一个新占位/空摘要 checkpoint、再次询问 Stage 1/2、或 100 次真实工具调用仍无 `svg_output/p01.svg`，立即停止并保存证据；另设 20 分钟无新产物的纯成本安全兜底，但不把超时本身归为模型根因。调用数从真实消息/tool call 还原，不用流式行数。
+- [x] **Step 4：判定是否命中目标路径。** 若出现字符级 fallback WARNING 且随后生成非占位 checkpoint、重建窗口保留最终确认并写出 P01，记 `PASS + EXERCISED`；若未触发 fallback 但 P01 正常出现，记 `PASS + NOT_EXERCISED`，只能声称行为冒烟通过，确定性回归才是 bug 修复证据。不得为追求命中反复烧 token。
+- [x] **Step 5：P01 后即停并分类。** 本冒烟不要求 PPTX。若摘要健康、确认/规格/锁可见但仍反复重读，记录实际文件和 checkpoint，不在本 PR 加 prompt 或调 5000 skill cap，并暂停在进入 Batch B 之前按 §6 决策；若仍有占位/确认丢失，返回 Task 1/2。只有 P01 冒烟通过才默认进入 PR B。
+- [x] **Step 6：回填 changelog 与计划。** 记录输入 hash、代码 commit、thread、起止时间、压缩/占位数、是否 EXERCISED、真实调用数、P01 结果和停止原因；更新 PR A，满足 Task 3 Step 7 后 `gh pr merge --rebase`。不部署。
 
 ## Batch B / PR B：补跨代摘要连续性并完成 7 页验收
 
