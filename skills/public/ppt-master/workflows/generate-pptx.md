@@ -241,6 +241,8 @@ Read ${SKILL_DIR}/references/visual-styles/<resolved-id>.md # one preset id, or 
 # and read every triggered module in this same batch.
 ```
 
+**Compacted recovery precedence**: if compaction happens before or during the initial Step 6 read batch, stop that batch immediately and switch to the compacted row below. Do not restart or complete the full core or roster-wide triggered module set before writing the current page; read only the current-page sections required by that row.
+
 Read the core as one batch with the exact detail files named by the retained `spec_lock.md`, then every module the roster sweep triggers. Never reopen the planning indexes, infer adjacent bases, glob a catalog, or blend unselected identities (an unreferenced custom follows its behavior alone). Conditional modules load on [`executor-base.md`](../references/executor-base.md)'s routing table, never by analogy; `video-design.md` is read before the first SVG when §I records recorded/self-running/video delivery or §X a literal script. Read each reference once per valid context.
 
 **Context validity**: reuse the retained Design Spec and lock for every page while the context is unchanged and uncompacted; do not reread or poll them. On local uncertainty consult the retained lock, then only the owning Design Spec fragment — sources supply facts only, and the Design Spec wins a conflict.

@@ -162,6 +162,21 @@ def test_non_compacted_context_recovery_remains_full():
     assert "triggered inputs" in recovery_row
 
 
+def test_compacted_recovery_preempts_initial_step6_batch():
+    generate = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
+    assert "**Compacted recovery precedence**" in generate
+    assert "before or during the initial Step 6 read batch" in generate
+    assert "stop that batch immediately" in generate
+    assert "Do not restart or complete the full core" in generate
+
+    recovery_row = _markdown_table_row(
+        SKILL_DIR / "workflows" / "governance" / "failure-recovery.md",
+        "Execution context is compacted",
+    )
+    assert "takes precedence over the initial Step 6 read batch" in recovery_row
+    assert "before or during that batch" in recovery_row
+
+
 def _markdown_table_row(path: Path, first_cell: str) -> str:
     prefix = f"| {first_cell}"
     for line in path.read_text(encoding="utf-8").splitlines():
