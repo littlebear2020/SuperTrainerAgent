@@ -349,8 +349,8 @@ def test_reseed_preserves_runtime_memory_json(tmp_path: Path, monkeypatch):
 
 
 def test_seed_version_and_exact_agent_roster():
-    # 2026-11-16.4: ppt-master 最终确认短路 + P05 同 thread 续写规则 + 用户明确改方案例外。
-    assert SEED_VERSION == "2026-11-16.4"
+    # 2026-11-18.1: ppt-master compacted recovery 改为查盘与当前页有界读取。
+    assert SEED_VERSION == "2026-11-18.1"
     agent_names = {path.name for path in SEED_DIR.iterdir() if path.is_dir() and (path / "config.yaml").exists()}
     assert agent_names == {
         "co-writer",

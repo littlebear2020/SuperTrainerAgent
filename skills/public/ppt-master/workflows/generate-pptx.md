@@ -247,7 +247,8 @@ Read the core as one batch with the exact detail files named by the retained `sp
 
 | Situation | Read |
 |---|---|
-| Fresh, resumed, restarted, compacted, or externally changed context | `design_spec.md`, then `spec_lock.md`, once, plus triggered references and the latest completed SVG when mid-deck ([`failure-recovery.md`](governance/failure-recovery.md)) |
+| Fresh, resumed, restarted, or externally changed context | `design_spec.md`, then `spec_lock.md`, once, plus triggered references and the latest completed SVG when mid-deck ([`failure-recovery.md`](governance/failure-recovery.md)) |
+| Compacted context only, with `design_spec.md` and `spec_lock.md` both present | First inspect `svg_output/` on disk, verify existing SVGs are non-empty, and choose the first missing page in §IX order (a 0-byte file still stops under P22). Read `spec_lock.md` once, the current page's §IX block, and only the reference sections required by that page (its resolved mode/visual-style and triggered modules). Locate section headings and use `read_file` with `start_line`/`end_line`; do not follow a truncation marker into a whole-file read. **Do not read the complete Design Spec, any complete core reference, or the roster-wide triggered module set.** Resume at the current page without rewriting completed non-empty SVGs. |
 | Bounded same-context repair that preserves roster/order/identity/communication | Only the affected fragment readback plus `project_manager.py validate` |
 | **Five-page lock re-read** — after P05, P10, P15, … when another page follows | `spec_lock.md` in full once before the next page: a pure re-anchor of palette, typography, icon style, and `page_rhythm` under long context, with no checker run, no output, no pause, and no repair loop; an external change found here follows the recovery branch |
 | §X records a literal script | The frozen `notes/total.md` once before P01; design each visible state around its segment |

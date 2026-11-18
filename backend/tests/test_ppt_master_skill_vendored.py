@@ -109,6 +109,67 @@ def test_overlay_pins_document_patches():
     assert "backend/seed/agents/ppt-master/SOUL.md" in overlay
 
 
+def test_generate_compacted_recovery_is_disk_first_and_bounded():
+    row = _markdown_table_row(
+        SKILL_DIR / "workflows" / "generate-pptx.md",
+        "Compacted context",
+    )
+    for anchor in (
+        "svg_output/",
+        "first missing page",
+        "spec_lock.md",
+        "current page's §IX block",
+        "only the reference sections required by that page",
+        "start_line",
+        "end_line",
+    ):
+        assert anchor in row
+    assert "Do not read the complete Design Spec" in row
+    assert "roster-wide triggered module set" in row
+
+
+def test_failure_recovery_compacted_branch_matches_bounded_contract():
+    row = _markdown_table_row(
+        SKILL_DIR / "workflows" / "governance" / "failure-recovery.md",
+        "Execution context is compacted",
+    )
+    for anchor in (
+        "svg_output/",
+        "first missing page",
+        "spec_lock.md",
+        "current page",
+        "start_line",
+        "end_line",
+        "roster-wide triggered module set",
+    ):
+        assert anchor in row
+
+
+def test_non_compacted_context_recovery_remains_full():
+    generate_row = _markdown_table_row(
+        SKILL_DIR / "workflows" / "generate-pptx.md",
+        "Fresh, resumed, restarted, or externally changed context",
+    )
+    assert "design_spec.md" in generate_row
+    assert "spec_lock.md" in generate_row
+    assert "triggered references" in generate_row
+
+    recovery_row = _markdown_table_row(
+        SKILL_DIR / "workflows" / "governance" / "failure-recovery.md",
+        "Execution context is fresh, resumed, restarted, external, or unknown",
+    )
+    assert "complete Design Spec" in recovery_row
+    assert "triggered inputs" in recovery_row
+
+
+def _markdown_table_row(path: Path, first_cell: str) -> str:
+    prefix = f"| {first_cell}"
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith(prefix):
+            return line
+    raise AssertionError(f"{path.name} missing table row: {first_cell}")
+
+
 def _trainerai_overlay() -> str:
     text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     assert "TrainerAI 覆盖" in text, "P1 覆盖段缺失"
