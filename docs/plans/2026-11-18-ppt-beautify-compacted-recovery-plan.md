@@ -1,6 +1,6 @@
 # PPT 美化 compacted recovery 收窄修复计划
 
-> **状态**：未执行（部分执行：静态门禁全绿；v1 `6616aa94` 与 v2 `0c942a8f` 两次授权 qwen 冒烟均 FAIL+EXERCISED、100 次调用无 P01，摘要零占位且无重问；prompt-only 收窄未成立，后续架构决策待定；PR A 保持未合并，PR B 不启动）。
+> **状态**：未执行（部分执行：静态门禁与 PR #28 远程 CI/AI+OCR 全绿、OCR 0 发现；v1 `6616aa94` 与 v2 `0c942a8f` 两次授权 qwen 冒烟均 FAIL+EXERCISED、100 次调用无 P01，摘要零占位且无重问；prompt-only 收窄未成立，后续架构决策待定；PR A 保持未合并，PR B 不启动，PR #28 不合并）。
 > **TL;DR**：只收窄 ppt-master 在上下文压缩后的恢复读取，先查盘已有 SVG，再有界读取 `spec_lock.md`、当前页 §IX 与当前页所需模块章节；fresh/resumed/restarted/external 全量恢复、PR A summarization、压缩 trigger/cap 和模型配置均不变。影响面为 vendored 技能文档、补丁登记、SEED_VERSION 与测试；真实验收只到 P01。
 
 ## 1. 已确认根因与单一假设
@@ -73,8 +73,8 @@ PR A 真实冒烟已证明摘要健康、最终确认保留且没有重问，但
 ### Task 5：记录、stacked PR 与 OCR
 
 - [x] 新建 `docs/changelog/changelog-2026-11-18-ppt-beautify-compacted-recovery.md`，含 TL;DR、RED→GREEN、reseed 与真实行为结果、`## 验收记录`；回填本计划勾选和唯一状态头，不宣称完整 7 页或 46 页通过。
-- [ ] 提交单主题 commits，确认 summarization diff 为零、真实证据未入库；push `ppt-beautify-compacted-recovery`，以 PR A 分支为 base 开 PR，正文链接计划/changelog 并说明 stacked 关系。
-- [ ] 等待 AI/OCR 与 CI，处理所有 Critical/Important；PR A 保持未合并、PR B 不启动。authoring PR 的合入与 PR A 后续推进在 P01 结果和评审齐备后按用户门槛决定，不部署。
+- [x] 提交单主题 commits，确认 summarization diff 为零、真实证据未入库；push `ppt-beautify-compacted-recovery`，以 PR A 分支为 base 开 PR #28，正文链接计划/changelog 并说明 stacked 关系。
+- [x] 等待 AI/OCR 与 CI，处理所有 Critical/Important；远程 quick-checks/backend-unit-tests/review 全绿，OCR `0 finding(s)`、无 Critical/Important。PR A 保持未合并、PR B 不启动；P01 未通过，PR #28 仅评审、不合并、不部署。
 
 ## 5. 完成定义与边界
 

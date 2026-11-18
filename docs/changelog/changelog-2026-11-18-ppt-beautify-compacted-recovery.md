@@ -1,6 +1,6 @@
 # PPT 美化 compacted recovery 收窄修复记录
 
-> **状态**：部分执行／行为验收未通过（静态门禁全绿；两次授权 qwen 冒烟均为 FAIL+EXERCISED，P01 未产出；PR 仅评审，不合并）。
+> **状态**：部分执行／行为验收未通过（静态门禁与 PR #28 远程 CI/AI+OCR 全绿、OCR 0 发现；两次授权 qwen 冒烟均为 FAIL+EXERCISED，P01 未产出；PR 仅评审，不合并）。
 > **TL;DR**：将 compacted recovery 拆为查盘 + 当前页有界恢复，登记 P30 并 bump `SEED_VERSION=2026-11-18.1`；随后补上其对首次 Step 6 读批次的显式优先级。两次真实 qwen 运行都保持摘要健康且无重问，但都在 100 次调用后无 P01；prompt-only 收窄未成立，未改 summarization、trigger/cap 或 PR B。
 
 ## 1. 改动范围
@@ -69,10 +69,12 @@
 - v1 最终轮 + audit → `HARD_STOP=TOOL_LIMIT_100_NO_P01`；`FAIL+EXERCISED`；`bad_count=0`；13 个有效摘要；无 P01。
 - v2 零调用 preflight → 同上且 compacted + precedence marker 均存在，HEAD=`0c942a8f`。
 - v2 最终轮 + audit → `HARD_STOP=TOOL_LIMIT_100_NO_P01`；`FAIL+EXERCISED`；`bad_count=0`；14 个有效摘要；无 P01。
+- `gh pr checks 28 --watch` → quick-checks `pass 23s`、backend-unit-tests `pass 4m5s`、review `pass 24s`。
+- `gh pr view 28 --comments` → `OpenCodeReview: Review complete: 0 finding(s) across 1 selected item(s)`；reviews/inline comments 均为空。
 - `git diff --exit-code 468a7761 -- backend/.../summarization_middleware.py backend/tests/test_summarization_middleware.py` → exit 0，summarization 零改动。
 
 ## 6. 评审与合并边界
 
 - 本地实现提交：`6616aa94`、`0c942a8f`。
-- stacked PR：待创建，base=`ppt-beautify-summarization-context-integrity`（PR A #27）；OCR/CI 结果待回填。
+- stacked PR：[#28](https://github.com/littlebear2020/SuperTrainerAgent/pull/28)，base=`ppt-beautify-summarization-context-integrity`（PR A #27）。远程 quick-checks（run `44289144376`）、backend-unit-tests（`44289144387`）、review（`44289144587`）全绿；OCR `0 finding(s)`、`files_reviewed=1`，无 inline comments / Critical / Important。
 - PR A 保持未合并，PR B 未开始；不部署，不宣称完整 7 页或 46 页通过。
