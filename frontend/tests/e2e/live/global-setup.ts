@@ -16,13 +16,10 @@ const STATE_PATH = path.join(
   "state.json",
 );
 
+import { getLiveBaseUrl } from "./config";
+
 async function globalSetup() {
-  const baseURL = process.env.LIVE_BASE_URL;
-  if (!baseURL) {
-    throw new Error(
-      "缺少 LIVE_BASE_URL:请设置为被测部署的根地址(含协议与端口),不写入仓库",
-    );
-  }
+  const baseURL = getLiveBaseUrl();
   const email = process.env.LIVE_EMAIL;
   const password = process.env.LIVE_TEST_PASSWORD;
   if (!email || !password) {
