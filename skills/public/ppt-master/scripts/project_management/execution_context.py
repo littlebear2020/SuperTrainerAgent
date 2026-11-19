@@ -208,19 +208,33 @@ def _native_table_fragments(*, skill_dir: Path) -> list[dict[str, str]]:
     return [extract_rule_fragment(selector, skill_dir=skill_dir) for selector in selectors]
 
 
+_NATIVE_DECLARATION_RE = re.compile(r"native-ready\*{0,2}\s*[:：]\s*(.+?)\s*$", re.IGNORECASE)
+_NATIVE_COMMENTARY_RE = re.compile(r"[（(][^）)]*[）)]")
+_NATIVE_VERDICT_RE = re.compile(r"(yes|no)\b", re.IGNORECASE)
+
+
 def _native_ready_status(brief: str) -> bool | None:
+    """True when any Native-ready entry on the page says yes, False when every entry says no, None when undeclared.
+
+    A page may key several objects (`a=no; b=yes`), so every entry decides, not just the first. Parenthetical
+    commentary is dropped before entries are split, so prose that mentions yes/no cannot decide the page.
+    """
+    decisions: list[bool] = []
     for line in brief.splitlines():
         if "native-ready" not in line.casefold():
             continue
-        match = re.search(r"native-ready\*{0,2}\s*[:：]\s*(.+?)\s*$", line, flags=re.IGNORECASE)
+        match = _NATIVE_DECLARATION_RE.search(line)
         if match is None:
             continue
-        # `key = yes|no` (key may be backticked, commentary may follow) or the legacy bare `yes|no`; first `;` entry decides.
-        entry = match.group(1).split(";", 1)[0].strip()
-        ready = re.match(r"(?:[^=;]+?\s*=\s*)?(yes|no)\b", entry, flags=re.IGNORECASE)
-        if ready is not None:
-            return ready.group(1).lower() == "yes"
-    return None
+        for entry in re.split(r"[;；]", _NATIVE_COMMENTARY_RE.sub("", match.group(1))):
+            # `key = yes|no` decides on the value after `=` (a key such as `yes-table` is not a verdict); legacy bare `yes|no` has no `=`.
+            _key, equals, value = entry.partition("=")
+            ready = _NATIVE_VERDICT_RE.match((value if equals else entry).strip())
+            if ready is not None:
+                decisions.append(ready.group(1).lower() == "yes")
+    if not decisions:
+        return None
+    return any(decisions)
 
 
 def _select_core_and_modules(result: PageContextResult, *, skill_dir: Path) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
@@ -410,3 +424,6 @@ def validate_execution_context(payload: dict[str, object], result: PageContextRe
     expected = build_execution_context(result)
     if actual != expected["context_sha256"]:
         raise ExecutionContextError("execution-context stale: context_sha256 mismatch")
+    # The hash excludes the measured `tokens` (they embed the file's own size), so check them against the fresh build.
+    if payload.get("tokens") != expected["tokens"]:
+        raise ExecutionContextError("execution-context changed: tokens mismatch")
