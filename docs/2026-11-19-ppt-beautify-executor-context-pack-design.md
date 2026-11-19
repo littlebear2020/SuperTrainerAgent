@@ -5,7 +5,7 @@
 
 ## 1. 背景与已验证问题
 
-PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生在 authoring：v1 `6616aa94` 与 v2 `0c942a8f` 都在最终确认后的 100 次工具调用内未生成 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）`。两次真实 checkpoint 都显示首次 Step 6 核心批次和全 roster 模块读取继续执行；v2 还通过 `bash sed/cat` 读取核心大段。故继续叠加“少读一点”的 prompt 不构成可靠修复。
+PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生在 authoring：v1 `6616aa94` 与 v2 `0c942a8f` 都在最终确认后的 100 次工具调用内未生成 `svg_output/p01.svg`（或 `01_*.svg`）`。两次真实 checkpoint 都显示首次 Step 6 核心批次和全 roster 模块读取继续执行；v2 还通过 `bash sed/cat` 读取核心大段。故继续叠加“少读一点”的 prompt 不构成可靠修复。
 
 已排除的错误前提：
 
@@ -51,7 +51,7 @@ PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生
 - 不修改 System Prompt、SOUL、Dynamic Context、Skill Rescue、bash/read_file 中间件、trigger/trim/cap 或模型配置。
 - 不新增 `system-anchored` 标签，不按 Agent Name 注入全局豁免。
 - 不改变 Quick、structured/mirror、Create Template 等其他 PPT 路线的读取行为。
-- 不直接生成 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 或其他最终页面；执行包只是派生输入，不能替代模型 authoring。
+- 不直接生成 `svg_output/p01.svg`（或 `01_*.svg`）` 或其他最终页面；执行包只是派生输入，不能替代模型 authoring。
 - 不以 P01 冒烟冒充完整 7 页、46 页或生产质量验收。
 
 ## 4. 方案比较与选择
@@ -111,7 +111,7 @@ design_spec.md + spec_lock.md + selected templates/assets
 python3 ${SKILL_DIR}/scripts/project_manager.py execution-context <project_path> P01
 ```
 
-CLI 只输出短回执（产物路径、页码、token 数、SHA），不把大 JSON 塞进 bash stdout。模型随后用一次 `read_file` 读取该执行包。
+CLI 只输出短回执（产物路径、页码、token 数、SHA 和 `read_ranges`），不把大 JSON 塞进 bash stdout。模型随后按回执用最多两个 `<48000-byte` `read_file(start_line,end_line)` 有界读取完整执行包。
 
 ### 6.3 执行包格式
 
@@ -247,7 +247,7 @@ rule_id → source_path + stable heading/paragraph anchor + requiredness
 - 总 token 与各组成项，均须满足预算；
 - 必需 rule ID 覆盖和来源 SHA；
 - P01 图片规则、P03 表格/原生数据规则存在，其他页面专属内容不混入；
-- 包 bytes 小于 read_file 上限，CLI stdout 仅为短回执。
+- 整包 bytes <64000，且每个 `read_range` bytes <48000，CLI stdout 仅为短回执与 ranges。
 
 若覆盖或预算失败，停止在选择器/投影层修正，不进入第三次付费模型运行。
 
@@ -255,7 +255,7 @@ rule_id → source_path + stable heading/paragraph anchor + requiredness
 
 保持同一冻结输入 SHA=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`、qwen3.8-flash、PR A、token budget disabled、recursion 2400、fresh home/thread 和正常 Stage 1/2：
 
-- 模型自主写出非空 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 即停；100 次调用无 P01 / 新占位 / 重问 / 20 分钟无新产物硬停。
+- 模型自主写出非空 `svg_output/p01.svg`（或 `01_*.svg`）` 即停；100 次调用无 P01 / 新占位 / 重问 / 20 分钟无新产物硬停。
 - checkpoint 零占位、确认保留、无 Stage 1/2 重问。
 - 审计真实工具参数：首次 Step 6 和 compacted 后均无完整核心文件或全 roster 批次；执行包构建与读取路径、token、SHA 与当前页一致。
 - 未通过则保留证据，不宣称修复，不叠加 System Prompt 或 summarization 变更。
@@ -272,7 +272,7 @@ P01 通过后，完整 7 页的文字保真、原生表格、质量门和渲染�
 ## 13. 主要风险与权衡
 
 - **规则覆盖风险**：精确片段可能漏掉隐含依赖。以选择器 fail-closed、P01/P03 覆盖矩阵和后续 7 页质量门控制，不用自由摘要掩盖。
-- **预算风险**：14000 tokens 可能容纳不了某些复杂页面。先暴露并修正选择器，不静默加预算或截断。
+- **预算风险**：16000 tokens 可能容纳不了某些复杂页面。先暴露并修正选择器，不静默加预算或截断。
 - **行为风险**：模型仍可能无视新路径去读原文件。工作流会移除强制批次并以真实工具审计验证；若仍失败，不再叠加提示层修补。
 - **实现复杂度**：复用现有 page-context 可显著减少解析工作，但选择器和所有权变更仍需完整测试与 vendored 评审。
 - **质量权衡**：取消全 roster 预读是刻意改变，不把“读得少”等同于“质量必然不变”；P01 只是入口，后续完整页面验收仍是必要条件。

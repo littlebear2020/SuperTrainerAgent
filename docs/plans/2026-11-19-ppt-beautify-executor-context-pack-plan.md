@@ -154,20 +154,20 @@
 - [x] **Step 2：跑定向与相邻回归。** 先跑 Task 3 命令，再跑 `tests/test_ppt_master*.py tests/test_seed_*.py tests/test_sandbox_read_file_range.py tests/test_skillscan_native.py`；全部通过。
 - [x] **Step 3：顺序运行完整门禁。** 输入冻结，依次后台运行 `cd backend && make test`、`make lint`、根 `make check`，再跑 `python3 scripts/check_docs_convention.py` 和 `git diff --check`；不得把 warnings 当 errors 隐瞒，也不得并行修改被测输入。
 - [x] **Step 4：确认范围。** `git diff 468a7761...HEAD` 只含 allow 路径和本计划文档；summarization 零改动，真实证据未入库，工作区无测试生成的多余文件。
-- [ ] **Step 5：停在付费门。** 向用户报告真实探针 token、rule coverage、reseed 与全部免费结果，单独请求第三次 qwen 付费授权；未明确同意不得进入 Task 5。
+- [x] **Step 5：停在付费门。** 向用户报告真实探针 token、rule coverage、reseed 与全部免费结果，单独请求第三次 qwen 付费授权；未明确同意不得进入 Task 5。**实际：用户明确授权第三次付费，并授权继续完成当前计划 Task 5/6；未扩展到 PR B、完整 7/46 页或部署。**
 
 ### Task 5：用户另行授权后的 qwen P01 行为验收
 
 - [x] **Step 1：重建对照环境。** 使用最终 HEAD、fresh `DEER_FLOW_HOME`/evidence/thread/project/sandbox，同一冻结输入/qwen/PR A/config；preflight 再次验证 hash、seed 和 execution module/CLI。不得复用 v1/v2 home 或失败 checkpoint。
 - [x] **Step 2：正常完成 Stage 1/2。** 有明确推荐则确认推荐项；若仍未推荐，按首个列出项并记录 ruling。不得添加内容、布局或工具顺序指导。
-- [x] **Step 3：运行最终 authoring 监控。** 最终确认后，非空 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 即停；100 次真实工具调用无 P01、新占位/空 checkpoint、Stage 1/2 重问或 20 分钟无新产物立即硬停。不要求完整 PPTX。**实际：模型写出符合技能命名的 `svg_output/01_cover.svg`，2304 bytes、XML 可解析；驱动原先仅找 `p01.svg`，已修正为同时识别 `01_*.svg` 并重审为 P01_PRODUCED。**
+- [x] **Step 3：运行最终 authoring 监控。** 最终确认后，非空 `svg_output/p01.svg`（或 `01_*.svg`）` 即停；100 次真实工具调用无 P01、新占位/空 checkpoint、Stage 1/2 重问或 20 分钟无新产物立即硬停。不要求完整 PPTX。**实际：模型写出符合技能命名的 `svg_output/01_cover.svg`，2304 bytes、XML 可解析；驱动原先仅找 `p01.svg`，已修正为同时识别 `01_*.svg` 并重审为 P01_PRODUCED。**
 - [x] **Step 4：从 checkpoint 审计真实行为。** 驱动 turn args 可能为空，必须以持久化 checkpoint 参数为准：零占位、确认保留、无重问；首次和 compacted 后均无完整核心/全 roster；执行包构建/读取路径、页码、token、SHA 与 probe 一致，未重写已有非空 SVG。**实际：执行包调用 43/57/74，分段读取 59（1–8）/60（9–15）；采用后无无界核心 read_file，但 call 31/35 在首次执行包前仍有完整核心读取，严格“首次也无全量”要求未完全满足。**
 - [x] **Step 5：按结果处置。** PASS 只表示同一 qwen+输入+HEAD 的 P01 入口通过；FAIL 则保存证据并停止，不再叠加 System Prompt、bash 提醒、summarization 或 cap 修改。任何额外付费运行都需要新授权。**实际：P01 PASS + 首次全量读取缺口；不宣称全部读取约束通过，不合并，进入证据化评审。**
 
 ### Task 6：记录、完整自审、stacked PR 与 OCR
 
 - [x] **Step 1：写 changelog 并回填计划。** 新建 `docs/changelog/changelog-2026-11-19-ppt-beautify-executor-context-pack.md`，含 ≤5 行 TL;DR、RED→GREEN、真实 probe token/rule IDs、reseed、完整门禁、P01 真实结果和 `## 验收记录`（每行命令→关键输出）。更新本计划唯一状态头和勾选；P01 未通过则保持未执行/部分执行，禁止宣称完整 7 页或 46 页。
-- [ ] **Step 2：全分支自审。** 检查 spec 每项覆盖、默认 page-context 兼容、非 flat 不变、选择器无静默漏规则、summarization diff 为零；无获授权子代理时明确记录 self-review，不伪称独立评审。
+- [x] **Step 2：全分支自审。** 检查 spec 每项覆盖、默认 page-context 兼容、非 flat 不变、选择器无静默漏规则、summarization diff 为零；无获授权子代理时明确记录 self-review，不伪称独立评审。
 - [ ] **Step 3：提交并开 stacked PR。** 推送 `ppt-beautify-executor-context-pack`，以 PR A 分支为 base 开 PR，正文链接 spec/plan/changelog，说明 #28 为失败 prompt-only 分支且未合并、PR B 未开始。P01 未通过时标题/正文必须明确“行为未通过，仅评审”。
 - [ ] **Step 4：等待 AI/OCR 与 CI。** 读取实际评论与 OCR 日志，不只信绿色状态；Critical/Important 必须先按 TDD 修复并重跑门禁。远程 OCR 不依赖本地 OCR 凭据，本地失败不绕过。
 - [ ] **Step 5：保持合并边界并清理。** P01 未通过不合并；即使 P01 通过，PR A/#28/新 PR 的处置也按用户后续门槛执行，PR B 不自动启动。停止沙箱容器，确认无后台任务，保留 temp 证据但不提交，不部署。
