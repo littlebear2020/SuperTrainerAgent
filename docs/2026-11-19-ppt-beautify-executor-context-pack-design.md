@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 设计
 
-> **状态**：待用户书面评审（尚未进入实施计划或生产代码改动）。
+> **状态**：已确认（含 2026-11-19 修订 A：真实探针后将执行包预算从 14000 调整为 14000 tokens；其余设计不变）。
 > **TL;DR**：复用现有 `page-context` 的确定性当前页投影，新增执行模式以精确原文片段、token 硬门和输入哈希生成 Page Execution Pack；支持的 flat Default/Beautify 路线在首次 Step 6 与 compacted recovery 中共用该包，不再全量读取核心 references 和全 roster 模块。PR A、PR B、System Prompt、summarization 与其他 PPT 路线不变。
 
 ## 1. 背景与已验证问题
@@ -188,13 +188,15 @@ rule_id → source_path + stable heading/paragraph anchor + requiredness
 ## 8. Token 预算与输出边界
 
 - 延续 `o200k_base` 计量；执行模式要求 `token_status=exact`，计量不可用时 fail closed。
-- 首批总执行包硬门设为 **8000 tokens**，包含现有 page projection、core_rules、module_rules 和 schema 开销。该值给 32000-token summarization 窗口保留系统提示、摘要、工具结果和 SVG 输出空间。
+- 首批总执行包硬门设为 **14000 tokens**，包含现有 page projection、core_rules、module_rules 和 schema 开销。该值给 32000-token summarization 窗口保留系统提示、摘要、工具结果和 SVG 输出空间。
 - 现有 page projection 的 2000-token 目标和 lock/global 的 1000-token 目标继续作为分项遥测，不重复相加解释。
 - 任一目标超限即失败并输出各组成项 token，不得静默截断或降级为完整文件读取。
 - 零付费探针必须先证明 v2 P01/P03 都在预算内且规则覆盖完整；探针失败则不进入付费运行，也不通过提高预算掩盖选择器问题。
-- 执行包必须小于现有 `read_file` 输出上限；8000-token 硬门之外再检查 UTF-8 bytes，避免工具截断。
+- 执行包必须小于现有 `read_file` 输出上限；14000-token 硬门之外再检查 UTF-8 bytes，避免工具截断。
 
-8000 是本设计的保守初始上限，不是宣称所有页面天然适配。后续调整须基于实测并单独评审，不能为了通过而静默提高。
+原 8000-token 首版在真实 v2 探针中失败：P01=12297、P03=12726。用户随后明确选择修订 A，将预算调整为真实最大值约 110% 的 **14000 tokens**，保留全部精确规则内容；这不是实现者自行放宽，也不改变 trigger=32000。
+
+14000 是修订后的实测上限，不是宣称所有页面天然适配。后续调整仍须基于实测并单独评审，不能为了通过而静默提高。
 
 ## 9. 所有权与兼容性更新
 
@@ -269,7 +271,7 @@ P01 通过后，完整 7 页的文字保真、原生表格、质量门和渲染�
 ## 13. 主要风险与权衡
 
 - **规则覆盖风险**：精确片段可能漏掉隐含依赖。以选择器 fail-closed、P01/P03 覆盖矩阵和后续 7 页质量门控制，不用自由摘要掩盖。
-- **预算风险**：8000 tokens 可能容纳不了某些复杂页面。先暴露并修正选择器，不静默加预算或截断。
+- **预算风险**：14000 tokens 可能容纳不了某些复杂页面。先暴露并修正选择器，不静默加预算或截断。
 - **行为风险**：模型仍可能无视新路径去读原文件。工作流会移除强制批次并以真实工具审计验证；若仍失败，不再叠加提示层修补。
 - **实现复杂度**：复用现有 page-context 可显著减少解析工作，但选择器和所有权变更仍需完整测试与 vendored 评审。
 - **质量权衡**：取消全 roster 预读是刻意改变，不把“读得少”等同于“质量必然不变”；P01 只是入口，后续完整页面验收仍是必要条件。
