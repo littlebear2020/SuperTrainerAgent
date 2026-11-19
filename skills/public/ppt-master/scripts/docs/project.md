@@ -16,6 +16,7 @@ python3 scripts/project_manager.py import-sources <project_path> <source1_or_dir
 python3 scripts/project_manager.py scaffold-spec <project_path>  # optional manual helper
 python3 scripts/project_manager.py scaffold-lock <project_path>  # optional manual helper
 python3 scripts/project_manager.py validate <project_path>
+python3 scripts/project_manager.py execution-context <project_path> P01
 python3 scripts/project_manager.py info <project_path>
 python3 scripts/project_manager.py page-context <project_path> P07 [--pretty] [--record-usage]
 python3 scripts/project_manager.py page-context-report <project_path>
@@ -93,6 +94,16 @@ Notes:
   multi-deck index `source_profile.json` (`decks[]`).
   Multi-deck per project: several PPTX imports each get their own `<stem>.*`
   artifacts and a `decks[]` entry; re-importing the same stem replaces its entry.
+
+### Per-page execution pack
+
+`execution-context` writes `validation/execution-context/P<NN>.json` as an atomic, derived execution view. It does not change the diagnostic page-context output or its compact JSON contract. The execution pack contains exact current-page and rule fragments, source/content SHA-256 values, and exact `o200k_base` token measurements; it is not a second source of truth and never generates or edits `svg_output/`.
+
+```bash
+python3 scripts/project_manager.py execution-context <project_path> P01
+```
+
+The command prints one short receipt with `path`, `page`, `tokens`, `sha256`, and `read_ranges`. The pack must remain below 16000 tokens and 64000 UTF-8 bytes. Each top-level JSON field occupies one line; each field line and each returned read range is below 48000 bytes. Use the receipt's at most two ranges with `read_file(start_line,end_line)` to read the complete pack without a whole-file read or truncation. Missing/duplicate selectors, stale hashes, unavailable exact token counting, or budget overflow fail closed and never fall back to complete core references or the roster-wide triggered module set.
 
 ### On-demand page execution view
 

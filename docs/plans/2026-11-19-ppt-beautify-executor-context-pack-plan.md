@@ -127,7 +127,7 @@
 - [x] **Step 3：实现原子写入、校验、分段序列化和 CLI。** 使用同目录临时文件 + `replace`；写失败不得让旧包被当成本次成功结果。CLI 先构建/预算校验再写包，以顶层字段换行产生合法 JSON，计算 `read_ranges` 供模型分最多两段 `read_file(start_line,end_line)` 读完；不得经 bash stdout 传大 JSON，也不得输出单行超长 JSON。
 - [x] **Step 4：运行 Task 1+2 全部测试确认 GREEN。** `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`。
 - [x] **Step 5：对真实 v2 P01/P03 运行 CLI。** 确认两页短回执、精确 token、SHA、最多两个 `<48000-byte` read_ranges 覆盖全部行且可完整读取；再次检查预算和规则覆盖，且 `svg_output/` 无新增/修改。失败则停止，不进入工作流接线。
-- [ ] **Step 6：提交 Task 2。** `feat(ppt-master): 增加当前页执行包原子生成命令`。
+- [x] **Step 6：提交 Task 2。** `feat(ppt-master): 增加当前页执行包原子生成命令`。
 
 ### Task 3：flat 工作流接线、所有权、P31 与 reseed
 
@@ -141,11 +141,11 @@
 - Modify: `backend/tests/test_ppt_master_execution_context.py`、`backend/tests/test_ppt_master_skill_vendored.py`、`backend/tests/test_seed_agents.py`
 - Modify: `temp/qwen-smoke/driver.py`（git-ignored，仅 preflight）
 
-- [ ] **Step 1：先写工作流和版本失败测试。** 断言 flat 的首次 Step 6/翻页/compacted 均调用 `execution-context` 并只读当前页包；不再含 flat 的完整核心/全 roster 批次；同上下文不因 bash 重读；未注册触发 fail closed；非 flat 原完整恢复不变；诊断 page-context 与派生执行包所有权不同；P31 存在且说明 #28/P30 边界；`SEED_VERSION == "2026-11-19.1"`。
-- [ ] **Step 2：运行定向测试确认 RED。** `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py tests/test_ppt_master_skill_vendored.py tests/test_seed_agents.py -q`，记录旧工作流/版本导致的失败。
-- [ ] **Step 3：接入 flat 工作流与所有权。** 首次、翻页和 compacted 都先盘点已有非空 SVG、确定当前页、构建执行包并按 CLI `read_ranges` 用最多两个 `<48000-byte` 有界读取读完；缺规格/锁、0 字节和 Gate 失败仍走原门禁。明确禁止手改包、直接生成 P01、未注册触发回退全量、无界整文件读取。同步 failure-recovery、artifact-ownership、project.md、P31 和 seed 注释/版本。
-- [ ] **Step 4：更新零调用 preflight。** 用独立 `temp/qwen-execution-pack-home` 与 `temp/qwen-execution-pack-smoke`；把旧 P30 `compacted_rule_present` 检查改为检查 `execution_context.py` 与 CLI `execution-context`，继续验证实际 seed 邮票、工作树技能来源、输入 hash/7 页/P03 表格/qwen/config，不读取或打印密钥。
-- [ ] **Step 5：运行测试与 fresh home reseed 确认 GREEN。** 先跑 Step 2 命令，再执行 driver `preflight`；预期 `seeded=6`、`SEED_VERSION=2026-11-19.1`、runtime stamp 相同、execution module/CLI 均存在、`PREFLIGHT OK (no model call made)`。不得发起模型调用。
+- [x] **Step 1：先写工作流和版本失败测试。** 断言 flat 的首次 Step 6/翻页/compacted 均调用 `execution-context` 并只读当前页包；不再含 flat 的完整核心/全 roster 批次；同上下文不因 bash 重读；未注册触发 fail closed；非 flat 原完整恢复不变；诊断 page-context 与派生执行包所有权不同；P31 存在且说明 #28/P30 边界；`SEED_VERSION == "2026-11-19.1"`。
+- [x] **Step 2：运行定向测试确认 RED。** `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py tests/test_ppt_master_skill_vendored.py tests/test_seed_agents.py -q`，记录旧工作流/版本导致的失败。
+- [x] **Step 3：接入 flat 工作流与所有权。** 首次、翻页和 compacted 都先盘点已有非空 SVG、确定当前页、构建执行包并按 CLI `read_ranges` 用最多两个 `<48000-byte` 有界读取读完；缺规格/锁、0 字节和 Gate 失败仍走原门禁。明确禁止手改包、直接生成 P01、未注册触发回退全量、无界整文件读取。同步 failure-recovery、artifact-ownership、project.md、P31 和 seed 注释/版本。
+- [x] **Step 4：更新零调用 preflight。** 用独立 `temp/qwen-execution-pack-home` 与 `temp/qwen-execution-pack-smoke`；把旧 P30 `compacted_rule_present` 检查改为检查 `execution_context.py` 与 CLI `execution-context`，继续验证实际 seed 邮票、工作树技能来源、输入 hash/7 页/P03 表格/qwen/config，不读取或打印密钥。
+- [x] **Step 5：运行测试与 fresh home reseed 确认 GREEN。** 先跑 Step 2 命令，再执行 driver `preflight`；预期 `seeded=6`、`SEED_VERSION=2026-11-19.1`、runtime stamp 相同、execution module/CLI 均存在、`PREFLIGHT OK (no model call made)`。不得发起模型调用。
 - [ ] **Step 6：提交 Task 3。** `feat(ppt-master): 用当前页执行包替代全量执行预读`。
 
 ### Task 4：最终零付费验证与完整门禁
