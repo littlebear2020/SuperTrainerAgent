@@ -15,6 +15,7 @@ SCRIPTS_DIR = SKILL_DIR / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+from project_management import execution_context as execution_context_module  # noqa: E402
 from project_management.execution_context import (  # noqa: E402
     EXECUTION_CONTEXT_SCHEMA,
     EXECUTION_CONTEXT_TOKEN_BUDGET,
@@ -28,14 +29,12 @@ from project_management.execution_context import (  # noqa: E402
     validate_execution_context,
     write_execution_context,
 )
-from project_management import execution_context as execution_context_module  # noqa: E402
 from project_management.page_context import (  # noqa: E402
     PageContextResult,
     build_page_context,
     render_page_context,
 )
 from project_management.project_specs import validate_project_artifacts  # noqa: E402
-
 
 DESIGN_SPEC = """<!-- ppt-master-schema: design-spec/v1 -->
 # Synthetic Design Spec
