@@ -17,6 +17,10 @@
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "test:e2e:live:l1": "playwright test --config playwright.live.config.ts l1-smoke",
+    "test:e2e:live:l2": "playwright test --config playwright.live.config.ts l2-features",
+    "test:e2e:live:l3": "playwright test --config playwright.live.config.ts l3-",
     "typecheck": "tsc --noEmit",
     "check:dead": "knip"
   },
