@@ -17,11 +17,11 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from project_management import execution_context as execution_context_module  # noqa: E402
 from project_management.execution_context import (  # noqa: E402
-    _reference_ids,
     EXECUTION_CONTEXT_SCHEMA,
     EXECUTION_CONTEXT_TOKEN_BUDGET,
     ExecutionContextError,
     RuleSelector,
+    _reference_ids,
     build_execution_context,
     extract_preset_names,
     extract_rule_fragment,
