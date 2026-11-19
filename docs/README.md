@@ -13,7 +13,7 @@
 | `360-api-reference.md` | 360 平台 API 参考 |
 | `findings-backlog.md` | 新问题登记处 |
 
-后端模块笔记见 `backend/docs/`，前端模块笔记见 `frontend/docs/`，Harness 框架说明见 `backend/packages/harness/deerflow/HARNESS.md`。
+后端模块笔记见 `backend/docs/`，前端模块笔记见 `frontend/docs/`，Harness 框架说明见 `backend/packages/harness/deerflow/HARNESS.md`。前端另有 `frontend/docs/LIVE_E2E_RUNBOOK.md`（真实部署验收套件的三档运行策略与凭据约定）。
 
 ## 开发约定
 
