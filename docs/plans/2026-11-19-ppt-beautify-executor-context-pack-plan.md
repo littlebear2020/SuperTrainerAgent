@@ -105,7 +105,7 @@
 - [x] **Step 3：实现选择器、模块路由和预算构建。** 复用 `build_page_context()`、其 lock/template preflight、package 内现有 JSON/SHA/token helpers；不得改变默认 page-context 输出。实现起止锚点唯一定位、当前页模块选择、精确 o200k 计数及 `ExecutionContextError`。预算错误必须带各组成项 token，禁止截断。
 - [x] **Step 4：运行同一 pytest 确认 GREEN。** 所有合成夹具必须短小且通过 `validate_project_artifacts(..., include_design=False)` 的 lock 预检；断言默认 `build_page_context()` 输出在调用执行投影前后完全相同。
 - [x] **Step 5：运行真实 v2 零付费探针。** 用 `backend/.venv/bin/python` 直接调用 `build_page_context()` + `build_execution_context()`，分别测量 `temp/qwen-compacted-recovery-v2-home/users/default/threads/56d43057-aa36-48ff-93a7-f0fbdc029efe/user-data/workspace/projects/leike_store_manager_beautify_ppt169_20261118` 的 P01/P03，打印页码、总/组成 token、rule_id 列表和 context SHA。**初次结果：P01 `page_projection=1289 / core=7481 / module=2859 / total=12297`，P03 `1706 / 7481 / 2669 / 12726`，均超过原 8000；已按约定停止，未进入 Task 2、未删除规则、未付费。修订 A 重跑结果：P01=12297 tokens / 49738 bytes，P03=14562 tokens / 58323 bytes；两页 bytes 均超门，P03 tokens 也超门。已再次停止，未进入 Task 2、未删除规则、未付费；A 单独加预算不足以满足双硬门。修订 A2 重跑通过：P01=12297 tokens / 49738 bytes / SHA `2c2c7a76ae500c5617779e9c48b8c013ee9901d9ab62b1dedab7ef1c73dff4a5`；P03=14562 tokens / 58323 bytes / SHA `4ec0c92a7be8edfd1d549a1acf75be301d15cf8fa43edf49648c85605ead5f32`。两页均满足双上限，P01 图片规则与 P03 表格/native 数据规则全部覆盖。**
-- [ ] **Step 6：提交 Task 1。** `feat(ppt-master): 增加当前页执行规则确定性投影`。
+- [x] **Step 6：提交 Task 1。** `feat(ppt-master): 增加当前页执行规则确定性投影`。
 
 ### Task 2：执行包哈希、原子写入与 `execution-context` CLI
 
@@ -122,11 +122,11 @@
 - `render_execution_context(payload: dict[str, object], *, max_read_bytes: int = 48000) -> tuple[str, tuple[tuple[int, int], ...]]`：输出每个顶层字段一行的合法 JSON 和行号闭区间；每字段行与每个读取段均 `<48000 bytes`，任一字段单独超限即失败。
 - CLI 成功回执仅一行：`EXECUTION_CONTEXT path=<path> page=<PNN> tokens=<N> sha256=<hex> read_ranges=<start-end[,start-end]>`；失败沿用 CLI 非零异常路径，不输出大包。
 
-- [ ] **Step 1：先写持久化失败测试。** 覆盖：重复构建哈希一致；手改 `core_rules[0].text` 后 validate 失败；Design Spec/lock/reference 变化使旧包过期；token helper 返回 `(None, "unavailable")` 时不写文件；16001-token 合成输入与 bytes 超限均不写；临时文件异常不留下半包；损坏旧包只能从源重建；序列化后是合法 JSON、顶层字段换行、回执 ranges 覆盖全部行且每段 `<48000 bytes`、字段单独超限即失败；CLI stdout 只有短回执和 `read_ranges`；`svg_output/` 在命令前后文件集合与 SHA 不变；默认 page-context 输出不变。
-- [ ] **Step 2：运行新增测试确认 RED。** 预期 `write_execution_context`、`validate_execution_context` 和 CLI subcommand 不存在。
-- [ ] **Step 3：实现原子写入、校验、分段序列化和 CLI。** 使用同目录临时文件 + `replace`；写失败不得让旧包被当成本次成功结果。CLI 先构建/预算校验再写包，以顶层字段换行产生合法 JSON，计算 `read_ranges` 供模型分最多两段 `read_file(start_line,end_line)` 读完；不得经 bash stdout 传大 JSON，也不得输出单行超长 JSON。
-- [ ] **Step 4：运行 Task 1+2 全部测试确认 GREEN。** `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`。
-- [ ] **Step 5：对真实 v2 P01/P03 运行 CLI。** 确认两页短回执、精确 token、SHA、最多两个 `<48000-byte` read_ranges 覆盖全部行且可完整读取；再次检查预算和规则覆盖，且 `svg_output/` 无新增/修改。失败则停止，不进入工作流接线。
+- [x] **Step 1：先写持久化失败测试。** 覆盖：重复构建哈希一致；手改 `core_rules[0].text` 后 validate 失败；Design Spec/lock/reference 变化使旧包过期；token helper 返回 `(None, "unavailable")` 时不写文件；16001-token 合成输入与 bytes 超限均不写；临时文件异常不留下半包；损坏旧包只能从源重建；序列化后是合法 JSON、顶层字段换行、回执 ranges 覆盖全部行且每段 `<48000 bytes`、字段单独超限即失败；CLI stdout 只有短回执和 `read_ranges`；`svg_output/` 在命令前后文件集合与 SHA 不变；默认 page-context 输出不变。
+- [x] **Step 2：运行新增测试确认 RED。** 预期 `write_execution_context`、`validate_execution_context` 和 CLI subcommand 不存在。
+- [x] **Step 3：实现原子写入、校验、分段序列化和 CLI。** 使用同目录临时文件 + `replace`；写失败不得让旧包被当成本次成功结果。CLI 先构建/预算校验再写包，以顶层字段换行产生合法 JSON，计算 `read_ranges` 供模型分最多两段 `read_file(start_line,end_line)` 读完；不得经 bash stdout 传大 JSON，也不得输出单行超长 JSON。
+- [x] **Step 4：运行 Task 1+2 全部测试确认 GREEN。** `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`。
+- [x] **Step 5：对真实 v2 P01/P03 运行 CLI。** 确认两页短回执、精确 token、SHA、最多两个 `<48000-byte` read_ranges 覆盖全部行且可完整读取；再次检查预算和规则覆盖，且 `svg_output/` 无新增/修改。失败则停止，不进入工作流接线。
 - [ ] **Step 6：提交 Task 2。** `feat(ppt-master): 增加当前页执行包原子生成命令`。
 
 ### Task 3：flat 工作流接线、所有权、P31 与 reseed
