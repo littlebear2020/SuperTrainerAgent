@@ -493,3 +493,17 @@ def test_reference_ids_only_allow_kebab_case_identifiers():
     for unsafe in ("../executor-base", "modes/instructional", "instructional_foo", "hello world"):
         with pytest.raises(ExecutionContextError, match="invalid reference id"):
             _reference_ids(unsafe)
+
+
+def test_preset_reference_fallback_uses_same_id_validation(tmp_path):
+    project = _write_project(tmp_path / "project")
+    (project / "spec_lock.md").write_text(
+        SPEC_LOCK.replace("mode: custom", "mode: invalid id").replace("- mode_references: instructional, briefing\n", ""),
+        encoding="utf-8",
+    )
+    result = PageContextResult(project_path=project, page="P01", context={}, inputs=())
+
+    with pytest.raises(ExecutionContextError, match="invalid reference id"):
+        from project_management.execution_context import _style_fragments
+
+        _style_fragments(result, skill_dir=SKILL_DIR)
