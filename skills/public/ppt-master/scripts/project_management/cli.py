@@ -36,6 +36,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .execution_context import render_execution_context, write_execution_context
 from .page_context import (
     build_page_context,
     page_context_usage_report,
@@ -1173,6 +1174,13 @@ def build_parser() -> argparse.ArgumentParser:
     info = subparsers.add_parser("info", help="Print project metadata")
     info.add_argument("project_path", help="Project directory")
 
+    execution_context = subparsers.add_parser(
+        "execution-context",
+        help="Write one deterministic per-page execution pack",
+    )
+    execution_context.add_argument("project_path", help="Project directory")
+    execution_context.add_argument("page", help="Positive page key such as P01")
+
     page_context = subparsers.add_parser(
         "page-context",
         help="Print one deterministic per-page execution view",
@@ -1346,6 +1354,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Source count: {info['source_count']}")
             print(f"Canvas format: {info['canvas_format']}")
             print(f"Created: {info['create_date']}")
+            return 0
+
+        if args.command == "execution-context":
+            result = build_page_context(args.project_path, args.page)
+            path, payload = write_execution_context(result)
+            _rendered, ranges = render_execution_context(payload)
+            range_text = ",".join(f"{start}-{end}" for start, end in ranges)
+            print(
+                f"EXECUTION_CONTEXT path={path} page={payload['page']} "
+                f"tokens={payload['tokens']['total']} sha256={payload['context_sha256']} read_ranges={range_text}"
+            )
             return 0
 
         if args.command == "page-context":
