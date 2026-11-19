@@ -7,6 +7,9 @@ const gatewayURL = `http://127.0.0.1:${gatewayPort}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // live/ 打真实部署（凭据与地址走环境变量），由 playwright.live.config.ts 独立驱动；
+  // 常规 mock 套件跳过，避免误连真实服务器。
+  testIgnore: /\/live\//,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
