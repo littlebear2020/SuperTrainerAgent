@@ -161,10 +161,10 @@ def _style_fragments(result: PageContextResult, *, skill_dir: Path) -> list[dict
     style_fields = _lock_fields(result, "visual_style")
     mode_ids = _reference_ids(mode_fields.get("mode_references"))
     if not mode_ids and mode_fields.get("mode") not in (None, "", "custom"):
-        mode_ids = (mode_fields["mode"],)
+        mode_ids = _reference_ids(mode_fields.get("mode"))
     style_ids = _reference_ids(style_fields.get("visual_style_references"))
     if not style_ids and style_fields.get("visual_style") not in (None, "", "custom"):
-        style_ids = (style_fields["visual_style"],)
+        style_ids = _reference_ids(style_fields.get("visual_style"))
     fragments: list[dict[str, str]] = []
     for mode_id in mode_ids:
         fragments.append(
