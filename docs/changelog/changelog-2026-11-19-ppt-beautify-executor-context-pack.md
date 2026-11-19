@@ -78,11 +78,11 @@ P01 含 `module.image`；P03 含 `module.table`、`module.visualization_referenc
 - 真实 CLI P03 → `tokens=14562`，`read_ranges=1-8,9-15`，分段 37156B + 21181B；`svg_unchanged=true`。
 - 最终 qwen audit → P01=`01_cover.svg`，15 个有效摘要、`bad_count=0`、`final_confirmed=true`；结果为 `PASS+EXERCISED`，另附首次全量读取缺口。
 - `gh pr checks 29 --watch` → quick-checks `pass 29s`、backend-unit-tests `pass 4m10s`、review `pass 2m50s`。
-- `gh pr view 29 --comments` → OCR `3 finding(s) across 4 selected item(s)`；全部为 low，无 Critical/Important。
+- `gh pr view 29 --comments` → 最新 OCR 3 项：2 个 low + 1 个私有 helper 维护性 medium；另有三个 medium 已修复，P31 high 为误报并附证据驳回，无未处理 Critical/Important。
 - `git diff --exit-code 468a7761 -- backend/.../summarization_middleware.py backend/tests/test_summarization_middleware.py` → exit 0。
 
 ## 5. PR 与后续边界
 
 - 实现提交：`8eddcebb`、`a64ba498`、`3ac2289f`；lint 提交：`531600ce`。
-- stacked PR：[#29](https://github.com/littlebear2020/SuperTrainerAgent/pull/29)，base=`ppt-beautify-summarization-context-integrity`（PR A #27）；标题与正文明确 P01 通过及首次全量读取缺口，仅评审、不合并。远程 quick-checks（run `44467483770`）、backend-unit-tests（`44467483766`）、review（`44467483848`）全绿；OCR 3 个 low（重复渲染、187 常量、hashlib 导入位置），无 Critical/Important，均 deferred。
+- stacked PR：[#29](https://github.com/littlebear2020/SuperTrainerAgent/pull/29)，base=`ppt-beautify-summarization-context-integrity`（PR A #27）；标题与正文明确 P01 通过及首次全量读取缺口，仅评审、不合并。远程 quick-checks/backend-unit-tests/review 全绿；读取段数、重叠锚点、非法引用/回退三个 medium 已修复，P31 未登记的 high 为误报并已附证据驳回；私有 helper 复用与其他 low 均 deferred。
 - 首次全量读取缺口必须保留在 PR 标题与评审重点中；即使 P01 通过，也不自动合并，不启动 PR B，不部署。

@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 实施计划
 
-> **状态**：未执行（部分执行：P01 PASS+EXERCISED，但首次采用执行包前 call 31/35 仍完整读取核心，严格“首次也无全量”要求未完全满足；PR #29 远程 quick-checks/backend-unit-tests/review 全绿，OCR 3 个 low、无 Critical/Important；不合并、不启动 PR B）。
+> **状态**：未执行（部分执行：P01 PASS+EXERCISED，但首次采用执行包前 call 31/35 仍完整读取核心，严格“首次也无全量”要求未完全满足；PR #29 远程 checks 全绿，三个 medium 已修复，P31 high 为误报并已驳回，其余维护性 low/deferred；不合并、不启动 PR B）。
 > **TL;DR**：扩展现有 `page-context`，用精确规则选择器、16000-token/64000-byte 双硬门、输入哈希和最多两个有界读取生成当前页执行包；先证明真实 v2 P01/P03 可在预算内完整投影，再改 flat Default/Beautify 的首次与压缩恢复路径。PR A、PR B、summarization、System Prompt 和其他 PPT 路线不变。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 任务必须串行，禁止并行修改同一技能与共享测试。
@@ -169,7 +169,7 @@
 - [x] **Step 1：写 changelog 并回填计划。** 新建 `docs/changelog/changelog-2026-11-19-ppt-beautify-executor-context-pack.md`，含 ≤5 行 TL;DR、RED→GREEN、真实 probe token/rule IDs、reseed、完整门禁、P01 真实结果和 `## 验收记录`（每行命令→关键输出）。更新本计划唯一状态头和勾选；P01 未通过则保持未执行/部分执行，禁止宣称完整 7 页或 46 页。
 - [x] **Step 2：全分支自审。** 检查 spec 每项覆盖、默认 page-context 兼容、非 flat 不变、选择器无静默漏规则、summarization diff 为零；无获授权子代理时明确记录 self-review，不伪称独立评审。
 - [x] **Step 3：提交并开 stacked PR #29。** 推送 `ppt-beautify-executor-context-pack`，以 PR A 分支为 base 开 PR，正文链接 spec/plan/changelog，说明 #28 为失败 prompt-only 分支且未合并、PR B 未开始。P01 通过但首次全量读取缺口必须明确标注“仅评审、不合并”。
-- [x] **Step 4：等待 AI/OCR 与 CI。** 读取实际评论与 OCR 日志，不只信绿色状态；Critical/Important 必须先按 TDD 修复并重跑门禁。远程 OCR 不依赖本地 OCR 凭据，本地失败不绕过。**实际：quick-checks/backend-unit-tests/review 全绿；OCR 3 个 low（重复渲染、187 常量、hashlib 导入位置），无 Critical/Important，均 deferred。**
+- [x] **Step 4：等待 AI/OCR 与 CI。** 读取实际评论与 OCR 日志，不只信绿色状态；Critical/Important 必须先按 TDD 修复并重跑门禁。远程 OCR 不依赖本地 OCR 凭据，本地失败不绕过。**实际：quick-checks/backend-unit-tests/review 全绿；读取段数、重叠锚点、非法引用/回退三个 medium 已 RED→GREEN 修复；P31 未登记的 high 为误报并附证据驳回；私有 helper 复用与其他 low 均 deferred。**
 - [ ] **Step 5：保持合并边界并清理。** P01 未通过不合并；即使 P01 通过，PR A/#28/新 PR 的处置也按用户后续门槛执行，PR B 不自动启动。停止沙箱容器，确认无后台任务，保留 temp 证据但不提交，不部署。
 
 ## 完成定义
