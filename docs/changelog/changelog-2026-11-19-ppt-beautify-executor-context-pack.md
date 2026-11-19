@@ -86,3 +86,38 @@ P01 含 `module.image`；P03 含 `module.table`、`module.visualization_referenc
 - 实现提交：`8eddcebb`、`a64ba498`、`3ac2289f`；lint 提交：`531600ce`。
 - stacked PR：[#29](https://github.com/littlebear2020/SuperTrainerAgent/pull/29)，base=`ppt-beautify-summarization-context-integrity`（PR A #27）；标题与正文明确 P01 通过及首次全量读取缺口，仅评审、不合并。远程 quick-checks/backend-unit-tests/review 全绿；读取段数、重叠锚点、非法引用/回退三个 medium 已修复，P31 未登记的 high 为误报并已附证据驳回；私有 helper 复用与其他 low 均 deferred。
 - 首次全量读取缺口必须保留在 PR 标题与评审重点中；即使 P01 通过，也不自动合并，不启动 PR B，不部署。
+
+## 6. 收尾修复轮（2026-11-19，PR #29 后续）
+
+本轮只修接手时的三个失败测试并补护栏；未扩展架构，未改 summarization/SOUL/核心 references/PR B，未开新的付费模型运行。均先 RED 后实现。
+
+- **预算错误被单字段读取上限抢先**：`build_execution_context` 内部调用 `render_execution_context`，后者先查 48000-byte 单字段上限，超大输入于是报「单字段超限」而不是预算错误。现在预算只对整份渲染文件检查，顺序固定为 token 总预算 → 字节总预算；48000 单字段上限**未放宽、未删除**，仍由 `render_execution_context` 在 `write_execution_context` 写盘前强制，并由独立测试在放开总预算后单独钉住（测试用 monkeypatch 隔离，不靠放宽断言）。
+- **`tokens.total` 差 1**：`total` 的数字位本身就在被计数的文件里，单遍计数必然滞后（13340 vs 13341）。改为对写盘文本迭代至定点（真实 P03 三遍收敛），5 遍不收敛则 fail closed；`context_sha256` 排除 `tokens` 测量字段，不与 total 形成自引用。
+- **`native_ready` 为 None**：未提交的解析初稿不识别全角冒号、`= yes` 空格、反引号键与行尾说明。真实 v2 P03 行是 ``**Native-ready**: `industry-background-fit-table=yes`（table/record_table 原生表格对象导出）``——HEAD 的正则对该行为真，但初稿返回 None，按初稿提交会让真实 P03 静默丢掉 5 个 `module.native_table_*` 规则。现已覆盖并恢复；`=no`、`无` 与未声明仍不加载 native_table。
+- **token 口径更正**：旧回执（P01=12297、P03=14562）用 HEAD 公式作用于同一 payload 可精确复现，它少计了 `context_sha256`、`tokens.total` 与逐行布局换行；新口径 = 模型实际读取文件的 o200k 精确数——P01=**12353**（+56）、P03=**14627**（+65，含新增 `native_ready` 行 21B）。仍 ≤16000 tokens、<64000 bytes。§2 表中的旧 SHA/token 为历史探针值，不再作为预期值。
+- 随同提交的未提交改动：写盘改用同目录唯一临时文件（并发不互相覆盖）。
+
+### 本轮验收记录
+
+- `cd backend && PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`（接手时复现 RED）→ `3 failed, 29 passed`：`field 'page_context' exceeds single-read limit 48000`、`13340 == 13341`、`native_ready is None`。
+- 同一命令（native_ready 修复后、定点/预算实现前，含新增护栏测试）→ `4 failed, 49 passed`。
+- 同一命令（GREEN）→ `53 passed`。
+- `PYTHONPATH=. uv run pytest tests/test_ppt_master*.py tests/test_seed_*.py tests/test_sandbox_read_file_range.py tests/test_skillscan_native.py -q` → `354 passed`。
+- `cd backend && make test` → `10132 passed, 89 skipped in 68.42s`。
+- `cd backend && make lint` → `All checks passed!`、`1318 files already formatted`（首次发现新测试 1 处格式差异，已 `ruff format` 修复后重跑）。
+- 根 `make check` → exit 0；`All matched files use Prettier code style!`、`i18n key 存活检测通过：630 个叶子全活`、docs convention `OK`。
+- 真实 v2 P01（临时副本，经 `project_manager.py execution-context` CLI）→ `tokens=12353 … read_ranges=1-8,9-15`；文件 49752B（35532B + 14220B）；对写盘文件独立 o200k 计数 = 12353，与回执、payload 一致；core 15 + module 5（mode×2、style×2、image），无 table/native_table。
+- 真实 v2 P03 → `tokens=14627 … read_ranges=1-8,9-16`；文件 58358B（37156B + 21202B）；独立计数 = 14627；`native_ready=true`，含 `module.table`、`module.visualization_reference` 与 5 个 `module.native_table_*`。
+- 同一探针 → 回执 SHA = payload SHA；每个 read_range <48000B、段数 ≤2、行覆盖完整；v2 的 `svg_output` 本就为 0 个文件，故「未改 SVG」在真实探针上是空检查，非空覆盖由 `test_execution_context_cli_writes_short_receipt_without_touching_svg` 承担。
+- HEAD 公式（`count(compact_json(payload 去掉 context_sha256/total/native_ready))`）作用于同一 payload → P01=12297、P03=14562，与旧回执一致。
+- 受控对比（同 umask 022）→ HEAD 写法 `-rw-r--r--`；唯一临时文件写法 `-rw-------`。
+- 变异检查（临时副本，不入库）：单遍 total、定点不收敛不报错、token/字节检查顺序互换、删除单字段上限、build 先查读取上限、native_ready 恒真、哈希含 tokens 共 7 个变异 → 各有测试失败，无存活。
+- `git diff --check` → 无输出；`python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
+- CI/OCR 结果以 PR #29 的 checks 与评论为准，不回填本文件（回填会再触发一轮评审）。
+
+### 本轮发现、未修改的遗留
+
+- **产物权限 0644 → 0600**：唯一临时文件写法（本批未提交改动，已随本轮提交）使执行包文件变为 owner-only。默认 `LocalSandboxProvider` 与网关同 uid、CLI 与 `read_file` 同在沙箱内，且同 CLI 的 `_write_json_atomic` 已有 `mkstemp` 先例，风险判断为低，但是行为变化且未在真实跨 uid（Docker/AIO 挂载）环境验证。按「范围外不顺手改」与交接约束未动；若需恢复，写盘后对临时文件按 umask 设 `0o644` 即可，并补同口径测试。已登记 backlog。
+- **`Native-ready` 多键 map 只取首个条目**：文档语法允许 `a=no; b=yes`，当前（与 HEAD 正则一致）按首项判定，该页不加载 native_table。已登记 backlog。
+- `validate_execution_context` 不校验 `tokens`（哈希按设计排除测量字段）；CLI 只做 write+render，当前无生产调用方，deferred。
+- **首次全量读取缺口不变**：call 31/35 仍在首次 `execution-context` 之前完整读取核心；本轮零付费修复不改变该事实，严格完成定义仍未满足，不合并、不启动 PR B。
