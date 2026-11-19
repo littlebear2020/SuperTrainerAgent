@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 实施计划
 
-> **状态**：未执行（执行中：用户已批准修订 A2，采用 16000 tokens + 64000 bytes + 两个有界读取；Task 1 恢复，Task 2–6 未执行；原型从 SDD `prototype-a14000/` 恢复后重验；第三次付费 qwen 运行未授权）。
+> **状态**：未执行（部分执行：P01 PASS+EXERCISED，但首次采用执行包前 call 31/35 仍完整读取核心，严格“首次也无全量”要求未完全满足；Task 6 记录与 stacked PR/OCR 进行中，不合并、不启动 PR B）。
 > **TL;DR**：扩展现有 `page-context`，用精确规则选择器、16000-token/64000-byte 双硬门、输入哈希和最多两个有界读取生成当前页执行包；先证明真实 v2 P01/P03 可在预算内完整投影，再改 flat Default/Beautify 的首次与压缩恢复路径。PR A、PR B、summarization、System Prompt 和其他 PPT 路线不变。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 任务必须串行，禁止并行修改同一技能与共享测试。
@@ -146,27 +146,27 @@
 - [x] **Step 3：接入 flat 工作流与所有权。** 首次、翻页和 compacted 都先盘点已有非空 SVG、确定当前页、构建执行包并按 CLI `read_ranges` 用最多两个 `<48000-byte` 有界读取读完；缺规格/锁、0 字节和 Gate 失败仍走原门禁。明确禁止手改包、直接生成 P01、未注册触发回退全量、无界整文件读取。同步 failure-recovery、artifact-ownership、project.md、P31 和 seed 注释/版本。
 - [x] **Step 4：更新零调用 preflight。** 用独立 `temp/qwen-execution-pack-home` 与 `temp/qwen-execution-pack-smoke`；把旧 P30 `compacted_rule_present` 检查改为检查 `execution_context.py` 与 CLI `execution-context`，继续验证实际 seed 邮票、工作树技能来源、输入 hash/7 页/P03 表格/qwen/config，不读取或打印密钥。
 - [x] **Step 5：运行测试与 fresh home reseed 确认 GREEN。** 先跑 Step 2 命令，再执行 driver `preflight`；预期 `seeded=6`、`SEED_VERSION=2026-11-19.1`、runtime stamp 相同、execution module/CLI 均存在、`PREFLIGHT OK (no model call made)`。不得发起模型调用。
-- [ ] **Step 6：提交 Task 3。** `feat(ppt-master): 用当前页执行包替代全量执行预读`。
+- [x] **Step 6：提交 Task 3。** `feat(ppt-master): 用当前页执行包替代全量执行预读`。
 
 ### Task 4：最终零付费验证与完整门禁
 
-- [ ] **Step 1：重跑最终真实产物探针。** 以最终 HEAD 对 v2 P01/P03 再验 rule coverage、16000-token/64000-byte 双上限、原子产物、SHA 和最多两个 `<48000-byte` read_ranges；保存输出到 `temp/qwen-execution-pack-smoke/probe.json`，不入库。
-- [ ] **Step 2：跑定向与相邻回归。** 先跑 Task 3 命令，再跑 `tests/test_ppt_master*.py tests/test_seed_*.py tests/test_sandbox_read_file_range.py tests/test_skillscan_native.py`；全部通过。
-- [ ] **Step 3：顺序运行完整门禁。** 输入冻结，依次后台运行 `cd backend && make test`、`make lint`、根 `make check`，再跑 `python3 scripts/check_docs_convention.py` 和 `git diff --check`；不得把 warnings 当 errors 隐瞒，也不得并行修改被测输入。
-- [ ] **Step 4：确认范围。** `git diff 468a7761...HEAD` 只含 allow 路径和本计划文档；summarization 零改动，真实证据未入库，工作区无测试生成的多余文件。
+- [x] **Step 1：重跑最终真实产物探针。** 以最终 HEAD 对 v2 P01/P03 再验 rule coverage、16000-token/64000-byte 双上限、原子产物、SHA 和最多两个 `<48000-byte` read_ranges；保存输出到 `temp/qwen-execution-pack-smoke/probe.json`，不入库。
+- [x] **Step 2：跑定向与相邻回归。** 先跑 Task 3 命令，再跑 `tests/test_ppt_master*.py tests/test_seed_*.py tests/test_sandbox_read_file_range.py tests/test_skillscan_native.py`；全部通过。
+- [x] **Step 3：顺序运行完整门禁。** 输入冻结，依次后台运行 `cd backend && make test`、`make lint`、根 `make check`，再跑 `python3 scripts/check_docs_convention.py` 和 `git diff --check`；不得把 warnings 当 errors 隐瞒，也不得并行修改被测输入。
+- [x] **Step 4：确认范围。** `git diff 468a7761...HEAD` 只含 allow 路径和本计划文档；summarization 零改动，真实证据未入库，工作区无测试生成的多余文件。
 - [ ] **Step 5：停在付费门。** 向用户报告真实探针 token、rule coverage、reseed 与全部免费结果，单独请求第三次 qwen 付费授权；未明确同意不得进入 Task 5。
 
 ### Task 5：用户另行授权后的 qwen P01 行为验收
 
-- [ ] **Step 1：重建对照环境。** 使用最终 HEAD、fresh `DEER_FLOW_HOME`/evidence/thread/project/sandbox，同一冻结输入/qwen/PR A/config；preflight 再次验证 hash、seed 和 execution module/CLI。不得复用 v1/v2 home 或失败 checkpoint。
-- [ ] **Step 2：正常完成 Stage 1/2。** 有明确推荐则确认推荐项；若仍未推荐，按首个列出项并记录 ruling。不得添加内容、布局或工具顺序指导。
-- [ ] **Step 3：运行最终 authoring 监控。** 最终确认后，非空 `svg_output/p01.svg` 即停；100 次真实工具调用无 P01、新占位/空 checkpoint、Stage 1/2 重问或 20 分钟无新产物立即硬停。不要求完整 PPTX。
-- [ ] **Step 4：从 checkpoint 审计真实行为。** 驱动 turn args 可能为空，必须以持久化 checkpoint 参数为准：零占位、确认保留、无重问；首次和 compacted 后均无完整核心/全 roster；执行包构建/读取路径、页码、token、SHA 与 probe 一致，未重写已有非空 SVG。
-- [ ] **Step 5：按结果处置。** PASS 只表示同一 qwen+输入+HEAD 的 P01 入口通过；FAIL 则保存证据并停止，不再叠加 System Prompt、bash 提醒、summarization 或 cap 修改。任何额外付费运行都需要新授权。
+- [x] **Step 1：重建对照环境。** 使用最终 HEAD、fresh `DEER_FLOW_HOME`/evidence/thread/project/sandbox，同一冻结输入/qwen/PR A/config；preflight 再次验证 hash、seed 和 execution module/CLI。不得复用 v1/v2 home 或失败 checkpoint。
+- [x] **Step 2：正常完成 Stage 1/2。** 有明确推荐则确认推荐项；若仍未推荐，按首个列出项并记录 ruling。不得添加内容、布局或工具顺序指导。
+- [x] **Step 3：运行最终 authoring 监控。** 最终确认后，非空 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 即停；100 次真实工具调用无 P01、新占位/空 checkpoint、Stage 1/2 重问或 20 分钟无新产物立即硬停。不要求完整 PPTX。**实际：模型写出符合技能命名的 `svg_output/01_cover.svg`，2304 bytes、XML 可解析；驱动原先仅找 `p01.svg`，已修正为同时识别 `01_*.svg` 并重审为 P01_PRODUCED。**
+- [x] **Step 4：从 checkpoint 审计真实行为。** 驱动 turn args 可能为空，必须以持久化 checkpoint 参数为准：零占位、确认保留、无重问；首次和 compacted 后均无完整核心/全 roster；执行包构建/读取路径、页码、token、SHA 与 probe 一致，未重写已有非空 SVG。**实际：执行包调用 43/57/74，分段读取 59（1–8）/60（9–15）；采用后无无界核心 read_file，但 call 31/35 在首次执行包前仍有完整核心读取，严格“首次也无全量”要求未完全满足。**
+- [x] **Step 5：按结果处置。** PASS 只表示同一 qwen+输入+HEAD 的 P01 入口通过；FAIL 则保存证据并停止，不再叠加 System Prompt、bash 提醒、summarization 或 cap 修改。任何额外付费运行都需要新授权。**实际：P01 PASS + 首次全量读取缺口；不宣称全部读取约束通过，不合并，进入证据化评审。**
 
 ### Task 6：记录、完整自审、stacked PR 与 OCR
 
-- [ ] **Step 1：写 changelog 并回填计划。** 新建 `docs/changelog/changelog-2026-11-19-ppt-beautify-executor-context-pack.md`，含 ≤5 行 TL;DR、RED→GREEN、真实 probe token/rule IDs、reseed、完整门禁、P01 真实结果和 `## 验收记录`（每行命令→关键输出）。更新本计划唯一状态头和勾选；P01 未通过则保持未执行/部分执行，禁止宣称完整 7 页或 46 页。
+- [x] **Step 1：写 changelog 并回填计划。** 新建 `docs/changelog/changelog-2026-11-19-ppt-beautify-executor-context-pack.md`，含 ≤5 行 TL;DR、RED→GREEN、真实 probe token/rule IDs、reseed、完整门禁、P01 真实结果和 `## 验收记录`（每行命令→关键输出）。更新本计划唯一状态头和勾选；P01 未通过则保持未执行/部分执行，禁止宣称完整 7 页或 46 页。
 - [ ] **Step 2：全分支自审。** 检查 spec 每项覆盖、默认 page-context 兼容、非 flat 不变、选择器无静默漏规则、summarization diff 为零；无获授权子代理时明确记录 self-review，不伪称独立评审。
 - [ ] **Step 3：提交并开 stacked PR。** 推送 `ppt-beautify-executor-context-pack`，以 PR A 分支为 base 开 PR，正文链接 spec/plan/changelog，说明 #28 为失败 prompt-only 分支且未合并、PR B 未开始。P01 未通过时标题/正文必须明确“行为未通过，仅评审”。
 - [ ] **Step 4：等待 AI/OCR 与 CI。** 读取实际评论与 OCR 日志，不只信绿色状态；Critical/Important 必须先按 TDD 修复并重跑门禁。远程 OCR 不依赖本地 OCR 凭据，本地失败不绕过。
