@@ -9,6 +9,7 @@ Usage:
     python3 scripts/project_manager.py init <project_name> [--format <registered_format>]
     python3 scripts/project_manager.py import-sources <project_path> <sources...>
     python3 scripts/project_manager.py validate <project_path>
+    python3 scripts/project_manager.py execution-context <project_path> P01
 
 Examples:
     python3 scripts/project_manager.py init demo

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -22,8 +23,12 @@ from project_management.execution_context import (  # noqa: E402
     build_execution_context,
     extract_preset_names,
     extract_rule_fragment,
+    render_execution_context,
     select_rule_fragments,
+    validate_execution_context,
+    write_execution_context,
 )
+from project_management import execution_context as execution_context_module  # noqa: E402
 from project_management.page_context import (  # noqa: E402
     PageContextResult,
     build_page_context,
@@ -285,3 +290,130 @@ def test_execution_context_budget_failure_reports_components(tmp_path):
     assert "core_rules" in message
     assert "module_rules" in message
     assert "total" in message
+
+
+def test_write_and_validate_execution_context_detects_manual_and_source_changes(tmp_path):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+
+    path, payload = write_execution_context(result)
+    validate_execution_context(payload, result)
+    assert path == project / "validation" / "execution-context" / "P01.json"
+    assert json.loads(path.read_text(encoding="utf-8"))["context_sha256"] == payload["context_sha256"]
+
+    payload["core_rules"][0]["text"] = "manually changed"
+    with pytest.raises(ExecutionContextError, match="stale|mismatch|changed"):
+        validate_execution_context(payload, result)
+
+    _, fresh = write_execution_context(result)
+    (project / "design_spec.md").write_text(DESIGN_SPEC.replace("P01 only", "P01 changed"), encoding="utf-8")
+    with pytest.raises(ExecutionContextError, match="stale|mismatch|changed"):
+        validate_execution_context(fresh, _page_result(project, "P01"))
+
+
+def test_write_execution_context_rebuilds_corrupt_artifact(tmp_path):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+    path, _ = write_execution_context(result)
+    path.write_text("not json", encoding="utf-8")
+
+    _, rebuilt = write_execution_context(result)
+
+    assert json.loads(path.read_text(encoding="utf-8"))["context_sha256"] == rebuilt["context_sha256"]
+    validate_execution_context(rebuilt, result)
+
+
+def test_unavailable_token_counter_prevents_write(tmp_path, monkeypatch):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+    monkeypatch.setattr(execution_context_module, "_token_counter", lambda: (None, "unavailable"))
+
+    with pytest.raises(ExecutionContextError, match="unavailable"):
+        write_execution_context(result)
+
+    assert not (project / "validation" / "execution-context" / "P01.json").exists()
+
+
+def test_token_and_byte_budget_failures_prevent_write(tmp_path, monkeypatch):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+
+    oversized = replace(
+        result,
+        context={
+            **result.context,
+            "page_context": {
+                **result.context["page_context"],
+                "brief_markdown": "word " * 16001,
+            },
+        },
+    )
+    with pytest.raises(ExecutionContextError, match="token budget"):
+        build_execution_context(oversized)
+
+    monkeypatch.setattr(execution_context_module, "EXECUTION_CONTEXT_MAX_BYTES", 1)
+    with pytest.raises(ExecutionContextError, match="byte budget"):
+        write_execution_context(result)
+    assert not (project / "validation" / "execution-context" / "P01.json").exists()
+
+
+def test_atomic_replace_failure_preserves_previous_complete_pack(tmp_path, monkeypatch):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+    path, previous = write_execution_context(result)
+    previous_bytes = path.read_bytes()
+
+    def fail_replace(_self, _target):
+        raise OSError("synthetic replace failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="synthetic replace failure"):
+        write_execution_context(result)
+
+    assert path.read_bytes() == previous_bytes
+    assert not list(path.parent.glob("*.tmp"))
+    assert previous["context_sha256"]
+
+
+def test_render_execution_context_produces_valid_json_and_bounded_read_ranges(tmp_path):
+    project = _write_project(tmp_path / "project")
+    payload = build_execution_context(_page_result(project, "P03"))
+
+    rendered, ranges = render_execution_context(payload)
+
+    assert json.loads(rendered) == payload
+    assert len(ranges) == 2
+    lines = rendered.splitlines(keepends=True)
+    assert ranges[0][0] == 1 and ranges[-1][1] == len(lines)
+    for start, end in ranges:
+        assert len("".join(lines[start - 1 : end]).encode("utf-8")) < 48000
+    for line in lines:
+        assert len(line.encode("utf-8")) < 48000
+
+
+def test_render_execution_context_rejects_single_oversized_field():
+    with pytest.raises(ExecutionContextError, match="field|48000|read"):
+        render_execution_context({"oversized": "x" * 100}, max_read_bytes=10)
+
+
+def test_execution_context_cli_writes_short_receipt_without_touching_svg(tmp_path, capsys):
+    from project_management.cli import main
+
+    project = _write_project(tmp_path / "project")
+    svg = project / "svg_output" / "01_cover.svg"
+    svg.write_text("<svg>original</svg>", encoding="utf-8")
+    baseline = render_page_context(_page_result(project, "P01"))[0]
+
+    exit_code = main(["execution-context", str(project), "P01"])
+
+    assert exit_code == 0
+    receipt = capsys.readouterr().out.strip()
+    assert receipt.startswith("EXECUTION_CONTEXT path=")
+    assert "page=P01" in receipt
+    assert "tokens=" in receipt
+    assert "sha256=" in receipt
+    assert "read_ranges=" in receipt
+    assert len(receipt.splitlines()) == 1
+    assert "core_rules" not in receipt
+    assert svg.read_text(encoding="utf-8") == "<svg>original</svg>"
+    assert render_page_context(_page_result(project, "P01"))[0] == baseline

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -288,3 +289,58 @@ def _file_sha256_from_text(text: str) -> str:
     import hashlib
 
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def render_execution_context(payload: dict[str, object], *, max_read_bytes: int = 48000) -> tuple[str, tuple[tuple[int, int], ...]]:
+    """Render valid JSON with bounded top-level lines and read ranges."""
+    if max_read_bytes <= 0:
+        raise ExecutionContextError("max_read_bytes must be positive")
+    lines = ["{\n"]
+    items = list(payload.items())
+    for index, (key, value) in enumerate(items):
+        suffix = ",\n" if index + 1 < len(items) else "\n"
+        line = f"{json.dumps(key, ensure_ascii=False)}:{_compact_json(value).rstrip()}{suffix}"
+        if len(line.encode("utf-8")) >= max_read_bytes:
+            raise ExecutionContextError(f"field {key!r} exceeds single-read limit {max_read_bytes}")
+        lines.append(line)
+    lines.append("}\n")
+
+    ranges: list[tuple[int, int]] = []
+    start = 0
+    current_bytes = 0
+    for index, line in enumerate(lines):
+        line_bytes = len(line.encode("utf-8"))
+        if current_bytes and current_bytes + line_bytes >= max_read_bytes:
+            ranges.append((start + 1, index))
+            start = index
+            current_bytes = 0
+        current_bytes += line_bytes
+    ranges.append((start + 1, len(lines)))
+    return "".join(lines), tuple(ranges)
+
+
+def write_execution_context(result: PageContextResult, *, token_budget: int = EXECUTION_CONTEXT_TOKEN_BUDGET) -> tuple[Path, dict[str, object]]:
+    """Atomically write one fresh execution-context artifact."""
+    payload = build_execution_context(result, token_budget=token_budget)
+    rendered, _ranges = render_execution_context(payload)
+    destination = result.project_path / "validation" / "execution-context" / f"{result.page}.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(".json.tmp")
+    try:
+        temporary.write_text(rendered, encoding="utf-8")
+        temporary.replace(destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    return destination, payload
+
+
+def validate_execution_context(payload: dict[str, object], result: PageContextResult) -> None:
+    """Reject a manually changed or stale execution-context payload."""
+    unsigned = {key: value for key, value in payload.items() if key != "context_sha256"}
+    actual = _file_sha256_from_text(_compact_json(unsigned))
+    if actual != payload.get("context_sha256"):
+        raise ExecutionContextError("execution-context changed: context_sha256 mismatch")
+    expected = build_execution_context(result)
+    if actual != expected["context_sha256"]:
+        raise ExecutionContextError("execution-context stale: context_sha256 mismatch")
