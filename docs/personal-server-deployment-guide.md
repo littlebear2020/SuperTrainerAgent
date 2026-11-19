@@ -201,6 +201,8 @@ docker build --platform linux/amd64 -t deerflow-sandbox:local -f docker/sandbox/
 
 `DEER_FLOW_SKILL_SECRET_AUTOBIND` 仅是 runtime 没有 `available_skills`（字段缺失或为 `None`）时的 legacy 显式回退，默认关闭，正常技能调用无需开启。开启后注入范围是「全部启用技能声明并集 ∩ Gateway 进程 env」，required/optional 均计入并集，删除单个技能的声明不等于全局删除同名变量。开启前必须审计全部启用技能与 Gateway env，避免把同名密钥注入不需要它的沙箱。
 
+**Aio 沙箱空闲回收（cf5d4e7e，2026-11-17）**：代码默认 600s，长视频渲染的工具调用空窗会误杀沙箱——部署侧必须在部署目录 `config.yaml` 的 `sandbox:` 段显式设置 `idle_timeout: 7200`（线上仍是 600 即漏了此项）。注意 config.yaml 是单文件只读挂载：`sed -i` 换 inode 后 `restart` 无效，须 `docker compose up -d --force-recreate --no-deps gateway` 重新挂载；后续打包的 install/升级脚本应自动补该键。
+
 ### 3. 前端环境文件（可选）
 
 ```bash
