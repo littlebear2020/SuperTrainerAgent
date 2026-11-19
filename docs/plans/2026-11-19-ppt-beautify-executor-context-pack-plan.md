@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 实施计划
 
-> **状态**：未执行（执行中：用户已批准修订 A，将执行包预算从 8000 调整为 14000 tokens；Task 1 恢复，Task 2–6 未执行；原型从 SDD 证据区恢复后重验；第三次付费 qwen 运行未授权）。
+> **状态**：未执行（再次中止于 Task 1：修订 A 后真实 P03=14562 tokens / 58323 bytes，超过 14000-token 与 48000-byte 双硬门；Task 1 GREEN/提交与 Task 2–6 未执行；原型移至 SDD `prototype-a14000/`，待用户再次设计复审）。
 > **TL;DR**：扩展现有 `page-context`，用精确规则选择器、14000-token 硬门和输入哈希生成当前页执行包；先证明真实 v2 P01/P03 可在预算内完整投影，再改 flat Default/Beautify 的首次与压缩恢复路径。PR A、PR B、summarization、System Prompt 和其他 PPT 路线不变。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 任务必须串行，禁止并行修改同一技能与共享测试。
@@ -103,7 +103,7 @@
 - [x] **Step 2：运行测试确认 RED。** 执行 `cd backend && PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`；预期因 `project_management.execution_context` 不存在而失败，记录关键错误，不能用空实现或跳过真实 v2 路径转绿。
 - [x] **Step 3：实现选择器、模块路由和预算构建。** 复用 `build_page_context()`、其 lock/template preflight、package 内现有 JSON/SHA/token helpers；不得改变默认 page-context 输出。实现起止锚点唯一定位、当前页模块选择、精确 o200k 计数及 `ExecutionContextError`。预算错误必须带各组成项 token，禁止截断。
 - [ ] **Step 4：运行同一 pytest 确认 GREEN。** 所有合成夹具必须短小且通过 `validate_project_artifacts(..., include_design=False)` 的 lock 预检；断言默认 `build_page_context()` 输出在调用执行投影前后完全相同。
-- [x] **Step 5：运行真实 v2 零付费探针。** 用 `backend/.venv/bin/python` 直接调用 `build_page_context()` + `build_execution_context()`，分别测量 `temp/qwen-compacted-recovery-v2-home/users/default/threads/56d43057-aa36-48ff-93a7-f0fbdc029efe/user-data/workspace/projects/leike_store_manager_beautify_ppt169_20261118` 的 P01/P03，打印页码、总/组成 token、rule_id 列表和 context SHA。**初次结果：P01 `page_projection=1289 / core=7481 / module=2859 / total=12297`，P03 `1706 / 7481 / 2669 / 12726`，均超过原 8000；已按约定停止，未进入 Task 2、未删除规则、未付费。修订 A 获批后，以 14000 重跑；预期两页均 `exact`、`total<=14000`、bytes `<48000`，P01 含图片规则、P03 含表格与 native 数据规则。若仍失败，停止并回到设计评审。**
+- [x] **Step 5：运行真实 v2 零付费探针。** 用 `backend/.venv/bin/python` 直接调用 `build_page_context()` + `build_execution_context()`，分别测量 `temp/qwen-compacted-recovery-v2-home/users/default/threads/56d43057-aa36-48ff-93a7-f0fbdc029efe/user-data/workspace/projects/leike_store_manager_beautify_ppt169_20261118` 的 P01/P03，打印页码、总/组成 token、rule_id 列表和 context SHA。**初次结果：P01 `page_projection=1289 / core=7481 / module=2859 / total=12297`，P03 `1706 / 7481 / 2669 / 12726`，均超过原 8000；已按约定停止，未进入 Task 2、未删除规则、未付费。修订 A 重跑结果：P01=12297 tokens / 49738 bytes，P03=14562 tokens / 58323 bytes；两页 bytes 均超门，P03 tokens 也超门。已再次停止，未进入 Task 2、未删除规则、未付费；A 单独加预算不足以满足双硬门。**
 - [ ] **Step 6：提交 Task 1。** `feat(ppt-master): 增加当前页执行规则确定性投影`。
 
 ### Task 2：执行包哈希、原子写入与 `execution-context` CLI
