@@ -87,8 +87,8 @@ def extract_rule_fragment(selector: RuleSelector, *, skill_dir: Path = SKILL_DIR
         end = len(source)
     else:
         end = _unique_position(source, selector.end_anchor, selector=selector, kind="end_anchor")
-    if end <= start:
-        raise ExecutionContextError(f"{selector.rule_id}: end_anchor must be before the end of start_anchor")
+    if end < start + len(selector.start_anchor):
+        raise ExecutionContextError(f"{selector.rule_id}: end_anchor must not overlap or precede start_anchor")
     anchor = selector.start_anchor if selector.end_anchor is None else f"{selector.start_anchor} → {selector.end_anchor}"
     return {
         "rule_id": selector.rule_id,
@@ -148,6 +148,9 @@ def _reference_ids(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
     ids = tuple(item.strip() for item in value.split(",") if item.strip())
+    for ref_id in ids:
+        if re.fullmatch(r"[a-z0-9-]+", ref_id) is None:
+            raise ExecutionContextError(f"invalid reference id: {ref_id!r}")
     if len(ids) != len(set(ids)):
         raise ExecutionContextError(f"duplicate reference ids: {value}")
     return ids
