@@ -81,6 +81,9 @@ config.yaml.bak-*
 .playwright-mcp
 /frontend/test-results/
 /frontend/playwright-report/
+# live E2E 登录态（真实 access_token/csrf_token，严禁入库）
+/frontend/tests/e2e/live/.auth/
+/frontend/test-results/live*/
 .gstack/
 .worktrees
 node_modules
