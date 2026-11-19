@@ -54,7 +54,7 @@ _CORE_SELECTORS = (
     _selector("core.text_leading", "references/shared-standards-core.md", "**Default — leading by role and density", "**Hard rule — supported shape conversion**"),
     _selector("core.root_grouping", "references/shared-standards-core.md", "**Hard rule — root groups protect body-text layout**", "Wrap each logical Slide-local body unit"),
     _selector("core.grouping_units", "references/shared-standards-core.md", "Wrap each logical Slide-local body unit", "**Structural atoms and slots are excluded automatically.**"),
-    _selector("core.grouping_forbidden", "references/shared-standards-core.md", "**Forbidden**:\n\n- One giant", "```xml\n<g id=\"card-benefits-1\""),
+    _selector("core.grouping_forbidden", "references/shared-standards-core.md", "**Forbidden**:\n\n- One giant", '```xml\n<g id="card-benefits-1"'),
     _selector("core.preset_boundaries", "references/preset-shape-vocabulary.md", "**Hard rule — registered identities and behavior boundaries**", "**When to run**"),
 )
 
@@ -195,7 +195,7 @@ def _native_table_fragments(*, skill_dir: Path) -> list[dict[str, str]]:
     selectors = (
         _selector("module.native_table_selected_object", source, "**Hard rule — selected-object authoring**", "**Hard rule — activation is the opt-in**"),
         _selector("module.native_table_activation", source, "**Hard rule — activation is the opt-in**", "**Metadata placement and bounds**"),
-        _selector("module.native_table_bounds", source, "**Metadata placement and bounds**", "```xml\n<g id=\"p03-revenue-chart\""),
+        _selector("module.native_table_bounds", source, "**Metadata placement and bounds**", '```xml\n<g id="p03-revenue-chart"'),
         _selector("module.native_table_projection", source, "**Hard rule — project by the selected authority**", "### Table schema"),
         _selector("module.native_table_schema", source, "### Table schema", "### Chart schemas"),
     )
@@ -316,6 +316,8 @@ def render_execution_context(payload: dict[str, object], *, max_read_bytes: int 
             current_bytes = 0
         current_bytes += line_bytes
     ranges.append((start + 1, len(lines)))
+    if len(ranges) > 2:
+        raise ExecutionContextError("execution-context requires at most two read_ranges")
     return "".join(lines), tuple(ranges)
 
 
