@@ -466,3 +466,10 @@ def test_p31_records_execution_pack_and_failed_p30_boundary():
     assert "execution-context" in patches
     assert "#28" in patches
     assert "P30" in patches
+
+
+def test_render_execution_context_rejects_more_than_two_read_ranges():
+    payload = {f"field-{index}": "x" * 40 for index in range(4)}
+
+    with pytest.raises(ExecutionContextError, match="at most two|read_ranges|2"):
+        render_execution_context(payload, max_read_bytes=100)
