@@ -156,17 +156,27 @@ export async function validateZipArtifact(
 /** 从上下文 cookie 取 csrf_token(Double Submit),供 API POST 用。 */
 export async function csrfHeaders(page: Page): Promise<Record<string, string>> {
   const cookies = await page.context().cookies();
-  const token = cookies.find((c) => c.name.includes("csrf"))?.value;
+  // 精确名匹配,与产品侧 CSRF_COOKIE_PREFIX（frontend/src/core/api/fetcher.ts）一致；
+  // 用 includes("csrf") 模糊匹配可能误取其它同前缀 cookie。
+  const token = cookies.find((c) => c.name === "csrf_token")?.value;
   if (!token)
-    throw new Error("上下文里找不到 csrf cookie(应先经登录态建 context)");
+    throw new Error("上下文里找不到 csrf_token cookie(应先经登录态建 context)");
   return { "X-CSRF-Token": token };
 }
 
-/** 从当前页面 URL 提取线程 ID(chats/<id> 或 agents/<a>/chats/<id>)。 */
+/** 线程 ID 在 URL 里的统一形态；与 resolveThreadId 共用，避免正则漂移。 */
+const THREAD_ID_IN_URL = /chats\/([0-9a-zA-Z-]+)/;
+
+/**
+ * 从当前页面 URL 提取线程 ID(chats/<id> 或 agents/<a>/chats/<id>)。
+ * 新线程尚未落 ID 时 URL 停在 /chats/new，此处必须抛错而非返回 "new"——
+ * 否则调用方会把字面量 "new" 当成真实 thread_id 去查历史。
+ */
 export function threadIdFromUrl(url: string): string {
-  const m = /chats\/([0-9a-zA-Z-]+)/.exec(url);
-  if (!m) throw new Error(`URL 里没有线程 ID: ${url}`);
-  return m[1]!;
+  const m = THREAD_ID_IN_URL.exec(url);
+  const id = m?.[1];
+  if (!id || id === "new") throw new Error(`URL 里没有线程 ID: ${url}`);
+  return id;
 }
 
 /** 发送消息前的线程 ID 基线(用于事后识别新线程)。 */
@@ -192,8 +202,7 @@ export async function resolveThreadId(
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const m = /chats\/([0-9a-zA-Z-]+)/.exec(page.url());
-    const fromUrl = m?.[1];
+    const fromUrl = THREAD_ID_IN_URL.exec(page.url())?.[1];
     if (fromUrl && fromUrl !== "new") return fromUrl;
     try {
       const headers = await csrfHeaders(page);
