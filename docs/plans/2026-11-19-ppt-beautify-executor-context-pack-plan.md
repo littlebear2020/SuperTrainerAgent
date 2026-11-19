@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 实施计划
 
-> **状态**：未执行（计划已定稿，待用户评审并选择执行方式；书面设计 `fa42df6a` 已确认；第三次付费 qwen 运行未授权）。
+> **状态**：未执行（中止于 Task 1 真实探针：P01=12297、P03=12726 tokens，均超过 8000 硬门；Task 1 GREEN/提交与 Task 2–6 均未执行；原型已移至 SDD 证据区，待用户设计复审）。
 > **TL;DR**：扩展现有 `page-context`，用精确规则选择器、8000-token 硬门和输入哈希生成当前页执行包；先证明真实 v2 P01/P03 可在预算内完整投影，再改 flat Default/Beautify 的首次与压缩恢复路径。PR A、PR B、summarization、System Prompt 和其他 PPT 路线不变。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 任务必须串行，禁止并行修改同一技能与共享测试。
@@ -98,11 +98,11 @@
 - `module.mode.<id>` / `module.style.<id>`：从 lock 的 `mode_references` / `visual_style_references` 精确解析 id（直接读取 lock，不改变默认 page-context 输出），分别提取对应文件的 `## 1. Narrative skeleton` / `## 1. Shape & decoration` 至下一 `## 2.`。引用缺失、重复或文件不存在即失败。
 - 其他实际触发只在出现时使用已注册选择器；未注册触发必须抛 `ExecutionContextError`，不得扩大为全 roster。
 
-- [ ] **Step 1：先写选择器和投影失败测试。** 覆盖：唯一锚点精确切片；start/end 缺失、重复、逆序均抛错；187 个 preset 名称数量/顺序/去重；P01 含 image 且无 table；P03 含 table/reference/native_table 且不混入 P01 图片模块；P01/P03 的 `brief_markdown` 不含对方正文；非 flat 抛错；缺 `Native-ready` 声明不推断。断言 pack 文本与来源逐字一致、每条规则含四类来源字段、schema 为 v1、`token_status=exact`、`tokens.total<=8000`、UTF-8 bytes `<48000`。
-- [ ] **Step 2：运行测试确认 RED。** 执行 `cd backend && PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`；预期因 `project_management.execution_context` 不存在而失败，记录关键错误，不能用空实现或跳过真实 v2 路径转绿。
-- [ ] **Step 3：实现选择器、模块路由和预算构建。** 复用 `build_page_context()`、其 lock/template preflight、package 内现有 JSON/SHA/token helpers；不得改变默认 page-context 输出。实现起止锚点唯一定位、当前页模块选择、精确 o200k 计数及 `ExecutionContextError`。预算错误必须带各组成项 token，禁止截断。
+- [x] **Step 1：先写选择器和投影失败测试。** 覆盖：唯一锚点精确切片；start/end 缺失、重复、逆序均抛错；187 个 preset 名称数量/顺序/去重；P01 含 image 且无 table；P03 含 table/reference/native_table 且不混入 P01 图片模块；P01/P03 的 `brief_markdown` 不含对方正文；非 flat 抛错；缺 `Native-ready` 声明不推断。断言 pack 文本与来源逐字一致、每条规则含四类来源字段、schema 为 v1、`token_status=exact`、`tokens.total<=8000`、UTF-8 bytes `<48000`。
+- [x] **Step 2：运行测试确认 RED。** 执行 `cd backend && PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py -q`；预期因 `project_management.execution_context` 不存在而失败，记录关键错误，不能用空实现或跳过真实 v2 路径转绿。
+- [x] **Step 3：实现选择器、模块路由和预算构建。** 复用 `build_page_context()`、其 lock/template preflight、package 内现有 JSON/SHA/token helpers；不得改变默认 page-context 输出。实现起止锚点唯一定位、当前页模块选择、精确 o200k 计数及 `ExecutionContextError`。预算错误必须带各组成项 token，禁止截断。
 - [ ] **Step 4：运行同一 pytest 确认 GREEN。** 所有合成夹具必须短小且通过 `validate_project_artifacts(..., include_design=False)` 的 lock 预检；断言默认 `build_page_context()` 输出在调用执行投影前后完全相同。
-- [ ] **Step 5：运行真实 v2 零付费探针。** 用 `backend/.venv/bin/python` 直接调用 `build_page_context()` + `build_execution_context()`，分别测量 `temp/qwen-compacted-recovery-v2-home/users/default/threads/56d43057-aa36-48ff-93a7-f0fbdc029efe/user-data/workspace/projects/leike_store_manager_beautify_ppt169_20261118` 的 P01/P03，打印页码、总/组成 token、rule_id 列表和 context SHA。预期：两页均 `exact`、`total<=8000`、bytes `<48000`，P01 含图片规则，P03 含表格与 native 数据规则。**若覆盖或预算失败，停止本计划并回到设计评审，不进入 Task 2、不得提高 8000、不得删除必需规则、不得付费。**
+- [x] **Step 5：运行真实 v2 零付费探针。** 用 `backend/.venv/bin/python` 直接调用 `build_page_context()` + `build_execution_context()`，分别测量 `temp/qwen-compacted-recovery-v2-home/users/default/threads/56d43057-aa36-48ff-93a7-f0fbdc029efe/user-data/workspace/projects/leike_store_manager_beautify_ppt169_20261118` 的 P01/P03，打印页码、总/组成 token、rule_id 列表和 context SHA。**实际结果：P01 `page_projection=1289 / core=7481 / module=2859 / total=12297`，P03 `1706 / 7481 / 2669 / 12726`，均超过 8000；已按约定停止，未进入 Task 2、未提高预算、未删除规则、未付费。**
 - [ ] **Step 6：提交 Task 1。** `feat(ppt-master): 增加当前页执行规则确定性投影`。
 
 ### Task 2：执行包哈希、原子写入与 `execution-context` CLI
