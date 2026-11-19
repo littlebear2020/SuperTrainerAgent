@@ -1,6 +1,6 @@
 # PPT 美化 Page Execution Pack 设计
 
-> **状态**：已确认（含 2026-11-19 修订 A：真实探针后将执行包预算从 14000 调整为 14000 tokens；其余设计不变）。
+> **状态**：已确认（含 2026-11-19 修订 A2：16000 tokens + 64000 bytes + 两个有界读取；其余规则内容与选择器不变）。
 > **TL;DR**：复用现有 `page-context` 的确定性当前页投影，新增执行模式以精确原文片段、token 硬门和输入哈希生成 Page Execution Pack；支持的 flat Default/Beautify 路线在首次 Step 6 与 compacted recovery 中共用该包，不再全量读取核心 references 和全 roster 模块。PR A、PR B、System Prompt、summarization 与其他 PPT 路线不变。
 
 ## 1. 背景与已验证问题
@@ -188,15 +188,16 @@ rule_id → source_path + stable heading/paragraph anchor + requiredness
 ## 8. Token 预算与输出边界
 
 - 延续 `o200k_base` 计量；执行模式要求 `token_status=exact`，计量不可用时 fail closed。
-- 首批总执行包硬门设为 **14000 tokens**，包含现有 page projection、core_rules、module_rules 和 schema 开销。该值给 32000-token summarization 窗口保留系统提示、摘要、工具结果和 SVG 输出空间。
+- 总执行包硬门设为 **16000 tokens**，包含现有 page projection、core_rules、module_rules 和 schema 开销；序列化后另须 **<64000 UTF-8 bytes**。该值给 32000-token summarization 窗口保留系统提示、摘要、工具结果和 SVG 输出空间。
 - 现有 page projection 的 2000-token 目标和 lock/global 的 1000-token 目标继续作为分项遥测，不重复相加解释。
-- 任一目标超限即失败并输出各组成项 token，不得静默截断或降级为完整文件读取。
-- 零付费探针必须先证明 v2 P01/P03 都在预算内且规则覆盖完整；探针失败则不进入付费运行，也不通过提高预算掩盖选择器问题。
-- 执行包必须小于现有 `read_file` 输出上限；14000-token 硬门之外再检查 UTF-8 bytes，避免工具截断。
+- 任一目标超限即失败并输出各组成项 token/bytes，不得静默截断、删除规则或降级为完整 references 读取。
+- 零付费探针必须先证明 v2 P01/P03 都在预算内且规则覆盖完整；探针失败则不进入付费运行，也不通过再次提高预算掩盖问题。
+- 执行包以**每个顶层字段一行的合法 JSON** 持久化，CLI 计算并输出 `read_ranges`；每个字段行和每个读取段都必须 `<48000 UTF-8 bytes`。模型按回执使用 `read_file(start_line,end_line)` 分最多两段读完，禁止单行超长截断或无界整文件读取。
+- 若任一字段自身超过单次读取上限，生成失败，不得通过改变格式绕过；需要重新评审，而不是继续加预算。
 
-原 8000-token 首版在真实 v2 探针中失败：P01=12297、P03=12726。用户随后明确选择修订 A，将预算调整为真实最大值约 110% 的 **14000 tokens**，保留全部精确规则内容；这不是实现者自行放宽，也不改变 trigger=32000。
+原 8000-token 首版在真实 v2 探针中失败：P01=12297、P03=12726。修订 A 调整为 14000 后，P03 在正确纳入 native 表格规则后达到 14562 tokens / 58323 bytes，仍不满足双硬门。用户随后选择修订 A2：**16000 tokens + 64000 bytes + 两个有界读取**，分别约为实测最大值的 110%，保留全部精确规则内容，不改变 trigger=32000。
 
-14000 是修订后的实测上限，不是宣称所有页面天然适配。后续调整仍须基于实测并单独评审，不能为了通过而静默提高。
+16000/64000 是 A2 的实测上限，不是宣称所有页面天然适配。后续调整仍须基于实测并单独评审，不能为了通过而静默提高。
 
 ## 9. 所有权与兼容性更新
 
