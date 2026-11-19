@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,8 @@ from .project_specs import parse_spec_lock_artifact
 EXECUTION_CONTEXT_SCHEMA = "ppt-master.execution-context.v1"
 EXECUTION_CONTEXT_TOKEN_BUDGET = 16000
 EXECUTION_CONTEXT_MAX_BYTES = 64000
+# tokens.total sits inside the file it counts, so its own digits shift the count; real packs settle by pass 3.
+_TOTAL_SETTLE_PASSES = 5
 
 
 class ExecutionContextError(RuntimeError):
@@ -205,6 +208,21 @@ def _native_table_fragments(*, skill_dir: Path) -> list[dict[str, str]]:
     return [extract_rule_fragment(selector, skill_dir=skill_dir) for selector in selectors]
 
 
+def _native_ready_status(brief: str) -> bool | None:
+    for line in brief.splitlines():
+        if "native-ready" not in line.casefold():
+            continue
+        match = re.search(r"native-ready\*{0,2}\s*[:：]\s*(.+?)\s*$", line, flags=re.IGNORECASE)
+        if match is None:
+            continue
+        # `key = yes|no` (key may be backticked, commentary may follow) or the legacy bare `yes|no`; first `;` entry decides.
+        entry = match.group(1).split(";", 1)[0].strip()
+        ready = re.match(r"(?:[^=;]+?\s*=\s*)?(yes|no)\b", entry, flags=re.IGNORECASE)
+        if ready is not None:
+            return ready.group(1).lower() == "yes"
+    return None
+
+
 def _select_core_and_modules(result: PageContextResult, *, skill_dir: Path) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     route = dict(result.context.get("global", {}).get("pptx_structure", {}))
     if route.get("mode") != "flat":
@@ -230,7 +248,7 @@ def _select_core_and_modules(result: PageContextResult, *, skill_dir: Path) -> t
     if isinstance(visualization, str) and visualization.startswith("table/"):
         modules.append(_whole_file_fragment("module.table", "references/executor-table.md", skill_dir=skill_dir))
         brief = str(page.get("brief_markdown", ""))
-        if re.search(r"Native-ready\*{0,2}\s*:\s*[^\n;=]+=yes\b", brief, flags=re.IGNORECASE):
+        if _native_ready_status(brief) is True:
             modules.extend(_native_table_fragments(skill_dir=skill_dir))
     return core, modules
 
@@ -246,7 +264,11 @@ def _token_count(counter, payload: object) -> int:
 
 
 def build_execution_context(result: PageContextResult, *, token_budget: int = EXECUTION_CONTEXT_TOKEN_BUDGET) -> dict[str, object]:
-    """Build one measured, hashed execution-context payload without disk writes."""
+    """Build one measured, hashed execution-context payload without disk writes.
+
+    Budgets are checked on the whole rendered file, tokens first and then bytes; the per-field
+    single-read limit is a layout rule that render_execution_context enforces afterwards.
+    """
     counter, status = _token_counter()
     if counter is None or status != "exact":
         raise ExecutionContextError(f"token_status={status}: exact o200k_base counting is required")
@@ -272,17 +294,20 @@ def build_execution_context(result: PageContextResult, *, token_budget: int = EX
         scope, relative = _input_location(result.project_path, path)
         inputs.append({"scope": scope, "path": relative, "sha256": _file_sha256(path)})
     payload["inputs"] = inputs
+    visualization = result.context["page_context"].get("visualization")
+    if isinstance(visualization, str) and visualization.startswith("table/"):
+        payload["native_ready"] = _native_ready_status(str(result.context["page_context"].get("brief_markdown", "")))
     tokens = {
         "page_projection": _token_count(counter, {"global": payload["global"], "page_context": payload["page_context"]}),
         "core_rules": _token_count(counter, core),
         "module_rules": _token_count(counter, modules),
     }
     payload["tokens"] = tokens
-    tokens["total"] = _token_count(counter, payload)
+    payload["context_sha256"] = _execution_context_sha256(payload)
+    rendered = _settle_total_tokens(payload, counter)
     if tokens["total"] > token_budget:
         raise ExecutionContextError(f"execution-context token budget exceeded: {tokens} budget={token_budget}")
-    payload["context_sha256"] = _file_sha256_from_text(_compact_json(payload))
-    byte_count = len(_compact_json(payload).encode("utf-8"))
+    byte_count = len(rendered.encode("utf-8"))
     if byte_count >= EXECUTION_CONTEXT_MAX_BYTES:
         raise ExecutionContextError(f"execution-context byte budget exceeded: {byte_count} >= {EXECUTION_CONTEXT_MAX_BYTES}")
     return payload
@@ -294,19 +319,47 @@ def _file_sha256_from_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _execution_context_sha256(payload: dict[str, object]) -> str:
+    unsigned = {key: value for key, value in payload.items() if key not in {"context_sha256", "tokens"}}
+    return _file_sha256_from_text(_compact_json(unsigned))
+
+
+def _layout_lines(payload: dict[str, object]) -> list[str]:
+    """Lay the payload out as valid JSON, one line per top-level field; applies no size policy."""
+    items = list(payload.items())
+    lines = ["{\n"]
+    for index, (key, value) in enumerate(items):
+        suffix = ",\n" if index + 1 < len(items) else "\n"
+        lines.append(f"{json.dumps(key, ensure_ascii=False)}:{_compact_json(value).rstrip()}{suffix}")
+    lines.append("}\n")
+    return lines
+
+
+def _settle_total_tokens(payload: dict[str, object], counter) -> str:
+    """Set tokens.total to the exact token count of the rendered file that embeds it; return that file.
+
+    The number's own digits are part of what is counted, so iterate to the fixed point. context_sha256
+    excludes `tokens`, so it never feeds back into the count.
+    """
+    tokens = payload["tokens"]
+    tokens["total"] = 0
+    for _ in range(_TOTAL_SETTLE_PASSES):
+        rendered = "".join(_layout_lines(payload))
+        measured = counter(rendered)
+        if measured == tokens["total"]:
+            return rendered
+        tokens["total"] = measured
+    raise ExecutionContextError(f"execution-context token total did not settle after {_TOTAL_SETTLE_PASSES} passes: {tokens}")
+
+
 def render_execution_context(payload: dict[str, object], *, max_read_bytes: int = 48000) -> tuple[str, tuple[tuple[int, int], ...]]:
     """Render valid JSON with bounded top-level lines and read ranges."""
     if max_read_bytes <= 0:
         raise ExecutionContextError("max_read_bytes must be positive")
-    lines = ["{\n"]
-    items = list(payload.items())
-    for index, (key, value) in enumerate(items):
-        suffix = ",\n" if index + 1 < len(items) else "\n"
-        line = f"{json.dumps(key, ensure_ascii=False)}:{_compact_json(value).rstrip()}{suffix}"
+    lines = _layout_lines(payload)
+    for key, line in zip(payload, lines[1:-1]):
         if len(line.encode("utf-8")) >= max_read_bytes:
             raise ExecutionContextError(f"field {key!r} exceeds single-read limit {max_read_bytes}")
-        lines.append(line)
-    lines.append("}\n")
 
     ranges: list[tuple[int, int]] = []
     start = 0
@@ -330,9 +383,18 @@ def write_execution_context(result: PageContextResult, *, token_budget: int = EX
     rendered, _ranges = render_execution_context(payload)
     destination = result.project_path / "validation" / "execution-context" / f"{result.page}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(".json.tmp")
+    handle = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=destination.parent,
+        prefix=f"{destination.stem}.",
+        suffix=".tmp",
+        delete=False,
+    )
+    temporary = Path(handle.name)
     try:
-        temporary.write_text(rendered, encoding="utf-8")
+        with handle:
+            handle.write(rendered)
         temporary.replace(destination)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -342,8 +404,7 @@ def write_execution_context(result: PageContextResult, *, token_budget: int = EX
 
 def validate_execution_context(payload: dict[str, object], result: PageContextResult) -> None:
     """Reject a manually changed or stale execution-context payload."""
-    unsigned = {key: value for key, value in payload.items() if key != "context_sha256"}
-    actual = _file_sha256_from_text(_compact_json(unsigned))
+    actual = _execution_context_sha256(payload)
     if actual != payload.get("context_sha256"):
         raise ExecutionContextError("execution-context changed: context_sha256 mismatch")
     expected = build_execution_context(result)
