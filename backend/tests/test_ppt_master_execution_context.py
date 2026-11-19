@@ -312,6 +312,19 @@ def test_write_and_validate_execution_context_detects_manual_and_source_changes(
         validate_execution_context(fresh, _page_result(project, "P01"))
 
 
+def test_validate_execution_context_rejects_tampered_token_measurements(tmp_path):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+    _, payload = write_execution_context(result)
+    validate_execution_context(payload, result)
+
+    # context_sha256 excludes the measured `tokens`, so the validator must compare them with a fresh measurement.
+    payload["tokens"]["total"] = 1
+
+    with pytest.raises(ExecutionContextError, match="tokens"):
+        validate_execution_context(payload, result)
+
+
 def test_write_execution_context_rebuilds_corrupt_artifact(tmp_path):
     project = _write_project(tmp_path / "project")
     result = _page_result(project, "P01")
@@ -568,6 +581,8 @@ def test_execution_context_temp_files_are_unique(tmp_path):
         ("- **Native-ready**: 无（定性流程结构，不套目录模板）", None),
         ("- **Native-ready**: 无", None),
         ("- **Native-ready**: industry-match-table=yes (single table)", True),
+        # Unbolded, indented shape from the paid P01 run's spec.
+        ("  - Native-ready: industry-fit-table=yes", True),
         # Colon width, whitespace around "=", case, and the legacy bare yes/no.
         ("- **Native-ready**: industry-match-table=yes", True),
         ("- **Native-ready**：industry-match-table=yes", True),
@@ -579,15 +594,40 @@ def test_execution_context_temp_files_are_unique(tmp_path):
         ("- **Native-ready**: industry-match-table=no", False),
         ("- **Native-ready**：industry-match-table = no", False),
         ("- **Native-ready**: no", False),
+        # One page can key several objects: any native-ready entry loads the native rules; only all-no is False.
+        ("- **Native-ready**: table-a=no; table-b=yes", True),
+        ("- **Native-ready**: table-a=yes; table-b=no", True),
+        ("- **Native-ready**: table-a=no; table-b=no", False),
+        ("- **Native-ready**: `table-a=no`；`table-b=yes`（第二张表可原生）", True),
+        ("- **Native-ready**: `table-a=no`（含合并单元格；yes 不适用）", False),
+        ("- **Native-ready**: table-a=no\n- **Native-ready**: table-b=yes", True),
         # Words that merely start with yes/no, and lines that are not a declaration.
         ("- **Native-ready**: none", None),
         ("- **Native-ready**: not decided", None),
+        # A key that merely starts with yes/no must not be read as the decision; its value decides.
+        ("- **Native-ready**: yes-table=maybe", None),
+        ("- **Native-ready**: yes-table=no", False),
+        ("- **Native-ready**: no-merge-table=yes", True),
         ("- **Native-ready**:", None),
         ("- **Core message**: industry-match-table=yes", None),
     ],
 )
 def test_native_ready_status_grammar(line, expected):
     assert _native_ready_status(line) is expected
+
+
+def test_native_rules_load_when_any_keyed_table_on_the_page_is_native_ready(tmp_path):
+    design = DESIGN_SPEC.replace(
+        "Native-ready**: industry-match-table=yes",
+        "Native-ready**: summary-table=no; industry-match-table=yes",
+    )
+    project = _write_project(tmp_path / "project", design=design)
+
+    payload = build_execution_context(_page_result(project, "P03"))
+
+    assert payload["native_ready"] is True
+    rule_ids = {item["rule_id"] for item in payload["module_rules"]}
+    assert {"module.native_table_selected_object", "module.native_table_schema"} <= rule_ids
 
 
 def test_execution_context_total_that_cannot_settle_fails_closed(tmp_path, monkeypatch):
