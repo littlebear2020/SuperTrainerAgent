@@ -5,7 +5,7 @@
 
 ## 1. 背景与已验证问题
 
-PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生在 authoring：v1 `6616aa94` 与 v2 `0c942a8f` 都在最终确认后的 100 次工具调用内未生成 `svg_output/p01.svg`。两次真实 checkpoint 都显示首次 Step 6 核心批次和全 roster 模块读取继续执行；v2 还通过 `bash sed/cat` 读取核心大段。故继续叠加“少读一点”的 prompt 不构成可靠修复。
+PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生在 authoring：v1 `6616aa94` 与 v2 `0c942a8f` 都在最终确认后的 100 次工具调用内未生成 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）`。两次真实 checkpoint 都显示首次 Step 6 核心批次和全 roster 模块读取继续执行；v2 还通过 `bash sed/cat` 读取核心大段。故继续叠加“少读一点”的 prompt 不构成可靠修复。
 
 已排除的错误前提：
 
@@ -51,7 +51,7 @@ PR A 已证明摘要健康、最终确认保留且无重问。当前阻塞发生
 - 不修改 System Prompt、SOUL、Dynamic Context、Skill Rescue、bash/read_file 中间件、trigger/trim/cap 或模型配置。
 - 不新增 `system-anchored` 标签，不按 Agent Name 注入全局豁免。
 - 不改变 Quick、structured/mirror、Create Template 等其他 PPT 路线的读取行为。
-- 不直接生成 `svg_output/p01.svg` 或其他最终页面；执行包只是派生输入，不能替代模型 authoring。
+- 不直接生成 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 或其他最终页面；执行包只是派生输入，不能替代模型 authoring。
 - 不以 P01 冒烟冒充完整 7 页、46 页或生产质量验收。
 
 ## 4. 方案比较与选择
@@ -255,7 +255,7 @@ rule_id → source_path + stable heading/paragraph anchor + requiredness
 
 保持同一冻结输入 SHA=`16f7f0dbf06a559b8889333a0eae9a80349d39d92132efae7a369fe50ea9ff24`、qwen3.8-flash、PR A、token budget disabled、recursion 2400、fresh home/thread 和正常 Stage 1/2：
 
-- 模型自主写出非空 `svg_output/p01.svg` 即停；100 次调用无 P01 / 新占位 / 重问 / 20 分钟无新产物硬停。
+- 模型自主写出非空 `svg_output/p01.svg（或现有技能命名的 `01_*.svg`）` 即停；100 次调用无 P01 / 新占位 / 重问 / 20 分钟无新产物硬停。
 - checkpoint 零占位、确认保留、无 Stage 1/2 重问。
 - 审计真实工具参数：首次 Step 6 和 compacted 后均无完整核心文件或全 roster 批次；执行包构建与读取路径、token、SHA 与当前页一致。
 - 未通过则保留证据，不宣称修复，不叠加 System Prompt 或 summarization 变更。
