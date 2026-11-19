@@ -230,6 +230,10 @@ Load only the references the rows need; a mixed deck writes both `image_prompts.
 
 **TrainerAI override（P22）**: before the required reads and first SVG, run `df -h` for the project's working filesystem. With less than 1&nbsp;GB available, stop and report explicitly; do not author pages. After writing every SVG, verify its size is greater than zero; a 0-byte file is deleted, reported, and stops execution. On a long deck, recheck disk every five pages.
 
+**Flat Default / Beautify execution pack (P31)**: when `spec_lock.md` has `pptx_structure.mode: flat`, do not execute the legacy full-reference batch below. For each page, inspect `svg_output/` first, verify existing SVGs are non-empty, and select the first missing page in §IX order (a 0-byte file still stops under P22). Run `python3 ${SKILL_DIR}/scripts/project_manager.py execution-context <project_path> P<NN>`, then read the generated `validation/execution-context/P<NN>.json` using the CLI's `read_ranges` with `read_file(start_line,end_line)`; each range must be `<48000 bytes`, with at most two bounded reads covering the whole pack. The pack is a derived view, never a second source of truth, and it must not be read again for routine bash, `wc`, `ls`, or local uncertainty. On a page advance, build the next page's pack. On compacted, fresh, resumed, restarted, or externally changed context, rebuild or revalidate the current page pack and resume from the first missing page without rewriting completed non-empty SVGs. An unregistered trigger, over-budget pack, or stale hash fails closed: never fall back to the complete Design Spec, complete core references, or the roster-wide triggered module set.
+
+**Other routes**: for structured, mirror, and other non-flat routes, keep the original full-reference behavior:
+
 ```
 Read ${SKILL_DIR}/references/executor-base.md              # REQUIRED core: execution rules, device menu, everyday effects, module triggers
 Read ${SKILL_DIR}/references/shared-standards-core.md      # REQUIRED core: SVG contract + shared aesthetic/leading baseline
@@ -243,11 +247,12 @@ Read ${SKILL_DIR}/references/visual-styles/<resolved-id>.md # one preset id, or 
 
 Read the core as one batch with the exact detail files named by the retained `spec_lock.md`, then every module the roster sweep triggers. Never reopen the planning indexes, infer adjacent bases, glob a catalog, or blend unselected identities (an unreferenced custom follows its behavior alone). Conditional modules load on [`executor-base.md`](../references/executor-base.md)'s routing table, never by analogy; `video-design.md` is read before the first SVG when §I records recorded/self-running/video delivery or §X a literal script. Read each reference once per valid context.
 
-**Context validity**: reuse the retained Design Spec and lock for every page while the context is unchanged and uncompacted; do not reread or poll them. On local uncertainty consult the retained lock, then only the owning Design Spec fragment — sources supply facts only, and the Design Spec wins a conflict.
+**Context validity**: for flat routes, reuse the current execution pack while the context is unchanged and uncompacted; the pack must not be read again for routine bash, `wc`, `ls`, or local uncertainty. For other routes, reuse the retained Design Spec and lock for every page while the context is unchanged and uncompacted; do not reread or poll them. On local uncertainty consult the retained lock, then only the owning Design Spec fragment — sources supply facts only, and the Design Spec wins a conflict.
 
 | Situation | Read |
 |---|---|
-| Fresh, resumed, restarted, compacted, or externally changed context | `design_spec.md`, then `spec_lock.md`, once, plus triggered references and the latest completed SVG when mid-deck ([`failure-recovery.md`](governance/failure-recovery.md)) |
+| Flat Default / Beautify — fresh, resumed, restarted, compacted, or externally changed context | Build or revalidate `validation/execution-context/P<NN>.json` for the first missing page and read it using the CLI `read_ranges`; never the complete Design Spec, complete core references, or roster-wide triggered module set |
+| Other routes — fresh, resumed, restarted, compacted, or externally changed context | `design_spec.md`, then `spec_lock.md`, once, plus triggered references and the latest completed SVG when mid-deck ([`failure-recovery.md`](governance/failure-recovery.md)) |
 | Bounded same-context repair that preserves roster/order/identity/communication | Only the affected fragment readback plus `project_manager.py validate` |
 | **Five-page lock re-read** — after P05, P10, P15, … when another page follows | `spec_lock.md` in full once before the next page: a pure re-anchor of palette, typography, icon style, and `page_rhythm` under long context, with no checker run, no output, no pause, and no repair loop; an external change found here follows the recovery branch |
 | §X records a literal script | The frozen `notes/total.md` once before P01; design each visible state around its segment |

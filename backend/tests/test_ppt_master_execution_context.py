@@ -417,3 +417,53 @@ def test_execution_context_cli_writes_short_receipt_without_touching_svg(tmp_pat
     assert "core_rules" not in receipt
     assert svg.read_text(encoding="utf-8") == "<svg>original</svg>"
     assert render_page_context(_page_result(project, "P01"))[0] == baseline
+
+
+def test_flat_workflow_uses_execution_pack_for_initial_and_compacted_contexts():
+    workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
+    start = workflow.index("**Flat Default / Beautify execution pack (P31)**")
+    end = workflow.index("**Other routes**", start)
+    flat = workflow[start:end]
+
+    assert "execution-context <project_path> P<NN>" in flat
+    assert "read_ranges" in flat
+    assert "start_line" in flat and "end_line" in flat
+    assert "compacted" in flat
+    assert "first missing page" in flat
+    assert "must not be read again for routine bash" in flat
+    assert "unregistered trigger" in flat
+    assert "Read ${SKILL_DIR}/references/executor-base.md" not in flat
+    assert "Read ${SKILL_DIR}/references/shared-standards-core.md" not in flat
+
+
+def test_non_flat_workflow_keeps_legacy_full_reference_recovery():
+    workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
+    other = workflow[workflow.index("**Other routes**") :]
+    assert "Read ${SKILL_DIR}/references/executor-base.md" in other
+    assert "Read ${SKILL_DIR}/references/shared-standards-core.md" in other
+    assert "triggered references" in other
+
+    recovery = (SKILL_DIR / "workflows" / "governance" / "failure-recovery.md").read_text(encoding="utf-8")
+    assert "Execution context is fresh, resumed, compacted, external, or unknown" in recovery
+    assert "Read the complete Design Spec, then lock, once; reload triggered inputs" in recovery
+
+
+def test_execution_pack_ownership_is_distinct_from_page_context_diagnostics():
+    ownership = (SKILL_DIR / "references" / "artifact-ownership.md").read_text(encoding="utf-8")
+    assert "validation/execution-context/P<NN>.json" in ownership
+    assert "Derived per-page execution view" in ownership
+    assert "not a second source of truth" in ownership
+    assert "atomic rebuild" in ownership
+
+    project_docs = (SKILL_DIR / "scripts" / "docs" / "project.md").read_text(encoding="utf-8")
+    assert "execution-context <project_path> P01" in project_docs
+    assert "read_ranges" in project_docs
+    assert "does not change the diagnostic page-context output" in project_docs
+
+
+def test_p31_records_execution_pack_and_failed_p30_boundary():
+    patches = (SKILL_DIR / "TRAINERAI_PATCHES.md").read_text(encoding="utf-8")
+    assert "| P31 |" in patches
+    assert "execution-context" in patches
+    assert "#28" in patches
+    assert "P30" in patches

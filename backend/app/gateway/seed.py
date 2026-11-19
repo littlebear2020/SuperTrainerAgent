@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 
-# Bump when seed content changes (SOUL.md, config.yaml, new agents). Existing
-# deployments reseed on the next startup so the new content takes effect.
+# Bump when seed content changes (SOUL.md, config.yaml, new agents) or linked
+# skill behavior requires a runtime refresh. Existing deployments reseed on the
+# next startup so the new content takes effect.
 # 2026-09-02: SEC-C2/C3 batch B2 — six runtime-only agents (card-poster/
 # case-article/course-assistant/course-ppt/knowledge-extraction/video-clip，
 # 2026-09-09 前的旧清单) brought under seed management with explicit
@@ -51,7 +52,9 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # P05 early gate 后暂停并从 P06 顺序续写；SOUL D3.3/D3.4/D3.5 同步。
 # 2026-11-16.4: 评审小修——统一“只有用户新的明确修改才能重开已确认阶段”的例外
 # （P20/SOUL/failure-recovery/Beautify），并保持本批仅验证 P05 一次暂停的口径。
-SEED_VERSION = "2026-11-16.4"
+# 2026-11-19.1: ppt-master flat Default/Beautify 首次、翻页与 compacted recovery
+# 改用确定性当前页执行包，替代完整核心 references 与全 roster 预读。
+SEED_VERSION = "2026-11-19.1"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 
