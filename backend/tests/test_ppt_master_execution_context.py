@@ -17,6 +17,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from project_management import execution_context as execution_context_module  # noqa: E402
 from project_management.execution_context import (  # noqa: E402
+    _reference_ids,
     EXECUTION_CONTEXT_SCHEMA,
     EXECUTION_CONTEXT_TOKEN_BUDGET,
     ExecutionContextError,
@@ -177,7 +178,7 @@ def test_extract_rule_fragment_returns_exact_source_slice(tmp_path):
         ("START", "MISSING", "end_anchor"),
         ("DUP", "END", "start_anchor"),
         ("START", "DUP", "end_anchor"),
-        ("END", "START", "before"),
+        ("END", "START", "overlap|precede"),
     ],
 )
 def test_extract_rule_fragment_rejects_invalid_anchors(tmp_path, start, end, message):
@@ -473,3 +474,22 @@ def test_render_execution_context_rejects_more_than_two_read_ranges():
 
     with pytest.raises(ExecutionContextError, match="at most two|read_ranges|2"):
         render_execution_context(payload, max_read_bytes=100)
+
+
+def test_extract_rule_fragment_rejects_end_anchor_inside_start_anchor(tmp_path):
+    source = tmp_path / "references" / "overlap.md"
+    source.parent.mkdir()
+    source.write_text("START-END\nbody\n", encoding="utf-8")
+
+    with pytest.raises(ExecutionContextError, match="overlap|precede"):
+        extract_rule_fragment(
+            RuleSelector("bad.overlap", "references/overlap.md", "START-END", "END"),
+            skill_dir=tmp_path,
+        )
+
+
+def test_reference_ids_only_allow_kebab_case_identifiers():
+    assert _reference_ids("instructional, swiss-minimal") == ("instructional", "swiss-minimal")
+    for unsafe in ("../executor-base", "modes/instructional", "instructional_foo", "hello world"):
+        with pytest.raises(ExecutionContextError, match="invalid reference id"):
+            _reference_ids(unsafe)
