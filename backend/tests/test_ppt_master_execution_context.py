@@ -21,6 +21,7 @@ from project_management.execution_context import (  # noqa: E402
     EXECUTION_CONTEXT_TOKEN_BUDGET,
     ExecutionContextError,
     RuleSelector,
+    _native_ready_status,
     _reference_ids,
     build_execution_context,
     extract_preset_names,
@@ -507,3 +508,123 @@ def test_preset_reference_fallback_uses_same_id_validation(tmp_path):
         from project_management.execution_context import _style_fragments
 
         _style_fragments(result, skill_dir=SKILL_DIR)
+
+
+def test_execution_context_total_tokens_and_bytes_match_actual_rendered_file(tmp_path):
+    from project_management.page_context import _token_counter
+
+    project = _write_project(tmp_path / "project")
+    payload = build_execution_context(_page_result(project, "P03"))
+    rendered, _ = render_execution_context(payload)
+    counter, status = _token_counter()
+
+    assert status == "exact"
+    assert payload["tokens"]["total"] == counter(rendered)
+    assert len(rendered.encode("utf-8")) < 64000
+
+
+def test_native_ready_accepts_fullwidth_colon_and_legacy_bare_yes(tmp_path):
+    fullwidth = DESIGN_SPEC.replace("Native-ready**: industry-match-table=yes", "Native-ready**：industry-match-table = yes")
+    bare = DESIGN_SPEC.replace("Native-ready**: industry-match-table=yes", "Native-ready**: yes")
+    for design in (fullwidth, bare):
+        project = _write_project(tmp_path / "project", design=design)
+
+        payload = build_execution_context(_page_result(project, "P03"))
+
+        assert payload["native_ready"] is True
+        assert any(item["rule_id"].startswith("module.native_table") for item in payload["module_rules"])
+
+
+def test_execution_context_temp_files_are_unique(tmp_path):
+    import tempfile
+
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+    names = []
+    original = tempfile.NamedTemporaryFile
+
+    def recording_named_temporary_file(*args, **kwargs):
+        handle = original(*args, **kwargs)
+        names.append(handle.name)
+        return handle
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", recording_named_temporary_file)
+    try:
+        write_execution_context(result)
+        write_execution_context(result)
+    finally:
+        monkeypatch.undo()
+
+    assert len(names) == 2
+    assert len(set(names)) == 2
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        # Shapes the Strategist really wrote in the v2 spec: backticked entry + fullwidth commentary; 无 = undeclared.
+        ("- **Native-ready**: `industry-background-fit-table=yes`（table/record_table 原生表格对象导出）", True),
+        ("- **Native-ready**: 无（定性流程结构，不套目录模板）", None),
+        ("- **Native-ready**: 无", None),
+        ("- **Native-ready**: industry-match-table=yes (single table)", True),
+        # Colon width, whitespace around "=", case, and the legacy bare yes/no.
+        ("- **Native-ready**: industry-match-table=yes", True),
+        ("- **Native-ready**：industry-match-table=yes", True),
+        ("- **Native-ready**: industry-match-table = yes", True),
+        ("- **Native-ready**: industry-match-table=YES", True),
+        ("- **Native-ready**: YES", True),
+        ("- **Native-ready:** industry-match-table=yes", True),
+        ("- **Native-ready**: yes", True),
+        ("- **Native-ready**: industry-match-table=no", False),
+        ("- **Native-ready**：industry-match-table = no", False),
+        ("- **Native-ready**: no", False),
+        # Words that merely start with yes/no, and lines that are not a declaration.
+        ("- **Native-ready**: none", None),
+        ("- **Native-ready**: not decided", None),
+        ("- **Native-ready**:", None),
+        ("- **Core message**: industry-match-table=yes", None),
+    ],
+)
+def test_native_ready_status_grammar(line, expected):
+    assert _native_ready_status(line) is expected
+
+
+def test_execution_context_total_that_cannot_settle_fails_closed(tmp_path, monkeypatch):
+    project = _write_project(tmp_path / "project")
+    result = _page_result(project, "P01")
+
+    def flip_flop(text: str) -> int:
+        # Never reaches a fixed point: the count depends on the very total it is about to be stored as.
+        return 1 if '"total":0' in text else 0
+
+    monkeypatch.setattr(execution_context_module, "_token_counter", lambda: (flip_flop, "exact"))
+
+    with pytest.raises(ExecutionContextError, match="settle"):
+        build_execution_context(result)
+
+
+def _with_oversized_brief(result: PageContextResult) -> PageContextResult:
+    page_context = {**result.context["page_context"], "brief_markdown": "word " * 16001}
+    return replace(result, context={**result.context, "page_context": page_context})
+
+
+def test_byte_budget_is_reported_before_the_single_read_limit(tmp_path):
+    project = _write_project(tmp_path / "project")
+    oversized = _with_oversized_brief(_page_result(project, "P01"))
+
+    with pytest.raises(ExecutionContextError, match="byte budget"):
+        write_execution_context(oversized, token_budget=10**9)
+
+    assert not (project / "validation" / "execution-context" / "P01.json").exists()
+
+
+def test_single_read_limit_still_rejects_an_oversized_field_when_total_budgets_allow_it(tmp_path, monkeypatch):
+    project = _write_project(tmp_path / "project")
+    oversized = _with_oversized_brief(_page_result(project, "P01"))
+    monkeypatch.setattr(execution_context_module, "EXECUTION_CONTEXT_MAX_BYTES", 10**9)
+
+    with pytest.raises(ExecutionContextError, match="field 'page_context' exceeds single-read limit 48000"):
+        write_execution_context(oversized, token_budget=10**9)
+
+    assert not (project / "validation" / "execution-context" / "P01.json").exists()
