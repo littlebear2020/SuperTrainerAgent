@@ -433,9 +433,12 @@ def test_execution_context_cli_writes_short_receipt_without_touching_svg(tmp_pat
     assert render_page_context(_page_result(project, "P01"))[0] == baseline
 
 
+FLAT_STEP6_RULE = "**Flat Default / Beautify execution pack (P31)**"
+
+
 def test_flat_workflow_uses_execution_pack_for_initial_and_compacted_contexts():
     workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
-    start = workflow.index("**Flat Default / Beautify execution pack (P31)**")
+    start = workflow.index(FLAT_STEP6_RULE)
     end = workflow.index("**Other routes**", start)
     flat = workflow[start:end]
 
@@ -450,16 +453,119 @@ def test_flat_workflow_uses_execution_pack_for_initial_and_compacted_contexts():
     assert "Read ${SKILL_DIR}/references/shared-standards-core.md" not in flat
 
 
+def _step6(workflow: str) -> str:
+    return workflow[workflow.index("### Step 6: Executor Phase") : workflow.index("### Step 7: Post-processing & Export")]
+
+
+def test_flat_execution_pack_is_the_first_blocking_rule_of_step6():
+    """The first full-core read happened because the legacy batch looked like the Step 6 default.
+
+    The flat rule must come first in Step 6, before the P22 sentence that mentions "the required reads"
+    and before any Read of the core, so a flat run meets the execution-pack order before any core load.
+    """
+    step6 = _step6((SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8"))
+    flat = step6.index(FLAT_STEP6_RULE)
+
+    assert flat < step6.index("**TrainerAI override（P22）**")
+    assert flat < step6.index("Read ${SKILL_DIR}/references/executor-base.md")
+    assert flat < step6.index("Read ${SKILL_DIR}/references/shared-standards-core.md")
+    assert flat < step6.index("**Other routes**")
+
+
+def test_flat_step6_forbids_core_reads_before_the_execution_pack_is_read():
+    step6 = _step6((SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8"))
+    flat = step6[step6.index(FLAT_STEP6_RULE) : step6.index("**Other routes**")]
+
+    assert "Blocking order" in flat
+    assert "before the execution pack has been generated and read" in flat
+    assert "never read `executor-base.md` or `shared-standards-core.md` in full" in flat
+    # SKILL.md's generic "read the role reference before switching roles" would otherwise pull executor-base in first.
+    assert "the Executor role-switch read in `SKILL.md` included" in flat
+    # The prohibition precedes the command that builds the pack, so it already binds when the model gets there ...
+    command = flat.index("execution-context <project_path> P<NN>")
+    assert flat.index("Blocking order") < command
+    # ... and it is the only place before that command that names either core file (no read-style mention).
+    before_command = flat[:command]
+    assert before_command.count("executor-base.md") == 1
+    assert before_command.count("shared-standards-core.md") == 1
+
+
+def test_flat_step6_has_no_read_instruction_for_core_references_or_the_complete_spec():
+    step6 = _step6((SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8"))
+    flat = step6[step6.index(FLAT_STEP6_RULE) : step6.index("**Other routes**")]
+
+    for forbidden in ("Read ${SKILL_DIR}", "references/executor-base.md", "references/shared-standards-core.md"):
+        assert forbidden not in flat
+    # The P22 sentence sits outside the flat block but must not presuppose reads that a flat run never does.
+    p22 = step6[step6.index("**TrainerAI override（P22）**") :].split("\n", 1)[0]
+    assert "the required reads" not in p22
+
+
 def test_non_flat_workflow_keeps_legacy_full_reference_recovery():
     workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
     other = workflow[workflow.index("**Other routes**") :]
     assert "Read ${SKILL_DIR}/references/executor-base.md" in other
     assert "Read ${SKILL_DIR}/references/shared-standards-core.md" in other
     assert "triggered references" in other
+    assert "non-flat only" in other[: other.index("```")]
+    assert "Read the core as one batch with the exact detail files named by the retained `spec_lock.md`" in other
 
     recovery = (SKILL_DIR / "workflows" / "governance" / "failure-recovery.md").read_text(encoding="utf-8")
     assert "Execution context is fresh, resumed, compacted, external, or unknown" in recovery
     assert "Read the complete Design Spec, then lock, once; reload triggered inputs" in recovery
+
+
+def test_resume_execute_has_a_flat_branch_that_builds_the_pack_before_any_core_read():
+    resume = (SKILL_DIR / "workflows" / "stages" / "resume-execute.md").read_text(encoding="utf-8")
+    flat_start = resume.index("**Flat branch (P31)**")
+    flat = resume[flat_start : resume.index("**Non-flat branch**", flat_start)]
+
+    assert "pptx_structure.mode: flat" in flat
+    assert "execution-context <project_path> P<NN>" in flat
+    assert "first missing page" in flat
+    assert "read_ranges" in flat
+    assert "never load `executor-base.md`" in flat
+    assert "never read the complete Design Spec or complete lock" in flat
+    assert "before the execution pack has been generated and read" in flat
+
+    # The unconditional "complete reads happen after the Executor role core loads" sentence must not bind flat runs.
+    sanity = resume[resume.index("## Step 1: Sanity check") : resume.index("## Step 2")]
+    assert "must both exist; their complete reads happen after" not in sanity
+    assert "For non-flat routes their complete reads happen after the Executor role core loads" in sanity
+    assert "a flat route reads neither in full" in sanity
+    # The conditional-dependency check cannot demand a complete read of the pair on a flat route.
+    assert "(flat: from the pack and those bounded fragments)" in resume
+
+
+def test_resume_execute_non_flat_branch_keeps_the_original_full_read_flow():
+    resume = (SKILL_DIR / "workflows" / "stages" / "resume-execute.md").read_text(encoding="utf-8")
+    non_flat = resume[resume.index("**Non-flat branch**") :]
+
+    assert "loads `executor-base.md`" in non_flat
+    assert "read the complete Design Spec, then the complete lock, once" in non_flat
+    assert "resolve the effective Speaker Notes / Custom Animations / Narration Audio outcomes from `design_spec.md §I`" in non_flat
+    assert "Source verification" in resume  # the conditional-dependency and verification text stays shared
+
+
+def test_failure_recovery_flat_row_names_the_pack_order_without_core_reads():
+    recovery = (SKILL_DIR / "workflows" / "governance" / "failure-recovery.md").read_text(encoding="utf-8")
+    row = next(line for line in recovery.splitlines() if line.startswith("| Flat Default / Beautify execution context is fresh"))
+
+    assert "before any core reference" in row
+    assert "never the complete Design Spec, complete core references" in row
+
+
+def test_p31_patch_row_records_the_read_order_constraint_and_resume_execute():
+    patches = (SKILL_DIR / "TRAINERAI_PATCHES.md").read_text(encoding="utf-8")
+    row = next(line for line in patches.splitlines() if line.startswith("| P31 |"))
+
+    assert "workflows/stages/resume-execute.md" in row
+    assert "读取顺序" in row
+    assert "execution-context" in row and "executor-base.md" in row and "shared-standards-core.md" in row
+    # Static pins prove wording, not model behavior: the row must say the behavior is still unverified
+    # and that only a later paid retest can confirm it.
+    assert "尚未验证" in row
+    assert "付费复测" in row
 
 
 def test_execution_pack_ownership_is_distinct_from_page_context_diagnostics():

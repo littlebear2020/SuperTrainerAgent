@@ -16,15 +16,19 @@ The user opens a new chat naming a project path with continuation intent — "�
 
 ## Step 1: Sanity check
 
-`<project_path>/design_spec.md` (approved narrative and §IX outline) and `<project_path>/spec_lock.md` (execution anchors and routing contract) must both exist; their complete reads happen after the Executor role core loads. If either is missing, stop and recover through [`failure-recovery.md`](../governance/failure-recovery.md) §3 — never enter Step 6, treat an orphan lock as authority, or invent a replacement.
+`<project_path>/design_spec.md` (approved narrative and §IX outline) and `<project_path>/spec_lock.md` (execution anchors and routing contract) must both exist. For non-flat routes their complete reads happen after the Executor role core loads; a flat route reads neither in full (Step 2). If either is missing, stop and recover through [`failure-recovery.md`](../governance/failure-recovery.md) §3 — never enter Step 6, treat an orphan lock as authority, or invent a replacement.
 
 ---
 
 ## Step 2: Load the Generate authority, proceed from Step 6
 
-Read `skills/ppt-master/workflows/generate-pptx.md` and jump to `### Step 6: Executor Phase`, which loads `executor-base.md` and applies its context policy: read the complete Design Spec, then the complete lock, once; resolve the effective Speaker Notes / Custom Animations / Narration Audio outcomes from `design_spec.md §I` (missing outcomes default `enabled` / `disabled` / `disabled`; never from the lock).
+Read `skills/ppt-master/workflows/generate-pptx.md` and jump to `### Step 6: Executor Phase`. Branch on `spec_lock.md`'s `pptx_structure.mode`:
 
-Before the first SVG, verify every conditional dependency discoverable from that pair:
+**Flat branch (P31)** — `pptx_structure.mode: flat`: inspect `svg_output/` and select the first missing page; run `python3 skills/ppt-master/scripts/project_manager.py execution-context <project_path> P<NN>`, then read the generated pack with the CLI's `read_ranges`; before the execution pack has been generated and read, never load `executor-base.md` or `shared-standards-core.md` in full (the Executor role-switch read included), and never read the complete Design Spec or complete lock — the pack carries the exact core rules, the current-page §IX block, and the lock projection. The §I/§X outcomes and the dependency table below are read as bounded fragments, never as a complete file.
+
+**Non-flat branch** — structured, mirror, and every other route: Step 6 loads `executor-base.md` and applies its context policy: read the complete Design Spec, then the complete lock, once; resolve the effective Speaker Notes / Custom Animations / Narration Audio outcomes from `design_spec.md §I` (missing outcomes default `enabled` / `disabled` / `disabled`; never from the lock).
+
+Before the first SVG, verify every conditional dependency discoverable from that pair (flat: from the pack and those bounded fragments):
 
 | File / Directory | Required when | Recovery when missing |
 |---|---|---|
