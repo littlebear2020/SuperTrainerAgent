@@ -31,6 +31,7 @@
 #   - docx (npm):      docx skill (JavaScript Word document creation)
 #   - /etc/pip.conf + PIP_INDEX_URL：系统级清华源（2026-10-23 事故：原只配给 root）
 #   - python3.10-venv: `python3 -m venv` 可用（基座缺此包）
+#   - tiktoken + regex: ppt-master execution-context 精确 o200k_base 计数（wheel 与 BPE 缓存离线 vendoring）
 #
 # Build:
 #   docker build -t littlebear2016/deerflow-sandbox:latest -f docker/sandbox/Dockerfile .
@@ -300,6 +301,28 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     && python3 -c "import uharfbuzz; print('uharfbuzz OK')" \
     && python3 -c "import yaml; print('PyYAML OK')" \
     && python3 -c "import xlsxwriter; print('XlsxWriter OK')"
+
+# ppt-master 精确 token 计数：tiktoken + regex（o200k_base），构建期与运行期均不联网。
+# execution-context 强制 token_status=exact，沙箱缺 tiktoken 时执行包全链路 fail-closed。
+# 不赌镜像源/外网（2026-11-20）：开发机与容器内实测清华源包索引 403；公司服务器网络对 pypi.org
+# 静默丢包（见上文 2026-10-23 事故）；BPE 数据托管在 Azure blob。所以 wheel 与 BPE 缓存都
+# vendoring 在 docker/sandbox/cache/（K16 离线来源）：
+#   - python-wheels/：cp310 manylinux 的 amd64 + aarch64 wheel，pip 按平台标签自选；
+#     requirements.txt 钉版本 + sha256，--require-hashes 校验入库文件；--no-deps（requests 由基座预装）
+#   - tiktoken/：o200k_base BPE 预烘焙缓存（文件名 = sha1(下载 URL) = tiktoken 缓存键），
+#     TIKTOKEN_CACHE_DIR 指向它，tiktoken 加载时按 expected_hash 校验，命中即不联网
+# RUN --network=none：构建本身即证明安装与缓存命中不依赖网络（本文件已用 RUN heredoc，
+# 同为 BuildKit 语法，未新增 builder 要求）。chmod：COPY 保留权限位，umask 077 的机器上
+# checkout 出的 0600 文件会让任务用户（uid 1000）读不到 BPE 缓存。
+COPY docker/sandbox/cache/python-wheels/ /tmp/vendored-wheels/
+COPY docker/sandbox/cache/tiktoken/ /opt/tiktoken-cache/
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken-cache
+RUN --network=none \
+    chmod -R a+rX /opt/tiktoken-cache \
+    && pip3 install --no-cache-dir --break-system-packages --no-index --no-deps --require-hashes \
+       --find-links /tmp/vendored-wheels -r /tmp/vendored-wheels/requirements.txt \
+    && rm -rf /tmp/vendored-wheels \
+    && python3 -c "import tiktoken; enc = tiktoken.get_encoding('o200k_base'); assert enc.encode('hello world') == [24912, 2375]; print('tiktoken', tiktoken.__version__, 'o200k_base OK (offline)')"
 
 # Verify document skill dependencies
 RUN echo "=== Document dependencies check ===" \
