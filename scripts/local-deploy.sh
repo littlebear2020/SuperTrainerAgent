@@ -14,6 +14,13 @@ set -e
 #   DEPLOY_SERVER=user@example.com bash scripts/local-deploy.sh
 SERVER="${DEPLOY_SERVER:?请设置 DEPLOY_SERVER，例如 DEPLOY_SERVER=user@example.com}"
 REMOTE_DIR="/opt/trainer-ai"
+# 后端镜像构建（deploy.sh → uv sync）的 Python 包索引。2026-11-20：清华源在开发机与容器内实测对
+# 包索引整站 403（tiktoken 等全部包都拉不到），默认显式走 pypi.org；受限网络可覆盖，例如
+#   PYPI_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ bash scripts/local-deploy.sh
+# 注意：不要把它传给 sandbox 镜像构建（--build-arg PIP_INDEX）——sandbox Dockerfile 会把 PIP_INDEX
+# 烘焙成运行期 pip 源（/etc/pip.conf + ENV PIP_INDEX_URL），换成 pypi.org 会复发 2026-10-23 事故；
+# sandbox 的 tiktoken/regex 已 vendoring，构建期不依赖任何索引。
+PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.org/simple}"
 LOCAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_NAME="$(basename "$LOCAL_DIR")"
 PARENT_DIR="$(dirname "$LOCAL_DIR")"
@@ -106,12 +113,12 @@ fi
 
 read -p "是否立即构建并启动服务? (y/n): " deploy_answer
 if [ "$deploy_answer" = "y" ]; then
-    ssh "$SERVER" "$SANDBOX_CMD cd $REMOTE_DIR && NPM_REGISTRY=https://registry.npmmirror.com UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple APT_MIRROR=mirrors.aliyun.com bash scripts/deploy.sh"
+    ssh "$SERVER" "$SANDBOX_CMD cd $REMOTE_DIR && NPM_REGISTRY=https://registry.npmmirror.com UV_INDEX_URL=${PYPI_INDEX_URL} APT_MIRROR=mirrors.aliyun.com bash scripts/deploy.sh"
 else
     echo ""
     echo "手动启动命令:"
     echo "  ssh $SERVER"
-    echo "  cd $REMOTE_DIR && NPM_REGISTRY=https://registry.npmmirror.com UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple APT_MIRROR=mirrors.aliyun.com bash scripts/deploy.sh"
+    echo "  cd $REMOTE_DIR && NPM_REGISTRY=https://registry.npmmirror.com UV_INDEX_URL=${PYPI_INDEX_URL} APT_MIRROR=mirrors.aliyun.com bash scripts/deploy.sh"
 fi
 
 rm -f "$TMP_FILE"
