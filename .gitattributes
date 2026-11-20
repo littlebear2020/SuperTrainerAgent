@@ -41,3 +41,5 @@ Makefile text eol=lf
 *.woff binary
 *.woff2 binary
 docker/sandbox/cache/chrome-linux/chrome-headless-shell-linux64/chrome-headless-shell filter=lfs diff=lfs merge=lfs -text
+# tiktoken o200k_base BPE 预烘焙缓存（19.9 万行纯文本）：按二进制处理——逐字节保真（sha256 校验）、diff 不进 AI 评审
+docker/sandbox/cache/tiktoken/* binary

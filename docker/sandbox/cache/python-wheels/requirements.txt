@@ -1,0 +1,17 @@
+# ppt-master 沙箱精确 token 计数（tiktoken o200k_base）的离线依赖——构建期不访问任何包索引。
+#
+# 来源：PyPI（https://pypi.org/pypi/<pkg>/<ver>/json）的 cp310 manylinux wheel，amd64 与 aarch64 各一，
+#   pip 按平台标签自选；sha256 = PyPI 发布值，Dockerfile 以 --require-hashes 校验入库文件。
+# 为什么 vendoring：不赌镜像源——2026-11-20 开发机与容器内实测清华源包索引 403；公司网络对 pypi.org 静默丢包
+#   （见 Dockerfile 2026-10-23 事故注释）。uv.lock 按 requires-python>=3.12 裁掉了 cp310 wheel，无法复用其 hash。
+#   tiktoken 的 requests 依赖由基座预装（--no-deps 安装）。
+# 对应的 BPE 数据缓存：docker/sandbox/cache/tiktoken/fb374d419588a4632f3f557e76b4b70aebbca790
+#   = sha1(https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken)，
+#   sha256 = 446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d（tiktoken 加载时同样校验）。
+# 升级：同步更新本文件、wheel 文件与 backend/tests/test_sandbox_tiktoken_vendoring.py 的预期。
+tiktoken==0.12.0 \
+    --hash=sha256:6de0da39f605992649b9cfa6f84071e3f9ef2cec458d08c5feb1b6f0ff62e134 \
+    --hash=sha256:cde24cdb1b8a08368f709124f15b36ab5524aac5fa830cc3fdce9c03d4fb8030
+regex==2026.4.4 \
+    --hash=sha256:0540e5b733618a2f84e9cb3e812c8afa82e151ca8e19cf6c4e95c5a65198236f \
+    --hash=sha256:6780f008ee81381c737634e75c24e5a6569cc883c4f8e37a37917ee79efcafd9
