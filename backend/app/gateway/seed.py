@@ -54,7 +54,9 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # （P20/SOUL/failure-recovery/Beautify），并保持本批仅验证 P05 一次暂停的口径。
 # 2026-11-19.1: ppt-master flat Default/Beautify 首次、翻页与 compacted recovery
 # 改用确定性当前页执行包，替代完整核心 references 与全 roster 预读。
-SEED_VERSION = "2026-11-19.1"
+# 2026-11-20.1: flat 首次读取顺序——Step 6 以执行包为第一条阻塞规则，生成并读取执行包前
+# 禁止完整读取核心 references/Design Spec/lock；resume-execute 增加 flat 分支（P31）。
+SEED_VERSION = "2026-11-20.1"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 
