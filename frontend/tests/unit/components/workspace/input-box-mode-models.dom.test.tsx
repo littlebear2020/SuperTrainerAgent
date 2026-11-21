@@ -266,8 +266,12 @@ describe("submit guard", () => {
         mode: "standard",
       }),
     );
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "hello" }),
-    );
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ text: "hello" }),
+        );
+      });
+    });
   });
 });
