@@ -319,6 +319,50 @@ export interface Translations {
     providerAiVideo: string;
   };
 
+  personalUsage: {
+    title: string;
+    subtitle: string;
+    totalCost: string;
+    totalCostHint: string;
+    totalTokens: string;
+    totalTokensHint: string;
+    lastNDays: string;
+    all: string;
+    filterLabel: string;
+    windowLabel: string;
+    taskListLabel: string;
+    loading: string;
+    error: string;
+    retry: string;
+    empty: string;
+    completed: string;
+    running: string;
+    incomplete: string;
+    asOfNow: string;
+    calculating: string;
+    llmCost: string;
+    mediaCost: string;
+    taskCost: string;
+    mediaUnknown: string;
+    noModels: string;
+    model: string;
+    inputTokens: string;
+    outputTokens: string;
+    cacheReadTokens: string;
+    modelTotalTokens: string;
+    modelCost: string;
+    openOriginal: string;
+    previous: string;
+    next: string;
+    pageInfo: (from: number, to: number, total: number) => string;
+    real: string;
+    estimated: string;
+    mixed: string;
+    expandDetails: string;
+    collapseDetails: string;
+    footerNote: string;
+  };
+
   // Agents
   agents: {
     title: string;
