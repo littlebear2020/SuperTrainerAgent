@@ -24,6 +24,14 @@ function currencySymbol(currency: string | null | undefined): string {
   }
 }
 
+/** Full thousands-separated form, e.g. `1234567` → `"1,234,567"`. */
+export function formatInteger(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  return Math.round(value).toLocaleString("en-US");
+}
+
 /**
  * Money, or an explicit "unpriced" marker.
  *

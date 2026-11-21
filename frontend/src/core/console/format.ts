@@ -10,14 +10,6 @@
  * grouping.
  */
 
-/** Full thousands-separated form, e.g. `1234567` → `"1,234,567"`. */
-export function formatInteger(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) {
-    return "—";
-  }
-  return Math.round(value).toLocaleString("en-US");
-}
-
 /**
  * Compact token count for table cells, e.g. `256517593` → `"256.5M"`.
  *
@@ -43,10 +35,9 @@ function trimZero(value: number): string {
   return fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed;
 }
 
-// Money formatting lives in core/utils/format.ts now (批次 C Phase D) so task
-// views outside the console can share it; re-export keeps console imports
-// byte-compatible.
-export { currencySymbol, formatCost } from "@/core/utils/format";
+// Shared integer and money formatting lives in core/utils/format.ts; re-exports
+// keep existing console imports byte-compatible.
+export { currencySymbol, formatCost, formatInteger } from "@/core/utils/format";
 
 /** Wall-clock duration, e.g. `3661` → `"1h 1m"`, `12.4` → `"12.4s"`. */
 export function formatDuration(seconds: number | null | undefined): string {
