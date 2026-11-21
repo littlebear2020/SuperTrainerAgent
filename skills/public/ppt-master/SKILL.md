@@ -187,6 +187,7 @@ ends at export. Step numbers stay as written.
 - Match the user's language and source language unless the user explicitly overrides it.
 - Localize user-facing option labels and explanations. Keep exact enum IDs or field names when needed for precision.
 - Keep `design_spec.md` section headings and field names in the template's original English; content values may use the user's language.
+- **Flat Default / Beautify Executor exception (P31)** — when `spec_lock.md` declares `pptx_structure.mode: flat`, do not read `executor-base.md` or `shared-standards-core.md` at role switch. If the Step 6 flat rule is not retained, load `workflows/generate-pptx.md` Step 6 first; then generate and read the current-page execution pack before any core reference. The pack supplies the Executor role core. Quick Generate and non-flat routes still follow the generic rule below.
 - Before switching roles, read the corresponding role reference and output:
 
 ```markdown
