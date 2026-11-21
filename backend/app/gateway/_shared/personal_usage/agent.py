@@ -71,7 +71,8 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
         usage_map = row.token_usage_by_model
         run_has_tokens = run_input + run_output > 0
         parsed_buckets: dict[str, tuple[int, int, int | None]] = {}
-        buckets_valid = isinstance(usage_map, dict) and bool(usage_map)
+        has_buckets = isinstance(usage_map, dict) and bool(usage_map)
+        buckets_valid = has_buckets
 
         if isinstance(usage_map, dict):
             for model, usage in usage_map.items():
@@ -86,7 +87,7 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
                 cache_read_tokens = _token_count(usage.get("cache_read_tokens")) if "cache_read_tokens" in usage else None
                 parsed_buckets[model] = (input_tokens, output_tokens, cache_read_tokens)
 
-        if run_has_tokens and (not buckets_valid or sum(value[0] for value in parsed_buckets.values()) != run_input or sum(value[1] for value in parsed_buckets.values()) != run_output):
+        if (run_has_tokens or has_buckets) and (not buckets_valid or sum(value[0] for value in parsed_buckets.values()) != run_input or sum(value[1] for value in parsed_buckets.values()) != run_output):
             models_complete = False
 
         run_cost = _run_cost(

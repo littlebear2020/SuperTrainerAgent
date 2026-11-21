@@ -3,7 +3,7 @@ import type {
   PersonalUsageResponse,
   UsageCostSource,
 } from "@/core/usage/types";
-import { formatCost, formatInteger } from "@/core/utils/format";
+import { formatUsageCost, formatInteger } from "@/core/utils/format";
 
 export function UsageCostSourceBadge({
   source,
@@ -54,7 +54,7 @@ export function UsageSummary({
           />
         </div>
         <p className="mt-3 text-3xl font-semibold tracking-tight">
-          {formatCost(summary.cost, summary.currency)}
+          {formatUsageCost(summary.cost, summary.currency)}
         </p>
         <p className="text-muted-foreground mt-2 text-xs">{c.totalCostHint}</p>
       </div>

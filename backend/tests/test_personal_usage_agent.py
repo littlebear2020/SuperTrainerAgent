@@ -420,3 +420,58 @@ async def test_agent_failed_unpriced_and_incomplete_models_keep_task_totals(db):
     assert tasks["unpriced"].cost is None
     assert tasks["unpriced"].cost_source is None
     assert tasks["unpriced"].models[0].cost is None
+
+
+@pytest.mark.anyio
+async def test_agent_amount_only_row_invalidates_partial_models(db):
+    async with db() as session:
+        await add_pricing(session)
+        session.add_all(
+            [
+                thread("amount-only-partial"),
+                run(
+                    "amount-only-normal",
+                    "amount-only-partial",
+                    input_tokens=1,
+                    output_tokens=1,
+                    token_usage_by_model={"priced-model": bucket(1, 1)},
+                ),
+                run(
+                    "amount-only-real",
+                    "amount-only-partial",
+                    model_name="amount-only-model",
+                    token_usage_by_model={"amount-only-model": {"amount": 3}},
+                ),
+            ]
+        )
+        await session.commit()
+
+    task = (await aggregate(db))[0]
+    assert task.total_tokens == 2
+    assert task.llm_cost == pytest.approx(3.00004, abs=1e-9)
+    assert task.cost_source == "mixed"
+    assert task.models == []
+
+
+@pytest.mark.anyio
+async def test_agent_zero_token_run_with_positive_buckets_invalidates_models(db):
+    async with db() as session:
+        await add_pricing(session)
+        session.add_all(
+            [
+                thread("zero-positive-buckets"),
+                run(
+                    "zero-positive-buckets-run",
+                    "zero-positive-buckets",
+                    input_tokens=0,
+                    output_tokens=0,
+                    token_usage_by_model={"priced-model": bucket(10, 4)},
+                ),
+            ]
+        )
+        await session.commit()
+
+    task = (await aggregate(db))[0]
+    assert task.total_tokens == 0
+    assert task.llm_cost == pytest.approx(0.00022, abs=1e-9)
+    assert task.models == []

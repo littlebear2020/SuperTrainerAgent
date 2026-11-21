@@ -4,7 +4,11 @@ import { fetch } from "@/core/api/fetcher";
 import { formatInteger as consoleFormatInteger } from "@/core/console/format";
 import { fetchPersonalUsage } from "@/core/usage/api";
 import type { PersonalUsageResponse } from "@/core/usage/types";
-import { formatCost, formatInteger } from "@/core/utils/format";
+import {
+  formatCost,
+  formatInteger,
+  formatUsageCost,
+} from "@/core/utils/format";
 
 vi.mock("@/core/api/fetcher", () => ({ fetch: vi.fn() }));
 
@@ -99,5 +103,11 @@ describe("personal usage API and formatting", () => {
     expect(formatCost(response.summary.cost, response.summary.currency)).toBe(
       "¥1.50",
     );
+  });
+
+  it("does not round a known positive usage cost to displayed zero", () => {
+    expect(formatUsageCost(0.00001, "CNY")).toBe("<¥0.0001");
+    expect(formatUsageCost(0, "CNY")).toBe("¥0.00");
+    expect(formatUsageCost(null, "CNY")).toBe("—");
   });
 });

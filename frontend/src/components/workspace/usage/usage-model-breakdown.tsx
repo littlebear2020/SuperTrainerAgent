@@ -1,7 +1,7 @@
 import { UsageCostSourceBadge } from "@/components/workspace/usage/usage-summary";
 import { useI18n } from "@/core/i18n/hooks";
 import type { UsageModel } from "@/core/usage/types";
-import { formatCost, formatInteger } from "@/core/utils/format";
+import { formatUsageCost, formatInteger } from "@/core/utils/format";
 
 export function UsageModelBreakdown({
   models,
@@ -82,7 +82,7 @@ export function UsageModelBreakdown({
                     data-testid={`model-cost-${index}`}
                     className="whitespace-nowrap"
                   >
-                    {formatCost(model.cost, currency)}
+                    {formatUsageCost(model.cost, currency)}
                   </span>
                   <UsageCostSourceBadge
                     source={model.cost_source}
