@@ -12,7 +12,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 31
+config_version: 32
 
 # ============================================================================
 # Run Recursion Budget
@@ -141,6 +141,14 @@ token_usage:
 #
 # A model with no pricing block (or with input/output both <= 0) is treated as
 # unpriced: the console reports its cost as null rather than inventing a value.
+
+# User-selectable mode defaults reference model names declared below. Each model
+# declares its allowed modes with `modes: [flash]`, `[flash, standard]`,
+# `[standard, ultra]`, `[ultra]`, or `[]` for internal-only models.
+# mode_defaults:
+#   flash: qwen3.8-flash
+#   standard: claude-sonnet-5-5
+#   ultra: qwen4-max
 
 models:
   # ── 生产在用的模型清单（2026-10-12 调整）：360 网关 7 条——Ark 直连聊天已撤册

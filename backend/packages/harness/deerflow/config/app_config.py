@@ -6,7 +6,7 @@ from typing import Any, Self
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from deerflow.config.acp_config import load_acp_config_from_dict
 from deerflow.config.agents_api_config import AgentsApiConfig, load_agents_api_config_from_dict
@@ -17,7 +17,7 @@ from deerflow.config.extensions_config import ExtensionsConfig
 from deerflow.config.guardrails_config import GuardrailsConfig, load_guardrails_config_from_dict
 from deerflow.config.loop_detection_config import LoopDetectionConfig, load_loop_detection_config_from_dict
 from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
-from deerflow.config.model_config import ModelConfig
+from deerflow.config.model_config import ModelConfig, ModeName
 from deerflow.config.run_events_config import RunEventsConfig
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.skill_evolution_config import SkillEvolutionConfig
@@ -98,6 +98,7 @@ class AppConfig(BaseModel):
     log_level: str = Field(default="info", description="Logging level for deerflow and app modules (debug/info/warning/error); third-party libraries are not affected")
     token_usage: TokenUsageConfig = Field(default_factory=TokenUsageConfig, description="Token usage tracking configuration")
     models: list[ModelConfig] = Field(default_factory=list, description="Available models")
+    mode_defaults: dict[ModeName, str] = Field(default_factory=dict, description="Default model for each user-selectable mode")
     sandbox: SandboxConfig = Field(description="Sandbox configuration")
     tools: list[ToolConfig] = Field(default_factory=list, description="Available tools")
     tool_groups: list[ToolGroupConfig] = Field(default_factory=list, description="Available tool groups")
@@ -186,6 +187,16 @@ class AppConfig(BaseModel):
         description="Hard server-side ceiling for a client-supplied run recursion_limit. Client values above this are clamped; prevents runaway LangGraph super-steps (LLM cost / DoS).",
     )
     token_budget: TokenBudgetConfig = Field(default_factory=TokenBudgetConfig, description="Token Budget tracking and limits configuration.")
+
+    @model_validator(mode="after")
+    def validate_mode_defaults(self) -> Self:
+        for mode, model_name in self.mode_defaults.items():
+            model = self.get_model_config(model_name)
+            if model is None:
+                raise ValueError(f"Default model {model_name!r} for mode {mode!r} does not exist")
+            if mode not in model.modes:
+                raise ValueError(f"Default model {model_name!r} does not belong to mode {mode!r}")
+        return self
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path:

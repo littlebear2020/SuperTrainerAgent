@@ -1,4 +1,8 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+ModeName = Literal["flash", "standard", "ultra"]
 
 
 class ModelConfig(BaseModel):
@@ -12,6 +16,7 @@ class ModelConfig(BaseModel):
         description="Class path of the model provider(e.g. langchain_openai.ChatOpenAI)",
     )
     model: str = Field(..., description="Model name")
+    modes: list[ModeName] = Field(default_factory=list, description="User-selectable modes that include this model")
     model_config = ConfigDict(extra="allow")
     use_responses_api: bool | None = Field(
         default=None,

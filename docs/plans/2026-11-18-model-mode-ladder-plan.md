@@ -126,24 +126,24 @@
 
 ### Task 0：执行准备与串行约束
 
-- [ ] 规划侧先把本计划及仍需引用的在途计划以**单独纯 docs 批次**入库，作为跨会话次序载体；不与功能 diff 夹带。`agent-showcase-integration` 已在 `origin/main` 有实现文件，其状态头过时问题另行处理，不纳入本批。
-- [ ] 确认 DSML 守卫计划保持「不执行」（2026-11-20 用户决策），并核对本批未把 DeepSeek 设为任何档位默认；`git fetch origin`，从**最新 `origin/main`** 建 worktree/分支 `model-mode-ladder`，记录实际短 hash 与 `config_version: 31`。评审基准 `35338212` 仅用于漂移核对，不替代执行时最新基线。
-- [ ] 不带入当前工作区的无关修改与未跟踪素材。worktree 的 gitignored `config.yaml` 用**符号链接**指向主工作区文件；`.env` 只在当前 shell 以 `set -a; source <主工作区>/.env; set +a` 加载，不复制、不打印、不提交。CI 无真实花名册时按现有 skip 口径运行。
+- [x] 规划侧先把本计划及仍需引用的在途计划以**单独纯 docs 批次**入库，作为跨会话次序载体；不与功能 diff 夹带。`agent-showcase-integration` 已在 `origin/main` 有实现文件，其状态头过时问题另行处理，不纳入本批。
+- [x] 确认 DSML 守卫计划保持「不执行」（2026-11-20 用户决策），并核对本批未把 DeepSeek 设为任何档位默认；`git fetch origin`，从**最新 `origin/main`** 建 worktree/分支 `model-mode-ladder`，记录实际短 hash 与 `config_version: 31`。评审基准 `35338212` 仅用于漂移核对，不替代执行时最新基线。
+- [x] 不带入当前工作区的无关修改与未跟踪素材。worktree 的 gitignored `config.yaml` 用**符号链接**指向主工作区文件；`.env` 只在当前 shell 以 `set -a; source <主工作区>/.env; set +a` 加载，不复制、不打印、不提交。CI 无真实花名册时按现有 skip 口径运行。
 
 ### Task 1：后端 schema、factory 防泄漏与 API
 
-- [ ] `model_config.py`
-  - [ ] 新增 `ModeName = Literal["flash", "standard", "ultra"]`。
-  - [ ] 新增 `modes: list[ModeName] = Field(default_factory=list)`，非法值由 Pydantic 直接拒绝。
-- [ ] `app_config.py`
-  - [ ] 新增 `mode_defaults: dict[ModeName, str] = Field(default_factory=dict)`。
-  - [ ] 加 `@model_validator(mode="after")`：默认模型必须存在且其 `modes` 包含对应 mode；否则 `ValueError`。
-- [ ] `models/factory.py`
-  - [ ] `model_dump(exclude={...})` 增加 `modes`；除这一处外不改工厂逻辑。
-- [ ] `app/gateway/routers/models.py`
-  - [ ] `ModelResponse.modes: list[str] = []`；`ModelsListResponse.mode_defaults: dict[str,str] = {}`。
-  - [ ] 列表与详情端点同步填充；不暴露 api_key 等敏感字段。
-- [ ] `config.example.yaml` / `config.yaml`：`config_version: 31 → 32`，补 `modes` / `mode_defaults` 模板。
+- [x] `model_config.py`
+  - [x] 新增 `ModeName = Literal["flash", "standard", "ultra"]`。
+  - [x] 新增 `modes: list[ModeName] = Field(default_factory=list)`，非法值由 Pydantic 直接拒绝。
+- [x] `app_config.py`
+  - [x] 新增 `mode_defaults: dict[ModeName, str] = Field(default_factory=dict)`。
+  - [x] 加 `@model_validator(mode="after")`：默认模型必须存在且其 `modes` 包含对应 mode；否则 `ValueError`。
+- [x] `models/factory.py`
+  - [x] `model_dump(exclude={...})` 增加 `modes`；除这一处外不改工厂逻辑。
+- [x] `app/gateway/routers/models.py`
+  - [x] `ModelResponse.modes: list[str] = []`；`ModelsListResponse.mode_defaults: dict[str,str] = {}`。
+  - [x] 列表与详情端点同步填充；不暴露 api_key 等敏感字段。
+- [x] `config.example.yaml` / `config.yaml`：`config_version: 31 → 32`，补 `modes` / `mode_defaults` 模板。
 
 ### Task 2：模型清单与思考参数
 
