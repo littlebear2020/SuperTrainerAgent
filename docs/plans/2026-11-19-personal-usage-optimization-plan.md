@@ -376,11 +376,11 @@ query key = `["personal-usage", user?.id ?? "anonymous", days, capability, offse
 - `usageTaskHref(task): string`：Agent 固定调用 `pathOfThread(task.source_id, { agent_name: task.capability })` 生成 canonical URL，四类 capability ID 即真实 agent 名，禁止退回 `/workspace/chats/<id>` 或自造路由；视频返回 `/workspace/video-gen/<encodeURIComponent(source_id)>`。
 - `ConsoleRolePage`：通过现有 `useIsConsoleAdmin()` 读取角色（内部以 `system_role` 为准），admin → 原 `ConsolePage`；regular → 新 `PersonalUsagePage`，两个页面不共存；不得另写角色判断。
 
-- [ ] **Step 1：写 API/路由失败测试**。断言 7/14/30、capability、offset、limit、tz 全部进入 query；Agent 旧类型已归一到六类 URL，视频详情路径正确；通用 `null` 与缓存 `cache_read_tokens=null` 格式化 `—`，显式真实 0 正常显示，真实 LLM 费用的 CNY/`real` 字段不在前端被改写成估算或 0。
-- [ ] **Step 2：写角色与 query 隔离失败测试**。regular 不挂载旧 ConsolePage，五个 console 查询和定价请求均为 0；admin 不请求 `/api/usage`；admin→user 同帧卸载定价和旧查询，不泄露 admin cache。
-- [ ] **Step 3：运行确认失败，再实现数据层与角色边界**。`formatInteger` 移至 `core/utils/format.ts` 并由 console re-export；现有 console 组件逻辑不改。同步实现最小 `PersonalUsagePage` 容器，只调用 `usePersonalUsage` 并提供加载/错误出口，保证本任务提交可独立构建，完整视觉在任务 6 完成。
-- [ ] **Step 4：运行 usage 单测、角色测试及 `console-role-transition`、`console-query-scope` 回归并确认通过**。
-- [ ] **Step 5：提交**。`feat(usage): 建立个人页数据层与角色边界`
+- [x] **Step 1：写 API/路由失败测试**。断言 7/14/30、capability、offset、limit、tz 全部进入 query；Agent 旧类型已归一到六类 URL，视频详情路径正确；通用 `null` 与缓存 `cache_read_tokens=null` 格式化 `—`，显式真实 0 正常显示，真实 LLM 费用的 CNY/`real` 字段不在前端被改写成估算或 0。
+- [x] **Step 2：写角色与 query 隔离失败测试**。regular 不挂载旧 ConsolePage，五个 console 查询和定价请求均为 0；admin 不请求 `/api/usage`；admin→user 同帧卸载定价和旧查询，不泄露 admin cache。
+- [x] **Step 3：运行确认失败，再实现数据层与角色边界**。`formatInteger` 移至 `core/utils/format.ts` 并由 console re-export；现有 console 组件逻辑不改。同步实现最小 `PersonalUsagePage` 容器，只调用 `usePersonalUsage` 并提供加载/错误出口，保证本任务提交可独立构建，完整视觉在任务 6 完成。
+- [x] **Step 4：运行 usage 单测、角色测试及 `console-role-transition`、`console-query-scope` 回归并确认通过**。
+- [x] **Step 5：提交**。`feat(usage): 建立个人页数据层与角色边界`
 
 ### 任务 6：按 V4 实现两张总览卡、六项筛选、任务与模型明细
 

@@ -1,11 +1,9 @@
-import { ConsolePage } from "@/components/workspace/console/console-page";
+import { ConsoleRolePage } from "@/components/workspace/console/console-role-page";
 
 /**
- * Operations console at `/workspace/console`.
- *
- * Nests under the workspace layout, so auth + AuthProvider are already in
- * place — the page component reads admin status from that context.
+ * Role-specific usage page at `/workspace/console`, nested under the workspace
+ * layout where auth + AuthProvider are already in place.
  */
 export default function WorkspaceConsolePage() {
-  return <ConsolePage />;
+  return <ConsoleRolePage />;
 }
