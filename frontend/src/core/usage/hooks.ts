@@ -4,9 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/core/auth/AuthProvider";
 
-import { fetchPersonalUsage, type FetchPersonalUsageOptions } from "./api";
+import {
+  fetchPersonalUsage,
+  type PERSONAL_USAGE_PAGE_SIZE,
+  type FetchPersonalUsageOptions,
+} from "./api";
 
-export function usePersonalUsage(options: FetchPersonalUsageOptions) {
+export function usePersonalUsage(
+  options: FetchPersonalUsageOptions & {
+    limit: typeof PERSONAL_USAGE_PAGE_SIZE;
+  },
+) {
   const { user } = useAuth();
   const userKey = user?.id ?? "anonymous";
   return useQuery({
@@ -16,7 +24,7 @@ export function usePersonalUsage(options: FetchPersonalUsageOptions) {
       options.days,
       options.capability,
       options.offset,
-      20,
+      options.limit,
       options.tzOffsetMinutes,
     ],
     queryFn: () => fetchPersonalUsage(options),

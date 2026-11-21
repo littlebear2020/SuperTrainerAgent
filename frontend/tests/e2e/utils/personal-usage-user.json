@@ -1,0 +1,6 @@
+{
+  "id": "personal-usage-e2e-user",
+  "email": "personal-usage-e2e@test.local",
+  "system_role": "user",
+  "needs_setup": false
+}

@@ -1,7 +1,10 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 
 const port = Number(process.env.E2E_GATEWAY_PORT ?? 3010);
+const personalUsageUser = JSON.parse(
+  readFileSync(new URL("./personal-usage-user.json", import.meta.url), "utf8"),
+);
 
 const server = createServer((request, response) => {
   if (request.url === "/health") {
@@ -11,14 +14,7 @@ const server = createServer((request, response) => {
   }
   if (request.method === "GET" && request.url === "/api/v1/auth/me") {
     response.writeHead(200, { "Content-Type": "application/json" });
-    response.end(
-      JSON.stringify({
-        id: "personal-usage-e2e-user",
-        email: "personal-usage-e2e@test.local",
-        system_role: "user",
-        needs_setup: false,
-      }),
-    );
+    response.end(JSON.stringify(personalUsageUser));
     return;
   }
   if (

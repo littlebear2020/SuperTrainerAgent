@@ -8,13 +8,9 @@ import type {
   UsageTask,
 } from "../../src/core/usage/types";
 
+import REGULAR_USER from "./utils/personal-usage-user.json" with { type: "json" };
+
 const APP_URL = `http://localhost:${process.env.E2E_PORT ?? 3127}`;
-const REGULAR_USER = {
-  id: "personal-usage-e2e-user",
-  email: "personal-usage-e2e@test.local",
-  system_role: "user",
-  needs_setup: false,
-};
 
 function model(
   name: string,
@@ -40,8 +36,10 @@ function task(
   capability: UsageTask["capability"],
   overrides: Partial<UsageTask> = {},
 ): UsageTask {
+  const isVideoTask = capability === "ai_image" || capability === "ai_video";
+  const taskKeyPrefix = isVideoTask ? "video" : "agent";
   return {
-    task_key: `${capability === "ai_image" || capability === "ai_video" ? "video" : "agent"}:${id}`,
+    task_key: `${taskKeyPrefix}:${id}`,
     source_id: id,
     capability,
     title: id,

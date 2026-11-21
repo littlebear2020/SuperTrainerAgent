@@ -8,13 +8,13 @@ import { UsageSummary } from "@/components/workspace/usage/usage-summary";
 import { UsageTaskList } from "@/components/workspace/usage/usage-task-list";
 import { localTzOffsetMinutes } from "@/core/console/format";
 import { useI18n } from "@/core/i18n/hooks";
+import { PERSONAL_USAGE_PAGE_SIZE as PAGE_SIZE } from "@/core/usage/api";
 import { usePersonalUsage } from "@/core/usage/hooks";
 import type {
   UsageCapabilityFilter as CapabilityFilter,
   UsageDays,
 } from "@/core/usage/types";
 
-const PAGE_SIZE = 20;
 const WINDOW_OPTIONS: readonly UsageDays[] = [7, 14, 30];
 
 export function PersonalUsagePage() {

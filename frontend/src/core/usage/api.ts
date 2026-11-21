@@ -7,6 +7,8 @@ import type {
   UsageDays,
 } from "./types";
 
+export const PERSONAL_USAGE_PAGE_SIZE = 20;
+
 export interface FetchPersonalUsageOptions {
   days: UsageDays;
   capability: UsageCapabilityFilter;
