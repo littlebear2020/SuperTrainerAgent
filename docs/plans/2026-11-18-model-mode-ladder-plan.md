@@ -147,13 +147,14 @@
 
 ### Task 2：模型清单与思考参数
 
-- [ ] `qwen3.8-flash`：`modes: [flash]`，`supports_reasoning_effort: true`，补 §1.3 的 `when_thinking_*`。
-- [ ] `deepseek-v4.1-flash`：`model: deepseek/deepseek-v4.1-flash@360-latency`（内部 name 不变），`modes: [flash, standard]`，`supports_thinking/vision/reasoning_effort: true`，补成对配置。
-- [ ] `claude-sonnet-5-5`：`modes: [standard, ultra]`，thinking/effort 保持 false，不写 `when_thinking_*`。
-- [ ] 新增 `qwen4-max`：`modes: [ultra]`，`PatchedChatOpenAI + base_url`，`max_tokens: 32768`、`temperature: 0.7`、三个能力旗标 true、成对配置、`stream_chunk_timeout: 240`。
-- [ ] 新增 `kimi-k3.1-pro`：`modes: [ultra]`，同上，`stream_chunk_timeout: 300`、`request_timeout: 300`。
-- [ ] 除 §1.3 五个模型外的全部在册模型显式 `modes: []`；不改 qwen3.8-max 的内部引用。
-- [ ] `mode_defaults: {flash: qwen3.8-flash, standard: claude-sonnet-5-5, ultra: qwen4-max}`；`models[0]` 保持 qwen3.8-flash。
+- [x] `qwen3.8-flash`：`modes: [flash]`，`supports_reasoning_effort: true`，补 §1.3 的 `when_thinking_*`。
+- [x] `deepseek-v4.1-flash`：`model: deepseek/deepseek-v4.1-flash@360-latency`（内部 name 不变），`modes: [flash, standard]`，`supports_thinking/vision/reasoning_effort: true`，补成对配置。
+- [x] `claude-sonnet-5-5`：`modes: [standard, ultra]`，thinking/effort 保持 false，不写 `when_thinking_*`。
+- [x] 新增 `qwen4-max`：`modes: [ultra]`，`PatchedChatOpenAI + base_url`，`max_tokens: 32768`、`temperature: 0.7`、三个能力旗标 true、成对配置、`stream_chunk_timeout: 240`。
+- [x] 新增 `kimi-k3.1-pro`：`modes: [ultra]`，同上，`stream_chunk_timeout: 300`、`request_timeout: 300`。
+- [x] 除 §1.3 五个模型外的全部在册模型显式 `modes: []`；不改 qwen3.8-max 的内部引用。
+- [x] `mode_defaults: {flash: qwen3.8-flash, standard: claude-sonnet-5-5, ultra: qwen4-max}`；`models[0]` 保持 qwen3.8-flash。
+- [x] 执行修订：factory 的显式 `when_thinking_disabled` 分支弹出重复的运行时 `reasoning_effort`，确保配置中的 `minimal` 优先且真实 lead-agent 调用不发生重复 kwargs。
 
 ### Task 3：前端数据层、类型与迁移
 

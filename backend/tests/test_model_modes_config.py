@@ -115,3 +115,101 @@ def test_user_config_version_is_32() -> None:
         config = yaml.safe_load(stream)
 
     assert config["config_version"] == 32
+
+
+EXPECTED_MODES = {
+    "qwen3.8-flash": ["flash"],
+    "deepseek-v4.1-flash": ["flash", "standard"],
+    "claude-sonnet-5-5": ["standard", "ultra"],
+    "qwen4-max": ["ultra"],
+    "kimi-k3.1-pro": ["ultra"],
+}
+EXPECTED_MODE_DEFAULTS = {
+    "flash": "qwen3.8-flash",
+    "standard": "claude-sonnet-5-5",
+    "ultra": "qwen4-max",
+}
+THINKING_MODELS = {"qwen3.8-flash", "deepseek-v4.1-flash", "qwen4-max", "kimi-k3.1-pro"}
+
+
+@pytest.fixture()
+def real_config(monkeypatch: pytest.MonkeyPatch) -> AppConfig:
+    config_path = REPO_ROOT / "config.yaml"
+    if not config_path.exists():
+        pytest.skip("花名册测试依赖本地 config.yaml")
+    monkeypatch.setenv("QIHU_API_KEY", "test-key")
+    monkeypatch.setenv("ARK_API_KEY", "test-key")
+    return AppConfig.from_file(str(config_path))
+
+
+def test_real_roster_modes_and_defaults(real_config: AppConfig) -> None:
+    assert real_config.models[0].name == "qwen3.8-flash"
+    assert real_config.mode_defaults == EXPECTED_MODE_DEFAULTS
+    for model in real_config.models:
+        assert model.modes == EXPECTED_MODES.get(model.name, []), model.name
+
+
+def test_deepseek_latency_roster_contract(real_config: AppConfig) -> None:
+    model = real_config.get_model_config("deepseek-v4.1-flash")
+
+    assert model.model == "deepseek/deepseek-v4.1-flash@360-latency"
+    assert model.supports_thinking is True
+    assert model.supports_reasoning_effort is True
+    assert model.supports_vision is True
+
+
+def test_ultra_roster_contract(real_config: AppConfig) -> None:
+    qwen = real_config.get_model_config("qwen4-max")
+    kimi = real_config.get_model_config("kimi-k3.1-pro")
+    assert qwen is not None
+    assert kimi is not None
+
+    for model in (qwen, kimi):
+        assert model.use == "deerflow.models.patched_openai:PatchedChatOpenAI"
+        assert model.model_extra["base_url"] == "https://api.360.cn/v1"
+        assert model.model_extra["max_tokens"] == 32768
+        assert model.model_extra["temperature"] == 0.7
+        assert model.supports_thinking is True
+        assert model.supports_reasoning_effort is True
+        assert model.supports_vision is True
+    assert qwen.model == "qwen/qwen4-max"
+    assert qwen.model_extra["stream_chunk_timeout"] == 240
+    assert kimi.model == "moonshotai/kimi-k3.1-pro"
+    assert kimi.model_extra["stream_chunk_timeout"] == 300
+    assert kimi.model_extra["request_timeout"] == 300
+
+
+@pytest.mark.parametrize("thinking_enabled", [True, False])
+def test_real_roster_factory_mode_leak_and_thinking_shape(real_config: AppConfig, monkeypatch: pytest.MonkeyPatch, thinking_enabled: bool) -> None:
+    monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: _CapturingModel)
+
+    for model in real_config.models:
+        _CapturingModel.captured = {}
+        factory_module.create_chat_model(
+            model.name,
+            thinking_enabled=thinking_enabled,
+            reasoning_effort="high",
+            app_config=real_config,
+            attach_tracing=False,
+        )
+        kwargs = _CapturingModel.captured
+        assert "modes" not in kwargs, model.name
+        if model.name in THINKING_MODELS:
+            expected_type = "enabled" if thinking_enabled else "disabled"
+            assert kwargs["extra_body"]["thinking"] == {"type": expected_type}, model.name
+            assert kwargs["reasoning_effort"] == ("high" if thinking_enabled else "minimal"), model.name
+            assert "thinking" not in kwargs, model.name
+            assert model.thinking is None, model.name
+        elif model.name == "claude-sonnet-5-5":
+            assert "thinking" not in kwargs
+            assert "reasoning_effort" not in kwargs
+            assert "thinking" not in kwargs.get("extra_body", {})
+
+
+def test_example_contains_mode_model_templates() -> None:
+    text = (REPO_ROOT / "config.example.yaml").read_text(encoding="utf-8")
+
+    for name in EXPECTED_MODES:
+        assert f"# - name: {name}" in text
+    assert "#   model: deepseek/deepseek-v4.1-flash@360-latency" in text
+    assert "#   standard: claude-sonnet-5-5" in text

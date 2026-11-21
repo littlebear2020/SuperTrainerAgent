@@ -148,6 +148,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
     if not thinking_enabled:
         if model_config.when_thinking_disabled is not None:
             # User-provided disable settings take full precedence
+            kwargs.pop("reasoning_effort", None)
             model_settings_from_config.update(model_config.when_thinking_disabled)
         elif has_thinking_settings and effective_wte.get("extra_body", {}).get("thinking", {}).get("type"):
             # OpenAI-compatible gateway: thinking is nested under extra_body
