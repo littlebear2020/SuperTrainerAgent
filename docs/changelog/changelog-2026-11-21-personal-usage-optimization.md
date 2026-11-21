@@ -33,8 +33,9 @@
 - 整分支独立 review 后修复 zero-token/amount-only 模型完整性与小额正费用显示：两个后端回归及一个前端金额断言均 RED→GREEN；个人用量/console 定向回归 → backend `163 passed`、frontend `26 passed`。
 - PR #38 OCR 三项 medium 修复：异常 bucket 不再触发 500、最新状态改为 `ROW_NUMBER()` 每线程仅返回一行、缺失有效用户上下文返回 401；三个回归均 RED→GREEN，定向 backend `166 passed`。NULL run 纳入和固定 20 条 query key 按计划契约在线程中说明，不改。
 - 第二轮 OCR 可维护性项：query key 改用类型固定为 20 的 `options.limit`，页面共享 `PERSONAL_USAGE_PAGE_SIZE`；SSR gateway 与 E2E 共用 JSON 普通用户夹具；测试 task key 三元展开。`pnpm check`、`1805 tests` 与专用 E2E `2 passed` 全过。
+- 第三轮 OCR：`isPlaceholderData` 期间保留旧数据但显示“正在加载用量”状态，新增 DOM 回归 RED→GREEN；E2E 日期/任务夹具消除嵌套三元。最终 frontend `279 files / 1806 tests`、专用 E2E `2 passed`。固定 20 条与六类路由两条建议按计划契约回复，不改。
 - `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`（review/OCR fix 后最终复跑）→ `10273 passed, 95 skipped in 391.17s`。
-- `cd frontend && pnpm check && pnpm test` → 静态检查 exit 0（ESLint `0 errors`，121 条存量 warnings）；`279 files passed / 1805 tests passed`。
+- `cd frontend && pnpm check && pnpm test` → 静态检查 exit 0（ESLint `0 errors`，121 条存量 warnings）；`279 files passed / 1806 tests passed`。
 - `cd frontend && CI=1 E2E_PORT=3107 pnpm test:e2e` → `119 passed, 3 skipped`。
 - `cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts` → `2 passed`，覆盖 SSR regular、周期/筛选对账、双模型、21 任务分页、键盘、未知媒体及 320/390px 溢出。
 - 隔离临时 SQLite + `make_authed_test_app` 真实 `/api/usage` 验收 → `days=7 tasks=6 cost=2.2 tokens=330`；`days=14 tasks=8 summary-unchanged`；六类齐全；最新状态、NULL run、污染 run 排除、派生 Token、null cache、无模型明细、真实 CNY 和未计价媒体断言全过；非法 days 返回 422。

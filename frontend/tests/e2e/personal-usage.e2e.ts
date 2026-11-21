@@ -69,6 +69,12 @@ function summary(
   };
 }
 
+const START_DATE_BY_DAYS: Record<UsageDays, string> = {
+  7: "2026-11-15",
+  14: "2026-11-08",
+  30: "2026-10-23",
+};
+
 function response(
   days: UsageDays,
   tasks: UsageTask[],
@@ -79,8 +85,7 @@ function response(
   return {
     window: {
       days,
-      start_date:
-        days === 7 ? "2026-11-15" : days === 14 ? "2026-11-08" : "2026-10-23",
+      start_date: START_DATE_BY_DAYS[days],
       end_date: "2026-11-21",
     },
     summary: usageSummary,
@@ -299,19 +304,15 @@ test("pagination, statuses, keyboard, unknown media, and narrow-screen containme
   const tasks = Array.from({ length: 21 }, (_, index) => {
     const id = `task-${String(index).padStart(2, "0")}`;
     const empty = index === 20;
+    let title = `任务 ${index}`;
+    if (index === 3) title = "历史媒体任务";
+    if (index === 4) title = "未计价媒体任务";
+    let status: UsageTask["status"] = "completed";
+    if (index === 1 || empty) status = "running";
+    else if (index === 2) status = "incomplete";
     return task(id, index === 0 ? "course-video" : "ai_image", {
-      title:
-        index === 3
-          ? "历史媒体任务"
-          : index === 4
-            ? "未计价媒体任务"
-            : `任务 ${index}`,
-      status:
-        index === 1 || empty
-          ? "running"
-          : index === 2
-            ? "incomplete"
-            : "completed",
+      title,
+      status,
       cost: empty ? null : 1,
       llm_cost: empty ? null : 1,
       media_cost: null,
