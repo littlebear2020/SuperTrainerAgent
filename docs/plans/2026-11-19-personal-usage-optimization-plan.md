@@ -353,11 +353,11 @@ query key = `["personal-usage", user?.id ?? "anonymous", days, capability, offse
 
 **Interfaces**：产出 §2.3 唯一 HTTP 契约；前端不得再请求旧五个 console 读接口来拼个人页。
 
-- [ ] **Step 1：用 `make_authed_test_app` 写路由失败测试**。验证 200 响应字段、默认 days=7、7/14/30、六类筛选、offset/limit、tz 参数、窗口日期、UTC `updated_at`；响应中的 `cache_read_tokens=null` 不得被序列化为 0，模型/任务 `total_tokens` 已是输入 + 输出派生值，真实 LLM `amount` 无价目时返回 `cost_source="real"/currency="CNY"`。
-- [ ] **Step 2：写边界测试**。非法 days/capability/limit/offset 返回 422；无 SQL 返回 503；另一用户的任务永不出现；API 无 `user_id` 参数；管理员调用仍只返回本人个人用量。
-- [ ] **Step 3：运行确认失败，再实现 Pydantic 响应模型、路由与注册**。不得新增写接口或鉴权分支。
-- [ ] **Step 4：运行 `tests/test_personal_usage_router.py` 及任务 1–4 全部测试，并复跑 `tests/test_console_router.py` 证明管理员 API 未回归**。
-- [ ] **Step 5：提交**。`feat(usage): 增加个人用量只读接口`
+- [x] **Step 1：用 `make_authed_test_app` 写路由失败测试**。验证 200 响应字段、默认 days=7、7/14/30、六类筛选、offset/limit、tz 参数、窗口日期、UTC `updated_at`；响应中的 `cache_read_tokens=null` 不得被序列化为 0，模型/任务 `total_tokens` 已是输入 + 输出派生值，真实 LLM `amount` 无价目时返回 `cost_source="real"/currency="CNY"`。
+- [x] **Step 2：写边界测试**。非法 days/capability/limit/offset 返回 422；无 SQL 返回 503；另一用户的任务永不出现；API 无 `user_id` 参数；管理员调用仍只返回本人个人用量。
+- [x] **Step 3：运行确认失败，再实现 Pydantic 响应模型、路由与注册**。不得新增写接口或鉴权分支。
+- [x] **Step 4：运行 `tests/test_personal_usage_router.py` 及任务 1–4 全部测试，并复跑 `tests/test_console_router.py` 证明管理员 API 未回归**。
+- [x] **Step 5：提交**。`feat(usage): 增加个人用量只读接口`
 
 ### 任务 5：建立前端数据层、格式与角色边界
 
