@@ -31,7 +31,8 @@
 - 前端任务 5/6 定向 Vitest（usage、角色边界、console role transition/query scope）→ `9 files passed / 25 tests passed`；`pnpm exec tsc --noEmit` → exit 0。
 - 反向验证：临时令 `ConsoleRolePage` 对 regular 也返回旧页面，运行专用 E2E → `personal-usage-page` locator 失败且捕获 `17` 次旧 console 请求；随后立即恢复角色边界。
 - 整分支独立 review 后修复 zero-token/amount-only 模型完整性与小额正费用显示：两个后端回归及一个前端金额断言均 RED→GREEN；个人用量/console 定向回归 → backend `163 passed`、frontend `26 passed`。
-- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`（review fix 后最终复跑）→ `10270 passed, 95 skipped in 447.61s`。
+- PR #38 OCR 三项 medium 修复：异常 bucket 不再触发 500、最新状态改为 `ROW_NUMBER()` 每线程仅返回一行、缺失有效用户上下文返回 401；三个回归均 RED→GREEN，定向 backend `166 passed`。NULL run 纳入和固定 20 条 query key 按计划契约在线程中说明，不改。
+- `cd backend && env -u RUN_LIVE uv run pytest tests/ -q`（review/OCR fix 后最终复跑）→ `10273 passed, 95 skipped in 391.17s`。
 - `cd frontend && pnpm check && pnpm test` → 静态检查 exit 0（ESLint `0 errors`，121 条存量 warnings）；`279 files passed / 1805 tests passed`。
 - `cd frontend && CI=1 E2E_PORT=3107 pnpm test:e2e` → `119 passed, 3 skipped`。
 - `cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts` → `2 passed`，覆盖 SSR regular、周期/筛选对账、双模型、21 任务分页、键盘、未知媒体及 320/390px 溢出。

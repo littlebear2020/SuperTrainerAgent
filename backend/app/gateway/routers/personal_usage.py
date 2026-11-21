@@ -10,7 +10,6 @@ from app.gateway._shared.personal_usage.service import get_personal_usage
 from app.gateway._shared.personal_usage.types import UsageCapability, UsageCostSource, UsageStatus, UsageTask
 from app.gateway.authz import require_permission
 from deerflow.persistence.engine import get_session_factory
-from deerflow.runtime.user_context import get_effective_user_id
 
 router = APIRouter(prefix="/api/usage", tags=["personal-usage"])
 
@@ -111,7 +110,9 @@ async def personal_usage_endpoint(
         )
     auth = getattr(request.state, "auth", None)
     user = getattr(auth, "user", None) if auth is not None else getattr(request.state, "user", None)
-    user_id = str(user.id) if user is not None else get_effective_user_id()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authenticated user context missing")
+    user_id = str(user.id)
     result = await get_personal_usage(
         session_factory,
         user_id=user_id,

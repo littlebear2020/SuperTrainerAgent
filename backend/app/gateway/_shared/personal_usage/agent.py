@@ -4,7 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import aliased
 
 from app.gateway._shared.media_pricing_resolver import _load_media_pricing
 from app.gateway._shared.personal_usage.types import (
@@ -38,7 +39,7 @@ class _LLMUsage:
 def _token_count(value: Any) -> int | None:
     try:
         count = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return count if count >= 0 else None
 
@@ -50,6 +51,26 @@ def _real_amount(usage: dict) -> tuple[bool, float | None]:
         return True, float(usage["amount"])
     except (TypeError, ValueError):
         return False, None
+
+
+def _usage_for_cost(usage_map: dict | None) -> dict | None:
+    if not isinstance(usage_map, dict):
+        return usage_map
+    normalized = {}
+    for model, usage in usage_map.items():
+        if not isinstance(usage, dict):
+            normalized[model] = usage
+            continue
+        safe_usage = dict(usage)
+        for field in ("input_tokens", "output_tokens", "cache_read_tokens"):
+            if field not in safe_usage:
+                continue
+            try:
+                int(safe_usage[field] or 0)
+            except (TypeError, ValueError, OverflowError):
+                safe_usage[field] = 0
+        normalized[model] = safe_usage
+    return normalized
 
 
 def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
@@ -95,7 +116,7 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
             model_name=row.model_name,
             total_input_tokens=run_input,
             total_output_tokens=run_output,
-            token_usage_by_model=usage_map,
+            token_usage_by_model=_usage_for_cost(usage_map),
         )
         if run_cost is not None:
             cost += run_cost
@@ -106,8 +127,8 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
             for model, usage in usage_map.items():
                 if not isinstance(usage, dict):
                     continue
-                input_tokens = int(usage.get("input_tokens") or 0)
-                output_tokens = int(usage.get("output_tokens") or 0)
+                input_tokens = _token_count(usage.get("input_tokens")) or 0
+                output_tokens = _token_count(usage.get("output_tokens")) or 0
                 valid_amount, amount = _real_amount(usage)
                 model_cost: float | None = None
                 model_source: UsageCostSource = None
@@ -118,7 +139,7 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
                 else:
                     price = _lookup_pricing(pricing, model)
                     if price is not None and (input_tokens != 0 or output_tokens != 0):
-                        model_cost = _token_cost(input_tokens, output_tokens, price, int(usage.get("cache_read_tokens") or 0))
+                        model_cost = _token_cost(input_tokens, output_tokens, price, _token_count(usage.get("cache_read_tokens")) or 0)
                         model_source = "estimated"
                 if model_cost is not None:
                     bucket_has_cost = True
@@ -260,21 +281,20 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
     if not included:
         return []
 
-    latest_candidates = (
-        (
-            await session.execute(
-                select(RunRow)
-                .where(
-                    RunRow.thread_id.in_(included),
-                    RunRow.operation_kind == "run",
-                    run_user_filter,
-                )
-                .order_by(RunRow.created_at.desc(), RunRow.run_id.desc())
-            )
+    latest_ranked = (
+        select(
+            RunRow,
+            func.row_number().over(partition_by=RunRow.thread_id, order_by=(RunRow.created_at.desc(), RunRow.run_id.desc())).label("usage_run_rank"),
         )
-        .scalars()
-        .all()
+        .where(
+            RunRow.thread_id.in_(included),
+            RunRow.operation_kind == "run",
+            run_user_filter,
+        )
+        .subquery()
     )
+    latest_run = aliased(RunRow, latest_ranked)
+    latest_candidates = (await session.execute(select(latest_run).where(latest_ranked.c.usage_run_rank == 1).order_by(latest_ranked.c.created_at.desc(), latest_ranked.c.run_id.desc()))).scalars().all()
     all_runs_by_thread: dict[str, list[RunRow]] = defaultdict(list)
     for row in latest_candidates:
         all_runs_by_thread[row.thread_id].append(row)
@@ -286,6 +306,7 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
         metadata = thread.metadata_json if isinstance(thread.metadata_json, dict) else {}
         candidates = [thread.assistant_id, metadata.get("agent_name"), metadata.get("assistant_id")]
         candidates.extend(row.assistant_id for row in all_runs_by_thread[thread.thread_id])
+        candidates.extend(row.assistant_id for row in runs_by_thread[thread.thread_id])
         task_capability = canonical_agent_capability(*candidates)
         if task_capability is None or task_capability in {"ai_image", "ai_video"}:
             continue
