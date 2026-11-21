@@ -1,3 +1,4 @@
+import { normalizeMode, type InputMode } from "../models/modes";
 import type { AgentThreadContext } from "../threads";
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
@@ -7,7 +8,6 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   context: {
     model_name: undefined,
     mode: undefined,
-    reasoning_effort: undefined,
   },
 };
 
@@ -32,8 +32,7 @@ export interface LocalSettings {
     | "reasoning_effort"
   > & {
     model_name?: string | undefined;
-    mode: "flash" | "thinking" | "pro" | "ultra" | undefined;
-    reasoning_effort?: "minimal" | "low" | "medium" | "high";
+    mode: InputMode | undefined;
   };
 }
 
@@ -101,7 +100,13 @@ export function getLocalSettings(): LocalSettings {
   try {
     if (json) {
       const settings = JSON.parse(json) as Partial<LocalSettings>;
-      return mergeLocalSettings(settings);
+      const merged = mergeLocalSettings(settings);
+      const context = { ...merged.context } as LocalSettings["context"] & {
+        reasoning_effort?: "minimal" | "low" | "medium" | "high";
+      };
+      delete context.reasoning_effort;
+      context.mode = normalizeMode(context.mode);
+      return { ...merged, context };
     }
   } catch {}
   return DEFAULT_LOCAL_SETTINGS;

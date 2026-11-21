@@ -13,6 +13,8 @@ import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
 import { isHiddenFromUIMessage } from "../messages/utils";
 import type { FileInMessage } from "../messages/utils";
+import { useModels } from "../models/hooks";
+import { normalizeMode } from "../models/modes";
 import type { LocalSettings } from "../settings";
 import { useUpdateSubtask } from "../tasks/context";
 import { mapTaskEvent } from "../tasks/task-event";
@@ -152,6 +154,7 @@ export function useThreadStream({
   onToolEnd,
 }: ThreadStreamOptions) {
   const { t } = useI18n();
+  const { models } = useModels();
   // Track the thread ID that is currently streaming to handle thread changes during streaming
   const [onStreamThreadId, setOnStreamThreadId] = useState(() => threadId);
   // Ref to track current thread ID across async callbacks without causing re-renders,
@@ -483,6 +486,11 @@ export function useThreadStream({
           }),
         );
 
+        const mode = normalizeMode(context.mode) ?? "standard";
+        const selectedModel = models.find(
+          (model) => model.name === context.model_name,
+        );
+
         await thread.submit(
           {
             messages: [
@@ -513,18 +521,12 @@ export function useThreadStream({
             context: {
               ...extraContext,
               ...context,
-              thinking_enabled: context.mode !== "flash",
-              is_plan_mode: context.mode === "pro" || context.mode === "ultra",
-              subagent_enabled: context.mode === "ultra",
-              reasoning_effort:
-                context.reasoning_effort ??
-                (context.mode === "ultra"
-                  ? "high"
-                  : context.mode === "pro"
-                    ? "medium"
-                    : context.mode === "thinking"
-                      ? "low"
-                      : undefined),
+              mode,
+              thinking_enabled:
+                mode !== "flash" && selectedModel?.supports_thinking === true,
+              is_plan_mode: mode !== "flash",
+              subagent_enabled: mode === "ultra",
+              reasoning_effort: mode === "flash" ? "minimal" : "high",
               thread_id: threadId,
             },
           },
@@ -538,7 +540,7 @@ export function useThreadStream({
         sendInFlightRef.current = false;
       }
     },
-    [thread, t.uploads.uploadingFiles, context, queryClient],
+    [thread, t.uploads.uploadingFiles, context, models, queryClient],
   );
 
   // Memoized so the merged array keeps a stable identity between renders that
