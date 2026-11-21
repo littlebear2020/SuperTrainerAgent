@@ -29,6 +29,7 @@ from app.gateway.routers import (
     memory,
     model_pricing,
     models,
+    personal_usage,
     runs,
     skills,
     suggestions,
@@ -851,6 +852,7 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Operations console API (read-only run history / token spend reporting)
     app.include_router(console.router)
+    app.include_router(personal_usage.router)
 
     # Admin model pricing API (writes the prices the console reports on)
     app.include_router(model_pricing.router)
