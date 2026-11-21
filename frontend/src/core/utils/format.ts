@@ -56,6 +56,21 @@ export function formatCost(
   })}`;
 }
 
+export function formatUsageCost(
+  value: number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value < 0.0001
+  ) {
+    return `<${currencySymbol(currency)}0.0001`;
+  }
+  return formatCost(value, currency);
+}
+
 export { currencySymbol };
 
 /**

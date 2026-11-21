@@ -4,7 +4,7 @@ import { UsageCostSourceBadge } from "@/components/workspace/usage/usage-summary
 import { useI18n } from "@/core/i18n/hooks";
 import { usageTaskHref } from "@/core/usage/routes";
 import type { UsageTask } from "@/core/usage/types";
-import { formatCost, formatInteger } from "@/core/utils/format";
+import { formatUsageCost, formatInteger } from "@/core/utils/format";
 
 export function UsageTaskList({
   tasks,
@@ -93,7 +93,7 @@ export function UsageTaskList({
                   data-testid={`task-cost-${id}`}
                   className="text-sm font-semibold break-all"
                 >
-                  {formatCost(task.cost, task.currency)}
+                  {formatUsageCost(task.cost, task.currency)}
                 </div>
                 <div
                   data-testid={`task-tokens-${id}`}
@@ -124,7 +124,7 @@ export function UsageTaskList({
                       {c.llmCost}
                     </dt>
                     <dd className="mt-1 text-sm font-medium break-all">
-                      {formatCost(task.llm_cost, task.currency)}
+                      {formatUsageCost(task.llm_cost, task.currency)}
                     </dd>
                   </div>
                   <div className="bg-background rounded-lg border p-3">
@@ -137,7 +137,7 @@ export function UsageTaskList({
                     >
                       {task.media_cost === null
                         ? c.mediaUnknown
-                        : formatCost(task.media_cost, task.currency)}
+                        : formatUsageCost(task.media_cost, task.currency)}
                     </dd>
                   </div>
                   <div className="bg-background rounded-lg border p-3">
@@ -148,7 +148,7 @@ export function UsageTaskList({
                       data-testid={`task-total-cost-${id}`}
                       className="mt-1 text-sm font-medium break-all"
                     >
-                      {formatCost(task.cost, task.currency)}
+                      {formatUsageCost(task.cost, task.currency)}
                     </dd>
                   </div>
                 </dl>
@@ -157,9 +157,9 @@ export function UsageTaskList({
                     data-testid={`cost-equation-${id}`}
                     className="text-muted-foreground text-xs break-all"
                   >
-                    {formatCost(task.llm_cost, task.currency)} +{" "}
-                    {formatCost(task.media_cost, task.currency)} ={" "}
-                    {formatCost(task.cost, task.currency)}
+                    {formatUsageCost(task.llm_cost, task.currency)} +{" "}
+                    {formatUsageCost(task.media_cost, task.currency)} ={" "}
+                    {formatUsageCost(task.cost, task.currency)}
                   </p>
                 ) : null}
                 <UsageModelBreakdown
