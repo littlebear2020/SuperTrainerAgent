@@ -1,6 +1,6 @@
 # PPT 美化 flat 首次读取顺序修复记录
 
-> **状态**：静态修复与免费验证已完成；**行为级验证未执行**——付费 P01 复测冻结（待用户授权并提供配置），首次读取缺口不宣称已关闭。
+> **状态**：本批 Step 6-only 修复已于 2026-11-21 付费复测判定首读项未通过（call 100 全量读核心，call 104 才生成执行包）；后续 `SKILL.md` role-switch 源头修复见 [2026-11-21 记录](changelog-2026-11-21-ppt-master-first-read-role-switch.md)。
 > **TL;DR**：#29 的 P01 虽通过，但首次 `execution-context` 之前 call 31/35 仍完整读取了 `executor-base.md` 与 `shared-standards-core.md`；本批只改指令文案，把 flat 执行包规则升为 Step 6 首条阻塞规则（含 SKILL.md role-switch 读取在内，执行包读完前禁止完整读核心/Design Spec/lock），`resume-execute.md` 拆 flat/non-flat 分支；关键决策 = 不加代码门/中间件，先收口指令顺序并以静态断言钉住（成因为推断，生效须付费复测证实）；影响面 = `skills/public/ppt-master/` 4 个文档 + `SEED_VERSION=2026-11-20.1`（部署后触发 6 个 agent reseed），无 schema/config 改动。
 
 ## 1. 背景与改动范围
@@ -37,11 +37,11 @@
 - 根 `make check`（工作树含 7 个修复文件时运行）→ EXIT=0；`All checks passed!`、`1318 files already formatted`、eslint `0 errors`（121 条 warning 为既有，本批未改 frontend）、`All matched files use Prettier code style!`、`i18n key 存活检测通过：630 个叶子全活`、docs convention `OK`。
 - fresh home reseed（`DEER_FLOW_HOME=<临时目录> uv run python`，调用 `seed_agents()`）→ `seeded=6 SEED_VERSION=2026-11-20.1`，6 个 agent 邮票全等于 SEED_VERSION，二次调用返回 `0`；临时目录已删除。
 - prompt_audit（scratch 上游布局，`--root`）→ `BUDGET_FILE failure-recovery.md: File has 2912 tokens; budget is 2750`；直接 o200k 计数 origin/main=2799、95c8a12b=2908、工作树=2912。
-- 行为级验证 → **未执行**（付费 P01 复测冻结，见 §2）。
+- 行为级验证 → **2026-11-21 已执行，首读项未通过**：call 100 全量读取 `executor-base.md`，call 101 才加载 Step 6，call 104 首次生成执行包；其余 P01/精确 token/零占位/确认保留门槛通过，详见 [后续记录](changelog-2026-11-21-ppt-master-first-read-role-switch.md)。
 - `python3 scripts/check_docs_convention.py`（含本 changelog 与 backlog 新增行）→ `OK 仓库治理约定全过`，exit 0；`git diff --check` → 无输出，exit 0。
 
 ## 4. PR 与后续边界
 
 - stacked PR：head=`ppt-master-first-read-order`，base=`ppt-beautify-summarization-context-integrity`（#27 的 head 分支，沿用 #29 的堆叠方式）；#27 分支本身未改动。
 - CI/OCR 结果与合并状态以 PR 的 checks 与评论为准，不回填本文件（回填会再触发一轮评审）。
-- 后续：付费 P01 复测需用户授权（沙箱 `tiktoken` 预装为独立批次）；复测前不宣称首次读取约束已满足；本批不部署、不合并 #27。
+- 后续：2026-11-21 复测证实 §2 的 role-switch 残余风险；已在 `SKILL.md` 全局入口完成 flat 例外修复并提升 `SEED_VERSION=2026-11-21.1`，第二次付费 P01 复测为合并门。本批未部署。
