@@ -352,7 +352,8 @@ def test_seed_version_and_exact_agent_roster():
     # 2026-11-19.1: ppt-master flat Default/Beautify 改用当前页执行包。
     # 2026-11-20.1: flat 首次读取顺序——执行包先于任何核心 references 读取。
     # 2026-11-21.1: 在 SKILL.md 通用 role-switch 源头加入 flat Executor 执行包例外。
-    assert SEED_VERSION == "2026-11-21.1"
+    # 2026-11-21.2: 将 flat 首读阻塞提升到持久 SOUL D3，防止 skill 规则被压缩后失效。
+    assert SEED_VERSION == "2026-11-21.2"
     agent_names = {path.name for path in SEED_DIR.iterdir() if path.is_dir() and (path / "config.yaml").exists()}
     assert agent_names == {
         "co-writer",

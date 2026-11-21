@@ -519,6 +519,21 @@ def test_flat_executor_role_switch_replaces_the_generic_core_read():
     assert "Quick Generate and non-flat routes still follow the generic rule" in flat
 
 
+def test_persistent_soul_gates_flat_executor_read_order():
+    soul = (REPO_ROOT / "backend" / "seed" / "agents" / "ppt-master" / "SOUL.md").read_text(encoding="utf-8")
+    marker = "7. **flat Default / Beautify 首读阻塞（P31）**"
+
+    assert marker in soul
+    rule = soul.split(marker, 1)[1]
+    assert "pptx_structure.mode: flat" in rule
+    assert "Step 6 不在有效上下文" in rule
+    assert "第一动作是读取 `skills/public/ppt-master/workflows/generate-pptx.md` Step 6" in rule
+    assert "生成并读取当前页执行包" in rule
+    assert "禁止完整读取 `executor-base.md` 和 `shared-standards-core.md`" in rule
+    assert "通用 role-switch 不得先读核心" in rule
+    assert "Quick Generate 与非 flat 路线不适用" in rule
+
+
 def test_non_flat_workflow_keeps_legacy_full_reference_recovery():
     workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
     other = workflow[workflow.index("**Other routes**") :]
@@ -579,6 +594,7 @@ def test_p31_patch_row_records_the_read_order_constraint_and_resume_execute():
 
     assert "workflows/stages/resume-execute.md" in row
     assert "SKILL.md" in row
+    assert "SOUL.md" in row
     assert "role-switch" in row
     assert "读取顺序" in row
     assert "execution-context" in row and "executor-base.md" in row and "shared-standards-core.md" in row
