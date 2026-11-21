@@ -305,4 +305,21 @@ describe("PersonalUsagePage", () => {
         ?.hasAttribute("disabled"),
     ).toBe(true);
   });
+
+  it("marks same-user placeholder data as updating while keeping it visible", async () => {
+    h.result = {
+      ...success(response([task("completed")])),
+      isFetching: true,
+      isPlaceholderData: true,
+    };
+    await renderPage();
+
+    expect(
+      container.querySelector("[data-testid='usage-summary-cost']")
+        ?.textContent,
+    ).toContain("¥1.50");
+    expect(
+      container.querySelector("[data-testid='usage-updating']")?.textContent,
+    ).toContain("正在加载用量");
+  });
 });

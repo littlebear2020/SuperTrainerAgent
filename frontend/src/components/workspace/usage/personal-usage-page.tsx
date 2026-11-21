@@ -117,6 +117,15 @@ export function PersonalUsagePage() {
 
       {query.data ? (
         <>
+          {query.isPlaceholderData ? (
+            <div
+              data-testid="usage-updating"
+              role="status"
+              className="text-muted-foreground text-xs"
+            >
+              {c.loading}
+            </div>
+          ) : null}
           <UsageSummary summary={query.data.summary} />
           <section className="min-w-0">
             {query.data.tasks.length > 0 ? (
