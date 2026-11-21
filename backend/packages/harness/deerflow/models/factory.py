@@ -120,6 +120,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "when_thinking_disabled",
             "thinking",
             "supports_vision",
+            "modes",
             # Console cost-reporting annotation, not a provider parameter.
             # ``ModelConfig`` allows extra fields, so anything not excluded
             # here is forwarded into the chat-model constructor and reaches

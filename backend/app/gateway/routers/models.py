@@ -16,6 +16,7 @@ class ModelResponse(BaseModel):
     description: str | None = Field(None, description="Model description")
     supports_thinking: bool = Field(default=False, description="Whether model supports thinking mode")
     supports_reasoning_effort: bool = Field(default=False, description="Whether model supports reasoning effort")
+    modes: list[str] = Field(default_factory=list, description="User-selectable modes that include this model")
 
 
 class TokenUsageResponse(BaseModel):
@@ -28,6 +29,7 @@ class ModelsListResponse(BaseModel):
     """Response model for listing all models."""
 
     models: list[ModelResponse]
+    mode_defaults: dict[str, str] = Field(default_factory=dict)
     token_usage: TokenUsageResponse
     # D3（2026-09-23 批 2）：thread 累计 tokens 告警线（任务类型 → tokens；
     # "default" 兜底）。前端 Tokens 徽章据它变红——只提示不阻断。
@@ -84,11 +86,13 @@ async def list_models(config: AppConfig = Depends(get_config)) -> ModelsListResp
             description=model.description,
             supports_thinking=model.supports_thinking,
             supports_reasoning_effort=model.supports_reasoning_effort,
+            modes=list(model.modes),
         )
         for model in config.models
     ]
     return ModelsListResponse(
         models=models,
+        mode_defaults={str(mode): model_name for mode, model_name in config.mode_defaults.items()},
         token_usage=TokenUsageResponse(enabled=config.token_usage.enabled),
         token_budget_warn_tokens={str(key): int(value) for key, value in (config.token_budget_warn_tokens or {}).items() if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0},
     )
@@ -133,4 +137,5 @@ async def get_model(model_name: str, config: AppConfig = Depends(get_config)) ->
         description=model.description,
         supports_thinking=model.supports_thinking,
         supports_reasoning_effort=model.supports_reasoning_effort,
+        modes=list(model.modes),
     )
