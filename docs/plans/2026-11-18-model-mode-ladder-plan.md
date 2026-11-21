@@ -170,18 +170,18 @@
 
 ### Task 4：前端模式菜单、模型选择与类型接线
 
-- [ ] `input-mode.ts`：复用统一 `InputMode`；`resolveMode` 默认 `standard`；`reasoningEffortForMode = flash→minimal，standard/ultra→high`。
-- [ ] `input-box.tsx`
-  - [ ] 从 `useModels()` 同时读取 `models` 与 `modeDefaults`，传入过滤/默认函数。
-  - [ ] 模式菜单三项；删除「思考」和「推理深度」全部 UI 与相关 handler/死变量。
-  - [ ] `models` 按当前模式过滤；`selectedModel` 只从合法集合解析。
-  - [ ] mount 自动校正 effect 与 `handleSubmit` guard 都改用 `defaultModelForMode`，不再恒取 `models[0]`。
-  - [ ] `handleModeSelect` 按 §1.4 保留合法手动选择、非法时切默认；不再持久化独立 effort。
-  - [ ] `handleModelSelect` 保持当前模式；delisted 检测仍基于全量模型，不把跨档过滤当撤册。
-- [ ] `mode-hover-guide.tsx`：本地 `AgentMode` 与 i18n key 改为三模式，删除 thinking/pro 分支。
-- [ ] `welcome.tsx`：prop 改用统一 `InputMode`。
-- [ ] `app/workspace/chats/[thread_id]/page.tsx`：随统一 context 类型通过 tsc，不改变提交/上传逻辑。
-- [ ] i18n 三文件：删除 `reasoningMode*` / `reasoningEffort*` 死键；`proMode*` 改 `standardMode*`；Ultra 描述强调子代理与耗时。
+- [x] `input-mode.ts`：复用统一 `InputMode`；`resolveMode` 默认 `standard`；`reasoningEffortForMode = flash→minimal，standard/ultra→high`。
+- [x] `input-box.tsx`
+  - [x] 从 `useModels()` 同时读取 `models` 与 `modeDefaults`，传入过滤/默认函数。
+  - [x] 模式菜单三项；删除「思考」和「推理深度」全部 UI 与相关 handler/死变量。
+  - [x] `models` 按当前模式过滤；`selectedModel` 只从合法集合解析。
+  - [x] mount 自动校正 effect 与 `handleSubmit` guard 都改用 `defaultModelForMode`，不再恒取 `models[0]`。
+  - [x] `handleModeSelect` 按 §1.4 保留合法手动选择、非法时切默认；不再持久化独立 effort。
+  - [x] `handleModelSelect` 保持当前模式；delisted 检测仍基于全量模型，不把跨档过滤当撤册。
+- [x] `mode-hover-guide.tsx`：本地 `AgentMode` 与 i18n key 改为三模式，删除 thinking/pro 分支。
+- [x] `welcome.tsx`：prop 改用统一 `InputMode`。
+- [x] `app/workspace/chats/[thread_id]/page.tsx`：随统一 context 类型通过 tsc，不改变提交/上传逻辑。
+- [x] i18n 三文件：删除 `reasoningMode*` / `reasoningEffort*` 死键；`proMode*` 改 `standardMode*`；Ultra 描述强调子代理与耗时。
 
 ### Task 5：测试盘点与行为验证
 
