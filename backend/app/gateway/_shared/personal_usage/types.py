@@ -56,6 +56,11 @@ class UsageTask:
 
 
 @dataclass
+class UsageTaskEntry(UsageTask):
+    activity_at: datetime
+
+
+@dataclass
 class UsageSummary:
     cost: float | None
     currency: str | None
