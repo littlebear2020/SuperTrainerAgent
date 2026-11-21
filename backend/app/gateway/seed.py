@@ -56,7 +56,9 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # 改用确定性当前页执行包，替代完整核心 references 与全 roster 预读。
 # 2026-11-20.1: flat 首次读取顺序——Step 6 以执行包为第一条阻塞规则，生成并读取执行包前
 # 禁止完整读取核心 references/Design Spec/lock；resume-execute 增加 flat 分支（P31）。
-SEED_VERSION = "2026-11-20.1"
+# 2026-11-21.1: 在 SKILL.md 通用 role-switch 源头加入 flat Executor 执行包例外，避免
+# 模型在加载 Step 6 禁令之前先完整读取 executor-base.md。
+SEED_VERSION = "2026-11-21.1"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 

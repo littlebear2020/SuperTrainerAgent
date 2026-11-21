@@ -501,6 +501,24 @@ def test_flat_step6_has_no_read_instruction_for_core_references_or_the_complete_
     assert "the required reads" not in p22
 
 
+def test_flat_executor_role_switch_replaces_the_generic_core_read():
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    communication = skill[skill.index("## Global Communication Rules") : skill.index("## Repository Compatibility")]
+    marker = "**Flat Default / Beautify Executor exception (P31)**"
+
+    assert marker in communication
+    exception = communication.index(marker)
+    generic = communication.index("- Before switching roles, read the corresponding role reference")
+    assert exception < generic
+    flat = communication[exception:generic]
+    assert "pptx_structure.mode: flat" in flat
+    assert "do not read `executor-base.md` or `shared-standards-core.md` at role switch" in flat
+    assert "load `workflows/generate-pptx.md` Step 6 first" in flat
+    assert "generate and read the current-page execution pack" in flat
+    assert "pack supplies the Executor role core" in flat
+    assert "Quick Generate and non-flat routes still follow the generic rule" in flat
+
+
 def test_non_flat_workflow_keeps_legacy_full_reference_recovery():
     workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
     other = workflow[workflow.index("**Other routes**") :]
@@ -560,6 +578,8 @@ def test_p31_patch_row_records_the_read_order_constraint_and_resume_execute():
     row = next(line for line in patches.splitlines() if line.startswith("| P31 |"))
 
     assert "workflows/stages/resume-execute.md" in row
+    assert "SKILL.md" in row
+    assert "role-switch" in row
     assert "读取顺序" in row
     assert "execution-context" in row and "executor-base.md" in row and "shared-standards-core.md" in row
     # Static pins prove wording, not model behavior: the row must say the behavior is still unverified
