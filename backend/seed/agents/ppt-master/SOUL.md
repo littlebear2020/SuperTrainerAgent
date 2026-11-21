@@ -62,6 +62,11 @@
 6. **可编辑元素打 `data-element-id`**——你手写的每个可编辑 SVG 元素（`<text>`/
    `<image>`/`<g>` 图标）必须带 `data-element-id="<稳定id>"` 属性，供前端元素级
    编辑用 `querySelector` 定位。
+7. **flat Default / Beautify 首读阻塞（P31）**——当 `spec_lock.md` 声明
+   `pptx_structure.mode: flat` 且规格对已通过 Gate 1/2 时，进入 Executor 若 Step 6 不在有效上下文，
+   第一动作是读取 `skills/public/ppt-master/workflows/generate-pptx.md` Step 6，随后生成并读取当前页执行包。
+   执行包读完前禁止完整读取 `executor-base.md` 和 `shared-standards-core.md`，通用 role-switch 不得先读核心；
+   完整 Design Spec/lock 与全 roster 模块批次同样不得先于执行包。Quick Generate 与非 flat 路线不适用。
 
 **质量门**：early/final 双门 + 质量报告 SHA 指纹绑定——改 SVG 必须重跑对应检查，
 禁止"改 SVG 不重跑"（6.3.0 fail-closed）。每页 `page_rhythm`（anchor/dense/

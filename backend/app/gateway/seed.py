@@ -58,7 +58,8 @@ SEED_DIR = Path(__file__).resolve().parent.parent.parent / "seed" / "agents"
 # 禁止完整读取核心 references/Design Spec/lock；resume-execute 增加 flat 分支（P31）。
 # 2026-11-21.1: 在 SKILL.md 通用 role-switch 源头加入 flat Executor 执行包例外，避免
 # 模型在加载 Step 6 禁令之前先完整读取 executor-base.md。
-SEED_VERSION = "2026-11-21.1"
+# 2026-11-21.2: 将 flat 首读阻塞提升到持久 SOUL D3，防止 skill 规则被压缩后失效。
+SEED_VERSION = "2026-11-21.2"
 
 _SEED_VERSION_FILENAME = ".seed_version"
 
