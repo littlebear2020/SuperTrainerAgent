@@ -158,15 +158,15 @@
 
 ### Task 3：前端数据层、类型与迁移
 
-- [ ] `core/models/types.ts`：`Model.modes?: string[]`；`ModelsResponse.mode_defaults?: Record<string,string>`。
-- [ ] `core/models/hooks.ts`：`useModels` 透出 `modeDefaults`（缺省 `{}`）。
-- [ ] 新建 `core/models/modes.ts`
-  - [ ] `InputMode = "flash" | "standard" | "ultra"`。
-  - [ ] `normalizeMode(raw)`：`thinking/pro → standard`；`flash/standard/ultra` 原样；未知 `undefined`。
-  - [ ] `modelsForMode`：全部模型都缺 `modes` 字段时回退全量（旧后端）；否则仅 `modes.includes(mode)`，`modes: []` 不显示。
-  - [ ] `defaultModelForMode`：显式默认 → 该档首个 → 全列表首个。
-- [ ] `core/settings/local.ts`：使用统一 `InputMode`；`getLocalSettings()` 归一 mode 并清空旧 `reasoning_effort`；per-thread model override 保持，后续由合法性纠偏处理。
-- [ ] `core/threads/hooks.ts`：在 `useThreadStream` 内调用 `useModels`，按 `context.model_name` 查能力；归一 mode 后统一派生 §1.2 四个参数，忽略旧显式 effort。
+- [x] `core/models/types.ts`：`Model.modes?: string[]`；`ModelsResponse.mode_defaults?: Record<string,string>`。
+- [x] `core/models/hooks.ts`：`useModels` 透出 `modeDefaults`（缺省 `{}`）。
+- [x] 新建 `core/models/modes.ts`
+  - [x] `InputMode = "flash" | "standard" | "ultra"`。
+  - [x] `normalizeMode(raw)`：`thinking/pro → standard`；`flash/standard/ultra` 原样；未知 `undefined`。
+  - [x] `modelsForMode`：全部模型都缺 `modes` 字段时回退全量（旧后端）；否则仅 `modes.includes(mode)`，`modes: []` 不显示。
+  - [x] `defaultModelForMode`：显式默认 → 该档首个 → 全列表首个。
+- [x] `core/settings/local.ts`：使用统一 `InputMode`；`getLocalSettings()` 归一 mode 并清空旧 `reasoning_effort`；per-thread model override 保持，后续由合法性纠偏处理。
+- [x] `core/threads/hooks.ts`：在 `useThreadStream` 内调用 `useModels`，按 `context.model_name` 查能力；归一 mode 后统一派生 §1.2 四个参数，忽略旧显式 effort。
 
 ### Task 4：前端模式菜单、模型选择与类型接线
 

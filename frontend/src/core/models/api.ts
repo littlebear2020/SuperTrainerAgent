@@ -13,6 +13,7 @@ export async function loadModels(): Promise<ModelsResponse> {
   const data = (await res.json()) as Partial<ModelsResponse>;
   return {
     models: data.models ?? [],
+    mode_defaults: data.mode_defaults ?? {},
     token_usage: data.token_usage ?? { enabled: false },
     token_budget_warn_tokens: data.token_budget_warn_tokens ?? {},
   };

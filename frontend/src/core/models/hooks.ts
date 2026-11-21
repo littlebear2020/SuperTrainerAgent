@@ -11,6 +11,7 @@ export function useModels({ enabled = true }: { enabled?: boolean } = {}) {
   });
   return {
     models: data?.models ?? [],
+    modeDefaults: data?.mode_defaults ?? {},
     tokenUsageEnabled: data?.token_usage.enabled ?? false,
     // D3（2026-09-23 批 2）：thread 累计 tokens 告警线（任务类型 → tokens）。
     tokenBudgetWarnTokens: data?.token_budget_warn_tokens ?? {},
