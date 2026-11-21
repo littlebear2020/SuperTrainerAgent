@@ -338,11 +338,11 @@ query key = `["personal-usage", user?.id ?? "anonymous", days, capability, offse
 - `video-2` / `ai_video` / `running`：窗口内创建但无消耗行，必须出现且 `cost/total_tokens=None`。
 - 与任务 2 的一个 Agent 任务合并后：`summary.total_tokens=320`、`summary.cost=0.5058`、币种 CNY、`cost_source=mixed`。`video-2` 的未知值不得把上述已知小计变成 0 或 `null`。
 
-- [ ] **Step 1：写视频任务、总汇总与分页失败测试**。覆盖上述数值（金额统一按 §2.2 近似比较）、`ai_image/ai_video` 白名单、其他 task_type 与 domain 回落 `thread_id` 排除、媒体 `task_id` 关联、视频无消耗进行中任务、§2.2 `activity_at` 与 `TaskRow.updated_at`；额外构造 21 个任务，断言 `limit=20` 第一页 20 且 `has_more=True`、第二页 1，两页 summary 均为完整 21 任务合计。
-- [ ] **Step 2：写未知与对账断言**。无价格且无真实 `amount` 时费用 `None` 而 Token 保留；视频 LLM 无 pricing 但有真实 `amount=1.5` 时同样返回 `llm_cost=1.5/currency="CNY"/cost_source="real"`；无归因媒体时 `media_cost=None`；**有 `task_id` 但 `evaluate_media_call` 返回 `source="unpriced"` 时同样返回 `media_cost=None`**，不得虚构 0 或在 API 额外宣称“未归因”；真实媒体 `metadata_json.amount=0` 可保留 0；混币不求和；summary 是全部任务的已知小计而非当前页合计。
-- [ ] **Step 3：运行并确认失败，再实现批量查询与合并**。LLM 与媒体行按窗口过滤、按 task_id 批量取出；Token 按输入 + 输出派生，LLM 来源按 §2.2 逐 bucket 判定；复用 `evaluate_media_call`，不得每任务一次查询（N+1），不得为区分未归因/未计价另建媒体计价算法或扩大 API 字段。
-- [ ] **Step 4：运行任务 1–3 定向测试并确认通过**。确认 Step 1/2 的近似金额、视频真实 LLM 来源、未知媒体、跨分页对账与完整 summary 断言全部通过。
-- [ ] **Step 5：提交**。`feat(usage): 汇总视频任务与个人总账`
+- [x] **Step 1：写视频任务、总汇总与分页失败测试**。覆盖上述数值（金额统一按 §2.2 近似比较）、`ai_image/ai_video` 白名单、其他 task_type 与 domain 回落 `thread_id` 排除、媒体 `task_id` 关联、视频无消耗进行中任务、§2.2 `activity_at` 与 `TaskRow.updated_at`；额外构造 21 个任务，断言 `limit=20` 第一页 20 且 `has_more=True`、第二页 1，两页 summary 均为完整 21 任务合计。
+- [x] **Step 2：写未知与对账断言**。无价格且无真实 `amount` 时费用 `None` 而 Token 保留；视频 LLM 无 pricing 但有真实 `amount=1.5` 时同样返回 `llm_cost=1.5/currency="CNY"/cost_source="real"`；无归因媒体时 `media_cost=None`；**有 `task_id` 但 `evaluate_media_call` 返回 `source="unpriced"` 时同样返回 `media_cost=None`**，不得虚构 0 或在 API 额外宣称“未归因”；真实媒体 `metadata_json.amount=0` 可保留 0；混币不求和；summary 是全部任务的已知小计而非当前页合计。
+- [x] **Step 3：运行并确认失败，再实现批量查询与合并**。LLM 与媒体行按窗口过滤、按 task_id 批量取出；Token 按输入 + 输出派生，LLM 来源按 §2.2 逐 bucket 判定；复用 `evaluate_media_call`，不得每任务一次查询（N+1），不得为区分未归因/未计价另建媒体计价算法或扩大 API 字段。
+- [x] **Step 4：运行任务 1–3 定向测试并确认通过**。确认 Step 1/2 的近似金额、视频真实 LLM 来源、未知媒体、跨分页对账与完整 summary 断言全部通过。
+- [x] **Step 5：提交**。`feat(usage): 汇总视频任务与个人总账`
 
 ### 任务 4：暴露只读 `/api/usage` 并锁定权限和响应契约
 
