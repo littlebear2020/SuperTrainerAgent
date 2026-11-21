@@ -4,11 +4,12 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import event
 
 from app.gateway._shared.personal_usage.agent import aggregate_agent_usage
 from app.gateway._shared.personal_usage.types import make_usage_window
 from app.gateway.routers.console import invalidate_media_pricing_cache
-from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
+from deerflow.persistence.engine import close_engine, get_engine, get_session_factory, init_engine
 from deerflow.persistence.external_api_calls.model import ExternalApiCallRow
 from deerflow.persistence.model_pricing.model import ModelPricingRow
 from deerflow.persistence.run.model import RunRow
@@ -475,3 +476,55 @@ async def test_agent_zero_token_run_with_positive_buckets_invalidates_models(db)
     assert task.total_tokens == 0
     assert task.llm_cost == pytest.approx(0.00022, abs=1e-9)
     assert task.models == []
+
+
+@pytest.mark.anyio
+async def test_agent_malformed_bucket_never_breaks_usage(db):
+    async with db() as session:
+        await add_pricing(session)
+        session.add_all(
+            [
+                thread("malformed-bucket"),
+                run(
+                    "malformed-bucket-run",
+                    "malformed-bucket",
+                    input_tokens=10,
+                    output_tokens=10,
+                    token_usage_by_model={"priced-model": {"input_tokens": "n/a", "output_tokens": 10}},
+                ),
+            ]
+        )
+        await session.commit()
+
+    task = (await aggregate(db))[0]
+    assert task.total_tokens == 20
+    assert task.llm_cost == pytest.approx(0.0003, abs=1e-9)
+    assert task.cost_source == "estimated"
+    assert task.models == []
+
+
+@pytest.mark.anyio
+async def test_agent_latest_status_uses_one_row_per_thread_window_function(db):
+    async with db() as session:
+        session.add_all(
+            [
+                thread("latest-window"),
+                run("latest-window-old", "latest-window", created_at=IN_WINDOW - timedelta(days=1)),
+                run("latest-window-new", "latest-window"),
+            ]
+        )
+        await session.commit()
+
+    statements: list[str] = []
+
+    def capture_sql(_connection, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(" ".join(statement.lower().split()))
+
+    engine = get_engine()
+    event.listen(engine.sync_engine, "before_cursor_execute", capture_sql)
+    try:
+        await aggregate(db)
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", capture_sql)
+
+    assert any("row_number() over" in statement and "partition by" in statement for statement in statements), statements

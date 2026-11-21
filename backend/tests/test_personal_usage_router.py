@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
-from _router_auth_helpers import make_authed_test_app
+from _router_auth_helpers import call_unwrapped, make_authed_test_app
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 from app.gateway._shared.personal_usage.types import make_usage_window
@@ -228,3 +229,27 @@ def test_main_app_registers_usage_route():
     from app.gateway.app import app
 
     assert any(getattr(route, "path", None) == "/api/usage" and "GET" in getattr(route, "methods", set()) for route in app.routes)
+
+
+@pytest.mark.asyncio
+async def test_usage_rejects_missing_resolved_user_context(monkeypatch):
+    monkeypatch.setattr(personal_usage, "get_session_factory", lambda: object())
+
+    async def unexpected_call(*args, **kwargs):
+        raise AssertionError("usage aggregation must not run without a resolved user")
+
+    monkeypatch.setattr(personal_usage, "get_personal_usage", unexpected_call)
+    request = Request({"type": "http", "method": "GET", "path": "/api/usage", "headers": [], "query_string": b""})
+    request.state.auth = SimpleNamespace(user=None)
+
+    with pytest.raises(HTTPException) as exc:
+        await call_unwrapped(
+            personal_usage.personal_usage_endpoint,
+            request,
+            days=7,
+            capability="all",
+            tz_offset_minutes=0,
+            offset=0,
+            limit=20,
+        )
+    assert exc.value.status_code == 401
