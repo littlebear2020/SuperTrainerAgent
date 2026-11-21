@@ -1,10 +1,10 @@
 # 模型模式阶梯（闪速 / 标准 / Ultra）落地计划
 
-> **状态**：未执行（2026-11-18 定稿并经外部评审复核修订；本计划不授权自动 push、部署或修改公司服务器配置）。
-> **TL;DR**：把用户可见模式收敛为「闪速 / 标准 / Ultra」，删除「思考」档与推理深度入口；按模式限定可选模型并显式配置默认（闪速=qwen3.8-flash，标准=deepseek-v4.1-flash，Ultra=qwen4-max）。思考强度由模式内部固定（闪速关、标准/Ultra 最大），Claude 保留但无思考输出。影响面 = config schema/模型清单、factory 防泄漏、`/models` API、前端模式与模型选择；不改后端 agent 管线、部署形态与数据库。
+> **状态**：未执行（2026-11-18 定稿并经外部评审复核修订；2026-11-20 按用户决策修订：不执行 DSML 守卫计划，标准档默认由 deepseek-v4.1-flash 改为 claude-sonnet-5-5，DeepSeek 仅保留为可选；本计划不授权自动 push、部署或修改公司服务器配置）。
+> **TL;DR**：把用户可见模式收敛为「闪速 / 标准 / Ultra」，删除「思考」档与推理深度入口；按模式限定可选模型并显式配置默认（闪速=qwen3.8-flash，标准=claude-sonnet-5-5，Ultra=qwen4-max）。思考强度由模式内部固定（闪速关、标准/Ultra 最大），Claude 保留但无思考输出；DeepSeek 保留为可选、不作默认（2026-11-20 决策）。影响面 = config schema/模型清单、factory 防泄漏、`/models` API、前端模式与模型选择；不改后端 agent 管线、部署形态与数据库。
 > **基准**：评审时 `origin/main = 35338212`；当前 `config_version: 31`，本批升到 32。模型能力依据为 2026-11-18 全量探针与压测，闪速 minimal 参数已补测。
 
-> **For agentic workers：** 按 Task 0→6 串行执行并勾选；每步先写失败测试再实现。本批跨 backend config schema + gateway API + frontend，必须从最新 `origin/main` 建独立 worktree、分支 + PR，不直推、不并行修改共享基座。**前置次序**：先完成 `2026-11-17-deepseek-dsml-tool-protocol-hardening-plan.md` Task 1–4，再执行本计划；`core-product-frontend-reliability` 与 `agent-showcase-visual-fidelity` 排在本计划之后并 rebase。若用户另行调整次序，须先显式接受 DeepSeek 守卫空窗风险，且不得与 reliability 并行改 `input-box.tsx` / `core/threads/hooks.ts`。
+> **For agentic workers：** 按 Task 0→6 串行执行并勾选；每步先写失败测试再实现。本批跨 backend config schema + gateway API + frontend，必须从最新 `origin/main` 建独立 worktree、分支 + PR，不直推、不并行修改共享基座。**前置次序**：DSML 守卫计划已由用户决定不执行（2026-11-20），本计划接受守卫空窗，DeepSeek 仅保留为可选、不得设为任何档位默认；`core-product-frontend-reliability` 与 `agent-showcase-visual-fidelity` 排在本计划之后并 rebase。不得与 reliability 并行改 `input-box.tsx` / `core/threads/hooks.ts`。
 
 **Goal：** 用户只看到三个模式，每个模式只列该档允许的模型并自动落到合法模型；思考强度不再作为用户选项，由模式内部映射为 `thinking_enabled + reasoning_effort`。
 
@@ -17,7 +17,7 @@
 | 模式 | 可选模型 | 默认 | 内部行为 |
 |---|---|---|---|
 | **闪速** | `qwen3.8-flash`、`deepseek-v4.1-flash` | `qwen3.8-flash` | 关思考（`thinking: disabled` + `reasoning_effort: minimal`）、不规划、不调子代理 |
-| **标准** | `deepseek-v4.1-flash`、`claude-sonnet-5-5` | `deepseek-v4.1-flash` | 开思考（`thinking: enabled` + `reasoning_effort: high`）、规划开、不调子代理；Claude 无思考，靠规划补质量 |
+| **标准** | `deepseek-v4.1-flash`、`claude-sonnet-5-5` | `claude-sonnet-5-5`（2026-11-20 修订） | 规划开、不调子代理；Claude 无思考、响应快；DeepSeek 手动选择时开思考（`thinking: enabled` + `reasoning_effort: high`） |
 | **Ultra** | `qwen4-max`、`kimi-k3.1-pro`、`claude-sonnet-5-5` | `qwen4-max` | 最大思考（`thinking: enabled` + `reasoning_effort: high`）、规划 + 子代理 + 更长执行预算；Kimi 标注长文档/慢，Claude 无思考 |
 
 ### 1.2 模式 → 请求参数
@@ -78,11 +78,11 @@
 | 模式 | 名称 | 描述 |
 |---|---|---|
 | `flash` | 闪速 | 最快响应，适合改写、抽取、标题等轻量任务 |
-| `standard` | 标准 | 默认档：带推理与规划，兼顾质量与速度 |
+| `standard` | 标准 | 默认档：规划开、响应快，可手动切换深度思考模型 |
 | `ultra` | Ultra | 最强档：多子代理协作，适合复杂多步骤任务，耗时更长 |
 
 模型描述与模式解耦：
-- `deepseek-v4.1-flash`：支持深度思考，速度均衡（不写「默认」，默认徽标由模式配置决定）。
+- `deepseek-v4.1-flash`：支持深度思考，速度均衡（不再作为任何档位默认，仅在手动选择时使用）。
 - `claude-sonnet-5-5`：响应快，不输出思考过程。
 - `qwen4-max`：最强思考，首字约 5–7 秒。
 - `kimi-k3.1-pro`：长文档专用，首字约 9–28 秒。
@@ -95,7 +95,7 @@
 | Q2 | 是否保留「思考」模式？ | **删除**，语义并入标准与 Ultra。 | 原「思考」与 Pro 描述重叠 |
 | Q3 | 闪速是否默认开最大思考？ | **否**。 | 首字约 2–3 倍、token 约 5–6 倍 |
 | Q4 | 闪速默认模型是否换成 deepseek？ | **否**，维持 qwen3.8-flash。 | 快速档基准 42/43 vs 41/43，延迟持平，qwen 已有生产验证 |
-| Q5 | 标准默认用 qwen4-max 还是 deepseek/Claude？ | **deepseek-v4.1-flash**。 | qwen4-max 最大思考首字 4.7–6.7s；deepseek 1.3–2.8s、p90 2.7s、40/41 |
+| Q5 | 标准默认用 qwen4-max 还是 deepseek/Claude？ | **claude-sonnet-5-5**（2026-11-20 修订；原定 deepseek-v4.1-flash）。 | 用户决定不执行 DSML 守卫计划，避免把 DeepSeek 设为默认放大缺陷暴露面；Claude 响应快、无思考，标准档靠规划补质量。原依据保留：deepseek 1.3–2.8s、p90 2.7s、40/41；qwen4-max 首字 4.7–6.7s |
 | Q6 | Ultra 默认用 qwen4-max 吗？ | **是**。 | 最大强度全维度 40/41、工具 6/6 |
 | Q7 | Kimi 是否进 Ultra？ | **是**，标注长文档/慢。 | 最大思考首字 8.6–27.7s；工具 6/6 |
 | Q8 | Claude 无思考，是否进标准与 Ultra？ | **是**，定位最快、无思考，靠规划/子代理补执行深度。 | p50 1.8s、首字 1.5s；项目未使用强制 tool_choice |
@@ -103,7 +103,7 @@
 | Q10 | 模式值与旧数据如何迁移？ | 新值 `flash/standard/ultra`；旧 `thinking/pro → standard`，旧 effort 清空。 | 防止已删除的推理深度入口留下无法修正的 low/medium 残留 |
 | Q11 | DeepSeek 用标准 ID 还是 `@360-latency`？ | **用 `@360-latency`**，内部 `name` 不变。 | 专属计费变体；直连实测可用，目录缺失不等于不可用 |
 | Q12 | `minimal` 未上过线，能否直接作为闪速档？ | **可以**，两模型真实探针均验证。 | `disabled + minimal` 各 3 次 reasoning=0，工具正常；`enabled + high` 对照正常 |
-| Q13 | 与其他在途计划的次序？ | **DSML Task 1–4 → 本计划 → reliability / showcase visual-fidelity**。 | 先落 DeepSeek 守卫再放大其默认流量；reliability 需在本批模式语义上重写模型校正分支与测试 |
+| Q13 | 与其他在途计划的次序？ | **本计划 → reliability / showcase visual-fidelity**；DSML 计划不执行（2026-11-20 用户决策）。 | 本计划不得把 DeepSeek 设为任何档位默认，仅保留为可选；reliability 需在本批模式语义上重写模型校正分支与测试 |
 
 ## 三、外部评审修订对照（保留原方案 → 定稿差异）
 
@@ -127,7 +127,7 @@
 ### Task 0：执行准备与串行约束
 
 - [ ] 规划侧先把本计划及仍需引用的在途计划以**单独纯 docs 批次**入库，作为跨会话次序载体；不与功能 diff 夹带。`agent-showcase-integration` 已在 `origin/main` 有实现文件，其状态头过时问题另行处理，不纳入本批。
-- [ ] 确认 DSML Task 1–4 已合入；`git fetch origin`，从**最新 `origin/main`** 建 worktree/分支 `model-mode-ladder`，记录实际短 hash 与 `config_version: 31`。评审基准 `35338212` 仅用于漂移核对，不替代执行时最新基线。
+- [ ] 确认 DSML 守卫计划保持「不执行」（2026-11-20 用户决策），并核对本批未把 DeepSeek 设为任何档位默认；`git fetch origin`，从**最新 `origin/main`** 建 worktree/分支 `model-mode-ladder`，记录实际短 hash 与 `config_version: 31`。评审基准 `35338212` 仅用于漂移核对，不替代执行时最新基线。
 - [ ] 不带入当前工作区的无关修改与未跟踪素材。worktree 的 gitignored `config.yaml` 用**符号链接**指向主工作区文件；`.env` 只在当前 shell 以 `set -a; source <主工作区>/.env; set +a` 加载，不复制、不打印、不提交。CI 无真实花名册时按现有 skip 口径运行。
 
 ### Task 1：后端 schema、factory 防泄漏与 API
@@ -153,7 +153,7 @@
 - [ ] 新增 `qwen4-max`：`modes: [ultra]`，`PatchedChatOpenAI + base_url`，`max_tokens: 32768`、`temperature: 0.7`、三个能力旗标 true、成对配置、`stream_chunk_timeout: 240`。
 - [ ] 新增 `kimi-k3.1-pro`：`modes: [ultra]`，同上，`stream_chunk_timeout: 300`、`request_timeout: 300`。
 - [ ] 除 §1.3 五个模型外的全部在册模型显式 `modes: []`；不改 qwen3.8-max 的内部引用。
-- [ ] `mode_defaults: {flash: qwen3.8-flash, standard: deepseek-v4.1-flash, ultra: qwen4-max}`；`models[0]` 保持 qwen3.8-flash。
+- [ ] `mode_defaults: {flash: qwen3.8-flash, standard: claude-sonnet-5-5, ultra: qwen4-max}`；`models[0]` 保持 qwen3.8-flash。
 
 ### Task 3：前端数据层、类型与迁移
 
@@ -205,12 +205,12 @@
   - [ ] `input-box-mode-decouple.dom.test.tsx`：`pro/medium` 改 `standard/high`；保留模型加载失败 toast 用例；delisted 用例改按新默认/模式语义。
   - [ ] `input-box-new-thread-suggestions.dom.test.tsx`、`input-box-no-followups.dom.test.tsx`、`input-box-polish.dom.test.tsx` 纳入定向回归，按新 mock 数据补 `modes` 或验证旧后端回退，不静默删除。
 - [ ] 新增 `input-box-mode-models.dom.test.tsx`
-  - [ ] 默认 standard + deepseek；切 flash/Ultra 自动纠偏；合法共享模型保留；非法才切默认。
+  - [ ] 默认 standard + claude；切 flash/Ultra 自动纠偏；合法共享模型保留；非法才切默认。
   - [ ] 模型列表只显示本档模型；跨档过滤不触发 delisted toast。
 - [ ] 新增 `core/threads/thread-submit-mode-context.dom.test.tsx`（仿 `stream-isloading-at-submit` 捕获 `runs.stream` 入参）
   - [ ] flash：`thinking_enabled=false`、`is_plan_mode=false`、`subagent_enabled=false`、`reasoning_effort=minimal`。
-  - [ ] standard + deepseek：`thinking_enabled=true`、`is_plan_mode=true`、`subagent_enabled=false`、`reasoning_effort=high`。
-  - [ ] standard + Claude：`thinking_enabled=false`、其余同上。
+  - [ ] standard + deepseek（手动切换）：`thinking_enabled=true`、`is_plan_mode=true`、`subagent_enabled=false`、`reasoning_effort=high`。
+  - [ ] standard + Claude（默认）：`thinking_enabled=false`、其余同上。
   - [ ] Ultra：`subagent_enabled=true`；旧 `pro/thinking` 与旧 effort 不再覆盖矩阵。
 
 ### Task 6：文档、门禁与 PR
@@ -236,7 +236,7 @@ PYTHONPATH=. uv run python -c 'from deerflow.config.app_config import AppConfig;
 
 **行为级（mock，可重复）：**
 
-- [ ] 首次进入默认「标准 + deepseek」；切「闪速」只剩 qwen/deepseek 且默认 qwen；切「Ultra」只剩 qwen4-max/Kimi/Claude 且默认 qwen4-max。
+- [ ] 首次进入默认「标准 + claude」；切「闪速」只剩 qwen/deepseek 且默认 qwen；切「Ultra」只剩 qwen4-max/Kimi/Claude 且默认 qwen4-max。
 - [ ] flash/standard/ultra 提交参数全矩阵符合 §1.2，包含 `is_plan_mode` 与 `subagent_enabled`；Claude 不发 thinking。
 - [ ] 旧 `pro/thinking` 设置迁移为标准，旧 low/medium 不残留；合法档内选择保留，非法选择自动回退。
 - [ ] 「后端强制关闭警告」不靠 mock 断言；代码上 Claude 在前端已发 `thinking_enabled=false`，该警告只保留给绕过前端的直接 API 调用。
@@ -259,11 +259,11 @@ PYTHONPATH=. uv run python -c 'from deerflow.config.app_config import AppConfig;
 |---|---|
 | 部署端 config 只读挂载 | `config_version 31→32` 触发升级提示；部署侧另行合并，本批不自动部署 |
 | `@360-latency` 上游下线或路由失败 | 它不在目录，**部署前必须做直连 probe**；失败时只把 `model` 回退为标准 `deepseek/deepseek-v4.1-flash` 并重新验收，内部 name/modes 不变。不做未验证的自动静默降级 |
-| qwen4-max / Kimi 首字慢 | 仅 Ultra 可选并标注；标准默认 deepseek 规避 |
+| qwen4-max / Kimi 首字慢 | 仅 Ultra 可选并标注；标准默认 Claude（响应快、无思考）规避 |
 | Claude 无思考被误期待 | 描述明确「不输出思考过程」；plan/subagent 参数有测试，不把 thinking 当质量唯一来源 |
 | 配置非法或默认模型被删 | schema fail fast；前端三级回退；不允许模型从所有档静默消失 |
 | 旧后端无 `modes` / `mode_defaults` | 全模型缺字段时回退全量列表与顺序默认，不阻断旧部署 |
-| DSML 风险放大 | 本计划排在 DSML Task 1–4 合入后；擅自提前视为接受守卫空窗，须另行记录 |
+| DSML 守卫缺失（用户 2026-11-20 决定不执行） | DeepSeek 仅保留为可选、不作任何档位默认（标准默认 Claude）；用户手动选择 DeepSeek 时仍存在正文伪工具调用与子代理假成功缺陷，部署/验收不宣称已修复 |
 | 回滚 | **前端、后端与 config 同批回滚**，不支持只回退前端。新前端写入的 `standard` 在旧前端无法显示模式标签；回滚说明须让用户重选模式或清理 `deerflow.local-settings`，后端请求本身仍按旧布尔参数兼容 |
 | 工作区污染/配置泄漏 | worktree 只带本批文件；config 用符号链接，env 仅 shell 加载；不复制/打印/提交密钥 |
 
