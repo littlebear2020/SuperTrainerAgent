@@ -9,6 +9,18 @@ const server = createServer((request, response) => {
     response.end("ok");
     return;
   }
+  if (request.method === "GET" && request.url === "/api/v1/auth/me") {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      JSON.stringify({
+        id: "personal-usage-e2e-user",
+        email: "personal-usage-e2e@test.local",
+        system_role: "user",
+        needs_setup: false,
+      }),
+    );
+    return;
+  }
   if (
     request.method === "GET" &&
     request.url === "/api/video/tasks/playable/download"
