@@ -29,4 +29,6 @@
 - `PYTHONPATH=. uv run pytest tests/test_ppt_master_execution_context.py tests/test_seed_agents.py -q` → `94 passed`。
 - `PYTHONPATH=. uv run pytest tests/test_ppt_master*.py tests/test_seed_*.py tests/test_sandbox_read_file_range.py tests/test_skillscan_native.py -q` → `374 passed`。
 - fresh home reseed → `SEED_VERSION 2026-11-21.1 seeded 6`，六个运行时邮票均为 `2026-11-21.1`。
+- 最终 rebase 树 `cd backend && make test` → `10174 passed, 89 skipped, 431 warnings in 76.00s`。
+- 最终 rebase 树根 `make check` → exit 0；eslint `0 errors`（121 条既有 warning）、Prettier/knip/i18n/docs convention 均通过，`git diff --check` 无输出。
 - 第二次付费 P01 行为复测 → 待执行。
