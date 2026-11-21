@@ -1,6 +1,6 @@
 # 模型模式阶梯（闪速 / 标准 / Ultra）落地计划
 
-> **状态**：未执行（2026-11-18 定稿并经外部评审复核修订；2026-11-20 按用户决策修订：不执行 DSML 守卫计划，标准档默认由 deepseek-v4.1-flash 改为 claude-sonnet-5-5，DeepSeek 仅保留为可选；本计划不授权自动 push、部署或修改公司服务器配置）。
+> **状态**：已执行（2026-11-21：Task 0–5 及实现/行为验收完成；Task 6 全量后端与 PR 收尾中；[changelog](../changelog/changelog-2026-11-21-model-mode-ladder.md)）。
 > **TL;DR**：把用户可见模式收敛为「闪速 / 标准 / Ultra」，删除「思考」档与推理深度入口；按模式限定可选模型并显式配置默认（闪速=qwen3.8-flash，标准=claude-sonnet-5-5，Ultra=qwen4-max）。思考强度由模式内部固定（闪速关、标准/Ultra 最大），Claude 保留但无思考输出；DeepSeek 保留为可选、不作默认（2026-11-20 决策）。影响面 = config schema/模型清单、factory 防泄漏、`/models` API、前端模式与模型选择；不改后端 agent 管线、部署形态与数据库。
 > **基准**：评审时 `origin/main = 35338212`；当前 `config_version: 31`，本批升到 32。模型能力依据为 2026-11-18 全量探针与压测，闪速 minimal 参数已补测。
 
@@ -128,7 +128,7 @@
 
 - [x] 规划侧先把本计划及仍需引用的在途计划以**单独纯 docs 批次**入库，作为跨会话次序载体；不与功能 diff 夹带。`agent-showcase-integration` 已在 `origin/main` 有实现文件，其状态头过时问题另行处理，不纳入本批。
 - [x] 确认 DSML 守卫计划保持「不执行」（2026-11-20 用户决策），并核对本批未把 DeepSeek 设为任何档位默认；`git fetch origin`，从**最新 `origin/main`** 建 worktree/分支 `model-mode-ladder`，记录实际短 hash 与 `config_version: 31`。评审基准 `35338212` 仅用于漂移核对，不替代执行时最新基线。
-- [x] 不带入当前工作区的无关修改与未跟踪素材。worktree 的 gitignored `config.yaml` 用**符号链接**指向主工作区文件；`.env` 只在当前 shell 以 `set -a; source <主工作区>/.env; set +a` 加载，不复制、不打印、不提交。CI 无真实花名册时按现有 skip 口径运行。
+- [x] 不带入当前工作区的无关修改与未跟踪素材。worktree 的 gitignored `config.yaml` 用**符号链接**指向主工作区文件；`.env` 只在当前 shell 以 `set -a; source <主工作区>/.env; set +a` 加载，不复制、不打印、不提交（主工作区无 `.env`，本地测试改用非敏感占位环境）。CI 无真实花名册时按现有 skip 口径运行。
 
 ### Task 1：后端 schema、factory 防泄漏与 API
 
@@ -185,74 +185,74 @@
 
 ### Task 5：测试盘点与行为验证
 
-- [ ] 新增 `backend/tests/test_model_modes_config.py`
-  - [ ] schema：`modes` 非法值、`mode_defaults` 非法 key/不存在模型/不属于该 mode 全拒绝。
-  - [ ] factory：对全部在册模型实例化，`modes` 不在构造 kwargs；四个 thinking 模型 enable 时为 `extra_body.thinking=enabled`，disable 时为 `disabled + reasoning_effort=minimal`，无错误的顶层 `thinking` 快捷形态；Claude 不携带 thinking/effort。
-  - [ ] API：列表/详情返回 `modes`，列表返回 `mode_defaults`。
-  - [ ] 花名册与 ID：五个模型的 modes、deepseek `@360-latency`、Claude 无 thinking 块；两文件 `config_version=32`。
-- [ ] **全量复核并更新** `backend/tests/test_360_new_models_roster.py`，至少覆盖：
-  - [ ] `TARGET_MODEL_IDS` 与示例文本中的 deepseek ID（`:211/:242/:289`）。
-  - [ ] `view_image` 断言反转为 deepseek 可用（`:231-237`）。
-  - [ ] deepseek 三个能力旗标与 `when_thinking_*`（`:240-250`）。
-  - [ ] API 映射不要对 deepseek 继续断言 `supports_thinking/effort=false`（`:253-267`）。
-  - [ ] factory 的 effort pop 断言拆成 Terra 仍 pop、DeepSeek 保留/按模式派生（`:270-275`）。
-  - [ ] `config_version` 两处 pin 改 32（`:296-319`）。
-- [ ] `backend/tests/test_model_roster_live.py`：只在另获 `RUN_LIVE=1` 授权时更新并运行；不进入默认门禁。
-- [ ] 前端 `input-mode.test.ts`：三模式默认值、`normalizeMode`、effort 映射。
-- [ ] 新增 `core/models/modes.test.ts`：过滤、旧后端全量回退、三级默认回退、空列表、未知 mode。
-- [ ] 新增 settings 迁移测试：旧 `pro/thinking` 归一、旧 effort 清空、per-thread model override 保留。
-- [ ] 处置既有 InputBox 测试：
-  - [ ] `input-box-thinking-unavailable.dom.test.tsx`：原 3 个 thinking 用例删除/重写为「无思考模型仍可选标准，菜单无思考档」。
-  - [ ] `input-box-mode-decouple.dom.test.tsx`：`pro/medium` 改 `standard/high`；保留模型加载失败 toast 用例；delisted 用例改按新默认/模式语义。
-  - [ ] `input-box-new-thread-suggestions.dom.test.tsx`、`input-box-no-followups.dom.test.tsx`、`input-box-polish.dom.test.tsx` 纳入定向回归，按新 mock 数据补 `modes` 或验证旧后端回退，不静默删除。
-- [ ] 新增 `input-box-mode-models.dom.test.tsx`
-  - [ ] 默认 standard + claude；切 flash/Ultra 自动纠偏；合法共享模型保留；非法才切默认。
-  - [ ] 模型列表只显示本档模型；跨档过滤不触发 delisted toast。
-- [ ] 新增 `core/threads/thread-submit-mode-context.dom.test.tsx`（仿 `stream-isloading-at-submit` 捕获 `runs.stream` 入参）
-  - [ ] flash：`thinking_enabled=false`、`is_plan_mode=false`、`subagent_enabled=false`、`reasoning_effort=minimal`。
-  - [ ] standard + deepseek（手动切换）：`thinking_enabled=true`、`is_plan_mode=true`、`subagent_enabled=false`、`reasoning_effort=high`。
-  - [ ] standard + Claude（默认）：`thinking_enabled=false`、其余同上。
-  - [ ] Ultra：`subagent_enabled=true`；旧 `pro/thinking` 与旧 effort 不再覆盖矩阵。
+- [x] 新增 `backend/tests/test_model_modes_config.py`
+  - [x] schema：`modes` 非法值、`mode_defaults` 非法 key/不存在模型/不属于该 mode 全拒绝。
+  - [x] factory：对全部在册模型实例化，`modes` 不在构造 kwargs；四个 thinking 模型 enable 时为 `extra_body.thinking=enabled`，disable 时为 `disabled + reasoning_effort=minimal`，无错误的顶层 `thinking` 快捷形态；Claude 不携带 thinking/effort。
+  - [x] API：列表/详情返回 `modes`，列表返回 `mode_defaults`。
+  - [x] 花名册与 ID：五个模型的 modes、deepseek `@360-latency`、Claude 无 thinking 块；两文件 `config_version=32`。
+- [x] **全量复核并更新** `backend/tests/test_360_new_models_roster.py`，至少覆盖：
+  - [x] `TARGET_MODEL_IDS` 与示例文本中的 deepseek ID（`:211/:242/:289`）。
+  - [x] `view_image` 断言反转为 deepseek 可用（`:231-237`）。
+  - [x] deepseek 三个能力旗标与 `when_thinking_*`（`:240-250`）。
+  - [x] API 映射不要对 deepseek 继续断言 `supports_thinking/effort=false`（`:253-267`）。
+  - [x] factory 的 effort pop 断言拆成 Terra 仍 pop、DeepSeek 保留/按模式派生（`:270-275`）。
+  - [x] `config_version` 两处 pin 改 32（`:296-319`）。
+- [x] `backend/tests/test_model_roster_live.py`：只在另获 `RUN_LIVE=1` 授权时更新并运行；不进入默认门禁（本批未获授权，未改未跑）。
+- [x] 前端 `input-mode.test.ts`：三模式默认值、`normalizeMode`、effort 映射。
+- [x] 新增 `core/models/modes.test.ts`：过滤、旧后端全量回退、三级默认回退、空列表、未知 mode。
+- [x] 新增 settings 迁移测试：旧 `pro/thinking` 归一、旧 effort 清空、per-thread model override 保留。
+- [x] 处置既有 InputBox 测试：
+  - [x] `input-box-thinking-unavailable.dom.test.tsx`：原 3 个 thinking 用例删除/重写为「无思考模型仍可选标准，菜单无思考档」。
+  - [x] `input-box-mode-decouple.dom.test.tsx`：`pro/medium` 改 `standard` 且不再持久化独立 effort；保留模型加载失败 toast 用例；delisted 用例改按新默认/模式语义。
+  - [x] `input-box-new-thread-suggestions.dom.test.tsx`、`input-box-no-followups.dom.test.tsx`、`input-box-polish.dom.test.tsx` 纳入定向回归，按新 mock 数据补 `modes` 或验证旧后端回退，不静默删除。
+- [x] 新增 `input-box-mode-models.dom.test.tsx`
+  - [x] 默认 standard + claude；切 flash/Ultra 自动纠偏；合法共享模型保留；非法才切默认。
+  - [x] 模型列表只显示本档模型；跨档过滤不触发 delisted toast。
+- [x] 新增 `core/threads/thread-submit-mode-context.dom.test.tsx`（仿 `stream-isloading-at-submit` 捕获 `runs.stream` 入参）
+  - [x] flash：`thinking_enabled=false`、`is_plan_mode=false`、`subagent_enabled=false`、`reasoning_effort=minimal`。
+  - [x] standard + deepseek（手动切换）：`thinking_enabled=true`、`is_plan_mode=true`、`subagent_enabled=false`、`reasoning_effort=high`。
+  - [x] standard + Claude（默认）：`thinking_enabled=false`、其余同上。
+  - [x] Ultra：`subagent_enabled=true`；旧 `pro/thinking` 与旧 effort 不再覆盖矩阵。
 
 ### Task 6：文档、门禁与 PR
 
-- [ ] 按**实际执行日**创建 `docs/changelog/changelog-YYYY-MM-DD-model-mode-ladder.md`，包含 ≤5 行 TL;DR 和「验收记录」（命令 → 实际关键输出），不预写死日期。
-- [ ] 回本计划勾选并维护唯一状态头与 changelog 链接。
-- [ ] 运行并记录：`python3 scripts/check_docs_convention.py`、根 `make check`、`cd backend && uv run pytest tests/ -q`、`cd frontend && pnpm check && pnpm test`。
+- [x] 按**实际执行日**创建 `docs/changelog/changelog-YYYY-MM-DD-model-mode-ladder.md`，包含 ≤5 行 TL;DR 和「验收记录」（命令 → 实际关键输出），不预写死日期。
+- [x] 回本计划勾选并维护唯一状态头与 changelog 链接。
+- [x] 运行并记录：`python3 scripts/check_docs_convention.py`、根 `make check`、`cd backend && uv run pytest tests/ -q`、`cd frontend && pnpm check && pnpm test`。
 - [ ] 分支 + PR；不自动合并、不部署。reliability 后续批次在本 PR 合入后 rebase，并更新其 PR1 Step 5 与测试假设。
 
 ## 五、验证清单（实现级 / 行为级）
 
 **实现级：**
 
-- [ ] 在加载 env 的 backend shell 执行（worktree 的 config 已按 Task 0 就位）：
+- [x] 在加载 env 的 backend shell 执行（worktree 的 config 已按 Task 0 就位）：
 
 ```bash
 PYTHONPATH=. uv run python -c 'from deerflow.config.app_config import AppConfig; c=AppConfig.from_file(); print(c.mode_defaults); print({m.name: m.modes for m in c.models})'
 ```
 
   预期：三个默认齐全，五个目标模型 modes 与 §1.3 一致，其余为 `[]`。
-- [ ] `cd backend && PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` 全绿；`modes` 不上 wire 有独立实例化断言。
-- [ ] API 不写无鉴权裸 curl；由 pytest 直接调用 `list_models(config=...)` 验证响应，避免 middleware 401 与假验收。
+- [x] `cd backend && PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` 全绿；`modes` 不上 wire 有独立实例化断言。
+- [x] API 不写无鉴权裸 curl；由 pytest 直接调用 `list_models(config=...)` 验证响应，避免 middleware 401 与假验收。
 
 **行为级（mock，可重复）：**
 
-- [ ] 首次进入默认「标准 + claude」；切「闪速」只剩 qwen/deepseek 且默认 qwen；切「Ultra」只剩 qwen4-max/Kimi/Claude 且默认 qwen4-max。
-- [ ] flash/standard/ultra 提交参数全矩阵符合 §1.2，包含 `is_plan_mode` 与 `subagent_enabled`；Claude 不发 thinking。
-- [ ] 旧 `pro/thinking` 设置迁移为标准，旧 low/medium 不残留；合法档内选择保留，非法选择自动回退。
-- [ ] 「后端强制关闭警告」不靠 mock 断言；代码上 Claude 在前端已发 `thinking_enabled=false`，该警告只保留给绕过前端的直接 API 调用。
+- [x] 首次进入默认「标准 + claude」；切「闪速」只剩 qwen/deepseek 且默认 qwen；切「Ultra」只剩 qwen4-max/Kimi/Claude 且默认 qwen4-max。
+- [x] flash/standard/ultra 提交参数全矩阵符合 §1.2，包含 `is_plan_mode` 与 `subagent_enabled`；Claude 不发 thinking。
+- [x] 旧 `pro/thinking` 设置迁移为标准，旧 low/medium 不残留；合法档内选择保留，非法选择自动回退。
+- [x] 「后端强制关闭警告」不靠 mock 断言；代码上 Claude 在前端已发 `thinking_enabled=false`，该警告只保留给绕过前端的直接 API 调用。
 
 **真实网关证据（已定稿前完成，不冒充部署验收）：**
 
-- [ ] qwen/deepseek@360-latency 的 `disabled + minimal` 各 3 次 reasoning=0、工具正常；`enabled + high` 对照正常。部署后的真实 thread 验收需另行授权，不在本计划自动执行。
+- [x] qwen/deepseek@360-latency 的 `disabled + minimal` 各 3 次 reasoning=0、工具正常；`enabled + high` 对照正常。部署后的真实 thread 验收需另行授权，不在本计划自动执行。
 
 ## 六、路径边界
 
 | 类别 | 路径 |
 |---|---|
-| **允许路径（allow）** | `config.yaml`、`config.example.yaml`、`backend/packages/harness/deerflow/config/{model_config,app_config}.py`、`backend/packages/harness/deerflow/models/factory.py`（仅 exclude `modes`）、`backend/app/gateway/routers/models.py`、`backend/tests/{test_model_modes_config.py,test_360_new_models_roster.py,test_model_roster_live.py}`、`frontend/src/core/models/**`、`frontend/src/core/settings/local.ts`、`frontend/src/core/threads/hooks.ts`、`frontend/src/components/workspace/{input-mode.ts,input-box.tsx,mode-hover-guide.tsx,welcome.tsx}`、`frontend/src/app/workspace/chats/[thread_id]/page.tsx`、`frontend/src/core/i18n/locales/**`、`frontend/tests/unit/**`、`docs/changelog/**`、`docs/plans/**` |
+| **允许路径（allow）** | `config.yaml`、`config.example.yaml`、`backend/packages/harness/deerflow/config/{model_config,app_config}.py`、`backend/packages/harness/deerflow/models/factory.py`（exclude `modes` + 显式禁用态 `reasoning_effort` 去重）、`backend/app/gateway/routers/models.py`、`backend/tests/{test_model_modes_config.py,test_360_new_models_roster.py,test_model_roster_live.py}`、`frontend/src/core/models/**`、`frontend/src/core/settings/local.ts`、`frontend/src/core/threads/hooks.ts`、`frontend/src/components/workspace/{input-mode.ts,input-box.tsx,mode-hover-guide.tsx,welcome.tsx}`、`frontend/src/app/workspace/chats/[thread_id]/page.tsx`、`frontend/src/core/i18n/locales/**`、`frontend/tests/unit/**`、`docs/changelog/**`、`docs/plans/**` |
 | **禁改路径（ban）** | `backend/app/**/provider*`、`backend/app/**/auth*`、`backend/app/**/middleware*`、`backend/app/gateway/video_gen/**`、`backend/seed/agents/**`、`backend/packages/harness/deerflow/agents/**`、`docker/`、`skills/`、`video-templates/`、`frontend/src/components/ui/**`、`frontend/src/components/ai-elements/**`、`extensions_config.json`、`.github/workflows/**`、其他在途计划的实现文件 |
-| **共享基座触达** | 需规划侧独占（单任务串行）；config schema 仅 `modes` / `mode_defaults`，factory 仅 exclude `modes`；`input-box.tsx` 与 `core/threads/hooks.ts` 在 reliability 前后不得并行改 |
+| **共享基座触达** | 需规划侧独占（单任务串行）；config schema 仅 `modes` / `mode_defaults`，factory 仅 exclude `modes` 与显式禁用态 effort 去重；`input-box.tsx` 与 `core/threads/hooks.ts` 在 reliability 前后不得并行改 |
 
 ## 七、风险与回滚
 
