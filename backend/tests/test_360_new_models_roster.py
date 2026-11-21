@@ -208,7 +208,7 @@ def test_create_chat_model_reasoning_effort_popped_for_claude(stubbed_factory) -
 
 TARGET_MODEL_IDS = {
     "gpt-5.6-terra": "openai/gpt-6.1-terra",
-    "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+    "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash@360-latency",
 }
 
 
@@ -234,20 +234,20 @@ def test_terra_vision_controls_view_image_tool(real_config: AppConfig) -> None:
     terra_tools = get_available_tools(groups=[], include_mcp=False, model_name="gpt-5.6-terra", app_config=real_config)
     deepseek_tools = get_available_tools(groups=[], include_mcp=False, model_name="deepseek-v4.1-flash", app_config=real_config)
     assert "view_image" in [tool.name for tool in terra_tools]
-    assert "view_image" not in [tool.name for tool in deepseek_tools]
+    assert "view_image" in [tool.name for tool in deepseek_tools]
 
 
 def test_deepseek_v41_flash_roster_contract(real_config: AppConfig) -> None:
     deepseek = real_config.get_model_config("deepseek-v4.1-flash")
-    assert deepseek.model == "deepseek/deepseek-v4.1-flash"
+    assert deepseek.model == "deepseek/deepseek-v4.1-flash@360-latency"
     assert deepseek.display_name == "360·DeepSeek V4.1 Flash"
     assert deepseek.use == "deerflow.models.patched_deepseek:PatchedChatDeepSeek"
     assert (deepseek.model_extra or {}).get("api_base") == "https://api.360.cn/v1"
-    assert deepseek.supports_vision is False
-    assert deepseek.supports_thinking is False
-    assert deepseek.supports_reasoning_effort is False
-    assert deepseek.when_thinking_enabled is None
-    assert deepseek.when_thinking_disabled is None
+    assert deepseek.supports_vision is True
+    assert deepseek.supports_thinking is True
+    assert deepseek.supports_reasoning_effort is True
+    assert deepseek.when_thinking_enabled == {"extra_body": {"thinking": {"type": "enabled"}}}
+    assert deepseek.when_thinking_disabled == {"extra_body": {"thinking": {"type": "disabled"}}, "reasoning_effort": "minimal"}
 
 
 @pytest.mark.asyncio
@@ -257,22 +257,32 @@ async def test_models_api_maps_new_roster_without_exposing_vision(real_config: A
     response = await list_models(config=real_config)
     mapped = {m.name: m for m in response.models if m.name in TARGET_MODEL_IDS}
     assert set(mapped) == set(TARGET_MODEL_IDS)
+    expected_capabilities = {
+        "gpt-5.6-terra": (False, False),
+        "deepseek-v4.1-flash": (True, True),
+    }
     for name, upstream_id in TARGET_MODEL_IDS.items():
         model = mapped[name]
         assert model.model == upstream_id
-        assert model.supports_thinking is False
-        assert model.supports_reasoning_effort is False
+        assert model.supports_thinking == expected_capabilities[name][0]
+        assert model.supports_reasoning_effort == expected_capabilities[name][1]
         assert not hasattr(model, "supports_vision")
     assert mapped["gpt-5.6-terra"].display_name == "360·GPT 6.1 Terra"
     assert mapped["deepseek-v4.1-flash"].display_name == "360·DeepSeek V4.1 Flash"
 
 
-@pytest.mark.parametrize("name,upstream_id", TARGET_MODEL_IDS.items())
-def test_new_models_factory_preserves_upstream_and_pops_reasoning(stubbed_factory, name: str, upstream_id: str) -> None:
-    factory_module.create_chat_model(name, thinking_enabled=False, attach_tracing=False, app_config=stubbed_factory, reasoning_effort="low")
+def test_terra_factory_preserves_upstream_and_pops_reasoning(stubbed_factory) -> None:
+    factory_module.create_chat_model("gpt-5.6-terra", thinking_enabled=False, attach_tracing=False, app_config=stubbed_factory, reasoning_effort="low")
     kwargs = _RosterStubModel.captured
-    assert kwargs["model"] == upstream_id
+    assert kwargs["model"] == TARGET_MODEL_IDS["gpt-5.6-terra"]
     assert "reasoning_effort" not in kwargs
+
+
+def test_deepseek_factory_preserves_upstream_and_mode_effort(stubbed_factory) -> None:
+    factory_module.create_chat_model("deepseek-v4.1-flash", thinking_enabled=False, attach_tracing=False, app_config=stubbed_factory, reasoning_effort="low")
+    kwargs = _RosterStubModel.captured
+    assert kwargs["model"] == TARGET_MODEL_IDS["deepseek-v4.1-flash"]
+    assert kwargs["reasoning_effort"] == "minimal"
 
 
 # ── config.example.yaml 同步 ─────────────────────────────────────────────
@@ -286,7 +296,7 @@ def test_example_yaml_contains_new_models() -> None:
     assert "# - name: gpt-5.6-terra" in text
     assert "#   model: openai/gpt-6.1-terra" in text
     assert "# - name: deepseek-v4.1-flash" in text
-    assert "#   model: deepseek/deepseek-v4.1-flash" in text
+    assert "#   model: deepseek/deepseek-v4.1-flash@360-latency" in text
     assert "旧线程兼容别名" in text
     # 删册条目的模板不得残留
     for n in REMOVED_NAMES:
@@ -294,6 +304,7 @@ def test_example_yaml_contains_new_models() -> None:
 
 
 def test_example_config_version_bumped(example_yaml: dict) -> None:
+    # 32=模型模式阶梯（2026-11-21，modes/mode_defaults 与模式花名册）；
     # 31=本地模型与 Aio 执行就绪批（2026-11-11）；30 保留给 pending W2
     # （declarative-reasoning-profile），本批不占用该预留版本。
     # 29=vimax 遗留收口批（2026-10-16，删 vimax_longform_*×3 + remotion_agent_assistant 四死字段）；
@@ -301,7 +312,7 @@ def test_example_config_version_bumped(example_yaml: dict) -> None:
     # 27=花名册调整批（2026-10-12）；26=OPS-2 删全局 channels.feishu（D6，2026-10-07）；
     # 25=上传白名单（R2-1）；24=skill 机制优化批 A；23=审计整改批 C4；22=中断修复批 P1；
     # 21=长任务稳定性批。
-    assert example_yaml.get("config_version") == 31, "config_version 应为 31（2026-11-11 本地模型与 Aio 执行就绪批）"
+    assert example_yaml.get("config_version") == 32, "config_version 应为 32（2026-11-21 模型模式阶梯）"
 
 
 def test_user_config_version_bumped(example_yaml: dict) -> None:
@@ -316,4 +327,4 @@ def test_user_config_version_bumped(example_yaml: dict) -> None:
 
     with open(config_path, encoding="utf-8") as f:
         user_version = _yaml.safe_load(f).get("config_version")
-    assert user_version == example_yaml.get("config_version") == 31
+    assert user_version == example_yaml.get("config_version") == 32
