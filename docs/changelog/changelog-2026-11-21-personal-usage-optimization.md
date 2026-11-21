@@ -45,7 +45,11 @@
 ## 未验证项
 
 - 未运行 `RUN_LIVE=1` 付费测试，未在真实部署或真实用户数据库上验收；专用前端 E2E 使用 Playwright API mock，真实 API 行为验收使用一次性临时 SQLite。
-- PR/OCR 与远端 CI 结果将在交付阶段记录。
+
+## PR 与远端验收
+
+- PR：[#38 个人用量总账与任务明细](https://github.com/littlebear2020/SuperTrainerAgent/pull/38)。四轮 OCR 的正确性发现均已修复并以 RED→GREEN/全量测试验证；固定契约与 SSR 身份等不适用建议已在线程中回复，剩余 low 为文案、测试结构或优化建议，不阻断本批。
+- 最终代码提交 `c61ea5b3` 的远端 CI 全绿：backend-unit-tests、frontend-unit-tests、lint-frontend、quick-checks、review（run `44922182615`）、perf-budgets / e2e-tests（run `44922182635`）均 pass。
 
 ## 配置与回滚
 
