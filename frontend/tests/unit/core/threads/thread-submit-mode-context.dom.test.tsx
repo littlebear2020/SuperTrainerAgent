@@ -65,7 +65,7 @@ beforeEach(() => {
 
 afterEach(() => {
   if (root) {
-    act(() => root.unmount());
+    act(() => root!.unmount());
   }
   container?.remove();
   container = null;

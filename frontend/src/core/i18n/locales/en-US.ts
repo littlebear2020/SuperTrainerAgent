@@ -95,29 +95,14 @@ export const enUS: Translations = {
     addAttachments: "Add attachments",
     mode: "Mode",
     flashMode: "Flash",
-    flashModeDescription: "Fast and efficient, but may not be accurate",
-    reasoningMode: "Reasoning",
-    reasoningModeUnavailable:
-      "The selected model doesn't support deep reasoning — switch to Doubao or Qwen to enable it",
-    reasoningModeDescription:
-      "Reasoning before action, balance between time and accuracy",
-    proMode: "Pro",
-    proModeDescription:
-      "Reasoning, planning and executing, get more accurate results, may take more time",
+    flashModeDescription:
+      "Fastest responses for rewriting, extraction, titles, and other lightweight tasks",
+    standardMode: "Standard",
+    standardModeDescription:
+      "Default: planning and fast responses, with optional deep-thinking models",
     ultraMode: "Ultra",
     ultraModeDescription:
-      "Pro mode with subagents to divide work; best for complex multi-step tasks",
-    reasoningEffort: "Reasoning Effort",
-    reasoningEffortMinimal: "Minimal",
-    reasoningEffortMinimalDescription: "Retrieval + Direct Output",
-    reasoningEffortLow: "Low",
-    reasoningEffortLowDescription: "Simple Logic Check + Shallow Deduction",
-    reasoningEffortMedium: "Medium",
-    reasoningEffortMediumDescription:
-      "Multi-layer Logic Analysis + Basic Verification",
-    reasoningEffortHigh: "High",
-    reasoningEffortHighDescription:
-      "Full-dimensional Logic Deduction + Multi-path Verification + Backward Check",
+      "Strongest mode: multi-subagent collaboration for complex multi-step tasks; takes longer",
     searchModels: "Search models...",
     surpriseMe: "Surprise",
     surpriseMePrompt: "Surprise me",

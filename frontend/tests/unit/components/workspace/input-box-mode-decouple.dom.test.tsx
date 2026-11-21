@@ -1,12 +1,9 @@
 /**
- * 缺陷 1 解耦 + 缺陷 2 三路径（2026-08-27 计划，复用 T25 测试的 mock 骨架）：
+ * 模式解耦与模型列表错误路径：
  *
- * 1. 缺陷 1：supports_thinking=false 的模型，菜单点 Pro/Ultra → onContextChange
- *    收到 mode: "pro"/"ultra"（不弹回 flash）。
- * 2. 路径 B：context.model_name 为已撤册模型 → 回退 models[0]、delisted toast
- *    出现一次、原 mode 为 pro 时保持 pro。
- * 3. 路径 A：useModels 返回 error → 带重试 action 的 toast.error；点 action
- *    调用 refetch；重复渲染不刷屏。
+ * 1. supports_thinking=false 的模型仍可选标准/Ultra，且不持久化独立 effort。
+ * 2. 已撤册模型回退到合法默认，standard 保持，delisted toast 只提示一次。
+ * 3. useModels 返回 error 时显示可重试 toast，重复渲染不刷屏。
  */
 
 import { act } from "react";
@@ -153,8 +150,8 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-describe("缺陷 1：supports_thinking=false 模型上 Pro/Ultra 不再弹回", () => {
-  it("点 Pro → onContextChange 收到 mode: pro + reasoning_effort: medium", async () => {
+describe("supports_thinking=false 模型仍可选标准/Ultra", () => {
+  it("点标准 → onContextChange 收到 mode: standard", async () => {
     mockUseModels();
     const onContextChange = vi.fn();
     await renderInputBox({
@@ -163,23 +160,22 @@ describe("缺陷 1：supports_thinking=false 模型上 Pro/Ultra 不再弹回", 
     });
     await openMenu();
 
-    const pro = menuItems().find((el) =>
-      el.textContent?.includes(enUS.inputBox.proModeDescription),
+    const standard = menuItems().find((el) =>
+      el.textContent?.includes(enUS.inputBox.standardModeDescription),
     );
-    expect(pro).toBeTruthy();
-    await clickMenuItem(pro!);
+    expect(standard).toBeTruthy();
+    await clickMenuItem(standard!);
 
     expect(onContextChange).toHaveBeenCalled();
     expect(onContextChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         model_name: "m1",
-        mode: "pro",
-        reasoning_effort: "medium",
+        mode: "standard",
       }),
     );
   });
 
-  it("点 Ultra → onContextChange 收到 mode: ultra + reasoning_effort: high", async () => {
+  it("点 Ultra → onContextChange 收到 mode: ultra", async () => {
     mockUseModels();
     const onContextChange = vi.fn();
     await renderInputBox({
@@ -198,14 +194,13 @@ describe("缺陷 1：supports_thinking=false 模型上 Pro/Ultra 不再弹回", 
       expect.objectContaining({
         model_name: "m1",
         mode: "ultra",
-        reasoning_effort: "high",
       }),
     );
   });
 });
 
 describe("缺陷 2 路径 B：已撤册模型回退默认并提示", () => {
-  it("context.model_name 不在列表 → 回退 models[0]、toast.info 一次、mode pro 保持", async () => {
+  it("context.model_name 不在列表 → 回退合法默认、toast.info 一次、standard 保持", async () => {
     mockUseModels({
       models: [
         {
@@ -218,13 +213,13 @@ describe("缺陷 2 路径 B：已撤册模型回退默认并提示", () => {
     });
     const onContextChange = vi.fn();
     await renderInputBox({
-      context: { model_name: "delisted-x", mode: "pro" },
+      context: { model_name: "delisted-x", mode: "standard" },
       onContextChange,
     });
 
-    // 回退默认模型；mode pro 在支持 thinking 的默认模型上保持 pro（不被改写 flash）
+    // 回退合法默认模型；standard 不受模型 thinking 能力影响。
     expect(onContextChange).toHaveBeenCalledWith(
-      expect.objectContaining({ model_name: "m1", mode: "pro" }),
+      expect.objectContaining({ model_name: "m1", mode: "standard" }),
     );
 
     // delisted toast 恰好一次，含被撤册模型名

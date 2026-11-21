@@ -1,10 +1,3 @@
-/**
- * T25（2026-08-13，决策 D6）：thinking 开关对不支持深度思考的模型
- * 不再静默失效。旧行为：菜单项直接消失，用户不知道为什么没有「思考」。
- * 新行为：菜单项保留但置灰，描述换成「当前模型不支持深度思考，可切换到
- * 豆包/通义等模型」——用户能看懂原因并知道怎么切换。
- */
-
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,24 +6,17 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
 }));
-
 vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
 }));
-
 vi.mock("@/core/config", () => ({
   getBackendBaseURL: () => "",
   getLangGraphBaseURL: () => "",
 }));
-
-vi.mock("@/core/models/hooks", () => ({
-  useModels: vi.fn(),
-}));
-
+vi.mock("@/core/models/hooks", () => ({ useModels: vi.fn() }));
 vi.mock("@/core/skills/hooks", () => ({
   useSkills: () => ({ skills: [], isLoading: false }),
 }));
-
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
@@ -45,76 +31,26 @@ import { useModels } from "@/core/models/hooks";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-const fakeThread = { messages: [] } as never;
-
 let container: HTMLDivElement;
 let root: Root;
 
-function mockModel(supportsThinking: boolean) {
+type InputBoxProps = Parameters<typeof InputBox>[0];
+type OnContextChangeProp = InputBoxProps["onContextChange"];
+
+beforeEach(() => {
   (useModels as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
     models: [
       {
         name: "m1",
         display_name: "模型一",
         model: "m1",
-        supports_thinking: supportsThinking,
+        supports_thinking: false,
       },
     ],
+    modeDefaults: {},
     tokenUsageEnabled: false,
     isLoading: false,
   });
-}
-
-async function renderInputBox(locale: Locale = "en-US") {
-  await act(async () => root.unmount());
-  root = createRoot(container);
-  document.cookie = `locale=${locale}; path=/`;
-  await act(async () => {
-    root.render(
-      <I18nProvider initialLocale={locale}>
-        <ThreadContext.Provider value={{ thread: fakeThread }}>
-          <PromptInputProvider initialInput="">
-            <InputBox
-              threadId="t1"
-              context={{ model_name: "m1", mode: "flash" }}
-            />
-          </PromptInputProvider>
-        </ThreadContext.Provider>
-      </I18nProvider>,
-    );
-  });
-}
-
-function modeTrigger(locale: Locale): HTMLButtonElement {
-  const label =
-    locale === "zh-CN" ? zhCN.inputBox.flashMode : enUS.inputBox.flashMode;
-  const buttons = Array.from(
-    document.querySelectorAll<HTMLButtonElement>("button"),
-  );
-  const trigger = buttons.find((b) => b.textContent?.includes(label));
-  if (!trigger) throw new Error("mode trigger not rendered");
-  return trigger;
-}
-
-async function openMenu(locale: Locale) {
-  await act(async () => {
-    modeTrigger(locale).dispatchEvent(
-      new MouseEvent("pointerdown", { bubbles: true }),
-    );
-    modeTrigger(locale).dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
-    await new Promise((r) => setTimeout(r, 0));
-  });
-}
-
-function menuItems(): HTMLElement[] {
-  return Array.from(
-    document.body.querySelectorAll<HTMLElement>("[role='menuitem']"),
-  );
-}
-
-beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -126,52 +62,92 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-describe("T25 thinking 开关对不支持模型的可见性", () => {
-  it("不支持 thinking 的模型：菜单项置灰并提示可切换模型（中文）", async () => {
-    mockModel(false);
-    await renderInputBox("zh-CN");
-    await openMenu("zh-CN");
-
-    const items = menuItems();
-    const thinking = items.find((el) =>
-      el.textContent?.includes(zhCN.inputBox.reasoningMode),
-    );
-    expect(thinking).toBeTruthy();
-    expect(thinking!.getAttribute("aria-disabled")).toBe("true");
-    expect(thinking!.textContent).toContain(
-      zhCN.inputBox.reasoningModeUnavailable,
+async function renderInputBox(
+  locale: Locale = "en-US",
+  onContextChange = vi.fn(),
+) {
+  document.cookie = `locale=${locale}; path=/`;
+  await act(async () => {
+    root.render(
+      <I18nProvider initialLocale={locale}>
+        <ThreadContext.Provider value={{ thread: { messages: [] } as never }}>
+          <PromptInputProvider initialInput="">
+            <InputBox
+              threadId="t1"
+              context={{ model_name: "m1", mode: "flash" }}
+              onContextChange={
+                onContextChange as unknown as OnContextChangeProp
+              }
+            />
+          </PromptInputProvider>
+        </ThreadContext.Provider>
+      </I18nProvider>,
     );
   });
+  return onContextChange;
+}
 
-  it("不支持 thinking 的模型：英文文案同样出现", async () => {
-    mockModel(false);
+async function openModeMenu(locale: Locale) {
+  const label =
+    locale === "zh-CN" ? zhCN.inputBox.flashMode : enUS.inputBox.flashMode;
+  const trigger = Array.from(
+    container.querySelectorAll<HTMLButtonElement>("button"),
+  ).find((button) => button.textContent?.includes(label));
+  expect(trigger).toBeTruthy();
+  await act(async () => {
+    trigger!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    trigger!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+function menuItems(): HTMLElement[] {
+  return Array.from(
+    document.body.querySelectorAll<HTMLElement>("[role='menuitem']"),
+  );
+}
+
+describe("models without thinking still support standard mode", () => {
+  it("shows no separate thinking mode in Chinese", async () => {
+    await renderInputBox("zh-CN");
+    await openModeMenu("zh-CN");
+
+    expect(menuItems()).toHaveLength(3);
+    expect(document.body.textContent).not.toContain("推理深度");
+    expect(
+      menuItems().some((item) => item.textContent?.includes("思考后再行动")),
+    ).toBe(false);
+  });
+
+  it("shows no separate thinking mode or effort menu in English", async () => {
     await renderInputBox("en-US");
-    await openMenu("en-US");
+    await openModeMenu("en-US");
 
-    const items = menuItems();
-    const thinking = items.find((el) =>
-      el.textContent?.includes(enUS.inputBox.reasoningMode),
-    );
-    expect(thinking).toBeTruthy();
-    expect(thinking!.getAttribute("aria-disabled")).toBe("true");
-    expect(thinking!.textContent).toContain(
-      enUS.inputBox.reasoningModeUnavailable,
-    );
+    expect(menuItems()).toHaveLength(3);
+    expect(document.body.textContent).not.toContain("Reasoning Effort");
+    expect(document.body.textContent).not.toContain("Reasoning before action");
   });
 
-  it("支持 thinking 的模型：菜单项可点、显示正常描述", async () => {
-    mockModel(true);
-    await renderInputBox("zh-CN");
-    await openMenu("zh-CN");
-
-    const items = menuItems();
-    const thinking = items.find((el) =>
-      el.textContent?.includes(zhCN.inputBox.reasoningMode),
+  it("selects standard without requiring thinking support or persisting effort", async () => {
+    const onContextChange = await renderInputBox("en-US");
+    onContextChange.mockClear();
+    await openModeMenu("en-US");
+    const standard = menuItems().find((item) =>
+      item.textContent?.includes(enUS.inputBox.standardModeDescription),
     );
-    expect(thinking).toBeTruthy();
-    expect(thinking!.getAttribute("aria-disabled")).not.toBe("true");
-    expect(thinking!.textContent).toContain(
-      zhCN.inputBox.reasoningModeDescription,
+    expect(standard).toBeTruthy();
+
+    await act(async () => {
+      standard!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      standard!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onContextChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ model_name: "m1", mode: "standard" }),
+    );
+    expect(onContextChange.mock.lastCall?.[0]).not.toHaveProperty(
+      "reasoning_effort",
     );
   });
 });
