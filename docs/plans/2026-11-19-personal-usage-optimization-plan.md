@@ -1,6 +1,6 @@
 # 个人「我的用量」优化实施计划
 
-> **状态**：未执行（实施中）；定稿日 2026-11-19；二次复核 2026-11-21；执行日 2026-11-21；基准 commit `8c78dace`（执行前已从 `b2378833` 完成漂移比较并 re-pin）；任务 7 完成后按实际执行范围更新本行并链接 changelog。
+> **状态**：未执行（实施中；任务 0–6 及任务 7 Step 1–7 本地验收完成，Step 8 PR/OCR 进行中）；定稿日 2026-11-19；二次复核 2026-11-21；执行日 2026-11-21；基准 commit `8c78dace`（执行前已从 `b2378833` 完成漂移比较并 re-pin）；changelog：[个人用量优化](../changelog/changelog-2026-11-21-personal-usage-optimization.md)。
 > **TL;DR**：按已确认的 V4 Demo，将普通用户「我的用量」重构为总费用、总 Token、7/14/30 天切换、六项筛选、任务三态与可展开模型明细；后端只读聚合现有记录，不改表、不改采集、不改计价、不新建账务架构；以未知不为 0、媒体未核算不造数、跨分页对账和角色查询隔离为验收红线。
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐任务实施；必须先完成任务 0，之后的每项遵循“失败测试 → 确认原因 → 最小实现 → 定向回归 → 提交”，不得把本计划当成允许直接改生产的授权。
 
@@ -409,10 +409,10 @@ query key = `["personal-usage", user?.id ?? "anonymous", days, capability, offse
 
 **E2E 配置约定**：专用配置可继承现有 Playwright 的 `testDir/use/projects` 等配置，但 `testMatch = "**/*.e2e.ts"`，因此默认套件不会误跑该文件。**Next webServer 的 `env` 必须整块替换，不得照抄基础 env 或指望 CLI/浅继承覆盖**：显式设置 `SKIP_ENV_VALIDATION="1"`、`DEER_FLOW_AUTH_DISABLED="0"`、`DEER_FLOW_INTERNAL_GATEWAY_BASE_URL` 指向 download-gateway；基础配置的 `DEER_FLOW_AUTH_DISABLED="1"` 不得残留。专用 lane 使用独立端口 3127/3137 和独立构建。`download-gateway.mjs` 为 `/api/v1/auth/me` 返回固定普通测试用户；测试先写 `access_token` cookie，SSR 鉴权走测试 gateway，其余 API 仍由 Playwright route mock，禁止真实数据库和付费供应商。
 
-- [ ] **Step 1：先写 Playwright 行为断言并做反向验证**。普通用户打开 `/workspace/console` 看到新页面，并显式断言 SSR 初始身份为 regular 普通用户而非 auth-disabled admin；7/14/30 切换时总费用、总 Token、任务和模型明细同步变化；筛选后总额等于该能力全部任务合计；展开两个模型可对账，总 Token 等于输入 + 输出，真实 LLM `amount` 按供应商回传与 CNY 展示且不得标为估算，打开原任务 URL 正确。暂时将 `ConsoleRolePage` 强制回退旧页面，确认新页面与零旧请求断言会失败，随后立即恢复，防止“永远为绿”的假 E2E。
-- [ ] **Step 2：补充分页、状态、键盘与响应式断言**。21 任务跨页合计不变；进行中显示截至目前；未完成消耗不为 0；未归因与已归因未计价均显示“媒体费用未核算”且不显示 0 或“未归因”；缓存缺失显示 `—`、显式 0 显示 0；Tab 可聚焦任务行，Enter/Space 可展开收起，原任务按钮可键盘触发且不冒泡；390px 与 320px 无页面级横向溢出，模型表只能在自身容器内滚动；无旧 console/定价请求。
-- [ ] **Step 3：运行专用 E2E 并修复至通过**。`cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts`。
-- [ ] **Step 4：代码冻结后串行运行全量门禁**（均后台，禁止共享可变构建目录）：
+- [x] **Step 1：先写 Playwright 行为断言并做反向验证**。普通用户打开 `/workspace/console` 看到新页面，并显式断言 SSR 初始身份为 regular 普通用户而非 auth-disabled admin；7/14/30 切换时总费用、总 Token、任务和模型明细同步变化；筛选后总额等于该能力全部任务合计；展开两个模型可对账，总 Token 等于输入 + 输出，真实 LLM `amount` 按供应商回传与 CNY 展示且不得标为估算，打开原任务 URL 正确。暂时将 `ConsoleRolePage` 强制回退旧页面，确认新页面与零旧请求断言会失败，随后立即恢复，防止“永远为绿”的假 E2E。
+- [x] **Step 2：补充分页、状态、键盘与响应式断言**。21 任务跨页合计不变；进行中显示截至目前；未完成消耗不为 0；未归因与已归因未计价均显示“媒体费用未核算”且不显示 0 或“未归因”；缓存缺失显示 `—`、显式 0 显示 0；Tab 可聚焦任务行，Enter/Space 可展开收起，原任务按钮可键盘触发且不冒泡；390px 与 320px 无页面级横向溢出，模型表只能在自身容器内滚动；无旧 console/定价请求。
+- [x] **Step 3：运行专用 E2E 并修复至通过**。`cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts`。
+- [x] **Step 4：代码冻结后串行运行全量门禁**（均后台，禁止共享可变构建目录）：
 
 ```bash
 cd backend && env -u RUN_LIVE uv run pytest tests/ -q
@@ -421,9 +421,9 @@ cd frontend && CI=1 E2E_PORT=3107 pnpm test:e2e
 cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts
 ```
 
-- [ ] **Step 5：执行一次隔离真实 API 行为验收**。用临时 SQLite 和测试身份播种六类、两用户、两周期、缺价、无模型明细及可关联媒体调用，并加入多 run 状态倒序、存储 `total_tokens` 与输入 + 输出不一致、缓存字段缺失、无 pricing 的真实 LLM `amount`、已归因未计价媒体、本人 thread 下 NULL `user_id` run 与另一非空用户污染 run 六组边界；经真实 `/api/usage` 验证 §2.1–§2.3，不调用 create、不调用任何付费 API、不读取开发或用户数据库。结果写入 changelog 的「验收记录」节。
-- [ ] **Step 6：运行最终检查**。根目录 `make check`、`python3 scripts/check_docs_convention.py`、`git diff --check` 全部通过；检查并删除测试临时产物，不删除既有或陌生文件。
-- [ ] **Step 7：更新计划勾选与状态头，编写 changelog**。必须包含实现级/行为级验收命令及实际关键输出、已知数据边界、未验证项、是否涉及 config_version（本批应为“不涉及”）。
+- [x] **Step 5：执行一次隔离真实 API 行为验收**。用临时 SQLite 和测试身份播种六类、两用户、两周期、缺价、无模型明细及可关联媒体调用，并加入多 run 状态倒序、存储 `total_tokens` 与输入 + 输出不一致、缓存字段缺失、无 pricing 的真实 LLM `amount`、已归因未计价媒体、本人 thread 下 NULL `user_id` run 与另一非空用户污染 run 六组边界；经真实 `/api/usage` 验证 §2.1–§2.3，不调用 create、不调用任何付费 API、不读取开发或用户数据库。结果写入 changelog 的「验收记录」节。
+- [x] **Step 6：运行最终检查**。根目录 `make check`、`python3 scripts/check_docs_convention.py`、`git diff --check` 全部通过；检查并删除测试临时产物，不删除既有或陌生文件。
+- [x] **Step 7：更新计划勾选与状态头，编写 changelog**。必须包含实现级/行为级验收命令及实际关键输出、已知数据边界、未验证项、是否涉及 config_version（本批应为“不涉及”）。
 - [ ] **Step 8：按仓库 PR 流程交付**。跨 backend/frontend 且超过 5 文件，直接使用任务 0 已创建且承载全部提交的 `personal-usage-optimization` 分支 + PR + OCR；全量本地门禁先于 push，无 Critical/Important 且 CI 绿后才可 rebase merge。
 
 ---

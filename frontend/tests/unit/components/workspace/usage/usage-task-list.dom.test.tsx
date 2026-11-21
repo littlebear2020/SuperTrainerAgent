@@ -88,15 +88,13 @@ describe("UsageTaskList", () => {
 
   async function key(selector: string, key: string) {
     await act(async () => {
-      container
-        .querySelector(selector)!
-        .dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key,
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
+      container.querySelector(selector)!.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     });
   }
 
