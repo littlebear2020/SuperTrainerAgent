@@ -1,6 +1,6 @@
 # 个人「我的用量」优化实施计划
 
-> **状态**：未执行（实施中；任务 0–6 及任务 7 Step 1–7 本地验收完成，Step 8 PR/OCR 进行中）；定稿日 2026-11-19；二次复核 2026-11-21；执行日 2026-11-21；基准 commit `8c78dace`（执行前已从 `b2378833` 完成漂移比较并 re-pin）；changelog：[个人用量优化](../changelog/changelog-2026-11-21-personal-usage-optimization.md)。
+> **状态**：已执行（任务 0–7 全部完成；PR #38 OCR/CI 通过并进入 rebase merge 交付）；定稿日 2026-11-19；二次复核 2026-11-21；执行日 2026-11-21；完成日 2026-11-22；基准 commit `8c78dace`（执行前已从 `b2378833` 完成漂移比较并 re-pin）；changelog：[个人用量优化](../changelog/changelog-2026-11-21-personal-usage-optimization.md)。
 > **TL;DR**：按已确认的 V4 Demo，将普通用户「我的用量」重构为总费用、总 Token、7/14/30 天切换、六项筛选、任务三态与可展开模型明细；后端只读聚合现有记录，不改表、不改采集、不改计价、不新建账务架构；以未知不为 0、媒体未核算不造数、跨分页对账和角色查询隔离为验收红线。
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans`（单执行者、单工作区）逐任务实施；必须先完成任务 0，之后的每项遵循“失败测试 → 确认原因 → 最小实现 → 定向回归 → 提交”，不得把本计划当成允许直接改生产的授权。
 
@@ -424,7 +424,7 @@ cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright tes
 - [x] **Step 5：执行一次隔离真实 API 行为验收**。用临时 SQLite 和测试身份播种六类、两用户、两周期、缺价、无模型明细及可关联媒体调用，并加入多 run 状态倒序、存储 `total_tokens` 与输入 + 输出不一致、缓存字段缺失、无 pricing 的真实 LLM `amount`、已归因未计价媒体、本人 thread 下 NULL `user_id` run 与另一非空用户污染 run 六组边界；经真实 `/api/usage` 验证 §2.1–§2.3，不调用 create、不调用任何付费 API、不读取开发或用户数据库。结果写入 changelog 的「验收记录」节。
 - [x] **Step 6：运行最终检查**。根目录 `make check`、`python3 scripts/check_docs_convention.py`、`git diff --check` 全部通过；检查并删除测试临时产物，不删除既有或陌生文件。
 - [x] **Step 7：更新计划勾选与状态头，编写 changelog**。必须包含实现级/行为级验收命令及实际关键输出、已知数据边界、未验证项、是否涉及 config_version（本批应为“不涉及”）。
-- [ ] **Step 8：按仓库 PR 流程交付**。跨 backend/frontend 且超过 5 文件，直接使用任务 0 已创建且承载全部提交的 `personal-usage-optimization` 分支 + PR + OCR；全量本地门禁先于 push，无 Critical/Important 且 CI 绿后才可 rebase merge。
+- [x] **Step 8：按仓库 PR 流程交付**。跨 backend/frontend 且超过 5 文件，直接使用任务 0 已创建且承载全部提交的 `personal-usage-optimization` 分支 + PR + OCR；全量本地门禁先于 push，无 Critical/Important 且 CI 绿后才可 rebase merge。
 
 ---
 
