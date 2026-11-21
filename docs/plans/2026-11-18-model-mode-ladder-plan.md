@@ -1,6 +1,6 @@
 # 模型模式阶梯（闪速 / 标准 / Ultra）落地计划
 
-> **状态**：已执行（2026-11-21：Task 0–5 及实现/行为验收完成；Task 6 全量后端与 PR 收尾中；[changelog](../changelog/changelog-2026-11-21-model-mode-ladder.md)）。
+> **状态**：已执行（2026-11-21：Task 0–6 本地实现与验收完成；[PR #37](https://github.com/littlebear2020/SuperTrainerAgent/pull/37) 已创建，CI 待绿；[changelog](../changelog/changelog-2026-11-21-model-mode-ladder.md)）。
 > **TL;DR**：把用户可见模式收敛为「闪速 / 标准 / Ultra」，删除「思考」档与推理深度入口；按模式限定可选模型并显式配置默认（闪速=qwen3.8-flash，标准=claude-sonnet-5-5，Ultra=qwen4-max）。思考强度由模式内部固定（闪速关、标准/Ultra 最大），Claude 保留但无思考输出；DeepSeek 保留为可选、不作默认（2026-11-20 决策）。影响面 = config schema/模型清单、factory 防泄漏、`/models` API、前端模式与模型选择；不改后端 agent 管线、部署形态与数据库。
 > **基准**：评审时 `origin/main = 35338212`；当前 `config_version: 31`，本批升到 32。模型能力依据为 2026-11-18 全量探针与压测，闪速 minimal 参数已补测。
 
@@ -219,7 +219,7 @@
 - [x] 按**实际执行日**创建 `docs/changelog/changelog-YYYY-MM-DD-model-mode-ladder.md`，包含 ≤5 行 TL;DR 和「验收记录」（命令 → 实际关键输出），不预写死日期。
 - [x] 回本计划勾选并维护唯一状态头与 changelog 链接。
 - [x] 运行并记录：`python3 scripts/check_docs_convention.py`、根 `make check`、`cd backend && uv run pytest tests/ -q`、`cd frontend && pnpm check && pnpm test`。
-- [ ] 分支 + PR；不自动合并、不部署。reliability 后续批次在本 PR 合入后 rebase，并更新其 PR1 Step 5 与测试假设。
+- [x] 分支 + PR；不自动合并、不部署（[PR #37](https://github.com/littlebear2020/SuperTrainerAgent/pull/37)）。reliability 后续批次在本 PR 合入后 rebase，并更新其 PR1 Step 5 与测试假设。
 
 ## 五、验证清单（实现级 / 行为级）
 

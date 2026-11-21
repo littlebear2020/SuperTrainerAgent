@@ -31,4 +31,5 @@
 
 - 前端、后端与 config 需同批回滚；旧前端无法显示新 `standard` 设置，回滚后需重选模式或清理 `deerflow.local-settings`。
 - 部署前仍需按风险清单做 `@360-latency` 直连 probe；本批不把定稿前真实探针冒充部署验收。
+- PR：[PR #37 模型模式阶梯](https://github.com/littlebear2020/SuperTrainerAgent/pull/37)（不自动合并）。
 - reliability 后续批次应在本 PR 合入后 rebase，并更新模型校正分支与测试假设。
