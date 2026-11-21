@@ -1,6 +1,6 @@
 # 模型模式阶梯（闪速 / 标准 / Ultra）落地计划
 
-> **状态**：已执行（2026-11-21：Task 0–6 本地实现与验收完成；[PR #37](https://github.com/littlebear2020/SuperTrainerAgent/pull/37) 已创建，CI 待绿；[changelog](../changelog/changelog-2026-11-21-model-mode-ladder.md)）。
+> **状态**：已执行（2026-11-21：Task 0–6 完成；[PR #37](https://github.com/littlebear2020/SuperTrainerAgent/pull/37) CI 全绿，不自动合并；[changelog](../changelog/changelog-2026-11-21-model-mode-ladder.md)）。
 > **TL;DR**：把用户可见模式收敛为「闪速 / 标准 / Ultra」，删除「思考」档与推理深度入口；按模式限定可选模型并显式配置默认（闪速=qwen3.8-flash，标准=claude-sonnet-5-5，Ultra=qwen4-max）。思考强度由模式内部固定（闪速关、标准/Ultra 最大），Claude 保留但无思考输出；DeepSeek 保留为可选、不作默认（2026-11-20 决策）。影响面 = config schema/模型清单、factory 防泄漏、`/models` API、前端模式与模型选择；不改后端 agent 管线、部署形态与数据库。
 > **基准**：评审时 `origin/main = 35338212`；当前 `config_version: 31`，本批升到 32。模型能力依据为 2026-11-18 全量探针与压测，闪速 minimal 参数已补测。
 

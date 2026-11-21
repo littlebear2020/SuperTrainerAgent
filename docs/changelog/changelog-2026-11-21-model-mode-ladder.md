@@ -21,6 +21,7 @@
 - Task 5 前端定向 Vitest（模式、迁移、提交矩阵及 InputBox 回归）→ `12 files passed / 63 tests passed`。
 - `pnpm typecheck` → exit 0。
 - config 探针 → `flash=qwen3.8-flash, standard=claude-sonnet-5-5, ultra=qwen4-max`；其余在册模型 `modes=[]`。
+- PR #37 功能提交 `e55325d9` 的 CI（Unit Tests run `44895224522/44895224577`、E2E run `44895224478`、Quick Checks run `44895224489`）→ backend/frontend/e2e/lint/perf/quick-checks 全 pass。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - `make check` → exit 0；Ruff、ESLint/TypeScript/Prettier、knip、i18n 与 docs convention 全过（ESLint 存量 121 warnings、0 errors）。
 - `CI=true pnpm check && CI=true pnpm test` → exit 0；`272 files passed / 1782 tests passed`。
