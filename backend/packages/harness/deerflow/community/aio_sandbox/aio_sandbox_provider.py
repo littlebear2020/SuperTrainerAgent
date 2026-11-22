@@ -96,7 +96,7 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         image: <container image>
         port: 8080                      # Base port for local containers
         container_prefix: deer-flow-sandbox
-        idle_timeout: 600               # Idle timeout in seconds (0 to disable)
+        idle_timeout: 7200              # Idle timeout in seconds (0 to disable)
         replicas: 3                     # Max concurrent sandbox containers (LRU eviction when exceeded)
         mounts:                         # Volume mounts for local containers
           - host_path: /path/on/host
