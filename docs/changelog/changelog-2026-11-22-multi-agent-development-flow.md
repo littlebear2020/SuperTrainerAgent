@@ -75,7 +75,7 @@
 
 - 实测当前 Git LFS 会在 `git archive` 时尝试 smudge/下载，行为依赖本机对象与网络。发布工具改为 `GIT_LFS_SKIP_SMUDGE=1` 强制离线指针导出，再通过 `git check-attr` 找到 LFS 路径，只用本地 size/OID 完全匹配的对象替换；不联网、不接受未物化或被修改的对象。
 - 普通文件保持原始流式复制；另修掉非对齐文件尾部读取问题，并增加未跟踪计划、重复 manifest 之外的大对象与尾部回归。
-- 侧车升级为两行“源码 SHA + tar.gz SHA-256”。pack 先使侧车失效、成功后原子写入；upload 重算摘要并随包 scp；服务器 deploy 在停服/解压前再次重算和比对，传输损坏或替换不再依赖人工发现。
+- 侧车先升级为“源码 SHA + tar.gz SHA-256”，最终再补配置标记第三行。pack 先使侧车失效、成功后原子写入；upload 重算摘要并随包 scp；服务器 deploy 在停服/解压前再次重算和比对，传输损坏或替换不再依赖人工发现。
 - manifest 字段读取统一为 `release_manifest_value`，修复帮助文案和侧车错误提示；显式配置恢复语义保持第三轮结论。
 - 完整真实 Chrome 包验证：`REAL_LFS_ARCHIVE_OK 188087520 5e35986566a4f2c4369db965df03543d6d25d0fc37d6ac2aca83ebccaabc2545`，tar 成员大小与 LFS size 一致、成员 SHA-256 与指针 OID 一致。最终复审又将 LFS 属性来源固定为 `source_sha` 对应树，新增“工作区删除属性不影响历史 ref”回归；属性与文件清单均改 NUL 分隔，中文/空格路径不再漏配，scp 逐项显式失败。
 - 第四轮及 source/特殊路径补充回归三件测试文件合计 `35 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
@@ -93,6 +93,14 @@
 - 根 config workflow pattern 改为 `/config*.yaml`，与 quick-checks 根目录语义一致；生产 pack 参数转发统一为单个可选 `--no-sandbox`。
 - `ls-tree -z` high 评论经原始输出证伪：实际形态为 `<mode> blob <sha>\t<path>\0`，metadata/path 之间仍保留 TAB，现有解析与已跟踪计划测试正确，未按误报修改。
 - 本轮相关回归三件测试文件合计 `38 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
+
+## 发布性能与信任边界（PR #39 复审）
+
+- pack 一次读取 manifest 的源码 SHA 与配置标记，侧车最终为三行“源码 SHA + tar.gz SHA-256 + 配置标记”。upload/deploy 不再读取 manifest，只校验侧车和重新计算一次包摘要，避免大缓存包重复解压。
+- deploy 同步补齐源码/摘要格式和配置标记预检；LFS 在读取前检查成员大小，argparse 排除列表默认改为 `None`，git archive 中途失败保留 stderr 根因。
+- 同信道侧车只防旧包、误用与意外损坏，不宣称防主动篡改；正式发布必须联网 fetch，离线只允许明确授权的测试打包，不以陈旧 ref 冒充正式版本。
+- 重复出现的 `ls-tree -z` high 仍由原始输出与已跟踪计划测试证伪，未修改正确实现。
+- 本轮相关回归三件测试文件合计 `40 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
 
 ## 未验证范围
 

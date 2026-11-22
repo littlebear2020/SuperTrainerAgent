@@ -239,11 +239,12 @@ def test_tracked_manifest_is_replaced_not_duplicated(tmp_path: Path) -> None:
 def test_release_sha_failures_cannot_be_hidden_by_echo() -> None:
     for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
         script = (REPO_ROOT / name).read_text(encoding="utf-8")
-        calls = [line.strip() for line in script.splitlines() if "$(release_sha" in line]
-        assert len(calls) == 3
+        calls = [line.strip() for line in script.splitlines() if "$(release_manifest_values" in line]
+        assert len(calls) == 1
         for line in calls:
             assert not line.startswith("echo")
             assert "||" in line
+        assert "$(release_sha" not in script
 
 
 def test_packaging_guards_config_warning_and_stale_upload() -> None:
@@ -259,7 +260,7 @@ def test_packaging_guards_config_warning_and_stale_upload() -> None:
         assert "ACTUAL_ARCHIVE_SHA" in script
         assert "archive_sha256" in script
         assert ref_variable in script
-        assert 'RELEASE_SHA" != "$EXPECTED_SHA' in script
+        assert 'ACTUAL_ARCHIVE_SHA" != "$EXPECTED_ARCHIVE_SHA' in script
         assert "CONFIG_FROM_ARCHIVE" in script
         assert "跳过旧配置恢复" in script
 
@@ -348,7 +349,8 @@ def test_lfs_object_mismatch_fails_without_replacing_output(tmp_path: Path) -> N
 def test_sidecar_and_server_verify_archive_digest() -> None:
     for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
         script = (REPO_ROOT / name).read_text(encoding="utf-8")
-        assert "printf '%s\\n%s\\n'" in script
+        assert "printf '%s\\n%s\\n%s\\n'" in script
+        assert "sed -n '3p'" in script
         assert "EXPECTED_ARCHIVE_SHA" in script
         assert "ACTUAL_ARCHIVE_SHA" in script
         assert 'ACTUAL_ARCHIVE_SHA" != "$EXPECTED_ARCHIVE_SHA' in script
@@ -434,3 +436,21 @@ def test_production_pack_forwards_single_optional_argument() -> None:
     script = (REPO_ROOT / "deploy_on_server.sh").read_text(encoding="utf-8")
     assert 'if [ "${1:-}" = "--no-sandbox" ]' in script
     assert 'pack "${2:-}"' in script
+
+
+def test_upload_and_deploy_use_sidecar_without_rereading_manifest() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        upload = script.split("upload() {", 1)[1].split("deploy() {", 1)[0]
+        deploy = script.split("deploy() {", 1)[1]
+        assert "release_manifest" not in upload
+        assert "release_manifest" not in deploy
+        assert "EXPECTED_CONFIG" in deploy
+        assert "printf '%s\\n%s\\n%s\\n'" in script
+
+
+def test_lfs_pointer_size_is_checked_before_reading() -> None:
+    script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
+    assert script.index("member.size > 64 * 1024") < script.index("pointer = stream.read()")
+    assert "default=None" in script
+    assert "args.exclude or []" in script

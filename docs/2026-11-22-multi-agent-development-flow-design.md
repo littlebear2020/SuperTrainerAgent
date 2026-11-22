@@ -69,7 +69,7 @@ live 报告还需单独记录部署包中的 `release-manifest.json` SHA；本�
 - `--exclude` 只接受仓库内归一化路径；输出使用临时文件后原子替换，失败不留下半包。
 - `--no-sandbox` 统一只排除 `docker/sandbox/cache/chrome-linux`，保留字体、Python wheels 与 BPE 缓存。
 
-生产和测试包装脚本保留原命令入口及产物名，默认 `--ref origin/main`；测试可用环境变量显式指定其他 ref。pack 开始时使旧 SHA 侧车失效，成功后原子写入“源码 SHA + tar.gz SHA-256”；upload 与服务器 deploy 都重算包摘要并核对侧车与 manifest，不二次解析移动 ref。上传和服务器解压后均显示发布 SHA，部署记录以该 SHA 为准。
+生产和测试包装脚本保留原命令入口及产物名，默认 `--ref origin/main`；测试可用环境变量显式指定其他 ref。pack 开始时使旧 SHA 侧车失效，成功后原子写入“源码 SHA + tar.gz SHA-256 + 配置标记”三行侧车；upload 与服务器 deploy 只读取侧车并重算包摘要，不二次解析移动 ref，也不重复解压 manifest。上传和服务器解压后均显示发布 SHA，部署记录以该 SHA 为准。
 
 ### 3.3 部署前检查 `scripts/pre_deploy_check.py`
 
@@ -91,7 +91,7 @@ live 报告还需单独记录部署包中的 `release-manifest.json` SHA；本�
 
 ## 4. 错误处理与兼容
 
-- 网络不可用时允许基于已有本地 `origin/main` 开发；发布前必须重新解析并核对远端，核对失败则不得正式发布。
+- 网络不可用时允许基于已有本地 `origin/main` 开发；发布前必须重新解析并核对远端，核对失败则不得正式发布。侧车与包同信道只防旧包和意外损坏，不宣称防主动篡改。
 - 老服务器首次部署若没有配置备份，必须使用显式本地配置选项；常规升级默认不带本地秘密配置。manifest 标记显式包含本地配置时，deploy 跳过旧配置恢复，防止新配置被备份覆盖；本地与服务器发布包/侧车均为 0600，显式包含配置的包在成功部署后删除。
 - 现有 `pack/upload/deploy` 命令和 tar 产物名不变，降低迁移成本。
 - 未验证例外允许合入和测试部署，但正式部署被阻断，直到对应 backlog 项带验证证据勾选关闭。

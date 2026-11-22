@@ -121,6 +121,8 @@ def _add_source_member(root: Path, member: tarfile.TarInfo, source: tarfile.TarF
     if member.name not in lfs_paths:
         target.addfile(member, stream)
         return
+    if member.size > 64 * 1024:
+        raise ArchiveError(f"LFS 指针异常过大：{member.name}")
     pointer = stream.read()
     if not pointer.startswith(LFS_POINTER_PREFIX):
         raise ArchiveError(f"LFS 文件未以指针形式导出：{member.name}")
@@ -235,11 +237,16 @@ def build_archive(
         if returncode != 0:
             raise ArchiveError(f"git archive 失败：{stderr or returncode}")
         os.replace(temporary, output)
-    except Exception:
+    except Exception as exc:
         if process is not None and process.poll() is None:
             process.kill()
             process.wait()
         temporary.unlink(missing_ok=True)
+        if stderr_file is not None:
+            stderr_file.seek(0)
+            detail = stderr_file.read().decode(errors="replace").strip()
+            if detail:
+                raise ArchiveError(f"git archive 失败：{detail}") from exc
         raise
     finally:
         if stderr_file is not None:
@@ -254,7 +261,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--allow-unmerged", action="store_true")
     parser.add_argument("--include-local-config", action="store_true")
-    parser.add_argument("--exclude", action="append", default=[])
+    parser.add_argument("--exclude", action="append", default=None)
     return parser
 
 
@@ -268,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             base_ref=args.base_ref,
             allow_unmerged=args.allow_unmerged,
             include_local_config=args.include_local_config,
-            excludes=args.exclude,
+            excludes=args.exclude or [],
         )
     except (ArchiveError, OSError, ValueError, tarfile.TarError) as exc:
         print(f"release_archive: {exc}", file=sys.stderr)
