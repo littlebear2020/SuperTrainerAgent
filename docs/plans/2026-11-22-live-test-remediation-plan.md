@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛实施计划
 
-> **状态**：未执行（2026-11-22 定稿；同日按 Cursor 复核修订：P12 整项退出，合并固定为四个主 PR，P6/P7 未取证不开 PR；不授权自动部署、付费调用或修改服务器配置）。
+> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1→2→3→4 串行，P6/P7 未取证不开 PR；PR 3 改为同一 PR 四笔本地提交；changelog 将登记为 `docs/changelog/changelog-2026-11-22-live-test-remediation.md`；不授权自动部署、付费调用或修改服务器配置）。
 > **TL;DR**：四个主 PR 分别修复停止清草稿、播客 URL 抓取、字节 TTS 单通道，以及默认徽标、用量标题、合成文案和 live 断言；P12、Writer、P4、P8、P15 退出。P6/P7 证据不足则记录阻塞且不开 PR；不自动部署，不修改服务器配置。
 
 > **For agentic workers：** 使用 `executing-plans`，单执行者按 Task 0→7 串行执行并逐项勾选；每项先写失败测试、确认功能原因失败、最小实现、定向回归，再提交。主批只允许本计划定义的四个 PR，P6/P7 各自取证后才能另开独立 PR；不在当前分叉工作区直接实施。
@@ -29,7 +29,7 @@
 | D4 | 标准档默认仍是 2026-11-20 修订的 **Claude Sonnet**；闪速默认 Qwen Flash，Ultra 默认 Qwen4 Max。DeepSeek 仅手动可选，原核实清单“DeepSeek/Qwen4 Max 出现默认徽标才算修复”的判定作废。 |
 | D5 | 在线配音只保留字节直连与既有声音克隆；新建入口只保留共享目录现有的 **4 个 `zh-CN` 豆包音色**，不再用 Edge 为英、日、韩、法、西、德补位。 |
 | D6 | 主批固定为 PR 1=P1、PR 2=P11、PR 3=Task 3+4、PR 4=P5/P9/P10/P13；禁止收成一个 PR。P6/P7 未取证不创建 PR。 |
-| D7 | PR 3 是同批运行、依赖、配置和镜像切换，必须同一个 PR 以便整体回滚；只拆三笔主题提交，不掺其他问题。 |
+| D7 | PR 3 是同批运行、依赖、配置和镜像切换，必须同一个 PR 以便整体回滚；只拆四笔主题提交，不掺其他问题。 |
 | D8 | 服务器 L1/L2 不是 GitHub CI，也不是主 PR 合并门禁；合并看对应单元测试、mock E2E 和 CI，L1/L2 只放部署验收。 |
 | D9 | PR 4 不改 `config.example.yaml` 或真实 config；前端展示时剥离 `display_name` 末尾手写“默认”，再按 `mode_defaults` 画唯一徽标。 |
 | D10 | PPT Master 的其他后端仍复用 `backend_edge` 字幕函数；先迁移共用函数到中性模块，再删除 Edge 合成、分发和依赖，不能整文件直接删除。 |
@@ -70,22 +70,22 @@
 |---|---|---|---|
 | **PR 1 / P1** | `frontend/src/components/workspace/input-box.tsx`；对应新增/既有 InputBox 测试 | registry UI/AI Elements、其他产品文件、P5 | 定向测试 + 相关 InputBox 回归 + 对应 CI 一轮通过；独立合并。 |
 | **PR 2 / P11** | `skills/public/podcast-studio/**`、`backend/tests/test_podcast_studio_ingest.py`、必要的对应部署文档 | 其他技能、关闭任何安全校验 | 安全测试随 PR 提交；`skills/` 核心路径必须 OCR；CI 无 Critical/Important。 |
-| **PR 3 / Task 3+4** | 点名的 backend voice_twin/video_gen/shared voice catalog、相关 routers/config/tests、音色相关 frontend、`skills/**` 的 Edge/360 TTS 引用、`docker/sandbox/Dockerfile`、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 AGENTS/常青 docs | 360 非 TTS 能力、Writer、P1/P5/P6/P7/P13、Remotion 模板、无关 provider 包裹链、真实配置与密钥 | **唯一大 PR，同一 PR 整体回滚**；三笔主题提交；预计 1–2 轮 OCR，范围不得随评审扩大。 |
+| **PR 3 / Task 3+4** | 点名的 backend voice_twin/video_gen/shared voice catalog、相关 routers/config/tests、音色相关 frontend、`skills/**` 的 Edge/360 TTS 引用、`docker/sandbox/Dockerfile`、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 AGENTS/常青 docs | 360 非 TTS 能力、Writer、P1/P5/P6/P7/P13、Remotion 模板、无关 provider 包裹链、真实配置与密钥 | **唯一大 PR，同一 PR 整体回滚**；四笔本地提交全部验证后一次性 push；预计 1–2 轮 OCR，范围不得随评审扩大。 |
 | **PR 4 / P5/P9/P10/P13** | `input-box.tsx`、`core/models/**`、personal_usage 的 agent/video/types 与 usage 前端、video status label、live tests/runbook、对应测试 | **PR 1 合入前不得开始**；P12、Writer、`settings/account-settings-page.tsx`、`app/(auth)/login/page.tsx`、`config.example.yaml`、真实 config | 对应单元测试、mock E2E、CI 通过；不含服务器 L1/L2 门禁。 |
 | **P6/P7 条件 PR** | 证据确认后分别点名最小实现与测试文件 | 未取证改实现、整体重写虚拟列表、无关中间件/provider 改动 | 各自根因/复现证据先行；证据不足不开 PR，只更新本计划阻塞状态。 |
 
-PR 3 三笔提交固定为：①目录和统一入口拒绝非字节音色；②调用方移除降级并清理技能/依赖/配置/镜像；③前端音色目录和旧值停用态。三笔可在本地逐笔验收，但只能作为一个 PR 评审和合入。
+PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色；②调用方去降级；③技能、依赖、配置和镜像清理；④前端停用态。四笔均在本地逐笔验收，全部验证后一次性 push，只能作为一个 PR 评审和合入。
 
 ## 四、实施任务
 
 ### Task 0：冻结基线与 P6/P7 取证
 
-- [ ] 确认最新 `origin/main`、工作区状态和漂移面；从最新 main 建分支，不带入其他未提交文件。
-- [ ] P6 收集目标线程脱敏 run 记录：`run_id/status/error/stop_reason/on_disconnect`、最后事件/工具调用、checkpoint/goal 状态和 gateway/沙箱日志；不得只凭“未完成”推断根因。
-- [ ] 核对实际前端 `streamResumable=true` 时 SDK 默认 `on_disconnect=continue`，不把后端默认 `cancel` 误当实际请求。
-- [ ] P6 写明终止组件、直接原因、现场是否可免费恢复、最小修复面；若不能免费恢复且无新付费授权，记录“外部阻塞、未重跑、未开 PR”并停止该任务。
-- [ ] P7 先建立真实浏览器复现证据：至少 60 个不同高度消息组、大量 Token 行、历史 prepend，记录首可见 key、scrollTop、scrollHeight 与已加载 run 数；未稳定复现则记录“证据不足、未开 PR”。
-- [ ] 复核 `/api/models` 的默认配置；服务器若将 DeepSeek 配成标准默认，只登记配置漂移，PR 4 仍按 Claude Sonnet 编写测试。
+- [x] 确认最新 `origin/main=f60a431b`、干净工作区和 docs-only 漂移面；已从最新 main 建隔离分支，未带入其他未提交文件。
+- [x] P6 已核查并登记可用脱敏材料：目标 run 的 `run_id/status/error/stop_reason`、最后事件/工具调用、checkpoint/goal 与 gateway/沙箱日志均未保留，未只凭“未完成”推断根因；见 `temp/live-test-remediation-20261122/p6-evidence.md`。
+- [x] 已从实际前端 `streamResumable=true` 与锁定 SDK 源码核对默认 `on_disconnect=continue`，未把后端默认 `cancel` 误当实际请求。
+- [x] P6 终止组件、直接原因、免费恢复条件与最小修复面均无法由现有现场确定；按 D13 记录“外部阻塞、未重跑、未开 PR”并停止该任务。
+- [x] P7 已复核真实浏览器历史截图与报告，但缺少至少 60 个不同高度消息组、大量 Token 行、历史 prepend 的可重放现场及首可见 key、scrollTop、scrollHeight、已加载 run 数序列；未稳定复现，记录“证据不足、未开 PR”，见 `temp/live-test-remediation-20261122/p7-evidence.md`。
+- [x] 已核对示例 `/api/models` 默认配置来源：standard=Claude Sonnet；原服务器 DeepSeek 选中截图不足以证明当前默认值，仅登记可能漂移，PR 4 仍按 Claude Sonnet 编写测试。
 
 ### Task 1 / PR 1：停止生成保留草稿（P1）
 
@@ -120,13 +120,13 @@ PR 3 三笔提交固定为：①目录和统一入口拒绝非字节音色；②
 
 **Files：** shared voice catalog、voice_twin service/production/config/schema、video_gen orchestration 与实际消费方、音色相关前端和测试；只改完成单通道所需文件。
 
-- [ ] 第一笔提交先写目录/入口失败测试：两个音色 API 和新建 UI 只剩上述 4 条；`preset:*`、`edge:*` 和裸 Edge ShortName 在任何网络调用前得到可读错误。
+- [ ] 第一笔提交先写目录/入口失败测试：两个音色 API 只剩上述 4 条；`preset:*`、`edge:*` 和裸 Edge ShortName 在任何网络调用前得到可读错误。
 - [ ] 在 shared catalog 与统一 `synthesize()` 实施拒绝，保留 `doubao:*`、既有克隆、字节重试、字级时间戳、情绪、section_id、缓存和 SRT 行为。
-- [ ] 第二笔提交移除 doubao→qihu→edge、qihu→edge 和仅为旧降级存在的策略；字节 429/5xx/传输错误重试耗尽后失败，不换声、不伪装降级成功。
+- [ ] 第二笔提交只移除实际调用方的 doubao→qihu→edge、qihu→edge 和仅为旧降级存在的策略；字节 429/5xx/传输错误重试耗尽后失败，不换声、不伪装降级成功。
 - [ ] 克隆上传、训练、试听、合成保持现状，克隆失败仍不降级。
 - [ ] 默认音色只从上述目录选择；英、日、韩、法、西、德不再保留 Edge 默认或新建入口。未获付费授权只记 `LIVE_NOT_VERIFIED`，不因此清空中文入口或新开语言。
 - [ ] 历史音频和用量不迁移；旧任务含退役音色时，试听、重配、重生或重渲在提交前提示“原音色已停用，请改选字节直连音色”。
-- [ ] 第三笔提交清理前端 provider 类型、分组、筛选和残留值禁用态；旧任务仍可见原值与停用原因，不能自动变成另一音色。
+- [ ] 第四笔提交在 Task 4 的第三笔清理通过后进行：先写前端失败测试，再清理 provider 类型、分组、筛选和残留值禁用态；新建 UI 只剩上述 4 条，旧任务仍可见原值与停用原因，不能自动变成另一音色。
 - [ ] 运行相关 backend/frontend 测试和 mock E2E，证明 360 LLM/生图/视频无行为 diff。
 
 ### Task 4 / PR 3-B：技能、依赖、配置和镜像清理（与 Task 3 同一 PR）
@@ -141,7 +141,7 @@ PR 3 三笔提交固定为：①目录和统一入口拒绝非字节音色；②
 - [ ] 基准 `config_version=32`。仅当真正删除 `qihu_tts`/`edge_tts` 配置结构时同步示例并升到 33；若只删注释/死配置引用则不升。
 - [ ] 部署配置按字段合并，不比较服务器与示例的版本号大小，不自动覆盖真实 config。
 - [ ] 更新 `backend/AGENTS.md` 为“字节直连，失败响亮；克隆不降级”，同步其他现行注释；历史文档不改。
-- [ ] 重建本地 sandbox 镜像，证明 Edge 包已移除且字节脚本/FFmpeg 可用；Task 3+4 最终只开 PR 3，三笔提交整体 OCR、CI 和合入。
+- [ ] 第三笔提交完成上述清理并重建本地 sandbox 镜像，证明 Edge 包已移除且字节脚本/FFmpeg 可用；随后完成 Task 3 的第四笔前端提交，Task 3+4 全部验证后一次性 push，只开 PR 3，四笔提交整体 OCR、CI 和合入。
 
 ### Task 5 / PR 4：P5、P9、P10、P13（PR 1 合入后开始）
 
