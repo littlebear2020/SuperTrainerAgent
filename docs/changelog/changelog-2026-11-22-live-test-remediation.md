@@ -6,7 +6,8 @@
 
 - P1（PR #40，已合入）：InputBox 在表单捕获阶段拦截 streaming 停止，保留文本、附件与 localStorage 草稿；正常发送仍清空。
 - P11（PR #41，已合入）：播客 URL 读取在连接 socket 已分离时使用 `response.fp.raw._sock` 设置剩余超时；EOF 安全结束，开放响应缺 socket 时响亮失败，安全链不变。
-- P3（PR 3 本地四提交已齐，待整体评审）：目录/API 只保留 4 个中文字节音色；统一入口在任何网络调用前拒绝 preset/Edge/裸 Edge ShortName；调用方不降级换声，前端旧值保留但停用。
+- P3（PR #42，已合入）：目录/API 只保留 4 个中文字节音色；统一入口在任何网络调用前拒绝 preset/Edge/裸 Edge ShortName 与白名单外 Doubao；调用方不降级换声，前端旧值保留但停用。
+- Doubao 直连 hotfix（独立 PR）：`VoiceCloneService` 目录音色直连 DoubaoTTSClient，不再误查克隆仓库；voice-twin 目录 API 与共享白名单一致。
 - P3 清理：PPT Master 共用字幕算法迁至 `subtitle_timing.py`，CosyVoice/ElevenLabs/MiniMax import 回归通过；Edge/360 客户端、依赖、配置结构与 sandbox 安装项移除；`config.example.yaml` 升至 33，真实 config 未触碰。
 - Task 0：确认实现代码相对计划基准无漂移；P6/P7 证据材料位于 `temp/live-test-remediation-20261122/`，均不满足条件 PR 门禁。
 - PR 3 已按最新决策固定为四笔本地提交、全部验证后一次性 push、同一 PR 合入与回滚。
@@ -45,6 +46,7 @@
 - PR #42 首轮 GitHub CI 全绿；GitHub OCR 8 findings，其中角色池 import 固化为 medium，已改为调用时惰性计算并补 RED→GREEN；该修复本地 OCR → 0 findings。
 - PR #42 第二轮 GitHub CI 全绿；OCR 后续发现已收敛为空默认渲染前拒绝、池空保留默认回退但明确告警、单口播不误判、无效 speaker 告警及前端命名/默认 ID 复用；最终本地 OCR → 0 findings。
 - PR #42 最终轮高危项：共享入口现拒绝目录/白名单外 Doubao 与空 ID，正向测试夹具使用目录内真实 ID；PPT 失效 CLI 参数文档已同步，修复 diff 本地 OCR → 0 findings。
+- Doubao 直连 hotfix RED → 目录音色误查克隆 repo、目录 API 白名单不一致；GREEN → 相关 260 passed，全量 10174 passed / 91 skipped，根 `make check` 与本地 OCR 0 findings。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
 ## 阻塞与未执行

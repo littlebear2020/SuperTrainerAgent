@@ -280,3 +280,28 @@ def test_retired_tts_config_is_removed_and_default_is_catalog_doubao():
     video_config = VideoGenConfig()
     assert video_config.tts_voice == DOUBAO_VOICE_IDS[0]
     assert not hasattr(video_config, "tts_fallback_voice")
+
+
+@pytest.mark.asyncio
+async def test_clone_service_routes_catalog_doubao_directly_before_repo(tmp_path):
+    service = object.__new__(VoiceCloneService)
+    service.doubao_client = SimpleNamespace(synthesize_sse=AsyncMock(return_value=b"mp3"))
+    service.repo = SimpleNamespace(get_by_id=AsyncMock(return_value=None))
+    service._write_synth_output = AsyncMock(return_value="output.mp3")
+
+    result = await service.synthesize(DOUBAO_VOICE_IDS[0], "目录音色直连")
+
+    assert result == "output.mp3"
+    service.repo.get_by_id.assert_not_awaited()
+    assert service.doubao_client.synthesize_sse.await_args.kwargs["speaker"] == "zh_female_vv_uranus_bigtts"
+
+
+@pytest.mark.asyncio
+async def test_voice_twin_catalog_uses_same_doubao_whitelist(monkeypatch):
+    from app.gateway.routers.voice_twin import list_preset_voices
+
+    monkeypatch.setenv("DOUBAO_TTS_ENABLED_SPEAKERS", "zh_female_vv_uranus_bigtts")
+    service = SimpleNamespace(doubao_client=MagicMock())
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(voice_clone_service=service)))
+    voices = await list_preset_voices(request)
+    assert [voice["id"] for voice in voices] == [DOUBAO_VOICE_IDS[0]]

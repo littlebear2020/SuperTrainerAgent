@@ -105,8 +105,10 @@ async def list_preset_voices(request: Request):
         return []
 
     from app.gateway._shared.voice_catalog import CURATED_VOICES
+    from app.gateway.video_gen.orchestration.voices import visible_doubao_voice_ids
 
-    return [voice.model_dump() for voice in CURATED_VOICES]
+    visible = set(visible_doubao_voice_ids())
+    return [voice.model_dump() for voice in CURATED_VOICES if voice.id in visible]
 
 
 @router.get("/{voice_id}/status", response_model=VoiceTwinStatusResponse)

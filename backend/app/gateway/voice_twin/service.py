@@ -495,6 +495,22 @@ class VoiceCloneService:
         from app.gateway._shared.voice_catalog import ensure_voice_id_supported
 
         ensure_voice_id_supported(voice_id)
+        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, parse_doubao_voice_id
+
+        if is_doubao_voice_id(voice_id):
+            if self.doubao_client is None:
+                raise RuntimeError("doubao TTS service not configured")
+            audio_bytes = await call_with_tts_retry(
+                lambda: self.doubao_client.synthesize_sse(
+                    speaker=parse_doubao_voice_id(voice_id),
+                    text=text,
+                    output_format=output_format,
+                    speed_ratio=speed_ratio,
+                ),
+                label="doubao synthesize",
+            )
+            return await self._write_synth_output(audio_bytes, output_format)
+
         if self.repo is None:
             raise RuntimeError("Repository not initialized")
 
