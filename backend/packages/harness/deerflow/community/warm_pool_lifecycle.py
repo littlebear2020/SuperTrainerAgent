@@ -9,7 +9,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_IDLE_TIMEOUT = 600
+DEFAULT_IDLE_TIMEOUT = 7200
 DEFAULT_REPLICAS = 3
 IDLE_CHECK_INTERVAL = 60
 

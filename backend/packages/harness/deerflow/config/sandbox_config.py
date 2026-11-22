@@ -22,7 +22,7 @@ class SandboxConfig(BaseModel):
         port: Base port for sandbox containers (default: 8080)
         replicas: Maximum number of concurrent sandbox containers (default: 3). When the limit is reached the least-recently-used sandbox is evicted to make room.
         container_prefix: Prefix for container names (default: deer-flow-sandbox)
-        idle_timeout: Idle timeout in seconds before sandbox is released (default: 600 = 10 minutes). Set to 0 to disable.
+        idle_timeout: Idle timeout in seconds before sandbox is released (default: 7200 = 2 hours). Set to 0 to disable.
         mounts: List of volume mounts to share directories with the container
         environment: Environment variables to inject into the container (values starting with $ are resolved from host env)
         mem_limit: Container memory limit, e.g. '6g' (default 3g; env SANDBOX_MEM_LIMIT overrides; empty env disables; restart required)
@@ -55,7 +55,7 @@ class SandboxConfig(BaseModel):
     )
     idle_timeout: int | None = Field(
         default=None,
-        description="Idle timeout in seconds before sandbox is released (default: 600 = 10 minutes). Set to 0 to disable.",
+        description="Idle timeout in seconds before sandbox is released (default: 7200 = 2 hours). Set to 0 to disable.",
     )
     mounts: list[VolumeMountConfig] = Field(
         default_factory=list,
