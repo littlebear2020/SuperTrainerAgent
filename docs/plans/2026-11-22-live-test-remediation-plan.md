@@ -91,11 +91,11 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 
 **Files：** 仅 `frontend/src/components/workspace/input-box.tsx` 与对应测试；禁止修改 `prompt-input.tsx`。
 
-- [ ] 写失败测试：streaming 时输入草稿并添加 mock 附件，分别通过停止按钮和 Enter 触发；两者均 `onStop` 一次、`onSubmit` 零次，文本与附件不变，超过 400ms 后 localStorage 草稿仍在。
-- [ ] 保留非 streaming 正常发送仍清空文本/附件的对照；运行并确认旧实现因停止后清空而失败。
-- [ ] 在 InputBox 外层使用 `onSubmitCapture` 拦截 streaming 时的表单 submit：调用 `onStop`，执行 `preventDefault` 并阻止事件继续传播，确保按钮和 Enter 都不能进入 PromptInput 的 `clear()`。
-- [ ] 只有捕获测试证明两条路径均被拦截后，才移除旧 `handleSubmit` 中会形成 resolved Promise 的停止分支；禁止抛异常冒充停止，禁止无拦截直接删除早退。
-- [ ] 跑新测试、相关 InputBox 回归和 `pnpm check`；行为验收为“长回复期间边等边写，停止后文字与附件仍在”。
+- [x] 写失败测试：streaming 时输入草稿并添加 mock 附件，分别通过停止按钮和 Enter 触发；两者均 `onStop` 一次、`onSubmit` 零次，文本与附件不变，超过 400ms 后 localStorage 草稿仍在。
+- [x] 保留非 streaming 正常发送仍清空文本/附件的对照；已确认旧实现两条停止路径均因清空文本而 RED、对照 GREEN。
+- [x] 在 InputBox 外层使用 `onSubmitCapture` 拦截 streaming 时的表单 submit：调用 `onStop`，执行 `preventDefault` 并阻止事件继续传播，确保按钮和 Enter 都不能进入 PromptInput 的 `clear()`。
+- [x] 捕获测试已证明两条路径均被拦截后才移除旧 `handleSubmit` 停止分支；未抛异常冒充停止，删除后定向回归仍绿。
+- [x] 新测试、8 个 InputBox 文件 33 条回归、`pnpm check` 与全量 `pnpm test`（280 files / 1809 tests）均通过；行为验收覆盖“长回复期间边等边写，停止后文字与附件仍在”。
 - [ ] 提交 `fix(chat): 停止生成时保留用户草稿`，只开 PR 1，一轮 CI 通过后合入。
 
 ### Task 2 / PR 2：播客 URL 抓取（P11）
