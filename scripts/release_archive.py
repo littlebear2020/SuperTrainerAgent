@@ -59,12 +59,12 @@ def _is_excluded(path: str, excludes: Sequence[str]) -> bool:
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 
-def _lfs_paths(root: Path) -> set[str]:
-    tracked = _git(root, "ls-files")
+def _lfs_paths(root: Path, source_sha: str) -> set[str]:
+    tracked = _git(root, "ls-tree", "-r", "--name-only", source_sha)
     if tracked.returncode != 0:
         raise ArchiveError(f"读取 Git 文件清单失败：{tracked.stderr.strip()}")
     result = subprocess.run(
-        ["git", "check-attr", "--stdin", "filter"],
+        ["git", "check-attr", f"--source={source_sha}", "--stdin", "filter"],
         cwd=root,
         input=tracked.stdout,
         capture_output=True,
@@ -190,7 +190,7 @@ def build_archive(
         "includes_local_config": include_local_config,
         "config_files": [name for name, _ in configs],
     }
-    lfs_paths = _lfs_paths(root)
+    lfs_paths = _lfs_paths(root, source_sha)
     fd, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", suffix=".tmp", dir=output_parent)
     os.close(fd)
     temporary = Path(temporary_name)

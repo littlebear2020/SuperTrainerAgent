@@ -1,6 +1,6 @@
 # 单人多 Agent 研发流程优化 Implementation Plan
 
-> **状态**：已执行（2026-11-22：Task 1–4 完成；[PR #39](https://github.com/littlebear2020/SuperTrainerAgent/pull/39) CI 全绿、OCR 无 Critical/Important/medium，3 条 low deferred，符合 rebase merge 条件）；定稿日 2026-11-22；基准 `0e84b148`；[changelog](../changelog/changelog-2026-11-22-multi-agent-development-flow.md)。
+> **状态**：未执行（实施中；Task 1–4 实现完成，Step 6 最终 source 属性修复复审中）；定稿日 2026-11-22；基准 `0e84b148`；[changelog](../changelog/changelog-2026-11-22-multi-agent-development-flow.md)。
 > **TL;DR**：新增会话基线与不可变发布工具，改造部署前检查以阻断 `release-blocker`，并补齐研发基座 CI 路径；保留单负责人和现有 PR + OCR，不部署、不跑付费测试。
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans` 在本工作区逐任务实施；每项先 RED 后 GREEN，不得修改其他 worktree 或未提交文件。
 
@@ -111,4 +111,4 @@
 - [x] **Step 3：运行相关测试和格式检查。** `cd backend && uv run pytest tests/test_agent_context.py tests/test_release_archive.py tests/test_pre_deploy_check.py -q`、`git diff --check`、`python3 scripts/check_docs_convention.py`。
 - [x] **Step 4：运行交付门禁。** `cd backend && make test`、根 `make check`；记录真实关键输出，不运行部署或 live 付费测试。
 - [x] **Step 5：更新计划勾选与 changelog。** 包含设计决策、发布兼容变化、两条现存 release-blocker、验收记录和未验证边界。
-- [x] **Step 6：自审 diff 后按核心路径流程交付。** 核对远端 main，必要时 rebase 并重跑相关门禁；push、PR + OCR，CI 无红且无 Critical/Important 后才 rebase merge。
+- [ ] **Step 6：自审 diff 后按核心路径流程交付。** 核对远端 main，必要时 rebase 并重跑相关门禁；push、PR + OCR，CI 无红且无 Critical/Important 后才 rebase merge。

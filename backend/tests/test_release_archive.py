@@ -370,3 +370,20 @@ def test_non_lfs_file_with_unaligned_tail_streams_exactly(tmp_path: Path) -> Non
         member = bundle.extractfile("unaligned.txt")
         assert member is not None
         assert member.read() == payload
+
+
+def test_lfs_attributes_are_read_from_source_commit_not_worktree(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    payload = b"source LFS object" * 100
+    add_lfs_pointer(repo, payload)
+    (repo / "binary.dat").write_bytes(payload)
+    (repo / ".gitattributes").write_text("", encoding="utf-8")
+    output = tmp_path / "release.tar.gz"
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(output, "r:gz") as bundle:
+        member = bundle.extractfile("binary.dat")
+        assert member is not None
+        assert member.read() == payload

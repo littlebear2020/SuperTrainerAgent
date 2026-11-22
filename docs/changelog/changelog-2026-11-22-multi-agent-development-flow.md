@@ -1,6 +1,6 @@
 # 单人多 Agent 研发流程优化
 
-> **状态**：实施与验收完成；[PR #39](https://github.com/littlebear2020/SuperTrainerAgent/pull/39) CI 全绿、OCR 无 Critical/Important/medium，3 条 low deferred，符合 rebase merge 条件；未部署、未运行付费 live。
+> **状态**：实现与本地验收完成；[PR #39](https://github.com/littlebear2020/SuperTrainerAgent/pull/39) 最终 source 属性修复 CI/OCR 复审中；未部署、未运行付费 live。
 > **TL;DR**：新增 Agent 会话基线与不可变 Git 发布包；其他 Agent 在途工作改为提示，未验收 `[release-blocker]` 阻断正式发布；补齐研发基座 CI 路径和 PR/live 三项版本证据。影响面 = 研发约定、CI、打包与部署前检查，不改产品运行代码、不改 config_version。
 
 ## 1. 完成内容
@@ -77,8 +77,8 @@
 - 普通文件保持原始流式复制；另修掉非对齐文件尾部读取问题，并增加未跟踪计划、重复 manifest 之外的大对象与尾部回归。
 - 侧车升级为两行“源码 SHA + tar.gz SHA-256”。pack 先使侧车失效、成功后原子写入；upload 重算摘要并随包 scp；服务器 deploy 在停服/解压前再次重算和比对，传输损坏或替换不再依赖人工发现。
 - manifest 字段读取统一为 `release_manifest_value`，修复帮助文案和侧车错误提示；显式配置恢复语义保持第三轮结论。
-- 完整真实 Chrome 包验证：`REAL_LFS_ARCHIVE_OK 188087520 5e35986566a4f2c4369db965df03543d6d25d0fc37d6ac2aca83ebccaabc2545`，tar 成员大小与 LFS size 一致、成员 SHA-256 与指针 OID 一致。
-- 第四轮相关回归三件测试文件合计 `32 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
+- 完整真实 Chrome 包验证：`REAL_LFS_ARCHIVE_OK 188087520 5e35986566a4f2c4369db965df03543d6d25d0fc37d6ac2aca83ebccaabc2545`，tar 成员大小与 LFS size 一致、成员 SHA-256 与指针 OID 一致。最终复审又将 LFS 属性来源固定为 `source_sha` 对应树，新增“工作区删除属性不影响历史 ref”回归。
+- 第四轮及 source 属性补充回归三件测试文件合计 `33 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
 
 ## PR #39 最终评审与 deferred minors
 
