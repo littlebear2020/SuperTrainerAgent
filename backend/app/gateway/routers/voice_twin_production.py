@@ -186,7 +186,8 @@ async def submit_script_to_audio(request: Request, body: ScriptToAudioRequest):
 
 
 async def _verify_voice(svc: ProductionService, voice_id: str, user_id: str):
-    """Common voice validation for both cloned and preset voices."""
+    """Common voice validation for cloned and catalog voices."""
+    from app.gateway._shared.voice_catalog import ensure_voice_id_supported
     from app.gateway.voice_twin.preset_voices import (
         get_preset_voice_name,
         is_doubao_voice_id,
@@ -196,6 +197,11 @@ async def _verify_voice(svc: ProductionService, voice_id: str, user_id: str):
         parse_edge_voice_id,
         parse_preset_voice_id,
     )
+
+    try:
+        ensure_voice_id_supported(voice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     if is_preset_voice_id(voice_id):
         name = get_preset_voice_name(voice_id) or f"360 预设音色 {parse_preset_voice_id(voice_id)}"

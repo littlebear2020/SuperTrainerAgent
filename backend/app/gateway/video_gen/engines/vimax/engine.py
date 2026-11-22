@@ -324,6 +324,9 @@ class VimaxEngine:
         # preset→豆包对照表，静默换声比失败更糟），文案给改选指引。doubao/Edge/clone
         # 放行；shared synthesize 的 reject 分支是同语义的第二道防线。
         ensure_vimax_voice_allowed(ctx.voice_id)
+        resolved_voice = ctx.voice_id or resolve_vimax_default_voice(str(request.get("lang") or "zh"))
+        if not resolved_voice:
+            raise ValueError(f"no supported default voice for lang '{request.get('lang') or 'zh'}'")
 
         working_dir = ctx.task_dir / "vimax_working"
         working_dir.mkdir(parents=True, exist_ok=True)
@@ -482,10 +485,7 @@ class VimaxEngine:
                         task_dir=ctx.task_dir,
                         original_script=request.get("script", ""),
                         llm=narration_llm,
-                        # Plan B（2026-10-19）：voice_id 为空时按 request lang 走 ViMax
-                        # 默认解析（D5 顺序：env speaker > 白名单首项 > Edge 语言默认），
-                        # 不再落 preset:146 残余兜底。
-                        voice_id=ctx.voice_id or resolve_vimax_default_voice(str(request.get("lang") or "zh")),
+                        voice_id=resolved_voice,
                         characters=characters,
                         # T7b（2026-10-14）：优先读 service 层三级解析结果（任务显式 >
                         # 项目 > config 缺省）——修前只读原始 payload，项目级 tts_speed

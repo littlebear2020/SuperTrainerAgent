@@ -921,16 +921,11 @@ def _visible_doubao_voice_ids() -> set[str]:
     """
     import os
 
-    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES
+    from app.gateway.video_gen.orchestration.voices import visible_doubao_voice_ids
 
     if not os.environ.get("VOLCENGINE_VOICE_ACCESS_KEY"):
         return set()
-    all_doubao = {v["id"] for v in CURATED_VOICES if v.get("provider") == "doubao"}
-    whitelist = os.environ.get("DOUBAO_TTS_ENABLED_SPEAKERS", "").strip()
-    if not whitelist:
-        return all_doubao
-    enabled = {s.strip() for s in whitelist.split(",") if s.strip()}
-    return {vid for vid in all_doubao if vid.split(":", 1)[-1] in enabled}
+    return set(visible_doubao_voice_ids())
 
 
 @router.get("/voices")
@@ -1030,12 +1025,7 @@ async def preview_voice(voice_id: str, text: str | None = None, task_type: str |
     try:
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_f:
             tmp_path = tmp_f.name
-        _preview_kwargs = {}
-        if task_type == "vimax":
-            from app.gateway.video_gen.engines.vimax.voice_policy import VIMAX_TTS_POLICY
-
-            _preview_kwargs["policy"] = VIMAX_TTS_POLICY
-        await tts_mod.synthesize(preview_text, voice_id=voice_id, speed=1.0, output_path=tmp_path, **_preview_kwargs)
+        await tts_mod.synthesize(preview_text, voice_id=voice_id, speed=1.0, output_path=tmp_path)
         shutil.move(tmp_path, str(cached))
         return FileResponse(str(cached), media_type="audio/mpeg")
     except Exception:

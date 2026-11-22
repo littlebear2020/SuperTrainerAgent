@@ -295,7 +295,7 @@ def strip_unrecognized_tags(text: str) -> tuple[str, list[str]]:
 
 # ── P2: per-speaker voice assignment ───────────────────────────────────────
 
-from app.gateway.video_gen.orchestration.voices import CURATED_VOICES  # noqa: E402
+from app.gateway.video_gen.orchestration.voices import CURATED_VOICES, visible_doubao_voice_ids  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -318,29 +318,10 @@ class SpeakerVoiceMap:
         return self.by_speaker.get(speaker, self.default_voice)
 
 
-# Voice pools per gender, zh-CN only. Plan B（2026-10-19，D4）：ViMax 整体禁用
-# 360 音色——池 = doubao（有 VOLCENGINE_VOICE_ACCESS_KEY 时优先）→ zh-CN Edge
-# 溢出，**不含任何 ``preset:*``**（池内 preset 会在正式 narration 的 reject
-# 防漏线上炸掉）。WITHOUT the locale filter the pool would mix in en-US/ja-JP/
-# ko-KR voices — a 10th same-gender speaker would get a Korean/Japanese voice
-# reading Chinese text (garbage).
-def _zh_voice_pool(gender: str, include_doubao: bool = True) -> list[str]:
-    """zh-CN voice pool for a gender：**doubao FIRST**（有字节 key 的国内可达首选），
-    edge-tts LAST（溢出槽位——需 bing 可达）。
-
-    历史（2026-07-15 修前）：池曾保序把 edge-tts 排前 → 对白角色拿 edge → TTS
-    失败插静音（silent dialogue lines 回归）——「国内可达渠道在前」的排序教训保留。
-    ``include_doubao=False`` 剔除 doubao 槽位（无 VOLCENGINE_VOICE_ACCESS_KEY 时
-    doubao 音色在 tts 层静默塌缩成 default，2026-07-24 核实）——池退化为纯 Edge
-    （仍可用；Plan B 起不再回落 360 preset）。"""
-    zh = [v for v in CURATED_VOICES if v["gender"] == gender and v.get("locale", "").startswith("zh")]
-    doubao = [v["id"] for v in zh if v.get("provider") == "doubao"] if include_doubao else []
-    edge = [v["id"] for v in zh if v.get("provider") == "edge-tts"]
-    return doubao + edge
-
-
-_MALE_PRESET_VOICES = _zh_voice_pool("Male")
-_FEMALE_PRESET_VOICES = _zh_voice_pool("Female")
+# Voice pools contain only same-gender zh-CN Doubao catalog entries.
+def _zh_voice_pool(gender: str) -> list[str]:
+    visible = set(visible_doubao_voice_ids())
+    return [v["id"] for v in CURATED_VOICES if v["gender"] == gender and v["id"] in visible and v.get("locale", "").startswith("zh") and v.get("provider") == "doubao"]
 
 
 def _infer_gender(static_features: str) -> str | None:
@@ -381,25 +362,20 @@ def build_speaker_voice_map(
       角色表人数（表多人仅一人开口仍是单口播）；0/≥2/None 不改动。池剔除
       narrator 后无人持有它，单口播改写不产生同声冲突。
     """
-    male_pool = list(_MALE_PRESET_VOICES)
-    female_pool = list(_FEMALE_PRESET_VOICES)
-    import os
-
-    include_doubao = bool(os.environ.get("VOLCENGINE_VOICE_ACCESS_KEY"))
-    if not include_doubao:
-        # 2026-07-27：无 key 时 doubao 槽位会在 tts 层静默塌缩成 default（多角色
-        # 听起来像一个人）——从轮转池剔除，改用 qihu/edge 槽位。
-        logger.info("build_speaker_voice_map: VOLCENGINE_VOICE_ACCESS_KEY unset — doubao voices excluded from pools")
-        male_pool = _zh_voice_pool("Male", include_doubao=False)
-        female_pool = _zh_voice_pool("Female", include_doubao=False)
-
-    # Task 8b: 把 narrator 音色从轮转池剔除。此前 narrator 不参与排除 → 第一个
-    # 女性角色拿到与 narrator 相同的 preset:146（实跑坐实）→ 旁白和该角色听起来
-    # 是同一个人。审计的 C5「角色音色无法区分」本身不成立（角色间确实互不相同），
-    # 真 bug 在这里。
+    male_pool = _zh_voice_pool("Male")
+    female_pool = _zh_voice_pool("Female")
     if narrator_voice:
         male_pool = [v for v in male_pool if v != narrator_voice]
         female_pool = [v for v in female_pool if v != narrator_voice]
+
+    if not (spoken_speakers and len(spoken_speakers) == 1):
+        required_genders = {_infer_gender(ch.get("static_features", "")) for ch in characters}
+        if "Male" in required_genders and not male_pool:
+            logger.warning("build_speaker_voice_map: 男声角色没有白名单内可用音色，将使用默认音色")
+        if "Female" in required_genders and not female_pool:
+            logger.warning("build_speaker_voice_map: 女声角色没有白名单内可用音色，将使用默认音色")
+        if None in required_genders and not male_pool and not female_pool:
+            logger.warning("build_speaker_voice_map: 未标注性别的角色没有白名单内可用音色，将使用默认音色")
 
     by_speaker: dict[str, str] = {}
     for ch in characters:

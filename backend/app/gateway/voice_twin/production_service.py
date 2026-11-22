@@ -232,50 +232,11 @@ class ProductionService(BaseTaskService):
         speed_ratio: float = 1.0,
         row: Any = None,
     ) -> bytes:
-        """Route TTS with retry + degradation chain (A2, 2026-08-09).
-
-        链路：doubao → qihu(preset) → edge-tts；preset → edge-tts。edge 兜底
-        默认开启（受 voice_service.config.edge_tts.enabled 控制），是付费引擎
-        全挂时的安全网（公司服务器 edge 直连可达但不稳定，见
-        memory edge-tts-reachable-on-company-server）。
-        **克隆音色永不降级**——静默换成别人的声音比任务失败更糟（诚实性）。
-        """
+        """Use only the requested Doubao or cloned voice; failures propagate."""
         from app.gateway._shared.voice_catalog import ensure_voice_id_supported
-        from app.gateway.voice_twin.preset_voices import (
-            is_doubao_voice_id,
-            is_edge_voice_id,
-            is_preset_voice_id,
-        )
 
         ensure_voice_id_supported(voice_id)
-        is_cloned = not (is_preset_voice_id(voice_id) or is_doubao_voice_id(voice_id) or is_edge_voice_id(voice_id))
-        primary_err: Exception | None = None
-        try:
-            return await self._synthesize_with_retry(voice_id, text, output_format, speed_ratio, row)
-        except Exception as e:
-            # except-as 名在块尾被解绑，另存一份供链末端 from 引用
-            primary_err = e
-            if is_cloned or is_edge_voice_id(voice_id) or not _is_degradable_tts_error(e):
-                raise
-            logger.warning("TTS primary engine failed for %s, entering degradation chain: %s", voice_id, str(e)[:200])
-
-        # doubao → qihu preset（360 key 在时）
-        if is_doubao_voice_id(voice_id) and self.voice_service.qihu_client is not None:
-            try:
-                logger.warning("doubao degraded → 360 preset:146 for %s", voice_id)
-                return await self._synthesize_with_retry("preset:146", text, output_format, speed_ratio, row)
-            except Exception as qihu_err:
-                if not _is_degradable_tts_error(qihu_err):
-                    raise
-                logger.warning("360 fallback also failed for %s: %s", voice_id, str(qihu_err)[:200])
-
-        # 链末端：edge-tts 兜底（性别/语言匹配的目录音色）
-        edge_client = getattr(self.voice_service, "edge_client", None)
-        if edge_client is None:
-            raise RuntimeError(f"TTS synthesis failed and edge fallback unavailable: {voice_id}") from primary_err
-        edge_voice = _edge_fallback_voice_for(voice_id)
-        logger.warning("TTS degraded to edge-tts voice %s (requested %s)", edge_voice, voice_id)
-        return await edge_client.synthesize(text=text, voice=edge_voice, speed=speed_ratio)
+        return await self._synthesize_with_retry(voice_id, text, output_format, speed_ratio, row)
 
     async def _synthesize_with_retry(
         self,

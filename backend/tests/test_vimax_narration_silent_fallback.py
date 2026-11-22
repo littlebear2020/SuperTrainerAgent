@@ -110,3 +110,23 @@ async def test_narration_success_uses_narration_audio(tmp_path, monkeypatch):
 
     await engine.render(ctx)
     assert any("audio_override" in kw for kw in overlay_calls), "narration success must pass audio_override to overlay_fn"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_narration_factory", [False, True])
+async def test_missing_resolved_voice_fails_before_narration(tmp_path, monkeypatch, with_narration_factory):
+    def _config_must_not_run(*args):
+        pytest.fail("voice configuration error must be rejected before rendering setup")
+
+    engine = VimaxEngine(
+        config_factory=_config_must_not_run,
+        pipeline_factory=lambda _: AsyncMock(),
+        overlay_fn=AsyncMock(),
+        narration_llm_factory=(lambda: MagicMock()) if with_narration_factory else None,
+    )
+    ctx = _make_ctx(tmp_path)
+    ctx.voice_id = ""
+    ctx.request["lang"] = "en"
+
+    with pytest.raises(ValueError, match="no supported default voice"):
+        await engine.render(ctx)

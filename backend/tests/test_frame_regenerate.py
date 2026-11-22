@@ -15,7 +15,7 @@ def _make_service(tmp_path):
     from app.gateway.video_gen.providers.registry import ProviderRegistry
     from app.gateway.video_gen.service import VideoGenService
 
-    cfg = VideoGenConfig(qihu_api_key="t")
+    cfg = VideoGenConfig(qihu_api_key="t", tts_voice="doubao:zh_female_vv_uranus_bigtts")
     providers = ProviderRegistry(cfg)
     return VideoGenService(
         repo=MagicMock(),
@@ -34,7 +34,7 @@ async def test_regenerate_frame_success(tmp_path, hermetic_tts):
     # Create storyboard.json
     sb = Storyboard(
         title="test",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="first", search_term="ocean", visual_url="http://old/0.mp4"),
             StoryboardFrame(index=1, narration="second", search_term="beach", visual_url="http://old/1.mp4"),
@@ -71,7 +71,7 @@ async def test_regenerate_frame_invalid_index(tmp_path):
 
     sb = Storyboard(
         title="test",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="only one")],
     )
     (tmp_path / "storyboard.json").write_text(json.dumps(sb.to_dict(), ensure_ascii=False), encoding="utf-8")
@@ -118,7 +118,7 @@ async def test_regenerate_frame_clears_stale_local_visual(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", visual_url="http://cdn/0.png"),
             StoryboardFrame(
@@ -212,7 +212,7 @@ async def test_regenerate_frame_skips_tts_when_narration_unchanged(tmp_path):
     narration = "第二句旁白"
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", duration=2.0, audio_path=str(tmp_path / "audio" / "a0.mp3")),
             StoryboardFrame(index=1, narration=narration, image_prompt="p1", duration=3.5, audio_path=str(tmp_path / "audio" / "a1.mp3")),
@@ -221,7 +221,7 @@ async def test_regenerate_frame_skips_tts_when_narration_unchanged(tmp_path):
     (tmp_path / "storyboard.json").write_text(json.dumps(sb.to_dict(), ensure_ascii=False), encoding="utf-8")
     audio_dir = tmp_path / "audio"
     audio_dir.mkdir()
-    content_hash = _audio_cache_key(narration, "preset:146", 1.2)
+    content_hash = _audio_cache_key(narration, "doubao:zh_female_vv_uranus_bigtts", 1.2)
     (audio_dir / f"{content_hash}.mp3").write_bytes(b"existing-audio")  # CAS 命中
     (tmp_path / "audio.mp3").write_bytes(b"concat")
 
@@ -268,7 +268,7 @@ async def test_regenerate_frame_cas_hit_probe_ok_no_drift_persists_audio_path(tm
     narration = "第二句旁白"
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", duration=2.0, audio_path=str(tmp_path / "audio" / "a0.mp3")),
             StoryboardFrame(index=1, narration=narration, image_prompt="p1", duration=3.5, audio_path=str(tmp_path / "audio" / "a1.mp3")),
@@ -277,7 +277,7 @@ async def test_regenerate_frame_cas_hit_probe_ok_no_drift_persists_audio_path(tm
     (tmp_path / "storyboard.json").write_text(json.dumps(sb.to_dict(), ensure_ascii=False), encoding="utf-8")
     audio_dir = tmp_path / "audio"
     audio_dir.mkdir()
-    content_hash = _audio_cache_key(narration, "preset:146", 1.2)
+    content_hash = _audio_cache_key(narration, "doubao:zh_female_vv_uranus_bigtts", 1.2)
     (audio_dir / f"{content_hash}.mp3").write_bytes(b"existing-audio")
     (tmp_path / "audio.mp3").write_bytes(b"concat")
 
@@ -326,7 +326,7 @@ async def test_regenerate_frame_cas_hit_with_duration_drift_recalibrates(tmp_pat
     narration_a = "原始旁白"
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", duration=2.0, audio_path=str(tmp_path / "audio" / "a0.mp3")),
             StoryboardFrame(
@@ -342,7 +342,7 @@ async def test_regenerate_frame_cas_hit_with_duration_drift_recalibrates(tmp_pat
     (tmp_path / "storyboard.json").write_text(json.dumps(sb.to_dict(), ensure_ascii=False), encoding="utf-8")
     audio_dir = tmp_path / "audio"
     audio_dir.mkdir()
-    content_hash = _audio_cache_key(narration_a, "preset:146", 1.2)
+    content_hash = _audio_cache_key(narration_a, "doubao:zh_female_vv_uranus_bigtts", 1.2)
     (audio_dir / f"{content_hash}.mp3").write_bytes(b"audio-of-A")
     (tmp_path / "audio.mp3").write_bytes(b"concat")
 
@@ -389,7 +389,7 @@ async def test_regenerate_frame_reruns_tts_when_narration_changed(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", duration=2.0, audio_path=str(tmp_path / "audio" / "a0.mp3")),
             StoryboardFrame(index=1, narration="用户改过的新旁白", image_prompt="p1", duration=3.5, audio_path=str(tmp_path / "audio" / "a1.mp3")),
@@ -443,7 +443,7 @@ async def test_regenerate_frame_marks_dirty_when_tts_fails_after_visual_success(
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句旁白", image_prompt="p0", duration=2.0, audio_path=str(tmp_path / "audio" / "a0.mp3")),
             StoryboardFrame(index=1, narration="用户改过的新旁白", image_prompt="p1", duration=3.5, audio_path=str(tmp_path / "audio" / "a1.mp3")),
@@ -493,7 +493,7 @@ async def test_preview_localizes_image_and_marks_dirty_in_ready(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(
                 index=0,
@@ -539,7 +539,7 @@ async def test_preview_in_draft_does_not_mark_dirty(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="旁白", image_prompt="p0")],
     )
     task_dir = tmp_path / "u1" / "tasks" / "vg_pv2"
@@ -572,7 +572,7 @@ async def test_regen_bg_success_marks_done_and_dirty(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="旁白", image_prompt="p0")],
     )
     task_dir = tmp_path / "u1" / "tasks" / "vg_bg"
@@ -599,7 +599,7 @@ async def test_regen_bg_failure_writes_error_state(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="旁白", image_prompt="p0")],
     )
     task_dir = tmp_path / "u1" / "tasks" / "vg_bg2"
@@ -627,7 +627,7 @@ async def test_regen_bg_serializes_per_task_via_synth_lock(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=i, narration=f"旁白{i}", image_prompt=f"p{i}") for i in range(2)],
     )
     task_dir = tmp_path / "u1" / "tasks" / "vg_bg3"
@@ -730,7 +730,7 @@ async def test_regenerate_frame_updates_reuse_frames(tmp_path):
     svc = _make_service(tmp_path)
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[
             StoryboardFrame(index=0, narration="第一句", image_prompt="p0", local_visual_path="visuals/img_0000.png", visual_type="image"),
             # 帧 1 是帧 0 的复用帧（生成失败时共享帧 0 的本地文件）
@@ -794,7 +794,7 @@ async def test_regenerate_frame_dispatches_per_frame_visual_source(tmp_path):
     frame1 = StoryboardFrame(index=1, narration="第二句", image_prompt="p1", visual_source="ai_video")
     sb = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="第一句", image_prompt="p0"), frame1],
     )
     task_dir = tmp_path / "u1" / "tasks" / "vg_mx"
@@ -838,7 +838,7 @@ async def test_regen_bg_success_clears_pending_regen(tmp_path):
     svc = _make_service(tmp_path)
     sb_dict = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="新旁白", image_prompt="p0")],
     ).to_dict()
     sb_dict["pending_regen_frames"] = [0]
@@ -862,7 +862,7 @@ async def test_regen_bg_failure_keeps_pending_regen(tmp_path):
     svc = _make_service(tmp_path)
     sb_dict = Storyboard(
         title="t",
-        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920),
+        config=StoryboardConfig(video_type="ai_image", width=1080, height=1920, voice_id="doubao:zh_female_vv_uranus_bigtts"),
         frames=[StoryboardFrame(index=0, narration="新旁白", image_prompt="p0")],
     ).to_dict()
     sb_dict["pending_regen_frames"] = [0]

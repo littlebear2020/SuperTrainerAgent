@@ -1401,11 +1401,7 @@ class TestDoubaoTtsSynthesis:
 
     @pytest.mark.asyncio
     async def test_doubao_raises_when_client_not_configured(self, async_production_svc: ProductionService):
-        """doubao 未配置且整条降级链（qihu/edge）也不可用 → RuntimeError（user-visible）。
-
-        A2 起 "not configured" 是可降级错误：doubao 缺 key 会依次尝试 qihu→edge；
-        三引擎全缺才抛错（cause 链保留原始的 not configured）。
-        """
+        """doubao 未配置直接失败，不尝试其他引擎。"""
         async_production_svc.voice_service.doubao_client = None
         async_production_svc.voice_service.qihu_client = None
         async_production_svc.voice_service.edge_client = None
@@ -1449,14 +1445,13 @@ class TestDoubaoTtsSynthesis:
 
     @pytest.mark.asyncio
     async def test_preset_still_uses_qihu(self, async_production_svc: ProductionService):
-        """preset: voice_id still routes to qihu_client (no regression)."""
         mock_qihu = MagicMock()
         mock_qihu.synthesize_sse = AsyncMock(return_value=b"qihu_audio")
         async_production_svc.voice_service.qihu_client = mock_qihu
 
-        result = await async_production_svc._do_tts_synthesis("preset:146", "hello")
-        assert result == b"qihu_audio"
-        mock_qihu.synthesize_sse.assert_called_once()
+        with pytest.raises(ValueError, match="原音色已停用"):
+            await async_production_svc._do_tts_synthesis("preset:146", "hello")
+        mock_qihu.synthesize_sse.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_clone_still_uses_volcengine(self, async_production_svc: ProductionService):
@@ -1611,16 +1606,11 @@ class TestIsDoubaoVoiceId:
 
     @pytest.mark.asyncio
     async def test_preset_voice_transcodes_wav_to_mp3(self, async_production_svc: ProductionService, tmp_path):
-        """Preset (360 TTS) returns WAV bytes; chunks must be transcoded to mp3.
-
-        Regression guard for the bug where preset chunks were stored as .wav but
-        renamed/concatenated into output.mp3, producing a corrupt container.
-        """
+        """WAV bytes are transcoded by content even when the caller requested mp3."""
         from types import SimpleNamespace
 
-        # 360 TTS returns WAV; we do NOT need real ffmpeg — mock the transcoder.
-        async_production_svc.voice_service.qihu_client = MagicMock()
-        async_production_svc.voice_service.qihu_client.synthesize_sse = AsyncMock(return_value=b"RIFF...WAV-bytes")
+        async_production_svc.voice_service.doubao_client = MagicMock()
+        async_production_svc.voice_service.doubao_client.synthesize_sse = AsyncMock(return_value=b"RIFF...WAV-bytes")
 
         task_dir = tmp_path / "task_preset"
         task_dir.mkdir()
@@ -1646,7 +1636,7 @@ class TestIsDoubaoVoiceId:
                 task_id="test_preset",
                 user_id="user_a",
                 payload={
-                    "voice_id": "preset:146",
+                    "voice_id": "doubao:zh_female_vv_uranus_bigtts",
                     "text": "短文本单 chunk",
                     "speed_ratio": 1.0,
                     "output_format": "mp3",
@@ -1661,8 +1651,7 @@ class TestIsDoubaoVoiceId:
         assert output.exists()
         assert output.read_bytes() == b"FAKE-MP3-FRAMES"
 
-        # 360 TTS WAS called (preset path), Volcengine was NOT
-        async_production_svc.voice_service.qihu_client.synthesize_sse.assert_awaited_once()
+        async_production_svc.voice_service.doubao_client.synthesize_sse.assert_awaited_once()
         async_production_svc.voice_service.client.synthesize_sse.assert_not_called()
 
         # The transcoder was invoked with a _chunk-*.wav input → *.mp3 output
@@ -1672,12 +1661,7 @@ class TestIsDoubaoVoiceId:
 
     @pytest.mark.asyncio
     async def test_doubao_degraded_to_qihu_transcodes_wav(self, async_production_svc: ProductionService, tmp_path):
-        """doubao→qihu 降级产物是 WAV——script chunks 消费层必须转码为 mp3（bug #1 核心场景）。
-
-        此前 needs_transcode 按请求 voice_id (doubao) 判定为 False，降级产的 WAV
-        不转码直写 chunk-NNN.mp3 → 多 chunk concat -c copy 容器不匹配必败。
-        修复后按实际字节嗅探：WAV 字节正确走转码分支。
-        """
+        """doubao 重试耗尽后任务失败，不调用 360、不产生转码或成片。"""
         from types import SimpleNamespace
 
         from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSHTTPError
@@ -1707,11 +1691,14 @@ class TestIsDoubaoVoiceId:
             mp3_path.write_bytes(b"FAKE-MP3-FRAMES")
             return SimpleNamespace(returncode=0, stderr=b"")
 
-        with patch(
-            "app.gateway.voice_twin.production_service._transcode_wav",
-            side_effect=_fake_wav_to_mp3,
+        with (
+            patch(
+                "app.gateway.voice_twin.production_service._transcode_wav",
+                side_effect=_fake_wav_to_mp3,
+            ),
+            pytest.raises(RuntimeError, match="after 3 retries"),
         ):
-            result = await async_production_svc._run_script_to_audio(
+            await async_production_svc._run_script_to_audio(
                 task_id="test_degrade",
                 user_id="user_a",
                 payload={
@@ -1723,29 +1710,18 @@ class TestIsDoubaoVoiceId:
                 task_dir=task_dir,
                 progress=_progress,
             )
-        assert result is None
-
-        # Output must be valid mp3 (transcoded), not raw WAV in a .mp3 container
-        output = task_dir / "output.mp3"
-        assert output.exists()
-        assert output.read_bytes() == b"FAKE-MP3-FRAMES"
-
-        # Transcoder was invoked with .wav source (qihu returned WAV, not mp3)
-        assert len(transcode_inputs) == 1
-        assert transcode_inputs[0][0].endswith(".wav")
-        assert transcode_inputs[0][1].endswith("chunk-000.mp3")
-
-        # doubao was retried 3× (call_with_tts_retry), then degraded to qihu
+        assert not (task_dir / "output.mp3").exists()
+        assert transcode_inputs == []
         assert async_production_svc.voice_service.doubao_client.synthesize_sse.await_count == 3
-        async_production_svc.voice_service.qihu_client.synthesize_sse.assert_awaited_once()
+        async_production_svc.voice_service.qihu_client.synthesize_sse.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_script_to_audio_transcode_failure_raises(self, async_production_svc, tmp_path):
         """转码 rc≠0 → RuntimeError（曾第二调用点 save raw bytes as-is 静默兜底，T9 改 fail-loud；评审跟进补失败路径）。"""
         from types import SimpleNamespace
 
-        async_production_svc.voice_service.qihu_client = MagicMock()
-        async_production_svc.voice_service.qihu_client.synthesize_sse = AsyncMock(return_value=b"RIFF...WAV-bytes")
+        async_production_svc.voice_service.doubao_client = MagicMock()
+        async_production_svc.voice_service.doubao_client.synthesize_sse = AsyncMock(return_value=b"RIFF...WAV-bytes")
 
         task_dir = tmp_path / "task_preset_fail"
         task_dir.mkdir()
@@ -1769,7 +1745,7 @@ class TestIsDoubaoVoiceId:
                 task_id="test_preset_fail",
                 user_id="user_a",
                 payload={
-                    "voice_id": "preset:146",
+                    "voice_id": "doubao:zh_female_vv_uranus_bigtts",
                     "text": "短文本单 chunk",
                     "speed_ratio": 1.0,
                     "output_format": "mp3",
@@ -1944,10 +1920,9 @@ def _make_prod_service(tmp_path) -> ProductionService:
 class TestPreviewVoice:
     def test_preset_voice_routes_to_qihu_and_returns_wav(self, tmp_path):
         svc = _make_prod_service(tmp_path)
-        audio, media_type = asyncio.run(svc.preview_voice("preset:146", "你好", user_id="u1"))
-        assert audio == b"RIFF\x24\x00\x00\x00WAVEfmt PRESET"
-        assert media_type == "audio/wav"
-        svc.voice_service.qihu_client.synthesize_sse.assert_awaited_once()
+        with pytest.raises(ValueError, match="原音色已停用"):
+            asyncio.run(svc.preview_voice("preset:146", "你好", user_id="u1"))
+        svc.voice_service.qihu_client.synthesize_sse.assert_not_called()
         svc.voice_service.client.synthesize_sse.assert_not_called()
 
     def test_cloned_voice_routes_to_volcengine_and_returns_mp3(self, tmp_path):
@@ -1999,7 +1974,7 @@ class TestPreviewVoiceEndpoint:
     def _svc_mock(self, audio=b"AUDIO", exc=None):
         svc = MagicMock()
         if exc is None:
-            svc.preview_voice = AsyncMock(return_value=(audio, "audio/wav"))
+            svc.preview_voice = AsyncMock(return_value=(audio, "audio/mpeg"))
         else:
             svc.preview_voice = AsyncMock(side_effect=exc)
         return svc
@@ -2012,15 +1987,15 @@ class TestPreviewVoiceEndpoint:
         from app.gateway.routers import voice_twin_production as router
 
         monkeypatch.setattr(router, "_preview_storage_dir", lambda: tmp_path)
-        key = "preset_146_" + hashlib.md5("你好".encode()).hexdigest()[:8]
-        (tmp_path / f"{key}.wav").write_bytes(b"CACHED")
+        key = "doubao_zh_female_vv_uranus_bigtts_" + hashlib.md5("你好".encode()).hexdigest()[:8]
+        (tmp_path / f"{key}.mp3").write_bytes(b"CACHED")
 
         svc = self._svc_mock()
         with patch.object(router, "_get_service", return_value=svc):
             with patch.object(router, "get_effective_user_id", return_value="u1"):
-                resp = asyncio.run(call_unwrapped(router.preview_voice, request=MagicMock(), voice_id="preset:146", text="你好"))
+                resp = asyncio.run(call_unwrapped(router.preview_voice, request=MagicMock(), voice_id="doubao:zh_female_vv_uranus_bigtts", text="你好"))
         assert resp.status_code == 200
-        assert resp.media_type == "audio/wav"
+        assert resp.media_type == "audio/mpeg"
         svc.preview_voice.assert_not_awaited()  # served from cache, no synthesis
 
     def test_generates_and_caches_on_first_request(self, tmp_path, monkeypatch):
@@ -2035,12 +2010,12 @@ class TestPreviewVoiceEndpoint:
 
         with patch.object(router, "_get_service", return_value=svc):
             with patch.object(router, "get_effective_user_id", return_value="u1"):
-                resp = asyncio.run(call_unwrapped(router.preview_voice, request=MagicMock(), voice_id="preset:146", text="你好"))
+                resp = asyncio.run(call_unwrapped(router.preview_voice, request=MagicMock(), voice_id="doubao:zh_female_vv_uranus_bigtts", text="你好"))
         assert resp.status_code == 200
         svc.preview_voice.assert_awaited_once()
         # File now cached on disk (":" sanitized to "_").
-        key = "preset_146_" + hashlib.md5("你好".encode()).hexdigest()[:8]
-        assert (tmp_path / f"{key}.wav").read_bytes() == b"FRESH-WAV"
+        key = "doubao_zh_female_vv_uranus_bigtts_" + hashlib.md5("你好".encode()).hexdigest()[:8]
+        assert (tmp_path / f"{key}.mp3").read_bytes() == b"FRESH-WAV"
 
     def test_not_found_maps_to_404(self, tmp_path, monkeypatch):
         from _router_auth_helpers import call_unwrapped
@@ -2270,23 +2245,22 @@ class TestVerifyVoice:
 
     @pytest.mark.asyncio
     async def test_verify_voice_unknown_preset_gets_fallback_name(self, async_production_svc: ProductionService):
-        """目录外 preset:999 → 伪音色名回退 "360 预设音色 999" 而非 404。"""
         from app.gateway.routers.voice_twin_production import _verify_voice
 
-        voice = await _verify_voice(async_production_svc, "preset:999", "user_a")
-        assert voice.voice_name == "360 预设音色 999"
-        assert voice.speaker_id == "preset:999"
-        assert voice.user_id == "user_a"
+        with pytest.raises(HTTPException) as caught:
+            await _verify_voice(async_production_svc, "preset:999", "user_a")
+        assert caught.value.status_code == 400
+        assert caught.value.detail == "原音色已停用，请改选字节直连音色"
         async_production_svc.voice_service.repo.get_by_id.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_verify_voice_whitelisted_preset_keeps_display_name(self, async_production_svc: ProductionService):
-        """目录内 preset 用共享目录展示名（2026-08-09 A1：以共享目录名为准）。"""
         from app.gateway.routers.voice_twin_production import _verify_voice
 
-        voice = await _verify_voice(async_production_svc, "preset:146", "user_a")
-        assert voice.voice_name == "知性女声（360）"
-        assert voice.speaker_id == "preset:146"
+        with pytest.raises(HTTPException) as caught:
+            await _verify_voice(async_production_svc, "preset:146", "user_a")
+        assert caught.value.status_code == 400
+        assert caught.value.detail == "原音色已停用，请改选字节直连音色"
 
     @pytest.mark.asyncio
     async def test_verify_voice_cloned_id_still_hits_repo(self, async_production_svc: ProductionService):

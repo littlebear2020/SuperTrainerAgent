@@ -175,41 +175,21 @@ def _parse_preset_id(voice_id: str) -> int:
 async def synthesize(
     text: str,
     *,
-    voice_id: str = "zh-CN-YunjianNeural",
+    voice_id: str = "doubao:zh_female_vv_uranus_bigtts",
     speed: float = 1.0,
     output_path: str,
-    fallback_voice: str = "preset:146",
     section_id: str | None = None,
     emotion: str | None = None,
-    policy: TTSPolicy | None = None,
 ) -> TTSResult:
-    """Unified TTS entry point. Routes based on voice_id prefix.
+    """Synthesize only with the requested Doubao or existing cloned voice."""
+    from app.gateway._shared.voice_catalog import ensure_voice_id_supported
 
-    - "doubao:X" → ByteDance seed-tts-2.0 (openspeech; fallback to 360→edge on infra errors)
-    - "clone:X" → voice_twin 克隆音色（seed-icl 资源；T11——同 openspeech 账号体系，
-      克隆音色不降级，失败即响亮报错）
-    - "preset:XXX" → 360 TTS (srt stays empty, _write_storyboard_srt fallback handles subtitles)
-    - other → edge-tts (with WordBoundary word-level SRT)
-
-    ``fallback_voice`` is the 360 preset used when the doubao path degrades
-    (wired to ``VideoGenConfig.tts_fallback_voice`` at the service call sites).
-    ``section_id``（T11）：同课程任务的关联键（additions.section_id，多轮语气一致）。
-    ``emotion``（T5，2026-10-14）：情绪枚举（resolve_doubao_emotion 的产物，如
-    ``焦急``/``sad``）——**仅 doubao 路径消费**，其他音色静默忽略；doubao→360/edge
-    降级时自动丢弃（下游通道无此参数）。
-    ``policy``（Plan B，2026-10-19）：可选 :class:`TTSPolicy`；缺省 None = 完全旧链路。
-    reject 策略下 ``preset:*`` 在进入 360 前抛 ValueError（ViMax 等专用调用方的防漏
-    底线，非静默换声）。
-    """
-    if policy is not None and policy.qihu == "reject" and voice_id.startswith("preset:"):
-        raise ValueError(f"TTS policy rejects 360 preset voices: {voice_id!r} ——本调用方已禁用 360 音色，请改选豆包（doubao:*）或 Edge（zh-CN-*）音色")
+    ensure_voice_id_supported(voice_id)
     if voice_id.startswith("doubao:"):
-        return await _synthesize_doubao(text, voice_id, speed, output_path, fallback_voice=fallback_voice, section_id=section_id, emotion=emotion, policy=policy)
+        return await _synthesize_doubao(text, voice_id, speed, output_path, section_id=section_id, emotion=emotion)
     if voice_id.startswith("clone:"):
         return await _synthesize_clone(text, voice_id, speed, output_path, section_id=section_id)
-    if voice_id.startswith("preset:"):
-        return await _synthesize_qihu(text, voice_id, speed, output_path)
-    return await _synthesize_edge(text, voice_id, speed, output_path)
+    raise ValueError("不支持的音色 ID；请改选字节直连音色")
 
 
 async def _synthesize_edge(
@@ -444,110 +424,30 @@ async def _synthesize_doubao(
     speed: float,
     output_path: str,
     *,
-    fallback_voice: str = "preset:146",
     section_id: str | None = None,
     emotion: str | None = None,
-    policy: TTSPolicy | None = None,
 ) -> TTSResult:
-    """ByteDance seed-tts-2.0 TTS (openspeech V3 SSE).
-
-    Fallback policy (requirement #4: only 429/5xx/timeout/conn degrade):
-      - infrastructure errors (HTTP 5xx/429, transport, timeout) → fall back to
-        the 360 ``fallback_voice`` (VideoGenConfig.tts_fallback_voice), which
-        itself falls back to edge-tts on failure.
-      - config/auth errors (HTTP 4xx, SSE non-zero code e.g. 55000000 "resource ID
-        mismatched with speaker", session failure, empty audio) → re-raise as a
-        user-visible error. No fallback: 360 uses different speakers, and a
-        speaker-mismatch is a config error, not a transient infra blip.
-      - ``policy.doubao_failure == "edge"``（Plan B，2026-10-19）：四个可降级分支
-        改走 :func:`_fallback_doubao_to_edge`（同性别 Edge，成功后留痕）；policy=None
-        时四个 360 分支原样保留。
-
-    ``access_key`` reuses ``voice_clone.access_key`` (``$VOLCENGINE_VOICE_ACCESS_KEY``),
-    the same openspeech account as voice clone. srt stays empty —
-    ``_write_storyboard_srt()`` builds sentence-level subtitles.
-    T5（2026-10-14）：``emotion`` = 探针验证过的情感枚举，进 ``audio_params.emotion``；
-    降级到 360/edge 的分支不带 emotion（自动丢弃，符合决策 4）。
-    """
+    """ByteDance seed-tts-2.0 TTS; retry exhaustion and config errors propagate."""
     import os
 
-    from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSClient, DoubaoTTSHTTPError
+    from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSClient
 
     speaker = voice_id.split(":", 1)[1]
     access_key = os.environ.get("VOLCENGINE_VOICE_ACCESS_KEY", "")
-    _edge_direct = policy is not None and policy.doubao_failure == "edge"
     if not access_key:
-        logger.warning("VOLCENGINE_VOICE_ACCESS_KEY empty — falling back (%s)", "edge" if _edge_direct else "360 TTS")
-        # Task 6: 这是**全片**降级（不是单帧抖动）——每一帧都会走 360，成片音色
-        # 与用户选的完全不同。此前只有一条 warning，用户界面零提示。
-        if _edge_direct:
-            return await _fallback_doubao_to_edge(text, voice_id, speed, output_path, reason="访问密钥未配置（VOLCENGINE_VOICE_ACCESS_KEY）")
-        record_tts_degradation(
-            kind="tts_access_key_missing",
-            requested_voice=voice_id,
-            actual_voice=fallback_voice,
-            detail="VOLCENGINE_VOICE_ACCESS_KEY 未配置，豆包音色全部降级为 360 预设",
-        )
-        return await _synthesize_qihu(text, fallback_voice, speed, output_path)
+        raise RuntimeError("doubao TTS requires VOLCENGINE_VOICE_ACCESS_KEY")
 
     client = DoubaoTTSClient(access_key=access_key)
-    words: list[dict] = []
-    # T-A3b（D4 保底开关）：DOUBAO_WORD_SRT=0 关闭字级时间戳收集，回落句级
-    # _write_storyboard_srt（width-ratio 估算）——三渠道回归若发现豆包词级致
-    # 老管线字幕变差，一行开关回滚（默认全开 = D4 拍板）。
     collect = os.environ.get("DOUBAO_WORD_SRT", "1") != "0"
-    try:
-        # T10：开 enable_subtitle 拿 event 364 字级时间戳（words 为空 = 服务未下发，
-        # 如 cache 缓存命中 → 降级句级 _write_storyboard_srt，不回退 edge）
-        audio_bytes, words = await _call_doubao_with_retry(
-            client=client,
-            speaker=speaker,
-            text=text,
-            speed=speed,
-            section_id=section_id,
-            collect_words=collect,
-            emotion=emotion,
-        )
-    except DoubaoTTSHTTPError as exc:
-        if exc.status_code == 429 or exc.status_code >= 500:
-            logger.exception("doubao TTS infra HTTP %s — falling back (%s)", exc.status_code, "edge" if _edge_direct else "360 TTS")
-            # C3 补接（2026-08-09 评审）：doubao→360 运行时降级留痕（修前零记录）
-            if _edge_direct:
-                return await _fallback_doubao_to_edge(text, voice_id, speed, output_path, reason=f"服务错误（HTTP {exc.status_code}）")
-            record_tts_degradation(
-                requested_voice=voice_id,
-                actual_voice=fallback_voice,
-                detail=f"豆包 TTS 服务错误（HTTP {exc.status_code}），本帧降级为 360 预设音色",
-            )
-            return await _synthesize_qihu(text, fallback_voice, speed, output_path)
-        raise  # 4xx auth/config → user-visible
-    except _RETRYABLE_TTS_ERRORS:
-        logger.exception("doubao TTS transport error — falling back (%s)", "edge" if _edge_direct else "360 TTS")
-        if _edge_direct:
-            return await _fallback_doubao_to_edge(text, voice_id, speed, output_path, reason="传输错误")
-        record_tts_degradation(
-            requested_voice=voice_id,
-            actual_voice=fallback_voice,
-            detail="豆包 TTS 传输错误，本帧降级为 360 预设音色",
-        )
-        return await _synthesize_qihu(text, fallback_voice, speed, output_path)
-    except RuntimeError as exc:
-        # 55000000 = speaker/resource 不匹配（配置错，不可恢复）→ user-visible，不降级。
-        # 其余 RuntimeError（配额/并发 45000292、会话失败、空音频等瞬时）→ 降级 360
-        # fallback_voice，避免单帧经 asyncio.gather 拖垮整批 draft audio（P3/A1）。
-        msg = str(exc)
-        if "55000000" in msg or "mismatched" in msg.lower():
-            raise
-        logger.exception("doubao TTS transient error — falling back (%s): %s", "edge" if _edge_direct else "360 TTS", msg)
-        # C3 补接（2026-08-09 评审）：这是「视频中途换人」最高频路径，必须留痕
-        if _edge_direct:
-            return await _fallback_doubao_to_edge(text, voice_id, speed, output_path, reason=f"瞬时错误（{msg[:80]}）")
-        record_tts_degradation(
-            requested_voice=voice_id,
-            actual_voice=fallback_voice,
-            detail=f"豆包 TTS 瞬时错误（{msg[:80]}），本帧降级为 360 预设音色",
-        )
-        return await _synthesize_qihu(text, fallback_voice, speed, output_path)
+    audio_bytes, words = await _call_doubao_with_retry(
+        client=client,
+        speaker=speaker,
+        text=text,
+        speed=speed,
+        section_id=section_id,
+        collect_words=collect,
+        emotion=emotion,
+    )
 
     with open(output_path, "wb") as f:
         f.write(audio_bytes)
