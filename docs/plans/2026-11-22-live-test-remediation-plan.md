@@ -180,7 +180,7 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 ### Task 7：门禁、登记、部署验收
 
 - [x] 每个实际执行 PR 均已更新本计划与同一 changelog；TL;DR、「验收记录」和真实命令关键输出齐全。
-- [x] 受影响层验证已完成：Sandbox 最终 backend 全量 10180 passed / 91 skipped；PR 4 frontend 1818 passed、相关 mock E2E 与 GitHub 全量 E2E 通过；各 PR 根 `make check`、docs convention 通过；PR 3 镜像与技能复制检查通过。
+- [x] 受影响层验证已完成：Sandbox 最终 backend 全量 10180 passed / 91 skipped，重生 hotfix 为 10182 passed / 91 skipped；PR 4 frontend 1818 passed、相关 mock E2E 与 GitHub 全量 E2E 通过；各 PR 根 `make check`、docs convention 通过；PR 3 镜像与技能复制检查通过。
 - [x] 四个主 PR 已严格按边界独立评审并依次合入：#40→#41→#42→#44；P6/P7 未开实现 PR，也未并行修改共享文件。
 - [x] 未获字节付费授权，真实配音记 `LIVE_NOT_VERIFIED`；未清空 4 个入口或切换其他通道。
 - [x] P2、P4、P12（账户/登录）、Writer 分享页英文、P14、P15 已分别登记到 `docs/findings-backlog.md`；历史报告未回改。

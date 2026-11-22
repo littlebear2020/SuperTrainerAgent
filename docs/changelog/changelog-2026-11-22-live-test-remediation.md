@@ -64,7 +64,7 @@
 - Sandbox 最终后端全量 `uv run pytest tests/ -q` → **10180 passed, 91 skipped**；P2/P4/P12/Writer 分享页/P14/P15 已分别登记 `docs/findings-backlog.md`，无对应产品代码 diff。
 - 整体复核后的文档同步：`config.example.yaml` 仅把空闲释放注释从 600 改为 7200（无结构变化，不递增 `config_version`）；部署指南明确已有显式覆盖仍优先；backend 模块说明移除已删除的 Edge/360 文件与降级链。
 - PR #45 最终 `gh pr checks 45 --watch` → backend-unit-tests、quick-checks、AI Code Review 全 pass，OCR 4 files / 0 findings；已合入，merge commit `4210d612a483475f9c19739c65d0d32db0cdff3b`。
-- 重生门禁 hotfix：退役音色 + CAS 的批量/单帧用例在旧实现均 RED（DID NOT RAISE）；前置统一校验后 2 passed，相关重生与单通道回归 229 passed，本地 OCR 0 findings、根 `make check` 通过；未执行真实付费重生。
+- 重生门禁 hotfix：退役音色 + CAS 的批量/单帧用例在旧实现均 RED（DID NOT RAISE）；前置统一校验后 2 passed，相关重生与单通道回归 229 passed，本地 OCR 0 findings、根 `make check` 通过；后端全量 **10182 passed / 91 skipped**；未执行真实付费重生。
 
 ## 阻塞与未执行
 
