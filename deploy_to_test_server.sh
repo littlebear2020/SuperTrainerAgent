@@ -26,6 +26,7 @@ PROJECT_DIR="${TEST_PROJECT_DIR:-/opt/trainer-ai-test}"
 
 LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 TAR_FILE="$LOCAL_DIR/../deer-flow-test-update.tar.gz"
+ARCHIVE_SHA_FILE="$TAR_FILE.sha"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -47,6 +48,7 @@ pack() {
     echo ""
 
     cd "$LOCAL_DIR"
+    rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
     REF="${TEST_DEPLOY_REF:-origin/main}"
     ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output "$TAR_FILE")
     if [ "${TEST_ALLOW_UNMERGED:-0}" = "1" ]; then
@@ -67,6 +69,7 @@ pack() {
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}" || { echo -e "${RED}❌ 打包失败，旧包未替换${NC}"; return 1; }
 
     RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 发布包缺少有效 manifest，请检查打包错误${NC}"; return 1; }
+    printf '%s\n' "$RELEASE_SHA" > "$ARCHIVE_SHA_FILE.tmp" && mv "$ARCHIVE_SHA_FILE.tmp" "$ARCHIVE_SHA_FILE"
     SIZE=$(ls -lh "$TAR_FILE" | awk '{print $5}')
     echo ""
     echo -e "${GREEN}✅ 打包完成: $SIZE${NC}"
@@ -78,6 +81,7 @@ pack() {
 # upload: 上传到测试服务器
 # ============================================================
 upload() {
+    cd "$LOCAL_DIR"
     echo -e "${BLUE}============================================${NC}"
     echo -e "${BLUE}  上传到测试服务器 ${SERVER}${NC}"
     echo -e "${BLUE}============================================${NC}"
@@ -92,7 +96,15 @@ upload() {
     ssh -p "$SSH_PORT" "$SERVER" "mkdir -p $PROJECT_DIR"
 
     RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack${NC}"; return 1; }
-    EXPECTED_SHA="$(git rev-parse --verify --end-of-options "${TEST_DEPLOY_REF:-origin/main}^{commit}")" || { echo -e "${RED}❌ 无法解析预期测试发布 ref${NC}"; return 1; }
+    if [ ! -f "$ARCHIVE_SHA_FILE" ]; then
+        echo -e "${RED}❌ 缺少本次 pack 的 SHA 侧车，禁止上传旧包，请重新 pack${NC}"
+        return 1
+    fi
+    EXPECTED_SHA="$(< "$ARCHIVE_SHA_FILE")"
+    if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+        echo -e "${RED}❌ SHA 侧车格式无效，请重新 pack${NC}"
+        return 1
+    fi
     if [ "$RELEASE_SHA" != "$EXPECTED_SHA" ]; then
         echo -e "${RED}❌ 发布包 SHA 与 ${TEST_DEPLOY_REF:-origin/main} 不一致，禁止上传旧包，请重新 pack${NC}"
         return 1
@@ -150,6 +162,7 @@ deploy() {
     echo ""
     echo -e "${YELLOW}步骤 2/6: 停止旧服务并解压新代码${NC}"
     RELEASE_SHA="$(release_sha deer-flow-test-update.tar.gz)" || { echo -e "${RED}❌ 压缩包缺少 release-manifest.json，已停止部署${NC}"; return 1; }
+    CONFIG_FROM_ARCHIVE="$(tar -xOf deer-flow-test-update.tar.gz release-manifest.json | python3 -c 'import json, sys; print(str(json.load(sys.stdin).get("includes_local_config", False)).lower())')" || { echo -e "${RED}❌ 无法读取配置来源标记${NC}"; return 1; }
 
     # 停止旧容器（如果存在）
     if [ -f "scripts/deploy.sh" ]; then
@@ -163,12 +176,14 @@ deploy() {
     echo "  解压 deer-flow-test-update.tar.gz ..."
     tar xzf deer-flow-test-update.tar.gz
     echo "  ✓ 解压完成"
-    echo "  部署源码 SHA: $RELEASE_SHA"
+    echo "  部署源码 SHA: $RELEASE_SHA（请与 upload 时打印的上传源码 SHA 人工核对）"
 
     # ── 步骤 3: 恢复配置 ──
     echo ""
     echo -e "${YELLOW}步骤 3/6: 恢复配置文件${NC}"
-
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        echo -e "${GREEN}✓ 发布包显式包含本地配置，跳过旧配置恢复${NC}"
+    else
     # .env
     BAK_ENV=$(ls -t .env.bak.* 2>/dev/null | head -1)
     if [ -n "$BAK_ENV" ]; then
@@ -208,6 +223,7 @@ deploy() {
         fi
     fi
     echo "  ✓ frontend/.env 已确认"
+    fi
 
     # ── 步骤 4: 修复权限 ──
     echo ""

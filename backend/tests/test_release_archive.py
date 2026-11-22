@@ -252,8 +252,12 @@ def test_packaging_guards_config_warning_and_stale_upload() -> None:
         assert "||" in script.split("scripts/release_archive.py", 1)[1].splitlines()[0]
         assert "本包不含 config.yaml/.env" in script
         assert "EXPECTED_SHA" in script
+        assert "ARCHIVE_SHA_FILE" in script
+        assert 'EXPECTED_SHA="$(< "$ARCHIVE_SHA_FILE")"' in script
         assert ref_variable in script
         assert 'RELEASE_SHA" != "$EXPECTED_SHA' in script
+        assert "CONFIG_FROM_ARCHIVE" in script
+        assert "跳过旧配置恢复" in script
 
 
 def test_git_archive_stderr_is_not_an_unconsumed_pipe() -> None:
@@ -273,4 +277,21 @@ def test_workflow_paths_are_cross_checked_and_config_glob_stays_at_root() -> Non
     assert "quick-checks.yml" in backend_workflow
     assert "backend-unit-tests.yml" in quick_checks
     assert 'path" != */*' in quick_checks
-    assert 'path" == config*.yaml' in quick_checks
+    assert '&& "$path" == config*.yaml' not in quick_checks
+
+
+def test_archive_stdout_has_explicit_check_and_close() -> None:
+    script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
+    assert "assert process.stdout" not in script
+    assert "process.stdout is None" in script
+    assert "process.stdout.close()" in script
+
+
+def test_upload_uses_pack_sidecar_and_runs_from_repo_root() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        upload = script.split("upload() {", 1)[1].split("# ============================================================", 1)[0]
+        assert 'cd "$LOCAL_DIR"' in upload
+        assert "git rev-parse" not in upload
+        assert "ARCHIVE_SHA_FILE" in upload
+        assert "请与 upload 时打印的上传源码 SHA 人工核对" in script

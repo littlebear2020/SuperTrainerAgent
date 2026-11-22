@@ -14,6 +14,7 @@ SERVER="${DEPLOY_SERVER:?请设置 DEPLOY_SERVER}"
 SSH_PORT=2222
 PROJECT_DIR="/opt/trainer-ai"
 LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
+ARCHIVE_SHA_FILE="$LOCAL_DIR/../deer-flow-update.tar.gz.sha"
 
 # ============================================================
 # pack: 本地打包（包含沙箱缓存）
@@ -28,6 +29,7 @@ pack() {
     echo "============================================"
 
     cd "$LOCAL_DIR"
+    rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
     REF="${DEPLOY_REF:-origin/main}"
     ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
     if [ "${2:-}" = "--no-sandbox" ]; then
@@ -45,6 +47,7 @@ pack() {
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}" || { echo "❌ 打包失败，旧包未替换"; return 1; }
 
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 发布包缺少有效 manifest，请检查打包错误"; return 1; }
+    printf '%s\n' "$RELEASE_SHA" > "$ARCHIVE_SHA_FILE.tmp" && mv "$ARCHIVE_SHA_FILE.tmp" "$ARCHIVE_SHA_FILE"
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"
     echo "   文件位置: ../deer-flow-update.tar.gz"
     echo "   源码 SHA: $RELEASE_SHA"
@@ -54,6 +57,7 @@ pack() {
 # upload: 上传到服务器
 # ============================================================
 upload() {
+    cd "$LOCAL_DIR"
     echo "============================================"
     echo "  上传到服务器 ${SERVER}..."
     echo "============================================"
@@ -64,7 +68,15 @@ upload() {
     fi
 
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack"; return 1; }
-    EXPECTED_SHA="$(git rev-parse --verify --end-of-options "${DEPLOY_REF:-origin/main}^{commit}")" || { echo "❌ 无法解析预期发布 ref"; return 1; }
+    if [ ! -f "$ARCHIVE_SHA_FILE" ]; then
+        echo "❌ 缺少本次 pack 的 SHA 侧车，禁止上传旧包，请重新 pack"
+        return 1
+    fi
+    EXPECTED_SHA="$(< "$ARCHIVE_SHA_FILE")"
+    if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "❌ SHA 侧车格式无效，请重新 pack"
+        return 1
+    fi
     if [ "$RELEASE_SHA" != "$EXPECTED_SHA" ]; then
         echo "❌ 发布包 SHA 与 ${DEPLOY_REF:-origin/main} 不一致，禁止上传旧包，请重新 pack"
         return 1
@@ -93,14 +105,18 @@ deploy() {
     echo "  步骤 2/6: 停止服务并解压"
     echo "============================================"
     RELEASE_SHA="$(release_sha deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，已停止部署"; return 1; }
+    CONFIG_FROM_ARCHIVE="$(tar -xOf deer-flow-update.tar.gz release-manifest.json | python3 -c 'import json, sys; print(str(json.load(sys.stdin).get("includes_local_config", False)).lower())')" || { echo "❌ 无法读取配置来源标记"; return 1; }
     ./scripts/deploy.sh down
     tar xzf deer-flow-update.tar.gz
-    echo "  部署源码 SHA: $RELEASE_SHA"
+    echo "  部署源码 SHA: $RELEASE_SHA（请与 upload 时打印的上传源码 SHA 人工核对）"
 
     echo ""
     echo "============================================"
     echo "  步骤 3/6: 恢复配置（如被覆盖）"
     echo "============================================"
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        echo "✅ 发布包显式包含本地配置，跳过旧配置恢复"
+    else
     # 检查 .env 是否被覆盖（简单比较行数）
     BAK_ENV=$(ls -t .env.bak.* 2>/dev/null | head -1)
     if [ -n "$BAK_ENV" ]; then
@@ -116,6 +132,7 @@ deploy() {
         fi
     fi
     echo "✅ 配置已确认"
+    fi
 
     echo ""
     echo "============================================"

@@ -99,8 +99,8 @@ AI 评审规则镜像见 `.opencodereview/rule.json`，改禁区时同步。
 ## 服务器与部署
 
 - 通用部署方式见 `docs/personal-server-deployment-guide.md` 与 `docker/` 中的配置样例。
-- **不可变发布（2026-11-22）**：禁止再用 `tar ... .` 直接打当前工作区。正式包经 `deploy_on_server.sh pack`（默认 `origin/main`，先跑 `pre_deploy_check --ref`），测试包经 `deploy_to_test_server.sh pack`；未合入 ref 只允许测试环境以 `TEST_ALLOW_UNMERGED=1` 显式打包。包内 `release-manifest.json` 是部署与验收的源码 SHA 事实源。
-- 其他 Agent 的 worktree/开放 PR 对不可变发布只提示、不阻断；未勾选 `[release-blocker]` 与 fetch/ref 核对失败才阻断正式发布。常规升级不追加本地秘密配置；仅首次部署或负责人明确需要时以 `DEPLOY_INCLUDE_LOCAL_CONFIG=1` / `TEST_INCLUDE_LOCAL_CONFIG=1` 显式追加。
+- **不可变发布（2026-11-22）**：禁止再用 `tar ... .` 直接打当前工作区。正式包经 `deploy_on_server.sh pack`（默认 `origin/main`，先跑 `pre_deploy_check --ref`），测试包经 `deploy_to_test_server.sh pack`；未合入 ref 只允许测试环境以 `TEST_ALLOW_UNMERGED=1` 显式打包。包内 `release-manifest.json` 是部署与验收的源码 SHA 事实源；pack 同时写入 `<发布包>.sha` 侧车，upload 只接受侧车与 manifest 一致且格式有效的包，禁止二次解析移动 ref 代替本次 pack 证据。
+- 其他 Agent 的 worktree/开放 PR 对不可变发布只提示、不阻断；未勾选 `[release-blocker]` 与 fetch/ref 核对失败才阻断正式发布。常规升级不追加本地秘密配置；仅首次部署或负责人明确需要时以 `DEPLOY_INCLUDE_LOCAL_CONFIG=1` / `TEST_INCLUDE_LOCAL_CONFIG=1` 显式追加，此时 deploy 跳过旧配置恢复，不得用服务器备份覆盖显式新配置。
 - 本仓库公开开发，真实主机、账号、密钥、内部任务 ID、用户数据和运行数据库不得提交。内部运维手册与部署记录应保存在仓库外。
 
 ## Remotion 课程视频管线（remotion_course）

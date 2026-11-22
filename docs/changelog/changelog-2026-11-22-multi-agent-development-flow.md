@@ -63,6 +63,14 @@
 - 测试 pack 不调用正式 pre-deploy 是保留未合入 ref 与付费修复验证通道；upload/deploy 的函数 `return 1` 配合 `set -e` 和显式 SHA 检查终止流程。
 - 第二轮相关回归三件测试文件合计 `26 passed`，`bash -n` 与 `git diff --check` 通过。
 
+## PR #39 第三轮 OCR 处置
+
+- pack 开始时先移除 SHA 侧车，成功后把本次 manifest SHA 原子写入 `<发布包>.sha`；upload 只读取该侧车，不再二次解析移动 ref。失败保留旧 tar 时侧车已失效，旧包不能误传。
+- 两件 upload 都先 `cd "$LOCAL_DIR"`，避免从其他目录调用时读取错误包；deploy 打印 SHA 并要求与 upload 输出人工核对。
+- manifest `includes_local_config=true` 时，生产和测试 deploy 均跳过旧配置恢复；显式打包的新配置不会再被服务器备份覆盖。
+- `process.stdout` 改为显式空值检查并在等待子进程前关闭；根 config 的目录判断去重。
+- 第三轮相关回归三件测试文件合计 `28 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。

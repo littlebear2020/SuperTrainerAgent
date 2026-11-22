@@ -131,7 +131,8 @@ def build_archive(
             stdout=subprocess.PIPE,
             stderr=stderr_file,
         )
-        assert process.stdout is not None
+        if process.stdout is None:
+            raise ArchiveError("git archive 未返回输出管道")
         with temporary.open("wb") as raw:
             with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=commit_time) as compressed:
                 with tarfile.open(fileobj=compressed, mode="w|") as target:
@@ -151,6 +152,7 @@ def build_archive(
                         )
         stderr_file.seek(0)
         stderr = stderr_file.read().decode(errors="replace").strip()
+        process.stdout.close()
         returncode = process.wait()
         if returncode != 0:
             raise ArchiveError(f"git archive 失败：{stderr or returncode}")

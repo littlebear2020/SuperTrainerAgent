@@ -105,7 +105,7 @@ jobs:
           while IFS= read -r path; do
             case "$path" in
               config*.yaml)
-                if [[ "$path" != */* && "$path" == config*.yaml ]]; then
+                if [[ "$path" != */* ]]; then
                   changed=true
                   break
                 fi
