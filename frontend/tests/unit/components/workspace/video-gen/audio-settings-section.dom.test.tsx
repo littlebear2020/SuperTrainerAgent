@@ -24,8 +24,8 @@ const h = vi.hoisted(() => ({
   recomposeMut: { mutate: vi.fn(), isPending: false },
   rerenderMut: { mutate: vi.fn(), isPending: false },
   voices: [
-    { id: "preset:146", name: "女声一", gender: "女" },
-    { id: "preset:200", name: "男声一", gender: "男" },
+    { id: "doubao:zh_female_vv_uranus_bigtts", name: "女声一", gender: "女" },
+    { id: "doubao:zh_male_m191_uranus_bigtts", name: "男声一", gender: "男" },
   ],
 }));
 
@@ -61,7 +61,7 @@ function makeStoryboard(cfg: Record<string, unknown> = {}): StoryboardData {
   return {
     title: "t",
     config: {
-      voice_id: "preset:146",
+      voice_id: "doubao:zh_female_vv_uranus_bigtts",
       tts_speed: 1.0,
       bgm_volume: 0.15,
       subtitle_style: "default",
@@ -176,9 +176,12 @@ describe("T14 voice_id 三分态提交（F4）", () => {
       />,
     );
     await expand();
-    setSelect('[data-testid="voice-select"]', "preset:200");
+    setSelect(
+      '[data-testid="voice-select"]',
+      "doubao:zh_male_m191_uranus_bigtts",
+    );
     const patch = saveAndResolve();
-    expect(patch).toEqual({ voice_id: "preset:200" });
+    expect(patch).toEqual({ voice_id: "doubao:zh_male_m191_uranus_bigtts" });
   });
 });
 
@@ -192,7 +195,10 @@ describe("T9 保存后三选弹层（F1）", () => {
       />,
     );
     await expand();
-    setSelect('[data-testid="voice-select"]', "preset:200");
+    setSelect(
+      '[data-testid="voice-select"]',
+      "doubao:zh_male_m191_uranus_bigtts",
+    );
     saveAndResolve();
     // AlertDialog(Radix) 弹层 portal 到 document.body——断言走 body
     expect(document.body.textContent).toContain("将为 2 帧重新配音");
@@ -225,7 +231,10 @@ describe("T9 保存后三选弹层（F1）", () => {
       />,
     );
     await expand();
-    setSelect('[data-testid="voice-select"]', "preset:200");
+    setSelect(
+      '[data-testid="voice-select"]',
+      "doubao:zh_male_m191_uranus_bigtts",
+    );
     saveAndResolve();
     expect(document.body.textContent).not.toContain("将为 2 帧重新配音");
     expect(toast.success).toHaveBeenCalledWith(
@@ -242,7 +251,10 @@ describe("T9 保存后三选弹层（F1）", () => {
       />,
     );
     await expand();
-    setSelect('[data-testid="voice-select"]', "preset:200");
+    setSelect(
+      '[data-testid="voice-select"]',
+      "doubao:zh_male_m191_uranus_bigtts",
+    );
     saveAndResolve();
     const btn = document.body.querySelector(
       '[data-testid="regen-all-audio-btn"]',
@@ -296,9 +308,12 @@ describe("T11 config 外部同步（F3）", () => {
       />,
     );
     await expand();
-    // 服务端外部变化：bgm 0.45 → 滑杆 45；音色 preset:200
+    // 服务端外部变化：bgm 0.45 → 滑杆 45；音色 doubao:zh_male_m191_uranus_bigtts
     rerenderWith(
-      makeStoryboard({ bgm_volume: 0.45, voice_id: "preset:200" }),
+      makeStoryboard({
+        bgm_volume: 0.45,
+        voice_id: "doubao:zh_male_m191_uranus_bigtts",
+      }),
       "ready",
     );
     const sliders = Array.from(
@@ -307,7 +322,7 @@ describe("T11 config 外部同步（F3）", () => {
     expect(sliders[1]!.value).toBe("45");
     expect(
       (q('[data-testid="voice-select"]') as unknown as HTMLSelectElement).value,
-    ).toBe("preset:200");
+    ).toBe("doubao:zh_male_m191_uranus_bigtts");
   });
 
   it("dirty → 不覆盖用户输入（经 select 制造 dirty——range 合成事件在 happy-dom 不可靠）", async () => {
@@ -345,15 +360,20 @@ describe("T11 config 外部同步（F3）", () => {
         const sel = cont!.querySelector(
           '[data-testid="voice-select"]',
         ) as unknown as HTMLSelectElement;
-        sel.value = "preset:200";
+        sel.value = "doubao:zh_male_m191_uranus_bigtts";
         sel.dispatchEvent(new Event("change", { bubbles: true }));
       });
       // 服务端外部变化（音色回退 + bgm 0.45）——dirty 期间不得覆盖
-      renderIt(makeStoryboard({ voice_id: "preset:146", bgm_volume: 0.45 }));
+      renderIt(
+        makeStoryboard({
+          voice_id: "doubao:zh_female_vv_uranus_bigtts",
+          bgm_volume: 0.45,
+        }),
+      );
       const sel = cont!.querySelector(
         '[data-testid="voice-select"]',
       ) as unknown as HTMLSelectElement;
-      expect(sel.value).toBe("preset:200");
+      expect(sel.value).toBe("doubao:zh_male_m191_uranus_bigtts");
       const sliders = Array.from(
         cont!.querySelectorAll('input[type="range"]'),
       ) as unknown as HTMLInputElement[];

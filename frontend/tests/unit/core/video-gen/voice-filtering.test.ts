@@ -1,74 +1,77 @@
-/**
- * Plan B Task 4（2026-10-19）：ViMax 音色目录过滤与 preset 残留判定。
- *
- * 契约（设计 D4）：
- * - filterVoicesForTaskType：vimax 剔除 qihu/preset 条目；ai_image 原样返回。
- * - vimaxVoiceBlocked：vimax + preset → true（提交/试听阻断）；其他组合 false。
- * - isPresetVoice：仅 "preset:N" 前缀命中。
- */
 import { describe, expect, it } from "vitest";
 
 import {
-  filterVoicesForTaskType,
-  isPresetVoice,
-  vimaxVoiceBlocked,
+  filterSupportedVoices,
+  retiredVoiceBlocked,
 } from "@/core/video-gen/voice-filtering";
 
-const VOICES = [
-  { id: "preset:146", name: "知性女声", gender: "Female", provider: "qihu" },
-  { id: "preset:332", name: "磁性解说男声", gender: "Male", provider: "qihu" },
+const DOUBAO_VOICES = [
   {
-    id: "doubao:zh_male_A",
-    name: "豆包男声",
+    id: "doubao:zh_female_vv_uranus_bigtts",
+    name: "Vivi2.0",
+    gender: "Female",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_female_yingyujiaoxue_uranus_bigtts",
+    name: "Tina2.0",
+    gender: "Female",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_male_m191_uranus_bigtts",
+    name: "云舟2.0",
     gender: "Male",
     provider: "doubao",
   },
   {
-    id: "zh-CN-YunjianNeural",
-    name: "云健",
+    id: "doubao:zh_male_liufei_uranus_bigtts",
+    name: "刘飞2.0",
     gender: "Male",
-    provider: "edge-tts",
+    provider: "doubao",
   },
 ];
 
-describe("filterVoicesForTaskType", () => {
-  it("vimax 剔除全部 360 preset 条目（doubao/edge 保留）", () => {
-    const out = filterVoicesForTaskType(VOICES, "vimax");
-    expect(out.map((v) => v.id)).toEqual([
-      "doubao:zh_male_A",
-      "zh-CN-YunjianNeural",
-    ]);
-  });
+const VOICES = [
+  {
+    id: "qihu:custom",
+    name: "未识别旧渠道",
+    gender: "Female",
+    provider: "qihu",
+  },
+  { id: "preset:146", name: "旧 360 女声", gender: "Female", provider: "qihu" },
+  {
+    id: "edge:zh-CN-XiaoxiaoNeural",
+    name: "旧 Edge 女声",
+    provider: "edge-tts",
+  },
+  {
+    id: "zh-CN-YunjianNeural",
+    name: "旧裸 Edge 男声",
+    gender: "Male",
+    provider: "edge-tts",
+  },
+  ...DOUBAO_VOICES,
+];
 
-  it("ai_image 原样返回（qihu 仍展示）", () => {
-    expect(filterVoicesForTaskType(VOICES, "ai_image")).toEqual(VOICES);
-  });
-
-  it("taskType 缺省原样返回", () => {
-    expect(filterVoicesForTaskType(VOICES, undefined)).toEqual(VOICES);
+describe("filterSupportedVoices", () => {
+  it("所有视频任务共用时都只保留 4 个字节目录音色", () => {
+    const out = filterSupportedVoices(VOICES);
+    expect(out.map((v) => v.id)).toEqual(DOUBAO_VOICES.map((v) => v.id));
   });
 });
 
-describe("vimaxVoiceBlocked / isPresetVoice", () => {
-  it("vimax + preset 残留 → 阻断", () => {
-    expect(vimaxVoiceBlocked("vimax", "preset:332")).toBe(true);
+describe("退役音色提交阻断", () => {
+  it("所有任务类型的 preset/Edge 残留均阻断", () => {
+    expect(retiredVoiceBlocked("preset:332")).toBe(true);
+    expect(retiredVoiceBlocked("edge:zh-CN-XiaoxiaoNeural")).toBe(true);
+    expect(retiredVoiceBlocked("zh-CN-YunjianNeural")).toBe(true);
   });
 
-  it("vimax + doubao/edge/默认(null) → 放行", () => {
-    expect(vimaxVoiceBlocked("vimax", "doubao:zh_male_A")).toBe(false);
-    expect(vimaxVoiceBlocked("vimax", "zh-CN-YunjianNeural")).toBe(false);
-    expect(vimaxVoiceBlocked("vimax", null)).toBe(false);
-  });
-
-  it("非 ViMax + preset → 放行（其他类型语义不变）", () => {
-    expect(vimaxVoiceBlocked("ai_image", "preset:332")).toBe(false);
-    expect(vimaxVoiceBlocked("ai_video", "preset:146")).toBe(false);
-  });
-
-  it("isPresetVoice 只认 preset: 前缀", () => {
-    expect(isPresetVoice("preset:1")).toBe(true);
-    expect(isPresetVoice("doubao:preset")).toBe(false);
-    expect(isPresetVoice(null)).toBe(false);
-    expect(isPresetVoice("")).toBe(false);
+  it("字节、克隆与默认空值放行", () => {
+    expect(retiredVoiceBlocked(DOUBAO_VOICES[0]!.id)).toBe(false);
+    expect(retiredVoiceBlocked("clone:user-voice")).toBe(false);
+    expect(retiredVoiceBlocked(null)).toBe(false);
+    expect(retiredVoiceBlocked("")).toBe(false);
   });
 });

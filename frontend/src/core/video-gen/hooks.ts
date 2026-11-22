@@ -227,11 +227,7 @@ export function useVideoVoices(lang?: string) {
   });
 }
 
-/**
- * FP1-5: 后端解析的默认音色（doubao:<speaker>/preset:146），与成品一致。
- * 「默认」选项试听用——修前试听恒 edge-tts 静态值，试听满意≠成品声音。
- * 接口失败时 data 为 undefined，调用方退化到静态兜底值（评审预案 #8）。
- */
+/** 后端解析的字节默认音色与成品一致；接口失败时调用方使用目录内静态默认值。 */
 export function useDefaultVoice(lang: string, taskType?: string) {
   return useQuery({
     // Plan B（2026-10-19）：query key 含 taskType——vimax 与缺省默认不共用缓存

@@ -17,7 +17,10 @@ import {
   useVoiceTwins,
 } from "@/core/voice-twin/hooks";
 import type { PresetVoice } from "@/core/voice-twin/types";
-import { VOICE_PROVIDER_LABELS } from "@/core/voice-twin/types";
+import {
+  isRetiredVoiceId,
+  VOICE_PROVIDER_LABELS,
+} from "@/core/voice-twin/types";
 import type { VoiceFilterState } from "@/core/voice-twin/voice-filters";
 import {
   collectLocales,
@@ -45,8 +48,6 @@ interface ClonedOption {
 }
 
 const PROVIDER_BADGE_STYLE: Record<string, string> = {
-  "edge-tts": "bg-emerald-500/10 text-emerald-500",
-  qihu: "bg-indigo-500/10 text-indigo-500",
   doubao: "bg-sky-500/10 text-sky-500",
 };
 
@@ -348,8 +349,10 @@ export function VoiceSelector({
     [voicesQuery.data],
   );
 
+  // 提前剔除可让语言/标签选项与选中名称回退都不接触退役目录项。
   const catalogVoices = useMemo(
-    () => presetQuery.data ?? [],
+    () =>
+      (presetQuery.data ?? []).filter((voice) => !isRetiredVoiceId(voice.id)),
     [presetQuery.data],
   );
   const localeOptions = useMemo(
@@ -393,7 +396,11 @@ export function VoiceSelector({
   const selectedName = useMemo(() => {
     const cloned = clonedVoices.find((v) => v.id === value);
     if (cloned) return cloned.name;
-    return catalogVoices.find((v) => v.id === value)?.name ?? null;
+    const catalog = catalogVoices.find((v) => v.id === value)?.name;
+    if (catalog) return catalog;
+    if (isRetiredVoiceId(value))
+      return `${value}（已停用，请改选字节直连音色）`;
+    return null;
   }, [clonedVoices, catalogVoices, value]);
 
   // Layout-only classes from callers (mb-3, w-full, ...). Visual styling is

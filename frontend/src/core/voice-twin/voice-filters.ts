@@ -5,6 +5,7 @@
  * 比 URL query 简单）。克隆音色组不经过这里的筛选（始终全量显示）。
  */
 
+import { isRetiredVoiceId } from "./types";
 import type { PresetVoice, VoiceProvider } from "./types";
 
 /** 筛选状态。空数组 = 该维度不限制。 */
@@ -77,13 +78,14 @@ export function saveVoiceFilters(
   }
 }
 
-/** 多维筛选：locale/性别为精确匹配；scenario/tone 为「任一标签命中」。 */
+/** 退役条目先剔除；locale/性别精确匹配，scenario/tone 任一标签命中。 */
 export function filterCatalogVoices(
   voices: PresetVoice[],
   filters: VoiceFilterState,
 ): PresetVoice[] {
   return voices.filter(
     (v) =>
+      !isRetiredVoiceId(v.id) &&
       (filters.locales.length === 0 || filters.locales.includes(v.locale)) &&
       (filters.genders.length === 0 || filters.genders.includes(v.gender)) &&
       (filters.scenarios.length === 0 ||
@@ -98,9 +100,9 @@ export interface VoiceGroup {
   voices: PresetVoice[];
 }
 
-/** 按 provider 分组，固定顺序：edge-tts（免费）→ 360 → 豆包。空组不返回。 */
+/** 只保留字节直连目录组。 */
 export function groupCatalogVoices(voices: PresetVoice[]): VoiceGroup[] {
-  const order: VoiceProvider[] = ["edge-tts", "qihu", "doubao"];
+  const order: VoiceProvider[] = ["doubao"];
   return order
     .map((provider) => ({
       provider,

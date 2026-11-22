@@ -58,6 +58,10 @@ import {
 } from "@/core/video-gen/style-presets";
 import { SUBTITLE_STYLES } from "@/core/video-gen/subtitle-styles";
 import type { CharacterSheetData, PropAssetData } from "@/core/video-gen/types";
+import {
+  filterSupportedVoices,
+  retiredVoiceBlocked,
+} from "@/core/video-gen/voice-filtering";
 
 import {
   CharacterSheetLightbox,
@@ -1317,6 +1321,10 @@ export function CourseProjectDetailPage({
     );
   }
 
+  const voices = filterSupportedVoices(voicesQuery.data ?? []);
+  const retiredVoice = retiredVoiceBlocked(projectVoiceId);
+  const voiceInList = voices.some((voice) => voice.id === projectVoiceId);
+
   const handleSave = () => {
     updateMut.mutate({
       id: projectId,
@@ -1386,7 +1394,7 @@ export function CourseProjectDetailPage({
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={!hasChanges || updateMut.isPending}
+            disabled={!hasChanges || updateMut.isPending || retiredVoice}
           >
             <Save className="mr-1 h-4 w-4" />
             {updateMut.isPending ? "保存中..." : "保存"}
@@ -1460,12 +1468,24 @@ export function CourseProjectDetailPage({
               className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
             >
               <option value="">跟随系统默认</option>
-              {(voicesQuery.data ?? []).map((v) => (
+              {voices.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name} ({v.gender})
                 </option>
               ))}
+              {projectVoiceId && !voiceInList && (
+                <option value={projectVoiceId} disabled={retiredVoice}>
+                  {retiredVoice
+                    ? `${projectVoiceId}（原音色已停用，请改选字节直连音色）`
+                    : projectVoiceId}
+                </option>
+              )}
             </select>
+            {retiredVoice && (
+              <p className="text-xs text-amber-600">
+                原音色已停用，请改选字节直连音色后再保存。
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <label className="text-xs font-medium">默认字幕样式</label>

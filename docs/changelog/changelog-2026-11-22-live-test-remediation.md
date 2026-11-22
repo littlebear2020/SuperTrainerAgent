@@ -1,20 +1,18 @@
 # 服务器实测问题修复与 TTS 单通道收敛
 
-> **TL;DR**：本批按四个主 PR 串行修复实测问题；当前提交覆盖停止生成保留草稿与 Task 0 取证，后续 PR 继续处理播客 URL、TTS 单通道和前端/live 断言；不自动部署、不修改真实配置、不执行未授权付费调用。
+> **TL;DR**：P1/P11 已分别合入；PR 3 以同一分支四笔提交收敛字节 TTS 单通道；后续 PR 4 处理默认徽标、用量标题、合成文案与 live 断言；不自动部署、不修改真实配置、不执行未授权付费调用。
 
 ## 当前已落地
 
 - P1（PR #40，已合入）：InputBox 在表单捕获阶段拦截 streaming 停止，保留文本、附件与 localStorage 草稿；正常发送仍清空。
 - P11（PR #41，已合入）：播客 URL 读取在连接 socket 已分离时使用 `response.fp.raw._sock` 设置剩余超时；EOF 安全结束，开放响应缺 socket 时响亮失败，安全链不变。
-- P3（PR 3 本地四提交进行中）：目录/API 只保留 4 个中文字节音色；统一入口在任何网络调用前拒绝 preset/Edge/裸 Edge ShortName；调用方与 ViMax 不再降级换声。
+- P3（PR 3 本地四提交已齐，待整体评审）：目录/API 只保留 4 个中文字节音色；统一入口在任何网络调用前拒绝 preset/Edge/裸 Edge ShortName；调用方不降级换声，前端旧值保留但停用。
 - P3 清理：PPT Master 共用字幕算法迁至 `subtitle_timing.py`，CosyVoice/ElevenLabs/MiniMax import 回归通过；Edge/360 客户端、依赖、配置结构与 sandbox 安装项移除；`config.example.yaml` 升至 33，真实 config 未触碰。
 - Task 0：确认实现代码相对计划基准无漂移；P6/P7 证据材料位于 `temp/live-test-remediation-20261122/`，均不满足条件 PR 门禁。
 - PR 3 已按最新决策固定为四笔本地提交、全部验证后一次性 push、同一 PR 合入与回滚。
 
 ## 后续固定范围
 
-- PR 2：播客 URL 抓取 socket 超时，保留完整 SSRF 安全链。
-- PR 3：只保留 4 个中文豆包音色与既有克隆，移除 Edge/360 TTS。
 - PR 4：动态默认徽标、用量标题占位、首渲文案与 live 断言。
 - 新增独立后续 PR：Sandbox 空闲释放在本地与部署默认均为 7200 秒；不冒充 P6 已查明根因。
 - Writer、P4、P8、P12、P15 不加回；P6/P7 未取证不开 PR。
@@ -38,9 +36,15 @@
 - PR 3 提交①：目录/API/统一入口相关回归 → 168 passed, 3 skipped；缓存旁路 26 条通过。
 - PR 3 提交②：去降级与 video_gen 组合回归 → 259 passed。
 - PR 3 提交③：PPT/voice_twin/video_gen 相关回归 → 355 passed；`uv sync` 移除 `edge-tts` 与仅其需要的 `tabulate`，`EDGE_TTS_NOT_INSTALLED`；后端 ruff 全过。
-- PR 3 旧夹具迁移后四个文件回归 → 80 passed；OCR 与旧签名测试修正后的最终后端全量 `uv run pytest tests/ -q` → **10159 passed, 91 skipped**。
+- PR 3 旧夹具迁移后四个文件回归 → 80 passed；高危白名单与空 ID 修复后的最终后端全量 `uv run pytest tests/ -q` → **10172 passed, 91 skipped**。
 - PR 3 sandbox：`docker build --pull=false --network=host --progress=plain -t deerflow-sandbox:tts-single-channel-20261122 -f docker/sandbox/Dockerfile .` → 构建成功，镜像 ID `sha256:6fcb9108898f…`；镜像内 `EDGE_TTS_NOT_INSTALLED; FFMPEG_OK`，复制技能后 `COPIED_PPT_SKILL_DOUBAO_AND_SUBTITLE_OK`。
 - PR 3 本地 OCR → 5 findings：3 个旧注释/死参数已清理，1 个非中文默认值前置拒绝已按 RED→GREEN 修复（相关 74 passed）；`backend_edge.py` 仍存在为误报，已用文件系统核实其不存在。
+- PR 3 提交④ RED → 纯逻辑 9 failed、DOM 17 failed，均为旧条目仍显示/旧值未保留或未阻断；GREEN → 纯逻辑 11 passed、DOM 29 passed，相关共享组件回归 31 passed，`pnpm typecheck` 通过。
+- PR 3 提交④ 最终全量 `pnpm test` → 281 files / 1813 tests passed；相关 Playwright → 4 passed + 1 passed；语言/音色用例旧实现 7 个语言选项 RED，新实现仅中文与 4 个字节音色 GREEN。
+- PR 3 四提交整体本地 OCR → 43 files / 9 findings；白名单零交集越权回落、角色池白名单和非中文配置兜底均已 RED→GREEN 修复，白名单顺序兼容保留；修复 diff 复核 → **0 findings**。其余 low 维护建议未扩大范围。
+- PR #42 首轮 GitHub CI 全绿；GitHub OCR 8 findings，其中角色池 import 固化为 medium，已改为调用时惰性计算并补 RED→GREEN；该修复本地 OCR → 0 findings。
+- PR #42 第二轮 GitHub CI 全绿；OCR 后续发现已收敛为空默认渲染前拒绝、池空保留默认回退但明确告警、单口播不误判、无效 speaker 告警及前端命名/默认 ID 复用；最终本地 OCR → 0 findings。
+- PR #42 最终轮高危项：共享入口现拒绝目录/白名单外 Doubao 与空 ID，正向测试夹具使用目录内真实 ID；PPT 失效 CLI 参数文档已同步，修复 diff 本地 OCR → 0 findings。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
 ## 阻塞与未执行

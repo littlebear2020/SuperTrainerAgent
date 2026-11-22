@@ -5,13 +5,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 DEFAULT_SUBTITLE_MAX_CHARS = 20
 DEFAULT_BOUNDARY_OVERLAP_TOLERANCE_MS = 100
 _TICKS_PER_MILLISECOND = 10_000
 _SENTENCE_END = frozenset("。！？!?")
 _CLAUSE_END = frozenset("，,；;：:")
-_CLOSING_PUNCTUATION = frozenset('”’」』）》)"\'')
+_CLOSING_PUNCTUATION = frozenset("”’」』）》)\"'")
 
 
 @dataclass(frozen=True)
@@ -54,10 +53,7 @@ def _map_word_boundaries(
     boundary_keys = [_text_key(boundary["text"]) for boundary in boundaries]
     boundary_key = "".join(boundary_keys)
     if not source_key or source_key != boundary_key:
-        raise RuntimeError(
-            f"{provider_label} word boundaries could not be aligned with the narration text; "
-            "subtitle timing was not generated"
-        )
+        raise RuntimeError(f"{provider_label} word boundaries could not be aligned with the narration text; subtitle timing was not generated")
 
     mapped: list[_MappedWord] = []
     key_offset = 0
@@ -134,12 +130,7 @@ def _hard_split_span(
         remaining_length = _display_length(text, start, end)
         remaining_parts = (remaining_length + max_chars - 1) // max_chars
         target_length = (remaining_length + remaining_parts - 1) // remaining_parts
-        candidates = [
-            (word.source_end, _display_length(text, start, word.source_end))
-            for word in words
-            if start < word.source_end < end
-            and _display_length(text, start, word.source_end) <= max_chars
-        ]
+        candidates = [(word.source_end, _display_length(text, start, word.source_end)) for word in words if start < word.source_end < end and _display_length(text, start, word.source_end) <= max_chars]
         if candidates:
             split_at, _ = min(
                 candidates,
@@ -150,11 +141,7 @@ def _hard_split_span(
             )
         else:
             split_at = next(
-                (
-                    word.source_end
-                    for word in words
-                    if start < word.source_end < end
-                ),
+                (word.source_end for word in words if start < word.source_end < end),
                 end,
             )
         if split_at >= end:
@@ -192,11 +179,7 @@ def _split_sentence_span(
     if clause[0] < clause[1]:
         clauses.append(clause)
 
-    atoms = [
-        part
-        for clause in clauses
-        for part in _hard_split_span(text, clause, words, max_chars)
-    ]
+    atoms = [part for clause in clauses for part in _hard_split_span(text, clause, words, max_chars)]
     merged: list[tuple[int, int]] = []
     for atom in atoms:
         if not merged:
@@ -223,20 +206,14 @@ def _clamp_small_overlaps(
             overlap = normalized[-1].end - cue.start
             if overlap > tolerance:
                 overlap_ms = overlap / _TICKS_PER_MILLISECOND
-                raise RuntimeError(
-                    f"{provider_label} returned {overlap_ms:g} ms of overlapping "
-                    "word-boundary timing; audio and subtitles were not published"
-                )
+                raise RuntimeError(f"{provider_label} returned {overlap_ms:g} ms of overlapping word-boundary timing; audio and subtitles were not published")
             cue = _SubtitleCue(
                 start=normalized[-1].end,
                 end=cue.end,
                 text=cue.text,
             )
         if cue.end <= cue.start:
-            raise RuntimeError(
-                f"{provider_label} returned an invalid subtitle timing interval; "
-                "audio and subtitles were not published"
-            )
+            raise RuntimeError(f"{provider_label} returned an invalid subtitle timing interval; audio and subtitles were not published")
         normalized.append(cue)
     return normalized
 
@@ -250,20 +227,12 @@ def _subtitle_cues(
     if max_chars < 1:
         raise ValueError("subtitle_max_chars must be at least 1")
     words = _map_word_boundaries(text, boundaries, provider_label)
-    spans = [
-        span
-        for sentence in _sentence_spans(text)
-        for span in _split_sentence_span(text, sentence, words, max_chars)
-    ]
+    spans = [span for sentence in _sentence_spans(text) for span in _split_sentence_span(text, sentence, words, max_chars)]
 
     pending: list[tuple[int, int, str]] = []
     assigned_word_indexes: list[int] = []
     for start, end in spans:
-        matching = [
-            (index, word)
-            for index, word in enumerate(words)
-            if word.source_start >= start and word.source_end <= end
-        ]
+        matching = [(index, word) for index, word in enumerate(words) if word.source_start >= start and word.source_end <= end]
         if not matching:
             continue
         cue_text = re.sub(r"\s+", " ", text[start:end]).strip()
@@ -271,10 +240,7 @@ def _subtitle_cues(
         pending.append((matching[0][1].start, matching[-1][1].end, cue_text))
 
     if assigned_word_indexes != list(range(len(words))):
-        raise RuntimeError(
-            f"{provider_label} word boundaries crossed subtitle split points; "
-            "subtitle timing was not generated"
-        )
+        raise RuntimeError(f"{provider_label} word boundaries crossed subtitle split points; subtitle timing was not generated")
     if not pending:
         raise RuntimeError(f"{provider_label} produced no timed subtitle cues")
 
@@ -288,15 +254,9 @@ def _subtitle_cues(
     source_text = re.sub(r"\s+", "", text)
     subtitle_text = re.sub(r"\s+", "", "".join(cue.text for cue in cues))
     if subtitle_text != source_text:
-        raise RuntimeError(
-            f"{provider_label} subtitle text does not match the narration text; "
-            "audio and subtitles were not published"
-        )
+        raise RuntimeError(f"{provider_label} subtitle text does not match the narration text; audio and subtitles were not published")
     if any(_display_length(cue.text, 0, len(cue.text)) > max_chars for cue in cues):
-        raise RuntimeError(
-            f"A single {provider_label} word boundary exceeds the subtitle character limit; "
-            "audio and subtitles were not published"
-        )
+        raise RuntimeError(f"A single {provider_label} word boundary exceeds the subtitle character limit; audio and subtitles were not published")
     return cues
 
 
@@ -309,14 +269,7 @@ def _srt_timestamp(ticks: int) -> str:
 
 
 def _format_srt(cues: list[_SubtitleCue]) -> str:
-    blocks = [
-        (
-            f"{index}\n"
-            f"{_srt_timestamp(cue.start)} --> {_srt_timestamp(cue.end)}\n"
-            f"{cue.text}"
-        )
-        for index, cue in enumerate(cues, 1)
-    ]
+    blocks = [(f"{index}\n{_srt_timestamp(cue.start)} --> {_srt_timestamp(cue.end)}\n{cue.text}") for index, cue in enumerate(cues, 1)]
     return "\n\n".join(blocks) + "\n"
 
 
@@ -336,4 +289,3 @@ def format_word_timed_srt(
             provider_label,
         )
     )
-

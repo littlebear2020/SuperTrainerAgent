@@ -501,17 +501,12 @@ export async function listVideoVoices(lang?: string): Promise<VoiceInfo[]> {
   return res.json();
 }
 
-/**
- * FP1-5: 后端解析的默认音色（doubao:<speaker> 或 preset:146），与成品一致——
- * 修前「默认」试听恒用 types.ts LANG_OPTIONS 的静态 edge-tts 值，
- * 试听满意≠成品声音。接口不可达时调用方退化到静态兜底值。
- */
+/** 后端解析的目录内字节默认音色，与成品一致；接口失败时调用方使用目录内静态默认值。 */
 export async function fetchDefaultVoice(
   lang: string,
   taskType?: string,
 ): Promise<string> {
-  // Plan B（2026-10-19）：taskType=vimax 走 ViMax 策略解析（zh 兜底不再是
-  // preset:146）；缺省不追加参数——旧调用方 URL/响应零变化。
+  // taskType 仅用于隔离默认解析与缓存；缺省不追加参数。
   const taskTypeQuery = taskType
     ? `&task_type=${encodeURIComponent(taskType)}`
     : "";
