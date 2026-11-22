@@ -40,7 +40,7 @@
 - 本仓真实打包：`python3 scripts/release_archive.py --ref origin/main --output /tmp/agent-flow-release.tar.gz --exclude docker/sandbox/cache/chrome-linux` → `REAL_ARCHIVE_OK 0e84b1485f029d33b8ba57023003f6d4e39055c8 17023`；未提交脚本不在包内，wheels/BPE/fonts 均在，chrome-linux 不在。
 - 真实部署前探针：`python3 scripts/pre_deploy_check.py --ref origin/main` → `PRE_DEPLOY_PROBE_OK rc=1 blockers=2`；两条例外均阻断，其他 worktree 均为提示。
 - `bash -n deploy_on_server.sh deploy_to_test_server.sh` → exit 0；两件 workflow 经 PyYAML 解析 → `WORKFLOW_YAML_OK 2`。
-- 发布性能优化后最终 `cd backend && UV_PROJECT_ENVIRONMENT=/Users/littlebear/Documents/SuperTrainerAgent-home-plan/backend/.venv make test` → `10313 passed, 95 skipped, 434 warnings in 76.64s`，exit 0。
+- 安全失败路径修复后最终 `cd backend && UV_PROJECT_ENVIRONMENT=/Users/littlebear/Documents/SuperTrainerAgent-home-plan/backend/.venv make test` → `10314 passed, 95 skipped, 434 warnings in 75.58s`，exit 0。
 - 最终根 `UV_PROJECT_ENVIRONMENT=/Users/littlebear/Documents/SuperTrainerAgent-home-plan/backend/.venv make check` → exit 0；ESLint `0 errors`（121 条存量 warning）、Prettier 通过、knip 完成、i18n `659 个叶子全活`、docs convention `OK`。
 - `git diff --check` 与 `python3 scripts/check_docs_convention.py` → exit 0；`OK 仓库治理约定全过`。
 
