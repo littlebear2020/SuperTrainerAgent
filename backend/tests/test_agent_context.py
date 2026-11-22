@@ -157,3 +157,21 @@ def test_default_mode_allows_dirty_worktree(tmp_path: Path, dirty_content: str) 
     result = run_cli(repo, "--json")
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["dirty"] is True
+
+
+def test_untracked_spec_has_content_hash_without_blob(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    spec_path = repo / "docs/plans/untracked.md"
+    spec_path.write_text("new plan\n", encoding="utf-8")
+
+    context = load_module().build_context(repo, "origin/main", "docs/plans/untracked.md")
+
+    assert context["spec_blob_sha"] is None
+    assert context["spec_sha256"] == hashlib.sha256(b"new plan\n").hexdigest()
+
+
+def test_expect_spec_hash_requires_spec_path(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    result = run_cli(repo, "--expect-spec-sha256", "a" * 64)
+    assert result.returncode == 1
+    assert "--spec" in result.stderr

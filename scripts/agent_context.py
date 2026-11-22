@@ -76,12 +76,19 @@ def _spec_context(root: Path, spec: str) -> dict[str, str | None]:
     if not resolved_path.is_relative_to(resolved_root) or not resolved_path.is_file():
         raise ContextError(f"计划文件不存在或越过仓库边界：{spec}")
     normalized = relative.as_posix()
-    blob = _git(root, "rev-parse", "--verify", f"HEAD:{normalized}")
-    if blob.returncode not in (0, 1):
-        raise ContextError(f"读取计划 blob 失败：{blob.stderr.strip()}")
+    tree = _git(root, "ls-tree", "-z", "HEAD", "--", normalized)
+    if tree.returncode != 0:
+        raise ContextError(f"读取计划 blob 失败：{tree.stderr.strip()}")
+    spec_blob_sha = None
+    if tree.stdout:
+        metadata, _ = tree.stdout.split("\t", 1)
+        parts = metadata.split()
+        if len(parts) < 3 or parts[1] != "blob":
+            raise ContextError(f"计划路径不是 HEAD 中的文件：{spec}")
+        spec_blob_sha = parts[2]
     return {
         "spec_path": normalized,
-        "spec_blob_sha": blob.stdout.strip() if blob.returncode == 0 else None,
+        "spec_blob_sha": spec_blob_sha,
         "spec_sha256": hashlib.sha256(resolved_path.read_bytes()).hexdigest(),
     }
 
@@ -142,6 +149,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.expect_spec_sha256 is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", args.expect_spec_sha256):
         print("agent_context: --expect-spec-sha256 必须是 64 位十六进制", file=sys.stderr)
+        return 1
+    if args.expect_spec_sha256 is not None and args.spec is None:
+        print("agent_context: --expect-spec-sha256 必须同时指定 --spec", file=sys.stderr)
         return 1
     try:
         context = build_context(Path.cwd(), args.base_ref, args.spec)

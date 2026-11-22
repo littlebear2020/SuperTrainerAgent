@@ -136,7 +136,7 @@ def build_archive(
                     with tarfile.open(fileobj=process.stdout, mode="r|") as source:
                         for member in source:
                             name = _normalize_archive_path(member.name)
-                            if _is_excluded(name, normalized_excludes) or name in config_paths:
+                            if _is_excluded(name, normalized_excludes) or name in config_paths or name == MANIFEST_PATH:
                                 continue
                             target.addfile(member, source.extractfile(member) if member.isfile() else None)
                     manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()

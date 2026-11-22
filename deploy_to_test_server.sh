@@ -64,11 +64,12 @@ pack() {
 
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
 
+    RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 发布包缺少有效 manifest，请检查打包错误${NC}"; return 1; }
     SIZE=$(ls -lh "$TAR_FILE" | awk '{print $5}')
     echo ""
     echo -e "${GREEN}✅ 打包完成: $SIZE${NC}"
     echo -e "   文件位置: $TAR_FILE"
-    echo "   源码 SHA: $(release_sha "$TAR_FILE")"
+    echo "   源码 SHA: $RELEASE_SHA"
 }
 
 # ============================================================
@@ -88,7 +89,8 @@ upload() {
     # 确保目标目录存在
     ssh -p "$SSH_PORT" "$SERVER" "mkdir -p $PROJECT_DIR"
 
-    echo "  上传源码 SHA: $(release_sha "$TAR_FILE")"
+    RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack${NC}"; return 1; }
+    echo "  上传源码 SHA: $RELEASE_SHA"
     echo "  正在上传..."
     scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/"
     scp -P "$SSH_PORT" "$LOCAL_DIR/deploy_to_test_server.sh" "${SERVER}:${PROJECT_DIR}/"
@@ -140,6 +142,7 @@ deploy() {
     # ── 步骤 2: 停止服务并解压 ──
     echo ""
     echo -e "${YELLOW}步骤 2/6: 停止旧服务并解压新代码${NC}"
+    RELEASE_SHA="$(release_sha deer-flow-test-update.tar.gz)" || { echo -e "${RED}❌ 压缩包缺少 release-manifest.json，已停止部署${NC}"; return 1; }
 
     # 停止旧容器（如果存在）
     if [ -f "scripts/deploy.sh" ]; then
@@ -153,7 +156,7 @@ deploy() {
     echo "  解压 deer-flow-test-update.tar.gz ..."
     tar xzf deer-flow-test-update.tar.gz
     echo "  ✓ 解压完成"
-    echo "  部署源码 SHA: $(release_sha deer-flow-test-update.tar.gz)"
+    echo "  部署源码 SHA: $RELEASE_SHA"
 
     # ── 步骤 3: 恢复配置 ──
     echo ""

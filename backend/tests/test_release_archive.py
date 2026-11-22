@@ -215,3 +215,29 @@ def test_ci_workflows_cover_development_infrastructure() -> None:
     for path in backend_paths:
         quick_path = path.replace("/**", "/*")
         assert quick_path in quick_checks
+
+
+def test_tracked_manifest_is_replaced_not_duplicated(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    (repo / "release-manifest.json").write_text('{"source_sha":"stale"}\n', encoding="utf-8")
+    source_sha = commit(repo, "tracked stale manifest")
+    git(repo, "update-ref", "refs/remotes/origin/main", "main")
+    output = tmp_path / "release.tar.gz"
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(output, "r:gz") as bundle:
+        names = bundle.getnames()
+    assert names.count("release-manifest.json") == 1
+    assert manifest(output)["source_sha"] == source_sha
+
+
+def test_release_sha_failures_cannot_be_hidden_by_echo() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        calls = [line.strip() for line in script.splitlines() if "$(release_sha" in line]
+        assert len(calls) == 3
+        for line in calls:
+            assert not line.startswith("echo")
+            assert "||" in line

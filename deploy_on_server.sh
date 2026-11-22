@@ -42,9 +42,10 @@ pack() {
     python3 scripts/pre_deploy_check.py --ref "$REF"
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
 
+    RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 发布包缺少有效 manifest，请检查打包错误"; return 1; }
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"
     echo "   文件位置: ../deer-flow-update.tar.gz"
-    echo "   源码 SHA: $(release_sha ../deer-flow-update.tar.gz)"
+    echo "   源码 SHA: $RELEASE_SHA"
 }
 
 # ============================================================
@@ -60,7 +61,8 @@ upload() {
         exit 1
     fi
 
-    echo "   上传源码 SHA: $(release_sha ../deer-flow-update.tar.gz)"
+    RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack"; return 1; }
+    echo "   上传源码 SHA: $RELEASE_SHA"
     scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/
     echo "✅ 上传完成"
 }
@@ -83,9 +85,10 @@ deploy() {
     echo "============================================"
     echo "  步骤 2/6: 停止服务并解压"
     echo "============================================"
+    RELEASE_SHA="$(release_sha deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，已停止部署"; return 1; }
     ./scripts/deploy.sh down
     tar xzf deer-flow-update.tar.gz
-    echo "  部署源码 SHA: $(release_sha deer-flow-update.tar.gz)"
+    echo "  部署源码 SHA: $RELEASE_SHA"
 
     echo ""
     echo "============================================"

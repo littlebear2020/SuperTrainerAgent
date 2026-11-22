@@ -44,7 +44,15 @@
 - 最终根 `UV_PROJECT_ENVIRONMENT=/Users/littlebear/Documents/SuperTrainerAgent-home-plan/backend/.venv make check` → exit 0；ESLint `0 errors`（121 条存量 warning）、Prettier 通过、knip 完成、i18n `659 个叶子全活`、docs convention `OK`。
 - `git diff --check` 与 `python3 scripts/check_docs_convention.py` → exit 0；`OK 仓库治理约定全过`。
 
-## 5. 未验证范围
+## PR #39 首轮 OCR 处置
+
+- 未跟踪计划的 blob 读取：改用 `git ls-tree`，保留内容 SHA-256、blob 置空；新增未跟踪计划测试。
+- 单独传 `--expect-spec-sha256`：改为缺少 `--spec` 即失败，新增参数组合测试。
+- 已跟踪旧 `release-manifest.json`：复制源成员时排除，保证新 manifest 唯一；新增重复成员测试。
+- 两件包装脚本的 pack/upload/deploy：全部先赋值检查 `release_sha`，不得在 echo 命令替换中吞错；deploy 在停服和解压前验证 manifest。
+- 首轮 4 条 medium + 1 条 low 均已对应修复；回归结果 `test_agent_context.py` 8 passed、三件流程测试文件合计 21 passed。复审结果以 PR 最新 OCR 为准。
+
+## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。
 - 未使用真实本地秘密配置测试显式追加路径；该路径使用临时占位文件与仓库内符号链接测试。
