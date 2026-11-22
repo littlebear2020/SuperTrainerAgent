@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛
 
-> **TL;DR**：P1/P11/PR 3 与 Doubao hotfix 已合入；PR 4 的默认徽标、用量标题、合成文案与 live 断言已完成本地验证；不自动部署、不修改真实配置、不执行未授权付费调用。
+> **TL;DR**：四个主 PR 与 Doubao hotfix 已合入；P6/P7 按证据收口且未开实现 PR；Sandbox 7200 秒独立 PR 进行中；不自动部署、不修改真实配置、不执行未授权付费调用。
 
 ## 当前已落地
 
@@ -11,11 +11,10 @@
 - P3 清理：PPT Master 共用字幕算法迁至 `subtitle_timing.py`，CosyVoice/ElevenLabs/MiniMax import 回归通过；Edge/360 客户端、依赖、配置结构与 sandbox 安装项移除；`config.example.yaml` 升至 33，真实 config 未触碰。
 - Task 0：确认实现代码相对计划基准无漂移；P6/P7 证据材料位于 `temp/live-test-remediation-20261122/`，均不满足条件 PR 门禁。
 - PR 3 已按四笔提交完成评审与合入。
-- P5/P9/P10/P13（PR 4 本地验证完成）：动态默认徽标、缺标题统一占位、通用合成文案和 composer/live 断言已按 TDD 完成，本地全量、mock E2E 与 OCR 已复核，待远端验收。
+- P5/P9/P10/P13（PR #44，已合入）：动态默认徽标、缺标题统一占位、通用合成文案和 composer/live 断言已按 TDD 完成；英文默认徽标 i18n 回归修复后，GitHub 全量 CI 与 OCR 通过。
 
 ## 后续固定范围
 
-- PR 4：动态默认徽标、用量标题占位、首渲文案与 live 断言。
 - 新增独立后续 PR：Sandbox 空闲释放在本地与部署默认均为 7200 秒；不冒充 P6 已查明根因。
 - Writer、P4、P8、P12、P15 不加回；P6/P7 未取证不开 PR。
 
@@ -55,6 +54,7 @@
 - PR 4 rebase 后最终全量：backend `uv run pytest tests/ -q` → **10176 passed, 91 skipped**；frontend `pnpm test` → **281 files / 1818 tests passed**；相关 mock E2E → **8 passed**；根 `make check` 与 docs convention 通过。
 - PR 4 本地 OCR → 11 files / 4 findings；默认徽标仍严格按 `mode_defaults`，不把配置缺失后的临时回退误标为默认；终态缺标题占位遵循 D12；重复徽标样式 low 建议 deferred，未扩大范围。
 - PR #44 首轮 GitHub E2E → 119 passed / 1 flaky / 2 skipped / 1 failed；英文 PPT 导览因新徽标硬编码中文“默认”稳定失败，本地同用例 RED 复现。徽标接入 `inputBox.defaultModelBadge` 后同用例 GREEN，InputBox 7 passed、typecheck/i18n 通过；前端全量仍为 281 files / 1818 tests passed，根 `make check` 通过。
+- PR #44 第二轮 `gh pr checks 44 --watch` → backend/frontend/E2E/perf/lint/quick-checks/AI-review 全部 pass；GitHub OCR 4 条 low，无 Critical/Important；已 rebase 合入，merge commit `6441bf55b487a35fdcdd92f70f60311bb2cf1da3`。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
 ## 阻塞与未执行
