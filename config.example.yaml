@@ -916,8 +916,8 @@ sandbox:
 #   image: deerflow-sandbox:local
 #   allow_host_bash: false
 #
-#   # Idle container recycle timeout in seconds (default: 600). Use 2 hours to
-#   # avoid killing long video renders during gaps between sandbox tool calls.
+#   # Idle container recycle timeout in seconds (default: 7200 = 2 hours).
+#   # The two-hour default avoids killing long video renders during tool-call gaps.
 #   # Loaded once at gateway startup; changing this requires a gateway restart.
 #   idle_timeout: 7200
 #

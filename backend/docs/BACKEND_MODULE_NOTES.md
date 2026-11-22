@@ -10,31 +10,29 @@ Voice cloning via Volcengine Mega TTS API (V1/V3) with a production task pipelin
 
 ```
 voice_twin/
-├── config.py              # VoiceCloneConfig (appid, token, access_key, storage_dir, edge_tts, reaper/timeout knobs)
+├── config.py              # VoiceCloneConfig (appid, token, access_key, storage_dir, doubao_tts, reaper/timeout knobs)
 ├── models.py              # VoiceTwinRow SQLAlchemy model
 ├── ensure_schema.py       # voice_twins 表启动自愈（对齐 VoiceTwinRow 补缺失列；配套 tests/test_voice_twin_ensure_schema.py）
 ├── schemas.py             # Pydantic schemas (SynthesizeRequest, MODELS_INFO)
 ├── service.py             # VoiceCloneService (prescreen, training, polling, synthesize, training reaper)
 ├── volcengine_client.py   # Volcengine TTS HTTP client (upload, status, SSE synthesize; VolcengineTTSHTTPError)
-├── qihu_tts_client.py     # 360 TTS SSE client (QihuTTSHTTPError)
 ├── doubao_tts_client.py   # ByteDance seed-tts-2.0 SSE client (DoubaoTTSHTTPError)
-├── edge_tts_client.py     # edge-tts client (tenacity 3x transport retry + wait_for timeout, audio-only)
 ├── _retry.py              # Shared TTS retry: transport + structured 429/5xx, exponential backoff (clone + production paths)
-├── preset_voices.py       # voice_id syntax helpers (preset:/doubao:/edge:) + catalog display-name lookup
+├── preset_voices.py       # Doubao/clone ID helpers + retired-ID recognition and catalog display-name lookup
 ├── errors.py              # Friendly error messages
 ├── repository.py          # VoiceTwinRepository (async CRUD + list_by_status)
 ├── ppt_extract.py         # PPT content extraction for ppt-to-video
-├── production_service.py  # ProductionService (script-to-audio, ppt-to-video) + degradation chain doubao→qihu→edge
+├── production_service.py  # ProductionService (script-to-audio, ppt-to-video), Doubao/existing clone only
 └── production_schemas.py  # Production task schemas
 ```
 
-**Shared voice catalog (2026-08-09 A1)**: `app/gateway/_shared/voice_catalog.py` is the single source of truth for the 35 curated voices (edge/qihu/doubao, `CatalogVoice` with prefixed ids + scenario/tone tags). `video_gen/orchestration/voices.py` re-exports it as legacy dicts (bare edge ids, capitalized gender) so `/api/video/voices` is byte-identical. `GET /api/voice-twins/preset-voices` returns the full catalog filtered by configured credentials (qihu needs QIHU_API_KEY, doubao needs access_key, edge needs `edge_tts.enabled`).
+**Shared voice catalog**: `app/gateway/_shared/voice_catalog.py` is the single source of truth for the four zh-CN Doubao catalog voices and the shared support gate. `video_gen/orchestration/voices.py` re-exports legacy dictionaries and applies `DOUBAO_TTS_ENABLED_SPEAKERS` without expanding beyond the catalog. `/api/video/voices` and `GET /api/voice-twins/preset-voices` expose only visible Doubao entries; existing cloned voices remain a separate path. Retired Edge/360 IDs are rejected before synthesis rather than substituted.
 
 **Endpoints**: `POST /api/voice-twins/prescreen` / `upload`；`GET /api/voice-twins` / `/{id}/status` / `/{id}/demo`；`POST /{id}/synthesize`；`GET /models` / `/preset-voices`；production 族：`POST /api/voice-twins/production/script-to-audio` / `doc-extract-text` / `ppt-to-video`，`GET/DELETE /api/voice-twins/production[/{id}[/download|/stream]]`。
 
 **Document-to-Audio Flow**: 前端传 `.docx/.txt/.md` → `/doc-extract-text` 预览 → `/script-to-audio` 提交；直连 `/doc-to-audio` 已删（2026-08-09 批次C：零调用方）；`strip_markdown()` 先清洗再 TTS；`_extract_text_from_upload()` 统一校验 + markitdown 转换。
 
-**Concurrent TTS Synthesis**: `asyncio.Semaphore(3)`（`tts_concurrency` 可调）+ Lock 保护进度；`_do_tts_synthesis()` 路由 cloned/360/doubao/edge（`edge:` 前缀），共享 `_retry.call_with_tts_retry`（transport + 429/5xx，3 次指数退避）；降级链 doubao→qihu→edge，**克隆音色永不降级**（静默换音色比失败更糟）；失败 chunk 清理残件并汇报计数；`split_text(max_chars=5000)` 尊重段落/句子边界（英文缩写/小数先掩码）。
+**Concurrent TTS Synthesis**: `asyncio.Semaphore(3)`（`tts_concurrency` 可调）+ Lock 保护进度；`_do_tts_synthesis()` 只路由目录内 Doubao 或既有克隆，共享 `_retry.call_with_tts_retry`（transport + 429/5xx，3 次指数退避）；**Doubao 与克隆均不跨音色降级**（静默换音色比失败更糟）；失败 chunk 清理残件并汇报计数；`split_text(max_chars=5000)` 尊重段落/句子边界（英文缩写/小数先掩码）。
 
 **Training stall reaper (2026-08-09 D1)**: `start_training_reaper()` 从 lifespan 启动，按 `training_reaper_interval_minutes` 扫 `training`/`uploading` 超时行，真实远端轮询一次后收敛 ready/failed——不再依赖前端开着轮询。`poll_status` 拆异常：httpx transport → 继续轮询；`KeyError`/`TypeError`/`ValueError` → fail fast。
 

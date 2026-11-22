@@ -74,7 +74,7 @@
 | **PR 3 / Task 3+4** | 点名的 backend voice_twin/video_gen/shared voice catalog、相关 routers/config/tests、音色相关 frontend、`skills/**` 的 Edge/360 TTS 引用、`docker/sandbox/Dockerfile`、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 AGENTS/常青 docs | 360 非 TTS 能力、Writer、P1/P5/P6/P7/P13、Remotion 模板、无关 provider 包裹链、真实配置与密钥 | **唯一大 PR，同一 PR 整体回滚**；四笔本地提交全部验证后一次性 push；预计 1–2 轮 OCR，范围不得随评审扩大。 |
 | **PR 4 / P5/P9/P10/P13** | `input-box.tsx`、`core/models/**`、personal_usage 的 agent/video/types 与 usage 前端、video status label、live tests/runbook、对应测试 | **PR 1 合入前不得开始**；P12、Writer、`settings/account-settings-page.tsx`、`app/(auth)/login/page.tsx`、`config.example.yaml`、真实 config | 对应单元测试、mock E2E、CI 通过；不含服务器 L1/L2 门禁。 |
 | **P6/P7 条件 PR** | 证据确认后分别点名最小实现与测试文件 | 未取证改实现、整体重写虚拟列表、无关中间件/provider 改动 | 各自根因/复现证据先行；证据不足不开 PR，只更新本计划阻塞状态。 |
-| **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试、本计划/changelog 与 `docs/findings-backlog.md` | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR 实现 | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
+| **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试、本计划/changelog、`docs/findings-backlog.md`，以及 7200/TTS 现行说明所需的 `config.example.yaml` 注释、部署指南与 `backend/docs/BACKEND_MODULE_NOTES.md` | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR 实现 | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
 
 PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色；②调用方去降级；③技能、依赖、配置和镜像清理；④前端停用态。四笔均在本地逐笔验收，全部验证后一次性 push，只能作为一个 PR 评审和合入。
 
