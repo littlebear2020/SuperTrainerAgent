@@ -102,6 +102,7 @@ def test_default_voice_must_be_catalog_doubao_voice(monkeypatch):
     monkeypatch.delenv("DOUBAO_TTS_DEFAULT_SPEAKER")
     assert resolve_default_voice("zh") == DOUBAO_VOICE_IDS[0]
 
+
 def test_unavailable_default_speaker_logs_visible_warning(monkeypatch, caplog):
     import logging
 

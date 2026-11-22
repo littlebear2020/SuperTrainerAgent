@@ -55,7 +55,7 @@ test("video creation navigates to storyboard and polls until frames land", async
 
   const voiceTrigger = dialog.getByRole("combobox").nth(3);
   await voiceTrigger.click();
-  await page.getByRole("option", { name: /云健/ }).click();
+  await page.getByRole("option", { name: /Vivi2.0/ }).click();
 
   await dialog.getByRole("button", { name: /高级设置/ }).click();
   await dialog.getByRole("button", { name: "选择背景音乐" }).click();
@@ -77,7 +77,7 @@ test("video creation navigates to storyboard and polls until frames land", async
     mode: "fixed",
     script: "欢迎加入团队。第一天重点了解安全与合规。",
     lang: "zh",
-    voice_id: "zh-CN-YunjianNeural",
+    voice_id: "doubao:zh_female_vv_uranus_bigtts",
     bgm: "morning_piano",
   });
 

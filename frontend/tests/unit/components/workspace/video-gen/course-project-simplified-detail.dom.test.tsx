@@ -9,6 +9,12 @@ import type { CourseProject, VideoTaskBrief } from "@/core/video-gen/types";
 const h = vi.hoisted(() => ({
   projects: [] as CourseProject[],
   tasks: [] as VideoTaskBrief[],
+  voices: [] as Array<{
+    id: string;
+    name: string;
+    gender: string;
+    provider: string;
+  }>,
   updateMutate: vi.fn(),
   deleteMutate: vi.fn(),
 }));
@@ -42,7 +48,7 @@ vi.mock("@/core/video-gen/hooks", () => ({
   useClearStyleAnchorCandidate: stubMut,
   useUploadPropAsset: stubMut,
   useDeletePropAsset: stubMut,
-  useVideoVoices: () => ({ data: [] }),
+  useVideoVoices: () => ({ data: h.voices }),
   useCourseProject: () => ({ data: undefined }),
   PROJECT_KEY: "course-projects",
 }));
@@ -104,6 +110,32 @@ describe("simplified course project detail", () => {
   beforeEach(() => {
     h.projects = [storedProject()];
     h.tasks = [];
+    h.voices = [
+      {
+        id: "doubao:zh_female_vv_uranus_bigtts",
+        name: "Vivi2.0",
+        gender: "Female",
+        provider: "doubao",
+      },
+      {
+        id: "doubao:zh_female_yingyujiaoxue_uranus_bigtts",
+        name: "Tina2.0",
+        gender: "Female",
+        provider: "doubao",
+      },
+      {
+        id: "doubao:zh_male_m191_uranus_bigtts",
+        name: "云舟2.0",
+        gender: "Male",
+        provider: "doubao",
+      },
+      {
+        id: "doubao:zh_male_liufei_uranus_bigtts",
+        name: "刘飞2.0",
+        gender: "Male",
+        provider: "doubao",
+      },
+    ];
     h.updateMutate.mockReset();
     h.deleteMutate.mockReset();
     container = document.createElement("div");
@@ -174,5 +206,43 @@ describe("simplified course project detail", () => {
       expect(call.input).not.toHaveProperty(brandField);
     }
     expect(JSON.stringify(call.input)).not.toContain("dark-blue");
+  });
+
+  it("retired project voice stays visible and blocks saving until explicitly replaced", async () => {
+    h.projects = [{ ...storedProject(), voice_id: "preset:146" }];
+    await renderDetail();
+
+    const voiceLabel = Array.from(container.querySelectorAll("label")).find(
+      (item) => item.textContent === "默认音色",
+    );
+    const voiceSelect = voiceLabel?.parentElement?.querySelector("select");
+    if (!voiceSelect) throw new Error("project voice select not found");
+    const residual = Array.from(voiceSelect.options).find(
+      (option) => option.value === "preset:146",
+    );
+    expect(residual).toBeDefined();
+    expect(residual!.disabled).toBe(true);
+    expect(residual!.textContent).toContain("原音色已停用");
+    expect(voiceSelect.value).toBe("preset:146");
+
+    const title = container.querySelector<HTMLInputElement>(
+      "input[placeholder='如：AI 入门课程']",
+    );
+    if (!title) throw new Error("title input not found");
+    await act(async () => setNativeValue(title, "仅改标题"));
+    expect(button("保存").disabled).toBe(true);
+    await act(async () => button("保存").click());
+    expect(h.updateMutate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      voiceSelect.value = "doubao:zh_female_vv_uranus_bigtts";
+      voiceSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(button("保存").disabled).toBe(false);
+    await act(async () => button("保存").click());
+    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    expect(h.updateMutate.mock.calls[0]?.[0].input.voice_id).toBe(
+      "doubao:zh_female_vv_uranus_bigtts",
+    );
   });
 });

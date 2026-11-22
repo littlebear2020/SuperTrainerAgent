@@ -1,7 +1,3 @@
-/**
- * Tests for voice-twin selector filter/group pure logic (A4, 2026-08-09).
- */
-
 import { describe, expect, it } from "vitest";
 
 import type { PresetVoice } from "@/core/voice-twin/types";
@@ -15,49 +11,46 @@ import {
   toggleInList,
 } from "@/core/voice-twin/voice-filters";
 
-function voice(partial: Partial<PresetVoice> & { id: string }): PresetVoice {
+type VoiceFixture = Omit<PresetVoice, "provider"> & { provider: string };
+
+function voice(partial: Partial<VoiceFixture> & { id: string }): PresetVoice {
   return {
     name: partial.id,
     gender: "female",
     locale: "zh-CN",
-    provider: "edge-tts",
+    provider: "doubao",
     description: "",
     scenario: [],
     tone: [],
     ...partial,
-  };
+  } as PresetVoice;
 }
 
+const DOUBAO_IDS = [
+  "doubao:zh_female_vv_uranus_bigtts",
+  "doubao:zh_female_yingyujiaoxue_uranus_bigtts",
+  "doubao:zh_male_m191_uranus_bigtts",
+  "doubao:zh_male_liufei_uranus_bigtts",
+];
+
 const CATALOG: PresetVoice[] = [
+  voice({ id: DOUBAO_IDS[0]!, scenario: ["培训讲解"], tone: ["知性"] }),
+  voice({ id: DOUBAO_IDS[1]!, scenario: ["多语种"], tone: ["亲切"] }),
   voice({
-    id: "edge:zh-CN-XiaoxiaoNeural",
-    provider: "edge-tts",
-    scenario: ["日常对话"],
-    tone: ["亲切"],
-  }),
-  voice({
-    id: "edge:zh-CN-YunjianNeural",
-    provider: "edge-tts",
+    id: DOUBAO_IDS[2]!,
     gender: "male",
     scenario: ["培训讲解"],
     tone: ["沉稳"],
   }),
   voice({
-    id: "preset:146",
-    provider: "qihu",
-    scenario: ["培训讲解", "有声书"],
-    tone: ["知性"],
-  }),
-  voice({
-    id: "preset:295",
-    provider: "qihu",
+    id: DOUBAO_IDS[3]!,
     gender: "male",
     scenario: ["广告配音"],
     tone: ["磁性"],
   }),
   voice({
-    id: "doubao:zh_female_vv_uranus_bigtts",
-    provider: "doubao",
+    id: "preset:146",
+    provider: "qihu",
     scenario: ["培训讲解"],
     tone: ["知性"],
   }),
@@ -66,21 +59,29 @@ const CATALOG: PresetVoice[] = [
     provider: "edge-tts",
     locale: "en-US",
     scenario: ["多语种"],
-    tone: ["亲切"],
   }),
 ];
 
 describe("filterCatalogVoices", () => {
-  it("空筛选返回全部", () => {
-    expect(filterCatalogVoices(CATALOG, EMPTY_VOICE_FILTERS)).toHaveLength(6);
+  it("空筛选也只返回 4 个字节目录音色", () => {
+    expect(
+      filterCatalogVoices(CATALOG, EMPTY_VOICE_FILTERS).map((v) => v.id),
+    ).toEqual(DOUBAO_IDS);
   });
 
-  it("按语言精确匹配", () => {
-    const out = filterCatalogVoices(CATALOG, {
-      ...EMPTY_VOICE_FILTERS,
-      locales: ["en-US"],
-    });
-    expect(out.map((v) => v.id)).toEqual(["edge:en-US-AriaNeural"]);
+  it("语言筛选不会复活退役语言条目", () => {
+    expect(
+      filterCatalogVoices(CATALOG, {
+        ...EMPTY_VOICE_FILTERS,
+        locales: ["en-US"],
+      }),
+    ).toEqual([]);
+    expect(
+      filterCatalogVoices(CATALOG, {
+        ...EMPTY_VOICE_FILTERS,
+        locales: ["zh-CN"],
+      }).map((v) => v.id),
+    ).toEqual(DOUBAO_IDS);
   });
 
   it("按性别匹配", () => {
@@ -88,8 +89,7 @@ describe("filterCatalogVoices", () => {
       ...EMPTY_VOICE_FILTERS,
       genders: ["male"],
     });
-    expect(out.every((v) => v.gender === "male")).toBe(true);
-    expect(out).toHaveLength(2);
+    expect(out.map((v) => v.id)).toEqual([DOUBAO_IDS[2], DOUBAO_IDS[3]]);
   });
 
   it("scenario 任一命中即保留（多选为 OR）", () => {
@@ -98,10 +98,9 @@ describe("filterCatalogVoices", () => {
       scenarios: ["培训讲解", "广告配音"],
     });
     expect(out.map((v) => v.id)).toEqual([
-      "edge:zh-CN-YunjianNeural",
-      "preset:146",
-      "preset:295",
-      "doubao:zh_female_vv_uranus_bigtts",
+      DOUBAO_IDS[0],
+      DOUBAO_IDS[2],
+      DOUBAO_IDS[3],
     ]);
   });
 
@@ -112,31 +111,19 @@ describe("filterCatalogVoices", () => {
       scenarios: ["培训讲解"],
       tones: ["知性"],
     });
-    expect(out.map((v) => v.id)).toEqual([
-      "preset:146",
-      "doubao:zh_female_vv_uranus_bigtts",
-    ]);
+    expect(out.map((v) => v.id)).toEqual([DOUBAO_IDS[0]]);
   });
 });
 
 describe("groupCatalogVoices", () => {
-  it("按 provider 分组且顺序固定 edge→qihu→doubao", () => {
+  it("只生成豆包分组", () => {
     const groups = groupCatalogVoices(CATALOG);
-    expect(groups.map((g) => g.provider)).toEqual([
-      "edge-tts",
-      "qihu",
-      "doubao",
-    ]);
-    expect(groups[0]?.voices).toHaveLength(3);
-    expect(groups[1]?.voices).toHaveLength(2);
-    expect(groups[2]?.voices).toHaveLength(1);
+    expect(groups.map((group) => group.provider)).toEqual(["doubao"]);
+    expect(groups[0]?.voices.map((v) => v.id)).toEqual(DOUBAO_IDS);
   });
 
-  it("空组不返回", () => {
-    const groups = groupCatalogVoices(
-      CATALOG.filter((v) => v.provider === "qihu"),
-    );
-    expect(groups.map((g) => g.provider)).toEqual(["qihu"]);
+  it("退役组不返回", () => {
+    expect(groupCatalogVoices(CATALOG.slice(4))).toEqual([]);
   });
 });
 
@@ -146,15 +133,14 @@ describe("collectLocales", () => {
   });
 });
 
-/** Minimal Storage stub backed by a Map（对齐 tests/unit/lib 既有惯例）。 */
 function makeStorage(entries: Record<string, string> = {}): Storage {
   const store = new Map<string, string>(Object.entries(entries));
   return {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => void store.set(k, v),
-    removeItem: (k: string) => void store.delete(k),
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
     clear: () => store.clear(),
-    key: (i: number) => [...store.keys()][i] ?? null,
+    key: (index: number) => [...store.keys()][index] ?? null,
     get length() {
       return store.size;
     },

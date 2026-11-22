@@ -22,22 +22,32 @@ const MOCK_TASK_ID_READY = "vg-e2e-0002";
 
 const MOCK_VOICES = [
   {
-    id: "zh-CN-YunjianNeural",
-    name: "云健（男）",
-    locale: "zh-CN",
-    gender: "Male",
-  },
-  {
-    id: "zh-CN-XiaoxiaoNeural",
-    name: "晓晓（女）",
+    id: "doubao:zh_female_vv_uranus_bigtts",
+    name: "Vivi2.0",
     locale: "zh-CN",
     gender: "Female",
+    provider: "doubao",
   },
   {
-    id: "en-US-ChristopherNeural",
-    name: "Christopher (Male)",
-    locale: "en-US",
+    id: "doubao:zh_female_yingyujiaoxue_uranus_bigtts",
+    name: "Tina2.0",
+    locale: "zh-CN",
+    gender: "Female",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_male_m191_uranus_bigtts",
+    name: "云舟2.0",
+    locale: "zh-CN",
     gender: "Male",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_male_liufei_uranus_bigtts",
+    name: "刘飞2.0",
+    locale: "zh-CN",
+    gender: "Male",
+    provider: "doubao",
   },
 ];
 
@@ -362,9 +372,7 @@ test.describe("Video Gen — Create Task Dialog", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("language selector shows Chinese and English options", async ({
-    page,
-  }) => {
+  test("language selector shows the Chinese option", async ({ page }) => {
     await page.locator("[data-course-entry='ai_image']").click();
     await expect(
       page.getByRole("heading", { name: "创建图片动效" }),

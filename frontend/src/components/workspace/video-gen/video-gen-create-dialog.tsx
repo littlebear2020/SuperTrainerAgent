@@ -71,9 +71,8 @@ import {
 import { LANG_OPTIONS } from "@/core/video-gen/types";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import {
-  filterVoicesForTaskType,
-  isPresetVoice,
-  vimaxVoiceBlocked,
+  filterSupportedVoices,
+  retiredVoiceBlocked,
 } from "@/core/video-gen/voice-filtering";
 import { cn } from "@/lib/utils";
 
@@ -319,7 +318,7 @@ function useCreateTaskForm({
     }
     audioRef.current.src = url;
     audioRef.current.play().catch(() => {
-      // P1-U4 残余 / Task 17：试听失败（edge-tts 不可达/音色不存在）不再静默
+      // 试听失败必须清除播放态并给出可见错误。
       setPlayingAudio(null);
       toast.error("试听失败：音色暂不可用，请稍后再试");
     });
@@ -338,13 +337,10 @@ function useCreateTaskForm({
   const cfg = TYPE_CONFIG[taskType]!;
 
   const currentDefaultVoice =
-    LANG_OPTIONS.find((l) => l.value === lang)?.defaultVoiceId ??
-    "zh-CN-YunjianNeural";
+    LANG_OPTIONS.find((l) => l.value === lang)?.defaultVoiceId ?? "";
 
-  // FP1-5: 试听 voice_id —— 显式选择优先；「默认」(voiceId=null) 走后端解析的
-  // 真实默认音色（doubao:<speaker>/preset:146，与成品一致）；仅当接口不可达时
-  // 才退化到 types.ts LANG_OPTIONS 的静态 edge-tts 值（兜底降级，评审预案 #8）。
-  // Plan B：ViMax 的「默认」试听走 ViMax 默认解析（zh 兜底不是 preset:146）
+  // 显式选择优先；默认试听与成品共用后端解析的目录内字节音色。
+  // 接口暂不可用时仅使用目录内的静态默认值，不切换其他通道。
   const { data: resolvedDefaultVoice } = useDefaultVoice(
     lang,
     taskType === "vimax" ? "vimax" : undefined,
@@ -375,10 +371,8 @@ function useCreateTaskForm({
       );
       return false;
     }
-    // Plan B（2026-10-19，D4）：ViMax + preset（显式选择或类型切换残留）→ 提交
-    // 阻断（后端 /create 也会 422，前端先拦给可行动提示）。
-    if (vimaxVoiceBlocked(taskType, voiceId)) {
-      toast.error("ViMax 任务不支持 360 音色，请改选豆包或 Edge 音色后再提交");
+    if (retiredVoiceBlocked(voiceId)) {
+      toast.error("原音色已停用，请改选字节直连音色后再提交");
       return false;
     }
     if (targetDurationInvalid) {
@@ -569,7 +563,9 @@ function useCreateTaskForm({
   };
 
   const canSubmit =
-    mode === "generate" ? topic.trim().length > 0 : script.trim().length > 0;
+    (mode === "generate"
+      ? topic.trim().length > 0
+      : script.trim().length > 0) && !retiredVoiceBlocked(voiceId);
 
   const targetDurationVisible = isTargetDurationVisible(taskType, mode);
   const targetDurationInvalid =
@@ -673,11 +669,7 @@ function useCreateTaskForm({
   };
 }
 
-/**
- * 2026-10-06 拆分批：配音选择 + 试听行（自 CreateTaskDialog JSX 抽出）。
- * Plan B（2026-10-19，D4）：接收 taskType——ViMax 不展示 360 音色、残留 preset
- * 提示并阻断试听（提交阻断在 validateForm）；其他类型目录不变。
- */
+/** 配音选择与试听；所有任务类型都只显示字节目录，退役当前值保留并禁用。 */
 export function DialogVoiceRow(
   props: Pick<
     ReturnType<typeof useCreateTaskForm>,
@@ -707,14 +699,8 @@ export function DialogVoiceRow(
     voicesQuery,
     previewVoiceId,
   } = props;
-  // Plan B：ViMax 过滤 360 条目；残留 preset 当前值保留为禁用提示项
-  const isVimax = taskType === "vimax";
-  const allVoices = voicesQuery.data ?? [];
-  const voices = filterVoicesForTaskType(
-    allVoices,
-    isVimax ? "vimax" : undefined,
-  );
-  const presetResidual = isVimax && isPresetVoice(voiceId);
+  const voices = filterSupportedVoices(voicesQuery.data ?? []);
+  const retiredResidual = retiredVoiceBlocked(voiceId);
   return (
     <>
       {/* 配音 + 试听：独立整行，避免窄列下溢出/横向滚动 */}
@@ -738,20 +724,18 @@ export function DialogVoiceRow(
               ) : (
                 <SelectItem value="default">默认</SelectItem>
               )}
-              {presetResidual && (
+              {retiredResidual && (
                 <SelectItem value={voiceId!} disabled>
-                  {voiceId}（ViMax 不可用，请改选豆包/Edge）
+                  {voiceId}（原音色已停用，请改选字节直连音色）
                 </SelectItem>
               )}
               {(() => {
                 const groups: Record<string, typeof voices> = {};
                 for (const v of voices) {
-                  const provider = v.provider ?? "edge-tts";
+                  const provider = v.provider ?? "doubao";
                   (groups[provider] ??= []).push(v);
                 }
                 const providerLabels: Record<string, string> = {
-                  "edge-tts": "Edge TTS（免费）",
-                  qihu: "360 声音（高质量）",
                   doubao: "豆包 seed-tts-2.0（字节默认）",
                 };
                 return Object.entries(groups).map(
@@ -776,16 +760,13 @@ export function DialogVoiceRow(
             variant="ghost"
             size="icon"
             className="h-9 w-9 shrink-0"
-            disabled={presetResidual}
+            disabled={retiredResidual || !previewVoiceId}
             onClick={() => {
-              // FP1-5: 「默认」时 vid 为后端解析值（doubao/preset），试听=成品声
               const vid = previewVoiceId;
               const params = new URLSearchParams();
               if (mode === "fixed" && script.trim()) {
                 params.set("text", script.slice(0, 100));
               }
-              // 边界收口（2026-10-19 P1-1）：ViMax 试听带 task_type——后端按策略
-              // 走（缺字节 key 的 doubao 直落 Edge），不触 360；其他类型不变。
               if (taskType === "vimax") {
                 params.set("task_type", "vimax");
               }
@@ -812,13 +793,12 @@ export function DialogVoiceRow(
             将使用所选音色，不再沿用课程项目设置。
           </p>
         )}
-        {presetResidual && (
+        {retiredResidual && (
           <p
-            data-testid="vimax-preset-blocked-hint"
+            data-testid="retired-voice-blocked-hint"
             className="text-xs text-amber-600 dark:text-amber-400"
           >
-            ViMax 任务不支持 360 音色（{voiceId}），请改选豆包或 Edge
-            音色后再提交。
+            原音色已停用（{voiceId}），请改选字节直连音色后再提交。
           </p>
         )}
       </div>

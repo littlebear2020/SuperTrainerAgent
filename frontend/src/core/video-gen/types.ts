@@ -249,15 +249,13 @@ export interface LangOption {
   defaultVoiceId: string;
 }
 
-/** Available languages with labels and default voice mapping. */
+/** Available languages with labels and catalog Doubao default voice mapping. */
 export const LANG_OPTIONS: LangOption[] = [
-  { value: "zh", label: "中文", defaultVoiceId: "zh-CN-YunjianNeural" },
-  { value: "en", label: "English", defaultVoiceId: "en-US-ChristopherNeural" },
-  { value: "ja", label: "日本語", defaultVoiceId: "ja-JP-KeitaNeural" },
-  { value: "ko", label: "한국어", defaultVoiceId: "ko-KR-HyunsuNeural" },
-  { value: "fr", label: "Français", defaultVoiceId: "fr-FR-HenriNeural" },
-  { value: "de", label: "Deutsch", defaultVoiceId: "de-DE-ConradNeural" },
-  { value: "es", label: "Español", defaultVoiceId: "es-ES-AlvaroNeural" },
+  {
+    value: "zh",
+    label: "中文",
+    defaultVoiceId: "doubao:zh_female_vv_uranus_bigtts",
+  },
 ];
 
 /** BGM track info. */

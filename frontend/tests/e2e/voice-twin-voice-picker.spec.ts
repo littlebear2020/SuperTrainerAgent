@@ -24,11 +24,11 @@ test("voice picker opens, plays a preview, and selects a voice", async ({
         contentType: "application/json",
         body: JSON.stringify([
           {
-            id: "preset:146",
-            name: "知性女声",
+            id: "doubao:zh_female_vv_uranus_bigtts",
+            name: "Vivi2.0",
             gender: "female",
             locale: "zh-CN",
-            provider: "qihu",
+            provider: "doubao",
             description: "专业知性",
             scenario: ["培训讲解"],
             tone: ["知性"],
@@ -62,7 +62,7 @@ test("voice picker opens, plays a preview, and selects a voice", async ({
 
   // Open the picker (script-to-audio is the default sub-tab).
   await page.getByRole("combobox").first().click();
-  await expect(page.getByText("知性女声").first()).toBeVisible();
+  await expect(page.getByText("Vivi2.0").first()).toBeVisible();
 
   // Per-voice preview button → hits the intercepted /preview route.
   await page
@@ -72,6 +72,6 @@ test("voice picker opens, plays a preview, and selects a voice", async ({
   await expect.poll(() => previewHit).toBe(true);
 
   // Selecting the voice fires onChange and closes the popover.
-  await page.getByText("知性女声").first().click();
-  await expect(page.getByRole("combobox").first()).toContainText("知性女声");
+  await page.getByText("Vivi2.0").first().click();
+  await expect(page.getByRole("combobox").first()).toContainText("Vivi2.0");
 });

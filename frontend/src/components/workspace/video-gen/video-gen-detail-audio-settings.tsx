@@ -37,8 +37,8 @@ import type {
   StoryboardData,
 } from "@/core/video-gen/types";
 import {
-  filterVoicesForTaskType,
-  isPresetVoice,
+  filterSupportedVoices,
+  retiredVoiceBlocked,
 } from "@/core/video-gen/voice-filtering";
 
 // ── Info row ──────────────────────────────────────────────────────────────
@@ -55,9 +55,6 @@ export function AudioSettingsSection({
   taskStatus: string;
 }) {
   const cfg = storyboard.config;
-  // Plan B（2026-10-19，D4）：仅 ViMax 任务过滤 360 音色与阻断 preset（残留值
-  // 以禁用 option + 提示呈现，不静默清空）；其他视频类型语义不变。
-  const isVimax = cfg.video_type === "vimax";
   const [voiceId, setVoiceId] = useState(cfg.voice_id ?? "");
   const [ttsSpeed, setTtsSpeed] = useState(cfg.tts_speed ?? 1.0);
   const [bgmVolume, setBgmVolume] = useState(
@@ -192,15 +189,11 @@ export function AudioSettingsSection({
     taskStatus === "draft" || taskStatus === "failed" || taskStatus === "ready";
   if (!editable) return null;
 
-  const voices = filterVoicesForTaskType(
-    voicesQuery.data ?? [],
-    isVimax ? "vimax" : undefined,
-  );
+  const voices = filterSupportedVoices(voicesQuery.data ?? []);
   const voiceInList = voices.some((v) => v.id === voiceId);
   const voiceName =
     voices.find((v) => v.id === voiceId)?.name ?? voiceId ?? "默认";
-  // Plan B：ViMax 残留/新选 preset → 保存禁用（后端会 422，前端先拦）
-  const presetBlocked = isVimax && isPresetVoice(voiceId);
+  const retiredBlocked = retiredVoiceBlocked(voiceId);
   const frameCount = storyboard.frames?.length ?? 0;
 
   const handleSave = () => {
@@ -300,20 +293,18 @@ export function AudioSettingsSection({
                   {v.name} ({v.gender})
                 </option>
               ))}
-              {/* 当前 config 音色不在列表（如 doubao speaker 无 key 被门控）也显示原值；
-                  Plan B：ViMax 任务的 preset 残留值显示为「不可用」禁用项（不静默清空，
-                  改选豆包/Edge 后可保存） */}
+              {/* 当前 config 音色不在新目录时也保留原值；退役值禁用并等待用户改选。 */}
               {voiceId && !voiceInList && (
-                <option value={voiceId} disabled={presetBlocked}>
-                  {presetBlocked
-                    ? `${voiceId}（ViMax 不可用，请改选豆包/Edge）`
+                <option value={voiceId} disabled={retiredBlocked}>
+                  {retiredBlocked
+                    ? `${voiceId}（原音色已停用，请改选字节直连音色）`
                     : voiceId}
                 </option>
               )}
             </select>
-            {presetBlocked && (
+            {retiredBlocked && (
               <p className="text-xs text-amber-600">
-                ViMax 任务不支持 360 音色，请改选豆包或 Edge 音色后再保存
+                原音色已停用（{voiceId}），请改选字节直连音色后再保存
               </p>
             )}
           </div>
@@ -379,7 +370,7 @@ export function AudioSettingsSection({
               updateConfigMut.isPending ||
               !formDirty ||
               regenWatch !== null ||
-              presetBlocked
+              retiredBlocked
             }
             onClick={handleSave}
           >

@@ -99,34 +99,36 @@ export interface SynthesizeParams {
 }
 
 // ---------------------------------------------------------------------------
-// Preset voices（共享音色目录，对齐后端 CatalogVoice）
+// Catalog voices（共享音色目录，对齐后端 CatalogVoice）
 // ---------------------------------------------------------------------------
 
 /** 目录音色的提供方。 */
-export type VoiceProvider = "edge-tts" | "qihu" | "doubao";
+export type VoiceProvider = "doubao";
 
-/**
- * 共享音色目录中的一条预设音色（镜像后端 CatalogVoice）。
- * 注意：id 是带前缀的完整 voice_id（"edge:..." / "preset:..." / "doubao:..."），
- * 可直接传给 preview / synthesize，无需再拼前缀。
- */
+/** 共享音色目录中的一条字节直连音色（镜像后端 CatalogVoice）。 */
 export interface PresetVoice {
   id: string;
   name: string;
   gender: "male" | "female";
-  locale: string; // "zh-CN" / "en-US" / ...
+  locale: string;
   provider: VoiceProvider;
   description: string;
-  scenario: string[]; // 适用场景标签
-  tone: string[]; // 音色特质标签
+  scenario: string[];
+  tone: string[];
   preview_url?: string | null;
 }
 
-// ── 筛选枚举常量（纯中文，与后端目录标签口径一致；后端不强校验，保持扩展性）──
-
-/** provider → 中文展示标签。 */
 export const VOICE_PROVIDER_LABELS: Record<VoiceProvider, string> = {
-  "edge-tts": "Edge TTS（免费）",
-  qihu: "360 声音（高质量）",
   doubao: "豆包 seed-tts-2.0",
 };
+
+const BARE_EDGE_VOICE_RE = /^[a-z]{2}-[A-Z]{2}-.+Neural$/;
+
+export function isRetiredVoiceId(voiceId: string | null | undefined): boolean {
+  return (
+    !!voiceId &&
+    (voiceId.startsWith("preset:") ||
+      voiceId.startsWith("edge:") ||
+      BARE_EDGE_VOICE_RE.test(voiceId))
+  );
+}

@@ -17,10 +17,32 @@ import { mockLangGraphAPI } from "./utils/mock-api";
 
 const MOCK_VOICES = [
   {
-    id: "zh-CN-YunjianNeural",
-    name: "云健（男）",
+    id: "doubao:zh_female_vv_uranus_bigtts",
+    name: "Vivi2.0",
+    locale: "zh-CN",
+    gender: "Female",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_female_yingyujiaoxue_uranus_bigtts",
+    name: "Tina2.0",
+    locale: "zh-CN",
+    gender: "Female",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_male_m191_uranus_bigtts",
+    name: "云舟2.0",
     locale: "zh-CN",
     gender: "Male",
+    provider: "doubao",
+  },
+  {
+    id: "doubao:zh_male_liufei_uranus_bigtts",
+    name: "刘飞2.0",
+    locale: "zh-CN",
+    gender: "Male",
+    provider: "doubao",
   },
 ];
 
@@ -102,5 +124,27 @@ test.describe("video-gen create dialog — advanced panel + width", () => {
     // Bug 1a regression: advanced controls must now be visible.
     await expect(dialog.getByText("字幕样式")).toBeVisible();
     await expect(dialog.getByText("语速")).toBeVisible();
+  });
+
+  test("language and voice pickers expose only Chinese and four Doubao voices", async ({
+    page,
+  }) => {
+    await page.locator("[data-course-entry='ai_image']").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByRole("combobox").nth(2).click();
+    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("option", { name: "中文" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "English" })).toHaveCount(0);
+    await page.getByRole("option", { name: "中文" }).click();
+
+    await dialog.getByRole("combobox").nth(3).click();
+    await expect(
+      page
+        .getByRole("option")
+        .filter({ hasText: /Vivi2\.0|Tina2\.0|云舟2\.0|刘飞2\.0/ }),
+    ).toHaveCount(4);
+    await expect(page.getByRole("option", { name: /Edge|360/ })).toHaveCount(0);
   });
 });
