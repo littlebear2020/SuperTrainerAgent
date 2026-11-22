@@ -23,7 +23,7 @@ help:
 	@echo "  make config          - Generate local config files (aborts if config already exists)"
 	@echo "  make config-upgrade  - Merge new fields from config.example.yaml into config.yaml"
 	@echo "  make check           - Quality gates: backend lint + frontend checks + docs convention"
-	@echo "  make pre-deploy      - 部署前检查单（在途 PR/worktree/未同步 main + 近期部署动作 + config_version）"
+	@echo "  make pre-deploy      - 部署前检查单（发布 ref + release-blocker + 在途提示 + config_version）"
 	@echo "  make check-env       - Check if all required tools are installed"
 	@echo "  make install         - Install all dependencies (frontend + backend + pre-commit hooks)"
 	@echo "  make setup-sandbox   - Pre-pull sandbox container image (recommended)"
@@ -73,8 +73,8 @@ check:
 	$(MAKE) -C frontend check
 	$(PYTHON) scripts/check_docs_convention.py
 
-# 部署前检查单（2026-10-14）：在途 PR/worktree/未同步 main 为阻断项；
-# 近 14 天 changelog 部署动作 + config_version 为提示项。部署公司服务器/测试机前跑。
+# 部署前检查单（2026-11-22 多 Agent 口径）：发布 ref 异常与未关闭 release-blocker 为阻断项；
+# 在途 PR/worktree/main 漂移、近 14 天 changelog 部署动作 + config_version 为提示项。
 pre-deploy:
 	@$(PYTHON) scripts/pre_deploy_check.py
 

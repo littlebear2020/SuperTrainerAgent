@@ -31,6 +31,7 @@
 - 测试落位（放错位置静默不跑、CI 假绿）：backend pytest 只放 `backend/tests/`（豁免：`backend/scripts/` live 探针、vendored vimax、`docker/production-worker/` 独立套件）；frontend vitest 收 `tests/unit`/`src` 的 `.test.*`、playwright 收 `tests/e2e`。
 - 测试口径：迭代中跑定向 + 相关回归，提交前全量 `uv run pytest tests/ -q` 绿为门禁。
 - **plan 验证清单分层（2026-10-12）**：验证清单分两层——**实现级**（签名/常量/路由断言，进 pytest/vitest 拦回归）+ **行为级**（用户可感知行为的端到端断言）。**仅行为变更批次**必须含 ≥1 条行为级断言（纯重构/文档/配置批豁免，豁免须在 plan 写明）；行为级断言优先廉价探针（ffprobe 抽查、API 级断言），重型渲染类允许以「生效验证（部署侧）」条目延后（先例：`docs/plans/2026-10-12-auto-video-flow-voice-delivery-hardening-plan.md` §4）。
+- **行为未验证例外（2026-11-22）**：核心行为最终版本未验收时，允许按单负责人决策合入和测试部署，但必须在 `docs/findings-backlog.md` 留未勾选 `[release-blocker]`，写明验证/回退条件与证据指针；`make pre-deploy` 对这类条目阻断，附行为证据勾掉前不得正式发布，不得用全量单测绿冒充行为通过。
 - frontend 改动：`cd frontend && pnpm check` 过。
 - 新建/移动文档：`python3 scripts/check_docs_convention.py` 过，且按「文档治理」约定落位。
 - 批次工作收尾：按约定写 changelog（小修小改除外）；已执行计划在头部维护执行状态。
@@ -44,6 +45,7 @@
   - **分支 + PR**：成批工作——plan 驱动批次、>5 文件、跨层改动、或动核心链路（provider 包裹链/中间件链/config schema/沙箱）。
   - agent 侧全自动流程：建分支（`<主题>-kebab-case`）→ 常规提交粒度逐笔 commit → push → `gh pr create`（标题 = 批次摘要，正文带 plan/changelog 链接；gh 调用须设 `GH_REPO` 防解析到 upstream）→ 等 AI 评审 + PR 侧 CI（后台完成通知驱动，不轮询）→ 读评审结论（`gh pr view --comments` / reviews API）：无 Critical/Important 发现且 CI 绿 → `gh pr merge --rebase`（保逐笔主题提交、保线性历史）自动合并并回报用户；有发现 → 修复或带回拍板，修复后重推分支复跑。
   - PR 流程只叠加评审层，**不豁免本地门禁**（推送前全量测试绿的完成定义不变）；用户明确要求直推时以用户为准。
+  - PR 证据统一使用 `.github/pull_request_template.md`：`tested_sha` = 最终测试 HEAD、`deployed_sha` = 实际部署 manifest SHA、`spec_sha256` = 执行计划内容哈希；三者不得互相冒充，未部署/无计划明确填 N/A。
 - **不可直推核心路径清单**（2026-10-13 MA-P0 C3 入约）：命中以下路径的改动**必须**走分支 + PR + OCR，「≤5 文件小修直推」豁免不适用——文件数少 ≠ 风险小（P0-3）。清单 SoT = `scripts/check_main_push_paths.py` 的 `CORE_PATH_PATTERNS`（镜像一致性由 check 脚本校验项 19 兜底；本机 pre-push 拦截 + push 后 CI 报警的形态见本节「合入门补偿控制」条）：
   - `backend/app/**/auth*`、`backend/app/**/*_auth*`（鉴权/凭据，含 admin_auth 类后缀形态）
   - `backend/app/**/middleware*`、`backend/packages/harness/deerflow/**/middleware*`（中间件链）
@@ -58,8 +60,8 @@
 
 - **五步流**：规划侧集中定稿两份独立 plan（各含 allow/ban 三栏，路径重叠表为空才派发）→ 两执行 Agent 各自独立 worktree 按各自 plan 实现 → 规划侧集中审两路 diff（共享基座层加重）→ 审过后才授权 push/PR（走「Git 约定」PR 评审流）→ **串行合入** main（先合一路，另一路 rebase 新 main 后再合；禁止双 PR 同时抢 main）。
 - **模式共存**：单任务与并行双 worktree 共存——日常小改/单 plan 仍走单执行者流；并行是可选加速，仅当两路路径可互斥时开启。
-- **会话指引**：两 worktree = 两独立会话即可（同工具或跨工具均可，不强制混用）；禁止同一会话跨两个 worktree 写。
-- **worktree 卫生**：同时 ≤2–3 个；`git worktree add ../TrainerAI2.0-<agent|role>-<topic> -b <topic>`；合入后 `git worktree remove` + 删远程分支；主 clone 恒停在 main，不在主 clone 上开执行会话。
+- **会话指引**：两 worktree = 两独立会话即可（同工具或跨工具均可，不强制混用）；禁止同一会话跨两个 worktree 写。每个 Agent 开始任务先跑 `python3 scripts/agent_context.py --base origin/main --spec <计划路径> --require-clean --require-head --json`，交接时再输出最终 HEAD 与计划哈希；live 验收还须按 `frontend/docs/LIVE_E2E_RUNBOOK.md` 分开记录 `tested_sha` / `deployed_sha` / `spec_sha256`，禁止从残留分支旧计划生成预期。
+- **worktree 卫生**：同时活跃执行任务 ≤3 个（main clone 不计）；`git worktree add ../TrainerAI2.0-<agent|role>-<topic> -b <topic>`；合入后立即 `git worktree remove` + 删远程分支，patch-equivalent 分支不得当作仍在途；主 clone 恒停在 main，不在主 clone 上开执行会话。
 - **review-before-push**：执行侧默认不 push、不开 PR，只提交本地 commits；收尾打包说明（分支名、diff 统计、测试命令与结果、是否碰 config_version）交规划侧；规划侧 `git diff main...<branch>`（共享基座 path 加重审）通过后才授权 push/PR。
 - **派发前提**：plan 状态机干净（唯一状态头，check 脚本校验项 18 兜底）+ allow/ban 三栏齐 + 路径重叠表为空，缺一禁止派发；执行中途发现必碰 ban-list → 停工回规划侧重写互斥，勿私自扩权；姐妹 PR 合入后在本 worktree rebase main，解冲突仍守 ban-list，冲突落入禁改文件 → 停并交规划侧。
 - **硬性提醒**：worktree 只隔离工作目录与 index，**不**消除共享文件上的 merge/rebase 冲突；产品侧 DeerFlow「多 agent」≠ 本仓研发多 Agent 并行（勿拿 `backend/seed/agents/` 能力叙事当 SDLC 并行 SOP）；OpenSpec 非前置、不强制。
@@ -97,6 +99,8 @@ AI 评审规则镜像见 `.opencodereview/rule.json`，改禁区时同步。
 ## 服务器与部署
 
 - 通用部署方式见 `docs/personal-server-deployment-guide.md` 与 `docker/` 中的配置样例。
+- **不可变发布（2026-11-22）**：禁止再用 `tar ... .` 直接打当前工作区。正式包经 `deploy_on_server.sh pack`（默认 `origin/main`，先跑 `pre_deploy_check --ref`），测试包经 `deploy_to_test_server.sh pack`；未合入 ref 只允许测试环境以 `TEST_ALLOW_UNMERGED=1` 显式打包。包内 `release-manifest.json` 是部署与验收的源码 SHA 事实源。
+- 其他 Agent 的 worktree/开放 PR 对不可变发布只提示、不阻断；未勾选 `[release-blocker]` 与 fetch/ref 核对失败才阻断正式发布。常规升级不追加本地秘密配置；仅首次部署或负责人明确需要时以 `DEPLOY_INCLUDE_LOCAL_CONFIG=1` / `TEST_INCLUDE_LOCAL_CONFIG=1` 显式追加。
 - 本仓库公开开发，真实主机、账号、密钥、内部任务 ID、用户数据和运行数据库不得提交。内部运维手册与部署记录应保存在仓库外。
 
 ## Remotion 课程视频管线（remotion_course）

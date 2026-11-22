@@ -5,6 +5,14 @@ on:
     branches: [ 'main' ]
     paths:
       - 'backend/**'
+      - 'skills/**'
+      - 'docker/**'
+      - 'config*.yaml'
+      - 'scripts/agent_context.py'
+      - 'scripts/release_archive.py'
+      - 'scripts/pre_deploy_check.py'
+      - 'deploy_on_server.sh'
+      - 'deploy_to_test_server.sh'
       - '!backend/**/*.md'
       - '!backend/docs/**'
       - '.github/workflows/backend-unit-tests.yml'
@@ -12,6 +20,14 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'backend/**'
+      - 'skills/**'
+      - 'docker/**'
+      - 'config*.yaml'
+      - 'scripts/agent_context.py'
+      - 'scripts/release_archive.py'
+      - 'scripts/pre_deploy_check.py'
+      - 'deploy_on_server.sh'
+      - 'deploy_to_test_server.sh'
       - '!backend/**/*.md'
       - '!backend/docs/**'
       - '.github/workflows/backend-unit-tests.yml'

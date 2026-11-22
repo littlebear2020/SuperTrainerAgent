@@ -63,6 +63,25 @@ pnpm test:e2e:live:l3
 
 **L3 会占用约 3 个 Aio 容器**（每个约 3 GiB 内存 + 2 GiB shm）。跑之前确认沙箱池有余量，否则排队会让超时预算失效。
 
+## 基线证据（强制）
+
+live 验收前先冻结本地期望，不允许从残留功能分支读取旧计划：
+
+```bash
+python3 scripts/agent_context.py \
+  --base origin/main \
+  --spec docs/plans/<对应计划>.md \
+  --require-clean --require-head --json
+```
+
+报告头部必须分别填写：
+
+- `tested_sha`：本地验收预期与测试执行对应的完整 Git SHA。
+- `deployed_sha`：实际被测服务器发布包 `release-manifest.json` 中的 `source_sha`。
+- `spec_sha256`：上述命令输出的计划文件 SHA-256；可用 `--expect-spec-sha256` 在复核时防止计划漂移。
+
+**不得用本地 HEAD 冒充 `deployed_sha`。**二者不一致时先解释部署差异，再判断缺陷；配置、账号、真实主机和内部任务 ID 仍只保存在仓库外的运维记录中。测试截图或临时 JSON 放 `temp/`，不得把敏感信息写进入库报告。
+
 ## 环境变量
 
 三个都必填，**不提供默认值**——缺失即抛错退出，避免"忘记设置"变成"打到了错误的服务器"。

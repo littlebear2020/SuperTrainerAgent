@@ -106,9 +106,9 @@
 - Modify：本计划
 - Create：`docs/changelog/changelog-2026-11-22-multi-agent-development-flow.md`
 
-- [ ] **Step 1：先补静态失败断言。** 在 `test_release_archive.py` / `test_pre_deploy_check.py` 检查 CI 路径、包装脚本 pre-deploy 入口、PR 模板三项 SHA、runbook 的本地期望与部署 SHA 分离。
-- [ ] **Step 2：运行定向测试确认 RED，再实现 CI 与文档。** backend 测试覆盖 `skills/**`、`docker/**`、根 config、三件流程脚本和两件包装脚本；quick-checks 使用同一路径集合；文档写入机械命令与活跃任务≤3、已合入 worktree 即清理的口径。
-- [ ] **Step 3：运行相关测试和格式检查。** `cd backend && uv run pytest tests/test_agent_context.py tests/test_release_archive.py tests/test_pre_deploy_check.py -q`、`git diff --check`、`python3 scripts/check_docs_convention.py`。
+- [x] **Step 1：先补静态失败断言。** 在 `test_release_archive.py` / `test_pre_deploy_check.py` 检查 CI 路径、包装脚本 pre-deploy 入口、PR 模板三项 SHA、runbook 的本地期望与部署 SHA 分离。
+- [x] **Step 2：运行定向测试确认 RED，再实现 CI 与文档。** backend 测试覆盖 `skills/**`、`docker/**`、根 config、三件流程脚本和两件包装脚本；quick-checks 使用同一路径集合；文档写入机械命令与活跃任务≤3、已合入 worktree 即清理的口径。
+- [x] **Step 3：运行相关测试和格式检查。** `cd backend && uv run pytest tests/test_agent_context.py tests/test_release_archive.py tests/test_pre_deploy_check.py -q`、`git diff --check`、`python3 scripts/check_docs_convention.py`。
 - [ ] **Step 4：运行交付门禁。** `cd backend && make test`、根 `make check`；记录真实关键输出，不运行部署或 live 付费测试。
 - [ ] **Step 5：更新计划勾选与 changelog。** 包含设计决策、发布兼容变化、两条现存 release-blocker、验收记录和未验证边界。
 - [ ] **Step 6：自审 diff 后按核心路径流程交付。** 核对远端 main，必要时 rebase 并重跑相关门禁；push、PR + OCR，CI 无红且无 Critical/Important 后才 rebase merge。

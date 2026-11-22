@@ -195,3 +195,23 @@ def test_wrapper_scripts_delegate_to_immutable_packaging() -> None:
         assert "docker/sandbox/cache/chrome-linux" in script
         assert "--exclude=docker/sandbox/cache'" not in script
         assert "release-manifest.json" in script
+
+
+def test_ci_workflows_cover_development_infrastructure() -> None:
+    backend_workflow = (REPO_ROOT / ".github/workflows/backend-unit-tests.yml").read_text(encoding="utf-8")
+    quick_checks = (REPO_ROOT / ".github/workflows/quick-checks.yml").read_text(encoding="utf-8")
+    backend_paths = (
+        "skills/**",
+        "docker/**",
+        "config*.yaml",
+        "scripts/agent_context.py",
+        "scripts/release_archive.py",
+        "scripts/pre_deploy_check.py",
+        "deploy_on_server.sh",
+        "deploy_to_test_server.sh",
+    )
+    for path in backend_paths:
+        assert path in backend_workflow
+    for path in backend_paths:
+        quick_path = path.replace("/**", "/*")
+        assert quick_path in quick_checks

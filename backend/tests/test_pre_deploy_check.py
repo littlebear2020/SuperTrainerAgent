@@ -124,3 +124,22 @@ def test_fetch_failure_blocks_formal_release(tmp_path: Path, monkeypatch: pytest
     root = make_root(tmp_path)
 
     assert run_main(module, root, FakeRunner(fetch_returncode=1), monkeypatch) == 1
+
+
+def test_collaboration_contract_separates_expected_and_deployed_versions() -> None:
+    repo_root = SCRIPT.parents[1]
+    template = (repo_root / ".github/pull_request_template.md").read_text(encoding="utf-8")
+    runbook = (repo_root / "frontend/docs/LIVE_E2E_RUNBOOK.md").read_text(encoding="utf-8")
+    conventions = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+    production = (repo_root / "deploy_on_server.sh").read_text(encoding="utf-8")
+
+    for field in ("tested_sha", "deployed_sha", "spec_sha256"):
+        assert field in template
+        assert field in runbook
+    assert "scripts/agent_context.py" in runbook
+    assert "release-manifest.json" in runbook
+    assert "不得用本地 HEAD 冒充" in runbook
+    assert "活跃执行任务" in conventions
+    assert "scripts/agent_context.py" in conventions
+    assert "[release-blocker]" in conventions
+    assert 'pre_deploy_check.py --ref "$REF"' in production

@@ -88,7 +88,7 @@ jobs:
             CONVENTION_HEAD_SHA="$HEAD_SHA" \
             python3 scripts/check_docs_convention.py
 
-      - name: "[lint-backend] Detect backend changes"
+      - name: "[lint-backend] Detect backend and development infrastructure changes"
         id: backend
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
         run: |
@@ -99,11 +99,16 @@ jobs:
           else
             changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
           fi
-          if printf '%s\n' "$changed_files" | grep -qE '^(backend/|\.github/workflows/quick-checks\.yml$)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          changed=false
+          while IFS= read -r path; do
+            case "$path" in
+              backend/*|skills/*|docker/*|config*.yaml|scripts/agent_context.py|scripts/release_archive.py|scripts/pre_deploy_check.py|deploy_on_server.sh|deploy_to_test_server.sh|.github/workflows/quick-checks.yml)
+                changed=true
+                break
+                ;;
+            esac
+          done <<< "$changed_files"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: "[lint-backend] Install uv"
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' && steps.backend.outputs.changed == 'true' }}
