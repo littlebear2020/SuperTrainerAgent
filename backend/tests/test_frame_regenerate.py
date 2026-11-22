@@ -965,3 +965,45 @@ async def test_re_render_route_409_when_regen_inflight(tmp_path):
         svc.re_render_task.assert_not_called()
     finally:
         _regen_inflight.pop(("vg_rr", 1), None)
+
+
+@pytest.mark.asyncio
+async def test_retired_voice_frame_regen_rejected_before_cas_or_background(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+
+    from app.gateway.routers import video_gen as vg
+
+    svc = _make_service(tmp_path)
+    task_dir = tmp_path / "test-user-autouse" / "tasks" / "vg_retired"
+    task_dir.mkdir(parents=True)
+    voice_id = "edge:zh-CN-XiaoxiaoNeural"
+    narration = "历史旁白"
+    (task_dir / "storyboard.json").write_text(
+        json.dumps({"title": "t", "config": {"voice_id": voice_id, "tts_speed": 1.2}, "frames": [{"index": 0, "narration": narration}]}),
+        encoding="utf-8",
+    )
+    audio_dir = task_dir / "audio"
+    audio_dir.mkdir()
+    (audio_dir / f"{_audio_cache_key(narration, voice_id, 1.2)}.mp3").write_bytes(b"existing-audio")
+    task = MagicMock()
+    task.status = "ready"
+    task.task_type = "ai_image"
+    task.payload = "{}"
+    svc.get_task = AsyncMock(return_value=task)
+    svc._active_tasks = {}
+
+    def close_task(coro):
+        coro.close()
+        return MagicMock()
+
+    create_task = MagicMock(side_effect=close_task)
+    monkeypatch.setattr(vg.asyncio, "create_task", create_task)
+
+    try:
+        with pytest.raises(HTTPException) as exc:
+            await vg.regenerate_frame(_make_route_request(svc), "vg_retired", 0)
+        assert exc.value.status_code == 400
+        assert exc.value.detail == "原音色已停用，请改选字节直连音色"
+        create_task.assert_not_called()
+    finally:
+        vg._regen_inflight.pop(("vg_retired", 0), None)

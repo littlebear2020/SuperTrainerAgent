@@ -898,3 +898,30 @@ async def test_recover_audio_regen_flags_clears_stale_running(tmp_path):
     assert "audio_regen_running" not in pl
     assert "请重新发起批量重生配音" in pl["audio_error"]
     assert pl["bgm_volume"] == 0.15
+
+
+@pytest.mark.asyncio
+async def test_retired_voice_batch_regen_rejected_before_cas_or_background(tmp_path, monkeypatch):
+    from app.gateway.routers import video_gen as vg
+
+    _seed_regen_task(tmp_path, voice="preset:146")
+    svc = _regen_service(tmp_path)
+    svc.get_task = AsyncMock(return_value=SimpleNamespace(status="ready", task_type="ai_image", payload="{}"))
+
+    def close_task(coro):
+        coro.close()
+        return MagicMock()
+
+    create_task = MagicMock(side_effect=close_task)
+    monkeypatch.setattr(vg.asyncio, "create_task", create_task)
+
+    try:
+        with pytest.raises(HTTPException) as exc:
+            await vg.regenerate_all_audio(_fake_request(svc), "vg_edit")
+        assert exc.value.status_code == 400
+        assert exc.value.detail == "原音色已停用，请改选字节直连音色"
+        create_task.assert_not_called()
+        svc.repo.update.assert_not_awaited()
+    finally:
+        vg._regen_inflight.pop(("vg_edit", 0), None)
+        vg._regen_inflight.pop(("vg_edit", 1), None)
