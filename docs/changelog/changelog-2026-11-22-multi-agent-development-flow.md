@@ -52,6 +52,17 @@
 - 两件包装脚本的 pack/upload/deploy：全部先赋值检查 `release_sha`，不得在 echo 命令替换中吞错；deploy 在停服和解压前验证 manifest。
 - 首轮 4 条 medium + 1 条 low 均已对应修复；回归结果 `test_agent_context.py` 8 passed、三件流程测试文件合计 21 passed。复审结果以 PR 最新 OCR 为准。
 
+## PR #39 第二轮 OCR 处置
+
+- 正式/测试 pack 增加显式失败保护；生产 pre-deploy 阻断时立即停止，release_archive 失败时保留旧包且不打印成功。
+- 不采纳“先删除旧包”的建议：保留原子替换语义，改为 upload 强制比较包内 `source_sha` 与目标 ref 的提交 SHA，旧包和 main 前进后的过期包都不能上传。
+- `git archive` stderr 改为临时文件消费，避免大诊断输出填满管道造成死锁；源 manifest 唯一性保持第一轮回归。
+- 两件 pack 都显式提示默认包不含 `config.yaml/.env`，首次部署必须选择本地配置开关。
+- backlog 缺失改为失败关闭，缩进 `[release-blocker]` 同样识别；根 config 路径单独限制，避免 shell glob 跨目录。
+- GitHub Actions 不采用 YAML anchor；两件 workflow 加互守注释，并以 PyYAML 断言 push/pull_request paths 完全一致及 quick-checks 交叉引用。backend 文档触发 lint 是有意的较宽集合。
+- 测试 pack 不调用正式 pre-deploy 是保留未合入 ref 与付费修复验证通道；upload/deploy 的函数 `return 1` 配合 `set -e` 和显式 SHA 检查终止流程。
+- 第二轮相关回归三件测试文件合计 `26 passed`，`bash -n` 与 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。

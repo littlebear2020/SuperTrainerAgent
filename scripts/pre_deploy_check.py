@@ -25,8 +25,8 @@ def run(cmd: list[str], env: dict | None = None) -> subprocess.CompletedProcess[
 def find_release_blockers(root: Path) -> list[str]:
     backlog = root / "docs" / "findings-backlog.md"
     if not backlog.is_file():
-        return []
-    return [line.strip() for line in backlog.read_text(encoding="utf-8", errors="replace").splitlines() if line.startswith("- [ ]") and "[release-blocker]" in line]
+        raise FileNotFoundError(f"release-blocker 台账不存在：{backlog}")
+    return [line.strip() for line in backlog.read_text(encoding="utf-8", errors="replace").splitlines() if line.lstrip().startswith("- [ ]") and "[release-blocker]" in line]
 
 
 def _resolve_ref(ref: str) -> subprocess.CompletedProcess[str]:
@@ -139,8 +139,13 @@ def main(argv: list[str] | None = None) -> int:
     if fetch.returncode != 0:
         issues.append(f"git fetch 失败，无法核对远端最新状态：{fetch.stderr.strip()}")
     _validate_release_ref(args.ref, issues)
-    for blocker in find_release_blockers(REPO_ROOT):
-        issues.append(f"开放 release-blocker：{blocker}")
+    try:
+        blockers = find_release_blockers(REPO_ROOT)
+    except OSError as exc:
+        issues.append(f"release-blocker 台账读取失败：{exc}")
+    else:
+        for blocker in blockers:
+            issues.append(f"开放 release-blocker：{blocker}")
     _append_agent_notes(notes)
     _append_changelog_notes(notes)
 

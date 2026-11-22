@@ -37,10 +37,12 @@ pack() {
     if [ "${DEPLOY_INCLUDE_LOCAL_CONFIG:-0}" = "1" ]; then
         ARCHIVE_ARGS+=(--include-local-config)
         echo "显式追加本地配置（仅首次部署或负责人明确需要时使用）"
+    else
+        echo "提示：本包不含 config.yaml/.env，依赖服务器现有配置（首次部署需设 DEPLOY_INCLUDE_LOCAL_CONFIG=1）"
     fi
 
-    python3 scripts/pre_deploy_check.py --ref "$REF"
-    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
+    python3 scripts/pre_deploy_check.py --ref "$REF" || { echo "❌ 部署前检查存在阻断项，已停止打包"; return 1; }
+    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}" || { echo "❌ 打包失败，旧包未替换"; return 1; }
 
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 发布包缺少有效 manifest，请检查打包错误"; return 1; }
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"
@@ -62,6 +64,11 @@ upload() {
     fi
 
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack"; return 1; }
+    EXPECTED_SHA="$(git rev-parse --verify --end-of-options "${DEPLOY_REF:-origin/main}^{commit}")" || { echo "❌ 无法解析预期发布 ref"; return 1; }
+    if [ "$RELEASE_SHA" != "$EXPECTED_SHA" ]; then
+        echo "❌ 发布包 SHA 与 ${DEPLOY_REF:-origin/main} 不一致，禁止上传旧包，请重新 pack"
+        return 1
+    fi
     echo "   上传源码 SHA: $RELEASE_SHA"
     scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/
     echo "✅ 上传完成"

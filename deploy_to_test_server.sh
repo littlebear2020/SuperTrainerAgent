@@ -56,13 +56,15 @@ pack() {
     if [ "${TEST_INCLUDE_LOCAL_CONFIG:-0}" = "1" ]; then
         ARCHIVE_ARGS+=(--include-local-config)
         echo -e "${YELLOW}  显式追加本地测试配置${NC}"
+    else
+        echo "提示：本包不含 config.yaml/.env，依赖服务器现有配置（首次部署需设 TEST_INCLUDE_LOCAL_CONFIG=1）"
     fi
     if [ "${1:-}" = "--no-sandbox" ]; then
         ARCHIVE_ARGS+=(--exclude docker/sandbox/cache/chrome-linux)
         echo -e "${YELLOW}  跳过 Chrome 缓存，保留字体、Python wheels 与 BPE 缓存${NC}"
     fi
 
-    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
+    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}" || { echo -e "${RED}❌ 打包失败，旧包未替换${NC}"; return 1; }
 
     RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 发布包缺少有效 manifest，请检查打包错误${NC}"; return 1; }
     SIZE=$(ls -lh "$TAR_FILE" | awk '{print $5}')
@@ -90,6 +92,11 @@ upload() {
     ssh -p "$SSH_PORT" "$SERVER" "mkdir -p $PROJECT_DIR"
 
     RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack${NC}"; return 1; }
+    EXPECTED_SHA="$(git rev-parse --verify --end-of-options "${TEST_DEPLOY_REF:-origin/main}^{commit}")" || { echo -e "${RED}❌ 无法解析预期测试发布 ref${NC}"; return 1; }
+    if [ "$RELEASE_SHA" != "$EXPECTED_SHA" ]; then
+        echo -e "${RED}❌ 发布包 SHA 与 ${TEST_DEPLOY_REF:-origin/main} 不一致，禁止上传旧包，请重新 pack${NC}"
+        return 1
+    fi
     echo "  上传源码 SHA: $RELEASE_SHA"
     echo "  正在上传..."
     scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/"

@@ -88,6 +88,8 @@ jobs:
             CONVENTION_HEAD_SHA="$HEAD_SHA" \
             python3 scripts/check_docs_convention.py
 
+      # 与 backend-unit-tests.yml 的 paths 互守；lint 有意覆盖 backend 文档等更宽集合。
+      # config*.yaml 单独限制根目录，避免 shell case 的 * 跨目录匹配。
       - name: "[lint-backend] Detect backend and development infrastructure changes"
         id: backend
         if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
@@ -102,7 +104,13 @@ jobs:
           changed=false
           while IFS= read -r path; do
             case "$path" in
-              backend/*|skills/*|docker/*|config*.yaml|scripts/agent_context.py|scripts/release_archive.py|scripts/pre_deploy_check.py|deploy_on_server.sh|deploy_to_test_server.sh|.github/workflows/quick-checks.yml)
+              config*.yaml)
+                if [[ "$path" != */* && "$path" == config*.yaml ]]; then
+                  changed=true
+                  break
+                fi
+                ;;
+              backend/*|skills/*|docker/*|scripts/agent_context.py|scripts/release_archive.py|scripts/pre_deploy_check.py|deploy_on_server.sh|deploy_to_test_server.sh|.github/workflows/quick-checks.yml)
                 changed=true
                 break
                 ;;

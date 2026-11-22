@@ -1,5 +1,7 @@
 name: Unit Tests
 
+# 路径清单与 quick-checks.yml 的 lint-backend 检测互守；push/pull_request 一致性由
+# backend/tests/test_release_archive.py 机械断言。GitHub Actions 不使用 YAML anchor。
 on:
   push:
     branches: [ 'main' ]

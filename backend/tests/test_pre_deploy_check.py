@@ -144,3 +144,21 @@ def test_collaboration_contract_separates_expected_and_deployed_versions() -> No
     assert "scripts/agent_context.py" in conventions
     assert "[release-blocker]" in conventions
     assert 'pre_deploy_check.py --ref "$REF"' in production
+
+
+def test_missing_backlog_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_module()
+    root = make_root(tmp_path)
+    root.joinpath("docs/findings-backlog.md").unlink()
+
+    with pytest.raises(FileNotFoundError):
+        module.find_release_blockers(root)
+    assert run_main(module, root, FakeRunner(), monkeypatch) == 1
+
+
+def test_indented_release_blocker_is_not_ignored(tmp_path: Path) -> None:
+    module = load_module()
+    blocker = "  - [ ] 2026-11-22 [release-blocker] 缩进例外仍须阻断\n"
+    root = make_root(tmp_path, blocker)
+
+    assert module.find_release_blockers(root) == [blocker.strip()]

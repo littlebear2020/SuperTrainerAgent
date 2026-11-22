@@ -122,12 +122,14 @@ def build_archive(
     os.close(fd)
     temporary = Path(temporary_name)
     process: subprocess.Popen[bytes] | None = None
+    stderr_file = None
     try:
+        stderr_file = tempfile.TemporaryFile()
         process = subprocess.Popen(
             ["git", "archive", "--format=tar", source_sha],
             cwd=root,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=stderr_file,
         )
         assert process.stdout is not None
         with temporary.open("wb") as raw:
@@ -147,8 +149,8 @@ def build_archive(
                             _tar_info(name, len(data), commit_time, stat.S_IMODE(path.stat().st_mode)),
                             io.BytesIO(data),
                         )
-        assert process.stderr is not None
-        stderr = process.stderr.read().decode(errors="replace").strip()
+        stderr_file.seek(0)
+        stderr = stderr_file.read().decode(errors="replace").strip()
         returncode = process.wait()
         if returncode != 0:
             raise ArchiveError(f"git archive 失败：{stderr or returncode}")
@@ -159,6 +161,9 @@ def build_archive(
             process.wait()
         temporary.unlink(missing_ok=True)
         raise
+    finally:
+        if stderr_file is not None:
+            stderr_file.close()
     return manifest
 
 

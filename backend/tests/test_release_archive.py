@@ -6,6 +6,8 @@ import sys
 import tarfile
 from pathlib import Path
 
+import yaml
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "release_archive.py"
 REPO_ROOT = SCRIPT.parents[1]
 
@@ -241,3 +243,34 @@ def test_release_sha_failures_cannot_be_hidden_by_echo() -> None:
         for line in calls:
             assert not line.startswith("echo")
             assert "||" in line
+
+
+def test_packaging_guards_config_warning_and_stale_upload() -> None:
+    for name, ref_variable in (("deploy_on_server.sh", "DEPLOY_REF"), ("deploy_to_test_server.sh", "TEST_DEPLOY_REF")):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "release_archive.py" in script
+        assert "||" in script.split("scripts/release_archive.py", 1)[1].splitlines()[0]
+        assert "本包不含 config.yaml/.env" in script
+        assert "EXPECTED_SHA" in script
+        assert ref_variable in script
+        assert 'RELEASE_SHA" != "$EXPECTED_SHA' in script
+
+
+def test_git_archive_stderr_is_not_an_unconsumed_pipe() -> None:
+    script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
+    assert "stderr_file = tempfile.TemporaryFile()" in script
+    assert "stderr=stderr_file" in script
+    assert "stderr_file.seek(0)" in script
+
+
+def test_workflow_paths_are_cross_checked_and_config_glob_stays_at_root() -> None:
+    workflow_path = REPO_ROOT / ".github/workflows/backend-unit-tests.yml"
+    document = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    triggers = document.get("on", document.get(True))
+    assert triggers["push"]["paths"] == triggers["pull_request"]["paths"]
+    backend_workflow = workflow_path.read_text(encoding="utf-8")
+    quick_checks = (REPO_ROOT / ".github/workflows/quick-checks.yml").read_text(encoding="utf-8")
+    assert "quick-checks.yml" in backend_workflow
+    assert "backend-unit-tests.yml" in quick_checks
+    assert 'path" != */*' in quick_checks
+    assert 'path" == config*.yaml' in quick_checks
