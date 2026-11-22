@@ -2774,6 +2774,20 @@ async def get_frame_still(request: Request, task_id: str, frame_index: int, cach
     return {"status": "failed"}
 
 
+def _ensure_regen_voice_supported(storyboard: dict) -> None:
+    """在任何重生副作用前校验显式音色；缺失字段仍沿用 StoryboardConfig 默认值。"""
+    from app.gateway._shared.voice_catalog import ensure_voice_id_supported
+
+    config = storyboard.get("config", {})
+    voice_id = config.get("voice_id") if isinstance(config, dict) else None
+    if voice_id is None:
+        return
+    try:
+        ensure_voice_id_supported(voice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/tasks/{task_id}/frames/{frame_index}/regenerate", status_code=202)
 async def regenerate_frame(
     request: Request,
@@ -2814,6 +2828,7 @@ async def regenerate_frame(
         n_frames = 0
     if frame_index < 0 or frame_index >= n_frames:
         raise HTTPException(status_code=400, detail=f"frame_index {frame_index} out of range (0-{n_frames - 1})")
+    _ensure_regen_voice_supported(_sb)
 
     # 条目 3（2026-09-12 缺陷批）：残留旧图帧「重新生成视频」同步预检 → 400（判定
     # 矩阵与 service 层守卫同谓词 residual_visual_regen_block_reason、同文案——
@@ -3214,6 +3229,7 @@ async def regenerate_all_audio(request: Request, task_id: str):
     frame_indices = [f.get("index") for f in sb.get("frames", []) if isinstance(f.get("index"), int)]
     if not frame_indices:
         raise HTTPException(status_code=400, detail="无帧可重生配音")
+    _ensure_regen_voice_supported(sb)
 
     # v5：入口一次性登记**全部**目标帧键（值统一指向同一后台任务；create_task 后、
     # 本协程让出事件循环前的同步段完成登记，杜绝「起步后、登记前」漏防窗口）；
