@@ -1,6 +1,6 @@
 # 单人多 Agent 研发流程优化 Implementation Plan
 
-> **状态**：未执行（实施中）；定稿日 2026-11-22；基准 `0e84b148`；工作区分支 `multi-agent-flow-guardrails`。
+> **状态**：未执行（实施中；Task 1–3 完成，Task 4 Step 1–5 完成，Step 6 PR 交付中）；定稿日 2026-11-22；基准 `0e84b148`；工作区分支 `multi-agent-flow-guardrails`；[changelog](../changelog/changelog-2026-11-22-multi-agent-development-flow.md)。
 > **TL;DR**：新增会话基线与不可变发布工具，改造部署前检查以阻断 `release-blocker`，并补齐研发基座 CI 路径；保留单负责人和现有 PR + OCR，不部署、不跑付费测试。
 > **For agentic workers:** REQUIRED SUB-SKILL: 使用 `executing-plans` 在本工作区逐任务实施；每项先 RED 后 GREEN，不得修改其他 worktree 或未提交文件。
 
@@ -29,7 +29,7 @@
 - `deploy_on_server.sh`、`deploy_to_test_server.sh`：保留入口，调用不可变打包。
 - `backend/tests/test_agent_context.py`、`test_release_archive.py`、`test_pre_deploy_check.py`：真实临时仓库行为测试。
 - `.github/workflows/backend-unit-tests.yml`、`quick-checks.yml`：研发基座路径覆盖。
-- `.github/pull_request_template.md`、`frontend/docs/LIVE_E2E_RUNBOOK.md`、`AGENTS.md`：多 Agent 操作契约。
+- `.github/pull_request_template.md`、`frontend/docs/LIVE_E2E_RUNBOOK.md`、`AGENTS.md`、`Makefile`：多 Agent 操作契约。
 - `docs/findings-backlog.md`：已有未验证核心行为登记为发布阻断。
 - `docs/changelog/changelog-2026-11-22-multi-agent-development-flow.md`：最终验收证据。
 
@@ -102,13 +102,13 @@
 **Files：**
 - Modify：`.github/workflows/backend-unit-tests.yml`、`.github/workflows/quick-checks.yml`
 - Create：`.github/pull_request_template.md`
-- Modify：`frontend/docs/LIVE_E2E_RUNBOOK.md`、`AGENTS.md`
+- Modify：`frontend/docs/LIVE_E2E_RUNBOOK.md`、`AGENTS.md`、`Makefile`
 - Modify：本计划
 - Create：`docs/changelog/changelog-2026-11-22-multi-agent-development-flow.md`
 
 - [x] **Step 1：先补静态失败断言。** 在 `test_release_archive.py` / `test_pre_deploy_check.py` 检查 CI 路径、包装脚本 pre-deploy 入口、PR 模板三项 SHA、runbook 的本地期望与部署 SHA 分离。
 - [x] **Step 2：运行定向测试确认 RED，再实现 CI 与文档。** backend 测试覆盖 `skills/**`、`docker/**`、根 config、三件流程脚本和两件包装脚本；quick-checks 使用同一路径集合；文档写入机械命令与活跃任务≤3、已合入 worktree 即清理的口径。
 - [x] **Step 3：运行相关测试和格式检查。** `cd backend && uv run pytest tests/test_agent_context.py tests/test_release_archive.py tests/test_pre_deploy_check.py -q`、`git diff --check`、`python3 scripts/check_docs_convention.py`。
-- [ ] **Step 4：运行交付门禁。** `cd backend && make test`、根 `make check`；记录真实关键输出，不运行部署或 live 付费测试。
-- [ ] **Step 5：更新计划勾选与 changelog。** 包含设计决策、发布兼容变化、两条现存 release-blocker、验收记录和未验证边界。
+- [x] **Step 4：运行交付门禁。** `cd backend && make test`、根 `make check`；记录真实关键输出，不运行部署或 live 付费测试。
+- [x] **Step 5：更新计划勾选与 changelog。** 包含设计决策、发布兼容变化、两条现存 release-blocker、验收记录和未验证边界。
 - [ ] **Step 6：自审 diff 后按核心路径流程交付。** 核对远端 main，必要时 rebase 并重跑相关门禁；push、PR + OCR，CI 无红且无 Critical/Important 后才 rebase merge。
