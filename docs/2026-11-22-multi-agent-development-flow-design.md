@@ -63,13 +63,13 @@ live 报告还需单独记录部署包中的 `release-manifest.json` SHA；本�
 输入为 `--ref` 和输出路径：
 
 - 解析完整提交 SHA；默认要求该提交是 `origin/main` 的祖先，测试服务器显式 `--allow-unmerged` 才可打包未合入提交。
-- 通过 `git archive` 流式读取已提交文件，普通本地修改和未跟踪文件没有进入通道。
+- 通过 `GIT_LFS_SKIP_SMUDGE=1 git archive` 流式读取已提交文件，普通本地修改和未跟踪文件没有进入通道；LFS 路径由 `git check-attr` 确定，仅允许用工作区中 size/OID 完全匹配的真实对象替换指针，缺失或修改即失败。
 - 生成根目录 `release-manifest.json`，至少记录源码 SHA、完整 ref、构建所用 Git 基准、排除路径和是否包含本地配置。
 - 只有显式 `--include-local-config` 才追加本地配置：`config.yaml` 与 `.env` 必须存在，`frontend/.env` 与 `extensions_config.json` 存在时才追加；必需文件缺失或路径越界直接失败。
 - `--exclude` 只接受仓库内归一化路径；输出使用临时文件后原子替换，失败不留下半包。
 - `--no-sandbox` 统一只排除 `docker/sandbox/cache/chrome-linux`，保留字体、Python wheels 与 BPE 缓存。
 
-生产和测试包装脚本保留原命令入口及产物名，默认 `--ref origin/main`；测试可用环境变量显式指定其他 ref。pack 开始时使旧 SHA 侧车失效，成功后原子写入本次 manifest SHA；upload 只比较侧车与 manifest，不二次解析移动 ref。上传和服务器解压后均显示发布 SHA，部署记录以该 SHA 为准。
+生产和测试包装脚本保留原命令入口及产物名，默认 `--ref origin/main`；测试可用环境变量显式指定其他 ref。pack 开始时使旧 SHA 侧车失效，成功后原子写入“源码 SHA + tar.gz SHA-256”；upload 与服务器 deploy 都重算包摘要并核对侧车与 manifest，不二次解析移动 ref。上传和服务器解压后均显示发布 SHA，部署记录以该 SHA 为准。
 
 ### 3.3 部署前检查 `scripts/pre_deploy_check.py`
 

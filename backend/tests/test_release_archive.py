@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -253,7 +254,10 @@ def test_packaging_guards_config_warning_and_stale_upload() -> None:
         assert "本包不含 config.yaml/.env" in script
         assert "EXPECTED_SHA" in script
         assert "ARCHIVE_SHA_FILE" in script
-        assert 'EXPECTED_SHA="$(< "$ARCHIVE_SHA_FILE")"' in script
+        assert 'EXPECTED_SHA="$(sed -n' in script
+        assert "EXPECTED_ARCHIVE_SHA" in script
+        assert "ACTUAL_ARCHIVE_SHA" in script
+        assert "archive_sha256" in script
         assert ref_variable in script
         assert 'RELEASE_SHA" != "$EXPECTED_SHA' in script
         assert "CONFIG_FROM_ARCHIVE" in script
@@ -294,4 +298,75 @@ def test_upload_uses_pack_sidecar_and_runs_from_repo_root() -> None:
         assert 'cd "$LOCAL_DIR"' in upload
         assert "git rev-parse" not in upload
         assert "ARCHIVE_SHA_FILE" in upload
-        assert "请与 upload 时打印的上传源码 SHA 人工核对" in script
+        assert "包摘要与侧车校验通过" in script
+
+
+def add_lfs_pointer(repo: Path, payload: bytes) -> str:
+    oid = hashlib.sha256(payload).hexdigest()
+    (repo / ".gitattributes").write_text("binary.dat filter=lfs\n", encoding="utf-8")
+    (repo / "binary.dat").write_text(
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize {len(payload)}\n",
+        encoding="utf-8",
+    )
+    commit(repo, "LFS pointer")
+    git(repo, "update-ref", "refs/remotes/origin/main", "main")
+    return oid
+
+
+def test_lfs_pointer_is_replaced_with_verified_worktree_object(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    payload = bytes(range(256)) * 4096
+    add_lfs_pointer(repo, payload)
+    (repo / "binary.dat").write_bytes(payload)
+    output = tmp_path / "release.tar.gz"
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(output, "r:gz") as bundle:
+        member = bundle.extractfile("binary.dat")
+        assert member is not None
+        assert member.read() == payload
+
+
+def test_lfs_object_mismatch_fails_without_replacing_output(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    add_lfs_pointer(repo, b"expected object")
+    (repo / "binary.dat").write_bytes(b"modified local object")
+    output = tmp_path / "release.tar.gz"
+    output.write_bytes(b"previous-release")
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 1
+    assert output.read_bytes() == b"previous-release"
+
+
+def test_sidecar_and_server_verify_archive_digest() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "printf '%s\\n%s\\n'" in script
+        assert "EXPECTED_ARCHIVE_SHA" in script
+        assert "ACTUAL_ARCHIVE_SHA" in script
+        assert 'ACTUAL_ARCHIVE_SHA" != "$EXPECTED_ARCHIVE_SHA' in script
+        assert '"$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/"' in script
+        upload = script.split("upload() {", 1)[1].split("# ============================================================", 1)[0]
+        assert "与 ${DEPLOY_REF" not in upload
+        assert "与 ${TEST_DEPLOY_REF" not in upload
+
+
+def test_non_lfs_file_with_unaligned_tail_streams_exactly(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    payload = bytes(range(256)) * 16 + b"tail"
+    (repo / "unaligned.txt").write_bytes(payload)
+    commit(repo, "unaligned file")
+    git(repo, "update-ref", "refs/remotes/origin/main", "main")
+    output = tmp_path / "release.tar.gz"
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(output, "r:gz") as bundle:
+        member = bundle.extractfile("unaligned.txt")
+        assert member is not None
+        assert member.read() == payload

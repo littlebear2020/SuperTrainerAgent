@@ -65,11 +65,20 @@
 
 ## PR #39 第三轮 OCR 处置
 
-- pack 开始时先移除 SHA 侧车，成功后把本次 manifest SHA 原子写入 `<发布包>.sha`；upload 只读取该侧车，不再二次解析移动 ref。失败保留旧 tar 时侧车已失效，旧包不能误传。
+- pack 开始时先移除 SHA 侧车，成功后原子写入本次 manifest SHA；upload 只读取该侧车，不再二次解析移动 ref。失败保留旧 tar 时侧车已失效，旧包不能误传。第四轮又把侧车扩展为源码 SHA + 包摘要。
 - 两件 upload 都先 `cd "$LOCAL_DIR"`，避免从其他目录调用时读取错误包；deploy 打印 SHA 并要求与 upload 输出人工核对。
 - manifest `includes_local_config=true` 时，生产和测试 deploy 均跳过旧配置恢复；显式打包的新配置不会再被服务器备份覆盖。
 - `process.stdout` 改为显式空值检查并在等待子进程前关闭；根 config 的目录判断去重。
 - 第三轮相关回归三件测试文件合计 `28 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
+
+## PR #39 第四轮 OCR 处置
+
+- 实测当前 Git LFS 会在 `git archive` 时尝试 smudge/下载，行为依赖本机对象与网络。发布工具改为 `GIT_LFS_SKIP_SMUDGE=1` 强制离线指针导出，再通过 `git check-attr` 找到 LFS 路径，只用本地 size/OID 完全匹配的对象替换；不联网、不接受未物化或被修改的对象。
+- 普通文件保持原始流式复制；另修掉非对齐文件尾部读取问题，并增加未跟踪计划、重复 manifest 之外的大对象与尾部回归。
+- 侧车升级为两行“源码 SHA + tar.gz SHA-256”。pack 先使侧车失效、成功后原子写入；upload 重算摘要并随包 scp；服务器 deploy 在停服/解压前再次重算和比对，传输损坏或替换不再依赖人工发现。
+- manifest 字段读取统一为 `release_manifest_value`，修复帮助文案和侧车错误提示；显式配置恢复语义保持第三轮结论。
+- 完整真实 Chrome 包验证：`REAL_LFS_ARCHIVE_OK 188087520 5e35986566a4f2c4369db965df03543d6d25d0fc37d6ac2aca83ebccaabc2545`，tar 成员大小与 LFS size 一致、成员 SHA-256 与指针 OID 一致。
+- 第四轮相关回归三件测试文件合计 `32 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
 
 ## 未验证范围
 

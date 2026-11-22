@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import gzip
+import hashlib
 import io
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -51,6 +54,75 @@ def _normalize_archive_path(value: str) -> str:
 
 def _is_excluded(path: str, excludes: Sequence[str]) -> bool:
     return any(path == excluded or path.startswith(f"{excluded}/") for excluded in excludes)
+
+
+LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
+
+
+def _lfs_paths(root: Path) -> set[str]:
+    tracked = _git(root, "ls-files")
+    if tracked.returncode != 0:
+        raise ArchiveError(f"读取 Git 文件清单失败：{tracked.stderr.strip()}")
+    result = subprocess.run(
+        ["git", "check-attr", "--stdin", "filter"],
+        cwd=root,
+        input=tracked.stdout,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ArchiveError(f"读取 LFS 属性失败：{result.stderr.strip()}")
+    paths: set[str] = set()
+    for line in result.stdout.splitlines():
+        path, separator, value = line.rpartition(": filter: ")
+        if separator and value == "lfs":
+            paths.add(path)
+    return paths
+
+
+def _lfs_replacement(root: Path, name: str, member: tarfile.TarInfo, pointer: bytes):
+    if len(pointer) > 64 * 1024:
+        raise ArchiveError(f"LFS 指针异常过大：{name}")
+    text = pointer.decode("ascii")
+    oid_match = re.search(r"^oid sha256:([0-9a-f]{64})$", text, re.M)
+    size_match = re.search(r"^size (\d+)$", text, re.M)
+    if oid_match is None or size_match is None:
+        raise ArchiveError(f"LFS 指针缺少 oid/size：{name}")
+    path = (root / name).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise ArchiveError(f"LFS 对象未物化：{name}；请先 git lfs checkout")
+    expected_oid = oid_match.group(1)
+    expected_size = int(size_match.group(1))
+    if path.stat().st_size != expected_size:
+        raise ArchiveError(f"LFS 对象大小与指针不符：{name}")
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != expected_oid:
+        raise ArchiveError(f"LFS 对象 SHA-256 与指针不符：{name}")
+    info = copy.copy(member)
+    info.size = expected_size
+    return info, path
+
+
+def _add_source_member(root: Path, member: tarfile.TarInfo, source: tarfile.TarFile, target: tarfile.TarFile, lfs_paths: set[str]) -> None:
+    if not member.isfile():
+        target.addfile(member)
+        return
+    stream = source.extractfile(member)
+    if stream is None:
+        raise ArchiveError(f"无法读取归档成员：{member.name}")
+    if member.name not in lfs_paths:
+        target.addfile(member, stream)
+        return
+    pointer = stream.read()
+    if not pointer.startswith(LFS_POINTER_PREFIX):
+        raise ArchiveError(f"LFS 文件未以指针形式导出：{member.name}")
+    info, path = _lfs_replacement(root, member.name, member, pointer)
+    with path.open("rb") as replacement:
+        target.addfile(info, replacement)
 
 
 def _local_configs(root: Path, include: bool) -> list[tuple[str, Path]]:
@@ -118,6 +190,7 @@ def build_archive(
         "includes_local_config": include_local_config,
         "config_files": [name for name, _ in configs],
     }
+    lfs_paths = _lfs_paths(root)
     fd, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", suffix=".tmp", dir=output_parent)
     os.close(fd)
     temporary = Path(temporary_name)
@@ -130,6 +203,7 @@ def build_archive(
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=stderr_file,
+            env={**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"},
         )
         if process.stdout is None:
             raise ArchiveError("git archive 未返回输出管道")
@@ -141,7 +215,7 @@ def build_archive(
                             name = _normalize_archive_path(member.name)
                             if _is_excluded(name, normalized_excludes) or name in config_paths or name == MANIFEST_PATH:
                                 continue
-                            target.addfile(member, source.extractfile(member) if member.isfile() else None)
+                            _add_source_member(root, member, source, target, lfs_paths)
                     manifest_bytes = (json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
                     target.addfile(_tar_info(MANIFEST_PATH, len(manifest_bytes), commit_time), io.BytesIO(manifest_bytes))
                     for name, path in configs:
