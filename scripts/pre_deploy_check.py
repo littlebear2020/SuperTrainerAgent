@@ -45,8 +45,10 @@ def _validate_release_ref(ref: str, issues: list[str]) -> None:
     source_sha = source.stdout.strip()
     base_sha = base.stdout.strip()
     ancestry = run(["git", "merge-base", "--is-ancestor", source_sha, base_sha])
-    if ancestry.returncode != 0:
+    if ancestry.returncode == 1:
         issues.append(f"发布 ref {ref} 未合入 {BASE_REF}，正式发布拒绝使用未审提交")
+    elif ancestry.returncode != 0:
+        issues.append(f"无法验证 ref 祖先关系：{ancestry.stderr.strip()}")
 
 
 def _github_repo() -> str | None:

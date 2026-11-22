@@ -59,6 +59,7 @@ pack() {
     echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${TEST_DEPLOY_REF:-origin/main}"
     echo "测试链路明确豁免 release-blocker 与其他 worktree 检查，仅执行 ref 祖先校验"
+    git fetch origin --prune || { echo -e "${RED}❌ git fetch origin 失败，无法保证 origin/main 最新${NC}"; return 1; }
     RESOLVED_REF="$(git rev-parse --verify --end-of-options "${REF}^{commit}")" || { echo -e "${RED}❌ 无法解析测试发布 ref：$REF${NC}"; return 1; }
     ARCHIVE_ARGS=(--ref "$RESOLVED_REF" --base-ref origin/main --output "$TAR_FILE")
     if [ "${TEST_ALLOW_UNMERGED:-0}" = "1" ]; then
@@ -217,6 +218,10 @@ deploy() {
     # 解压新代码（覆盖）
     echo "  解压 deer-flow-test-update.tar.gz ..."
     tar xzf deer-flow-test-update.tar.gz
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        rm -f "$PROJECT_DIR/deer-flow-test-update.tar.gz" "$ARCHIVE_SHA_FILE"
+        trap - EXIT
+    fi
     echo "  ✓ 解压完成"
     echo "  部署源码 SHA: $RELEASE_SHA（包摘要与侧车校验通过）"
 
@@ -348,7 +353,7 @@ deploy() {
 # ============================================================
 case "${1:-}" in
     pack)
-        if [ "$#" -gt 2 ]; then
+        if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--no-sandbox" ]; }; then
             echo -e "${RED}❌ pack 仅支持一个可选参数 --no-sandbox${NC}"
             exit 1
         fi

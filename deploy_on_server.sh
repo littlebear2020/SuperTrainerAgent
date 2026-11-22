@@ -39,6 +39,7 @@ pack() {
     rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
     echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${DEPLOY_REF:-origin/main}"
+    git fetch origin --prune || { echo "❌ git fetch origin 失败，无法保证 origin/main 最新"; return 1; }
     RESOLVED_REF="$(git rev-parse --verify --end-of-options "${REF}^{commit}")" || { echo "❌ 无法解析发布 ref：$REF"; return 1; }
     ARCHIVE_ARGS=(--ref "$RESOLVED_REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
     if [ "${1:-}" = "--no-sandbox" ]; then
@@ -149,6 +150,10 @@ deploy() {
     CONFIG_FROM_ARCHIVE="$EXPECTED_CONFIG"
     ./scripts/deploy.sh down
     tar xzf deer-flow-update.tar.gz
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        rm -f "$PROJECT_DIR/deer-flow-update.tar.gz" "$ARCHIVE_SHA_FILE"
+        trap - EXIT
+    fi
     echo "  部署源码 SHA: $RELEASE_SHA（包摘要与侧车校验通过）"
 
     echo ""
@@ -247,7 +252,7 @@ deploy() {
 # ============================================================
 case "${1:-}" in
     pack)
-        if [ "$#" -gt 2 ]; then
+        if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--no-sandbox" ]; }; then
             echo "❌ pack 仅支持一个可选参数 --no-sandbox"
             exit 1
         fi

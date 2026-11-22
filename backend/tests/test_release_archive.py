@@ -477,3 +477,29 @@ def test_pack_freezes_ref_for_check_and_archive() -> None:
     assert 'RESOLVED_REF="$(git rev-parse' in test
     assert 'ARCHIVE_ARGS=(--ref "$RESOLVED_REF"' in test
     assert "测试链路明确豁免 release-blocker" in test
+
+
+def test_pack_fetches_before_freezing_ref() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "git fetch origin --prune" in script
+        assert script.index("git fetch origin --prune") < script.index("RESOLVED_REF")
+
+
+def test_sensitive_archive_is_removed_after_extract_with_trap_fallback() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "trap 'rm -f" in script
+        assert "trap - EXIT" in script
+        assert script.index("tar xzf") < script.index("trap - EXIT")
+
+
+def test_pack_rejects_unknown_optional_argument() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert '[ "$2" != "--no-sandbox" ]' in script
+
+
+def test_manifest_return_after_finally_is_present() -> None:
+    script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
+    assert "finally:\n        if stderr_file is not None:\n            stderr_file.close()\n    return manifest" in script

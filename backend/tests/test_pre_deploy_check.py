@@ -162,3 +162,14 @@ def test_indented_release_blocker_is_not_ignored(tmp_path: Path) -> None:
     root = make_root(tmp_path, blocker)
 
     assert module.find_release_blockers(root) == [blocker.strip()]
+
+
+def test_ancestry_git_error_is_not_reported_as_unmerged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    module = load_module()
+    root = make_root(tmp_path)
+
+    assert run_main(module, root, FakeRunner(ancestor_returncode=128), monkeypatch, "feature") == 1
+
+    output = capsys.readouterr().out
+    assert "无法验证 ref 祖先关系" in output
+    assert "未合入" not in output

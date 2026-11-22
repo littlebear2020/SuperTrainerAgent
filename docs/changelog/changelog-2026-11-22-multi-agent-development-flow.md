@@ -117,6 +117,14 @@
 - 测试链路显式输出“豁免 release-blocker 与其他 worktree 检查，仅执行 ref 祖先校验”，保留未验证修复的测试部署通道；正式 pre-deploy 语义不变。
 - 本轮相关回归三件测试文件合计 `42 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
 
+## 最终收尾与评审证伪（PR #39）
+
+- 两件 pack 在冻结 ref 前先 `git fetch origin --prune`，避免本地陈旧 origin/main；随后 pre-deploy 与 archive 共用完整 SHA。
+- 显式配置包在解压成功后立即删除，并保留 `EXIT trap` 作为失败兜底；不再等待六步部署全部结束。未知 pack 参数显式拒绝。
+- pre-deploy 区分 `merge-base` 返回码 1（确实未合入）与其他错误（无法验证祖先关系），不再把 Git 故障误报为业务结论。
+- “finally 后 return 不可达”评论被测试证伪：成功路径必须返回 manifest，已恢复并以 `test_manifest_return_after_finally_is_present` 永久钉住。
+- 本轮相关回归三件测试文件合计 `47 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。
