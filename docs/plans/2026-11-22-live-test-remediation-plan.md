@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛实施计划
 
-> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1=#40、PR 2=#41、PR 3=#42、PR 4=#44 与 Doubao 直连 hotfix=#43 均已合入；PR 3 为同一 PR 四笔提交；Task 6 已按证据收口，P6 外部阻塞、P7 证据不足，均未开实现 PR；Sandbox 7200 秒独立 PR 进行中；不授权自动部署、付费调用或修改服务器配置）。
+> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1=#40、PR 2=#41、PR 3=#42、PR 4=#44 与 Doubao 直连 hotfix=#43 均已合入；PR 3 为同一 PR 四笔提交；Task 6 已按证据收口，P6 外部阻塞、P7 证据不足，均未开实现 PR；Sandbox 7200 秒=#45 已合入；最终复核发现的退役音色重生绕过由独立 hotfix 修复中；不授权自动部署、付费调用或修改服务器配置）。
 > **TL;DR**：四个主 PR 分别修复停止清草稿、播客 URL 抓取、字节 TTS 单通道，以及默认徽标、用量标题、合成文案和 live 断言；P12、Writer、P4、P8、P15 退出。P6/P7 证据不足则记录阻塞且不开 PR；不自动部署，不修改服务器配置。
 
 > **For agentic workers：** 使用 `executing-plans`，单执行者按 Task 0→7 串行执行并逐项勾选；每项先写失败测试、确认功能原因失败、最小实现、定向回归，再提交。主批只允许本计划定义的四个 PR，P6/P7 各自取证后才能另开独立 PR；不在当前分叉工作区直接实施。
@@ -75,6 +75,7 @@
 | **PR 4 / P5/P9/P10/P13** | `input-box.tsx`、`core/models/**`、personal_usage 的 agent/video/types 与 usage 前端、video status label、live tests/runbook、对应测试 | **PR 1 合入前不得开始**；P12、Writer、`settings/account-settings-page.tsx`、`app/(auth)/login/page.tsx`、`config.example.yaml`、真实 config | 对应单元测试、mock E2E、CI 通过；不含服务器 L1/L2 门禁。 |
 | **P6/P7 条件 PR** | 证据确认后分别点名最小实现与测试文件 | 未取证改实现、整体重写虚拟列表、无关中间件/provider 改动 | 各自根因/复现证据先行；证据不足不开 PR，只更新本计划阻塞状态。 |
 | **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试、本计划/changelog、`docs/findings-backlog.md`，以及 7200/TTS 现行说明所需的 `config.example.yaml` 注释、部署指南与 `backend/docs/BACKEND_MODULE_NOTES.md` | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR 实现 | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
+| **最终复核 TTS 重生 hotfix** | `backend/app/gateway/routers/video_gen.py`、重生行为测试、本计划/changelog | 不改视觉/TTS 算法、不混入 Sandbox/P6/P7、不执行付费调用 | CAS 与后台/视觉调用前同步拒绝；TDD + OCR + CI 后独立合入。 |
 
 PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色；②调用方去降级；③技能、依赖、配置和镜像清理；④前端停用态。四笔均在本地逐笔验收，全部验证后一次性 push，只能作为一个 PR 评审和合入。
 
@@ -168,7 +169,13 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 ### Task 6B / 新增独立 PR：Sandbox 空闲释放 7200 秒
 
 - [x] 已先写默认值、本地未显式覆盖与一小时空闲回收失败测试，再把统一默认从 600 改为 7200；显式自定义与 `0=禁用` 对照保留。
-- [ ] 更新相关注释与验收记录；不读取/修改真实 config，不自动部署；独立 OCR、CI 后合入。
+- [x] 已更新相关注释与验收记录；未读取/修改真实 config、未部署；PR #45 经独立 OCR、CI 后合入。
+
+### Task 6C / 最终复核 TTS 重生门禁 hotfix
+
+- [x] 整体复核确认批量/单帧 CAS 可绕过退役音色拒绝，且单帧 `mode=all` 可能在 TTS 拒绝前先调用视觉；属于六卡共享 TTS 契约缺口。
+- [x] 两条路由行为测试先在旧实现 RED，再在读取分镜后、后台任务与任何 CAS/视觉/TTS 副作用前复用统一音色校验；缺省 `voice_id` 的历史默认行为保留。
+- [ ] 完成 hotfix 后端全量、根门禁、独立 OCR/CI 与合入；不执行真实付费重生。
 
 ### Task 7：门禁、登记、部署验收
 
