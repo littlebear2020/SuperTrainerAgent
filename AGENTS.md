@@ -60,7 +60,7 @@
 
 - **五步流**：规划侧集中定稿两份独立 plan（各含 allow/ban 三栏，路径重叠表为空才派发）→ 两执行 Agent 各自独立 worktree 按各自 plan 实现 → 规划侧集中审两路 diff（共享基座层加重）→ 审过后才授权 push/PR（走「Git 约定」PR 评审流）→ **串行合入** main（先合一路，另一路 rebase 新 main 后再合；禁止双 PR 同时抢 main）。
 - **模式共存**：单任务与并行双 worktree 共存——日常小改/单 plan 仍走单执行者流；并行是可选加速，仅当两路路径可互斥时开启。
-- **会话指引**：两 worktree = 两独立会话即可（同工具或跨工具均可，不强制混用）；禁止同一会话跨两个 worktree 写。每个 Agent 开始任务先跑 `python3 scripts/agent_context.py --base origin/main --spec <计划路径> --require-clean --require-head --json`，交接时再输出最终 HEAD 与计划哈希；live 验收还须按 `frontend/docs/LIVE_E2E_RUNBOOK.md` 分开记录 `tested_sha` / `deployed_sha` / `spec_sha256`，禁止从残留分支旧计划生成预期。
+- **会话指引**：两 worktree = 两独立会话即可（同工具或跨工具均可，不强制混用）；禁止同一会话跨两个 worktree 写。每个 Agent 在干净 worktree 起点先跑 `python3 scripts/agent_context.py --base origin/main --spec <计划路径> --require-clean --require-head --json`；**已携带计划提交**的执行分支去掉 `--require-head`，但必须 `behind=0`、工作区干净并记录计划哈希，交接时再输出最终 HEAD；live 验收还须按 `frontend/docs/LIVE_E2E_RUNBOOK.md` 分开记录 `tested_sha` / `deployed_sha` / `spec_sha256`，禁止从残留分支旧计划生成预期。
 - **worktree 卫生**：同时活跃执行任务 ≤3 个（main clone 不计）；`git worktree add ../TrainerAI2.0-<agent|role>-<topic> -b <topic>`；合入后立即 `git worktree remove` + 删远程分支，patch-equivalent 分支不得当作仍在途；主 clone 恒停在 main，不在主 clone 上开执行会话。
 - **review-before-push**：执行侧默认不 push、不开 PR，只提交本地 commits；收尾打包说明（分支名、diff 统计、测试命令与结果、是否碰 config_version）交规划侧；规划侧 `git diff main...<branch>`（共享基座 path 加重审）通过后才授权 push/PR。
 - **派发前提**：plan 状态机干净（唯一状态头，check 脚本校验项 18 兜底）+ allow/ban 三栏齐 + 路径重叠表为空，缺一禁止派发；执行中途发现必碰 ban-list → 停工回规划侧重写互斥，勿私自扩权；姐妹 PR 合入后在本 worktree rebase main，解冲突仍守 ban-list，冲突落入禁改文件 → 停并交规划侧。

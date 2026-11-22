@@ -140,6 +140,7 @@ def test_collaboration_contract_separates_expected_and_deployed_versions() -> No
     assert "release-manifest.json" in runbook
     assert "不得用本地 HEAD 冒充" in runbook
     assert "活跃执行任务" in conventions
+    assert "已携带计划提交" in conventions
     assert "scripts/agent_context.py" in conventions
     assert "[release-blocker]" in conventions
     assert 'pre_deploy_check.py --ref "$REF"' in production
