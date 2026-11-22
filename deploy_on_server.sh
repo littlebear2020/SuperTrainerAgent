@@ -2,6 +2,7 @@
 #
 # DeerFlow 服务器部署脚本
 # 使用 tar+scp 传输（服务器无 git），SSH 端口 2222
+# 前置要求：本地与服务器需安装 python3
 #
 # 用法:
 #   1. 本地执行: ./deploy_on_server.sh pack     # 打包
@@ -9,6 +10,8 @@
 #   3. SSH 到服务器后执行: ./deploy_on_server.sh deploy  # 部署
 #
 set -e
+
+command -v python3 >/dev/null 2>&1 || { echo "错误：本地与服务器需安装 python3"; exit 1; }
 
 SERVER="${DEPLOY_SERVER:?请设置 DEPLOY_SERVER}"
 SSH_PORT=2222
@@ -105,6 +108,9 @@ upload() {
 deploy() {
     cd "$PROJECT_DIR"
     ARCHIVE_SHA_FILE="$PROJECT_DIR/deer-flow-update.tar.gz.sha"
+    if [ -f "$ARCHIVE_SHA_FILE" ] && [ "$(sed -n '3p' "$ARCHIVE_SHA_FILE")" = "true" ]; then
+        trap 'rm -f "$PROJECT_DIR/deer-flow-update.tar.gz" "$ARCHIVE_SHA_FILE"' EXIT
+    fi
 
     echo "============================================"
     echo "  步骤 1/6: 备份关键数据"
@@ -119,7 +125,7 @@ deploy() {
     echo "  步骤 2/6: 停止服务并解压"
     echo "============================================"
     if [ ! -f "$ARCHIVE_SHA_FILE" ]; then
-        echo "❌ 缺少上传的 SHA 侧车，已停止部署"
+        echo "❌ 缺少上传的 SHA 侧车，已停止部署；若包内含本地配置，请手动删除 tar.gz 与 .sha"
         return 1
     fi
     EXPECTED_SHA="$(sed -n '1p' "$ARCHIVE_SHA_FILE")"
@@ -215,10 +221,6 @@ deploy() {
     docker system prune -f 2>/dev/null || true
 
     ./scripts/deploy.sh
-    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
-        rm -f "$PROJECT_DIR/deer-flow-update.tar.gz" "$ARCHIVE_SHA_FILE"
-        echo "  已删除含本地配置的发布包与 SHA 侧车"
-    fi
 
     echo ""
     echo "============================================"
@@ -244,6 +246,10 @@ deploy() {
 # ============================================================
 case "${1:-}" in
     pack)
+        if [ "$#" -gt 2 ]; then
+            echo "❌ pack 仅支持一个可选参数 --no-sandbox"
+            exit 1
+        fi
         pack "${2:-}"
         ;;
     upload)

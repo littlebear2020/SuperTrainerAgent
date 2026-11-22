@@ -156,6 +156,8 @@ def test_exclude_and_explicit_local_config(tmp_path: Path) -> None:
     assert read_text_member(output, ".env") == "TEST_PLACEHOLDER=not-a-secret\n"
     assert read_text_member(output, "frontend/.env") == "FRONTEND_PLACEHOLDER=not-a-secret\n"
     assert manifest(output)["config_files"] == ["config.yaml", ".env", "frontend/.env"]
+    assert manifest(output)["contains_sensitive_material"] is True
+    assert "包内含本地配置" in result.stderr
 
 
 def test_invalid_config_and_exclude_never_replace_existing_output(tmp_path: Path) -> None:
@@ -424,7 +426,11 @@ def test_cache_provenance_and_sensitive_archive_cleanup_are_explicit() -> None:
         script = (REPO_ROOT / name).read_text(encoding="utf-8")
         assert "缓存以 Git 提交内版本为准" in script
         assert "chmod 600" in script
-        assert 'if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then\n        rm -f' in script
+        assert "trap 'rm -f" in script
+        assert "EXIT" in script
+        assert "command -v python3" in script
+        assert "服务器需安装 python3" in script
+        assert 'if [ "$#" -gt 2 ]' in script
 
 
 def test_workflow_config_glob_is_anchored_to_repo_root() -> None:
@@ -454,3 +460,8 @@ def test_lfs_pointer_size_is_checked_before_reading() -> None:
     assert script.index("member.size > 64 * 1024") < script.index("pointer = stream.read()")
     assert "default=None" in script
     assert "args.exclude or []" in script
+
+
+def test_git_error_is_only_attributed_for_nonzero_process() -> None:
+    script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
+    assert "process.returncode not in (None, 0)" in script

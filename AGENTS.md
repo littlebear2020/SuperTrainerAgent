@@ -101,7 +101,7 @@ AI 评审规则镜像见 `.opencodereview/rule.json`，改禁区时同步。
 - 通用部署方式见 `docs/personal-server-deployment-guide.md` 与 `docker/` 中的配置样例。
 - **不可变发布（2026-11-22）**：禁止再用 `tar ... .` 直接打当前工作区。正式包经 `deploy_on_server.sh pack`（默认 `origin/main`，先跑 `pre_deploy_check --ref`），测试包经 `deploy_to_test_server.sh pack`；未合入 ref 只允许测试环境以 `TEST_ALLOW_UNMERGED=1` 显式打包。缓存只以 Git 提交内版本为准，本地未提交或忽略目录中的更新不得静默入包。包内 `release-manifest.json` 是部署与验收的源码 SHA 事实源；pack 同时写入 `<发布包>.sha` 三行侧车（源码 SHA + tar.gz SHA-256 + 配置标记），upload 与服务器 deploy 只读取侧车并重算包摘要，禁止二次解析移动 ref 或重复解压 manifest 代替本次 pack 证据；LFS 属性必须以 NUL 分隔读取 `source_sha` 对应树，指针只允许经本地 size/OID 校验后的真实对象替换，禁止联网 smudge、工作区属性漂移、特殊路径漏配或未物化对象静默入包。
 - 侧车与发布包同信道传输，用于防旧包、误用和意外损坏，不等同于防主动篡改的签名；如需抵御恶意篡改须另引入带外信任或签名。正式发布必须联网 fetch 核对远端，离线环境只能走明确授权的测试打包，不得把陈旧 ref 当作正式版本。
-- 其他 Agent 的 worktree/开放 PR 对不可变发布只提示、不阻断；未勾选 `[release-blocker]` 与 fetch/ref 核对失败才阻断正式发布。常规升级不追加本地秘密配置；仅首次部署或负责人明确需要时以 `DEPLOY_INCLUDE_LOCAL_CONFIG=1` / `TEST_INCLUDE_LOCAL_CONFIG=1` 显式追加，此时 deploy 跳过旧配置恢复，不得用服务器备份覆盖显式新配置；本地与服务器发布包/侧车一律 `chmod 600`，显式包含本地配置的包在成功部署后必须删除。
+- 其他 Agent 的 worktree/开放 PR 对不可变发布只提示、不阻断；未勾选 `[release-blocker]` 与 fetch/ref 核对失败才阻断正式发布。常规升级不追加本地秘密配置；仅首次部署或负责人明确需要时以 `DEPLOY_INCLUDE_LOCAL_CONFIG=1` / `TEST_INCLUDE_LOCAL_CONFIG=1` 显式追加，此时 deploy 跳过旧配置恢复，不得用服务器备份覆盖显式新配置；本地与服务器发布包/侧车一律 `chmod 600`，显式包含本地配置的包必须由 `EXIT trap` 在成功与失败路径均删除；本地与服务器均需前置检查 `python3`。
 - 本仓库公开开发，真实主机、账号、密钥、内部任务 ID、用户数据和运行数据库不得提交。内部运维手册与部署记录应保存在仓库外。
 
 ## Remotion 课程视频管线（remotion_course）

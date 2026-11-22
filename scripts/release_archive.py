@@ -194,6 +194,7 @@ def build_archive(
         "base_sha": base_sha,
         "excludes": normalized_excludes,
         "includes_local_config": include_local_config,
+        "contains_sensitive_material": include_local_config,
         "config_files": [name for name, _ in configs],
     }
     lfs_paths = _lfs_paths(root, source_sha)
@@ -245,7 +246,7 @@ def build_archive(
         if stderr_file is not None:
             stderr_file.seek(0)
             detail = stderr_file.read().decode(errors="replace").strip()
-            if detail:
+            if process is not None and process.returncode not in (None, 0) and detail:
                 raise ArchiveError(f"git archive 失败：{detail}") from exc
         raise
     finally:
@@ -281,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"release_archive: {exc}", file=sys.stderr)
         return 1
     print(f"release_archive: {args.output} source_sha={manifest['source_sha']}")
+    if args.include_local_config:
+        print("release_archive: 警告：包内含本地配置，请限制存放并在部署后删除", file=sys.stderr)
     return 0
 
 

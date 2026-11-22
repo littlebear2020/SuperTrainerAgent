@@ -102,6 +102,14 @@
 - 重复出现的 `ls-tree -z` high 仍由原始输出与已跟踪计划测试证伪，未修改正确实现。
 - 本轮相关回归三件测试文件合计 `40 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
 
+## 安全失败路径与运行依赖（PR #39 复审）
+
+- 两件脚本均在入口前置检查 `python3`，头部声明本地与服务器依赖，避免到部署步骤才报命令不存在。
+- 显式配置包改为 deploy 入口根据侧车设置 `EXIT trap`：成功、失败、`set -e` 退出均清理 tar 与侧车；缺侧车时错误提示也要求手动清理潜在敏感包，不再只覆盖成功路径。
+- manifest 新增 `contains_sensitive_material`，`release_archive --include-local-config` 输出限制存放和部署后删除警告。
+- git archive 只有在进程返回码非零时才把 stderr 归因为 git 失败，gzip/磁盘/替换等原始异常不再被掩盖；多余 pack 参数显式拒绝。
+- 本轮相关回归三件测试文件合计 `41 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。

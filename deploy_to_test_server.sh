@@ -2,6 +2,7 @@
 #
 # DeerFlow 测试服务器部署脚本
 # 使用 tar+scp 传输，与生产部署流程一致
+# 前置要求：本地与服务器需安装 python3
 #
 # 用法:
 #   1. 本地执行: ./deploy_to_test_server.sh pack     # 打包
@@ -15,6 +16,8 @@
 #   cd /opt/trainer-ai-test && ./deploy_to_test_server.sh deploy
 #
 set -e
+
+command -v python3 >/dev/null 2>&1 || { echo "错误：本地与服务器需安装 python3"; exit 1; }
 
 # ════════════════════════════════════════════════════════════
 # 配置：修改这里指向你的测试服务器
@@ -141,6 +144,9 @@ upload() {
 deploy() {
     cd "$PROJECT_DIR"
     ARCHIVE_SHA_FILE="$PROJECT_DIR/deer-flow-test-update.tar.gz.sha"
+    if [ -f "$ARCHIVE_SHA_FILE" ] && [ "$(sed -n '3p' "$ARCHIVE_SHA_FILE")" = "true" ]; then
+        trap 'rm -f "$PROJECT_DIR/deer-flow-test-update.tar.gz" "$ARCHIVE_SHA_FILE"' EXIT
+    fi
 
     echo -e "${BLUE}============================================${NC}"
     echo -e "${BLUE}  DeerFlow 测试环境部署${NC}"
@@ -176,7 +182,7 @@ deploy() {
     echo ""
     echo -e "${YELLOW}步骤 2/6: 停止旧服务并解压新代码${NC}"
     if [ ! -f "$ARCHIVE_SHA_FILE" ]; then
-        echo -e "${RED}❌ 缺少上传的 SHA 侧车，已停止部署${NC}"
+        echo -e "${RED}❌ 缺少上传的 SHA 侧车，已停止部署；若包内含本地配置，请手动删除 tar.gz 与 .sha${NC}"
         return 1
     fi
     EXPECTED_SHA="$(sed -n '1p' "$ARCHIVE_SHA_FILE")"
@@ -319,10 +325,6 @@ deploy() {
 
     # 启动服务
     bash scripts/deploy.sh
-    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
-        rm -f "$PROJECT_DIR/deer-flow-test-update.tar.gz" "$ARCHIVE_SHA_FILE"
-        echo -e "${GREEN}✓ 已删除含本地配置的发布包与 SHA 侧车${NC}"
-    fi
 
     echo ""
     echo -e "${GREEN}============================================${NC}"
@@ -344,6 +346,10 @@ deploy() {
 # ============================================================
 case "${1:-}" in
     pack)
+        if [ "$#" -gt 2 ]; then
+            echo -e "${RED}❌ pack 仅支持一个可选参数 --no-sandbox${NC}"
+            exit 1
+        fi
         pack "${2:-}"
         ;;
     upload)
