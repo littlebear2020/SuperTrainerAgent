@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type FormEvent,
 } from "react";
 import { toast } from "sonner";
 
@@ -412,12 +413,20 @@ export function InputBox({
     [onContextChange, context, allModels, modeDefaults],
   );
 
-  const handleSubmit = useCallback(
-    async (message: PromptInputMessage) => {
-      if (status === "streaming") {
-        onStop?.();
+  const handleSubmitCapture = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      if (status !== "streaming") {
         return;
       }
+      event.preventDefault();
+      event.stopPropagation();
+      onStop?.();
+    },
+    [onStop, status],
+  );
+
+  const handleSubmit = useCallback(
+    async (message: PromptInputMessage) => {
       if (!message.text) {
         return;
       }
@@ -439,15 +448,7 @@ export function InputBox({
 
       onSubmit?.(message);
     },
-    [
-      context,
-      onContextChange,
-      onSubmit,
-      onStop,
-      resolvedModelName,
-      currentMode,
-      status,
-    ],
+    [context, onContextChange, onSubmit, resolvedModelName, currentMode],
   );
 
   return (
@@ -462,6 +463,7 @@ export function InputBox({
         globalDrop
         multiple
         onSubmit={handleSubmit}
+        onSubmitCapture={handleSubmitCapture}
         {...props}
       >
         {/* Upload progress bar */}
