@@ -274,3 +274,101 @@ describe("缺陷 2 路径 A：模型列表加载失败可见且可重试", () =>
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("P5 动态默认模型徽标", () => {
+  const models = [
+    {
+      name: "deepseek-v4",
+      display_name: "DeepSeek 默认版（默认）",
+      model: "deepseek-v4",
+    },
+    {
+      name: "claude-sonnet-5-5",
+      display_name: "Claude Sonnet (默认)",
+      model: "claude-sonnet-5-5",
+    },
+  ];
+
+  function modelItems(): HTMLElement[] {
+    return Array.from(document.body.querySelectorAll("[cmdk-item]"));
+  }
+
+  it("选中按钮和当前档列表只给 mode_defaults 指定模型画默认徽标", async () => {
+    mockUseModels({
+      models,
+      modeDefaults: {
+        flash: "deepseek-v4",
+        standard: "claude-sonnet-5-5",
+        ultra: "deepseek-v4",
+      },
+    });
+    await renderInputBox({
+      context: { model_name: "claude-sonnet-5-5", mode: "standard" },
+      onContextChange: vi.fn(),
+    });
+
+    const trigger = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("Claude Sonnet"));
+    expect(trigger).toBeDefined();
+    expect(trigger!.textContent).toContain("默认");
+    expect(trigger!.textContent).not.toContain("(默认)");
+
+    await act(async () => {
+      trigger!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      trigger!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const items = modelItems();
+    expect(items).toHaveLength(2);
+    const deepseek = items.find((item) =>
+      item.textContent?.includes("DeepSeek"),
+    );
+    const claude = items.find((item) =>
+      item.textContent?.includes("Claude Sonnet"),
+    );
+    expect(deepseek!.textContent).toContain("DeepSeek 默认版");
+    expect(deepseek!.textContent).not.toContain("（默认）");
+    expect(
+      deepseek!.querySelector("[data-testid='default-model-badge']"),
+    ).toBeNull();
+    expect(claude!.textContent).toContain("Claude Sonnet");
+    expect(claude!.textContent).not.toContain("(默认)");
+    expect(
+      claude!.querySelectorAll("[data-testid='default-model-badge']"),
+    ).toHaveLength(1);
+  });
+
+  it("当前模型不是本档默认时按钮不画默认徽标，但仍剥离末尾后缀", async () => {
+    mockUseModels({
+      models,
+      modeDefaults: { standard: "claude-sonnet-5-5" },
+    });
+    await renderInputBox({
+      context: { model_name: "deepseek-v4", mode: "standard" },
+      onContextChange: vi.fn(),
+    });
+    const trigger = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("DeepSeek"));
+    expect(trigger).toBeDefined();
+    expect(trigger!.textContent).toContain("DeepSeek 默认版");
+    expect(trigger!.textContent).not.toContain("（默认）");
+    expect(
+      trigger!.querySelector("[data-testid='default-model-badge']"),
+    ).toBeNull();
+  });
+});
+
+describe("P13 composer 稳定定位", () => {
+  it("输入框提供与本地化占位文案无关的稳定 testid", async () => {
+    mockUseModels();
+    await renderInputBox({
+      context: { model_name: "m1", mode: "standard" },
+      onContextChange: vi.fn(),
+    });
+    const input = document.querySelector("[data-testid='composer-input']");
+    expect(input).not.toBeNull();
+    expect(input!.tagName).toBe("TEXTAREA");
+    expect((input as HTMLTextAreaElement).disabled).toBe(false);
+  });
+});

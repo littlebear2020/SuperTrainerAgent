@@ -528,3 +528,22 @@ async def test_agent_latest_status_uses_one_row_per_thread_window_function(db):
         event.remove(engine.sync_engine, "before_cursor_execute", capture_sql)
 
     assert any("row_number() over" in statement and "partition by" in statement for statement in statements), statements
+
+
+@pytest.mark.anyio
+async def test_agent_missing_title_uses_first_human_then_none(db):
+    missing = thread("missing")
+    missing.display_name = None
+    placeholder = thread("placeholder")
+    fallback = thread("fallback")
+    fallback.display_name = None
+    fallback_run = run("fallback-run", "fallback")
+    fallback_run.first_human_message = "首条用户消息"
+    async with db() as session:
+        session.add_all([missing, placeholder, fallback, fallback_run])
+        await session.commit()
+
+    tasks = {task.source_id: task for task in await aggregate(db)}
+    assert tasks["fallback"].title == "首条用户消息"
+    assert tasks["placeholder"].title is None
+    assert tasks["missing"].title is None

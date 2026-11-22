@@ -1,16 +1,17 @@
 # 服务器实测问题修复与 TTS 单通道收敛
 
-> **TL;DR**：P1/P11 已分别合入；PR 3 以同一分支四笔提交收敛字节 TTS 单通道；后续 PR 4 处理默认徽标、用量标题、合成文案与 live 断言；不自动部署、不修改真实配置、不执行未授权付费调用。
+> **TL;DR**：P1/P11/PR 3 与 Doubao hotfix 已合入；PR 4 的默认徽标、用量标题、合成文案与 live 断言已完成本地验证；不自动部署、不修改真实配置、不执行未授权付费调用。
 
 ## 当前已落地
 
 - P1（PR #40，已合入）：InputBox 在表单捕获阶段拦截 streaming 停止，保留文本、附件与 localStorage 草稿；正常发送仍清空。
 - P11（PR #41，已合入）：播客 URL 读取在连接 socket 已分离时使用 `response.fp.raw._sock` 设置剩余超时；EOF 安全结束，开放响应缺 socket 时响亮失败，安全链不变。
 - P3（PR #42，已合入）：目录/API 只保留 4 个中文字节音色；统一入口在任何网络调用前拒绝 preset/Edge/裸 Edge ShortName 与白名单外 Doubao；调用方不降级换声，前端旧值保留但停用。
-- Doubao 直连 hotfix（独立 PR）：`VoiceCloneService` 目录音色直连 DoubaoTTSClient，不再误查克隆仓库；voice-twin 目录 API 与共享白名单一致。
+- Doubao 直连 hotfix（PR #43，已合入）：`VoiceCloneService` 目录音色直连 DoubaoTTSClient，不再误查克隆仓库；voice-twin 目录 API 与共享白名单一致。
 - P3 清理：PPT Master 共用字幕算法迁至 `subtitle_timing.py`，CosyVoice/ElevenLabs/MiniMax import 回归通过；Edge/360 客户端、依赖、配置结构与 sandbox 安装项移除；`config.example.yaml` 升至 33，真实 config 未触碰。
 - Task 0：确认实现代码相对计划基准无漂移；P6/P7 证据材料位于 `temp/live-test-remediation-20261122/`，均不满足条件 PR 门禁。
-- PR 3 已按最新决策固定为四笔本地提交、全部验证后一次性 push、同一 PR 合入与回滚。
+- PR 3 已按四笔提交完成评审与合入。
+- P5/P9/P10/P13（PR 4 本地验证完成）：动态默认徽标、缺标题统一占位、通用合成文案和 composer/live 断言已按 TDD 完成，本地全量、mock E2E 与 OCR 已复核，待远端验收。
 
 ## 后续固定范围
 
@@ -46,7 +47,13 @@
 - PR #42 首轮 GitHub CI 全绿；GitHub OCR 8 findings，其中角色池 import 固化为 medium，已改为调用时惰性计算并补 RED→GREEN；该修复本地 OCR → 0 findings。
 - PR #42 第二轮 GitHub CI 全绿；OCR 后续发现已收敛为空默认渲染前拒绝、池空保留默认回退但明确告警、单口播不误判、无效 speaker 告警及前端命名/默认 ID 复用；最终本地 OCR → 0 findings。
 - PR #42 最终轮高危项：共享入口现拒绝目录/白名单外 Doubao 与空 ID，正向测试夹具使用目录内真实 ID；PPT 失效 CLI 参数文档已同步，修复 diff 本地 OCR → 0 findings。
-- Doubao 直连 hotfix RED → 目录音色误查克隆 repo、目录 API 白名单不一致；GREEN → 相关 260 passed，全量 10174 passed / 91 skipped，根 `make check` 与本地 OCR 0 findings。
+- Doubao 直连 hotfix RED → 目录音色误查克隆 repo、目录 API 白名单不一致；GREEN → 相关 260 passed，全量 10174 passed / 91 skipped，根 `make check` 与本地 OCR 0 findings；PR #43 CI/OCR 全绿并已合入。
+- PR 4 P5 RED → 动态徽标缺失且手写后缀残留；GREEN → InputBox 7 条通过，当前档唯一徽标、非默认不误标、仅剥离末尾后缀。
+- PR 4 P9 RED → Agent/视频缺标题回退 ID、前端无占位；GREEN → 后端相关 92 passed、前端 usage 8 passed，首条用户消息回退保留。
+- PR 4 P10 RED → 通用 composing 为“重新合成中”；GREEN → active-status 3 + StatusBadge 4 passed，主动 pending 文案未改。
+- PR 4 P13 RED → 无稳定 composer testid；GREEN → InputBox 7 条与 typecheck 通过；live `--list` → 20 tests / 8 files，仅列出不执行。
+- PR 4 rebase 后最终全量：backend `uv run pytest tests/ -q` → **10176 passed, 91 skipped**；frontend `pnpm test` → **281 files / 1818 tests passed**；相关 mock E2E → **8 passed**；根 `make check` 与 docs convention 通过。
+- PR 4 本地 OCR → 11 files / 4 findings；默认徽标仍严格按 `mode_defaults`，不把配置缺失后的临时回退误标为默认；终态缺标题占位遵循 D12；重复徽标样式 low 建议 deferred，未扩大范围。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
 ## 阻塞与未执行

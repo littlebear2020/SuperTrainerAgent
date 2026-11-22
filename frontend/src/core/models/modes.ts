@@ -32,3 +32,7 @@ export function defaultModelForMode(
     models[0]
   );
 }
+
+export function stripDefaultSuffix(displayName: string): string {
+  return displayName.replace(/\s*(?:（默认）|\(默认\))$/, "");
+}

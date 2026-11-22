@@ -330,7 +330,8 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
         activity_candidates.extend(row.created_at for row in runs_by_thread[thread.thread_id])
         activity_candidates.extend(row.created_at for row in media_by_thread[thread.thread_id])
         activity_at = max(_as_utc(value) or value for value in activity_candidates)
-        title = thread.display_name or (latest_run.first_human_message if latest_run else None) or thread.thread_id
+        display_name = thread.display_name if thread.display_name and thread.display_name != thread.thread_id else None
+        title = display_name or (latest_run.first_human_message if latest_run else None)
         tasks.append(
             UsageTaskEntry(
                 task_key=f"agent:{thread.thread_id}",

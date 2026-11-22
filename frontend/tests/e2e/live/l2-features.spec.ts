@@ -1,11 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  CHAT_PLACEHOLDER,
-  openAgentChat,
-  sendChatMessage,
-  waitForRunSettled,
-} from "./helpers";
+import { openAgentChat, sendChatMessage, waitForRunSettled } from "./helpers";
 
 /**
  * L2 轻功能:真实 API 往返但控制消耗(1 条小模型消息、文档 CRUD、各页面可达)。
@@ -105,12 +100,11 @@ test.describe("L2 轻功能", () => {
     await expect(page.getByText(/加载失败|出错了/i)).toHaveCount(0);
   });
 
-  test("控制台:用量面板渲染", async ({ page }) => {
+  test("控制台:普通用户个人用量页渲染", async ({ page }) => {
     await page.goto("/workspace/console");
-    const panel = page
-      .getByTestId("llm-usage-panel")
-      .or(page.getByTestId("console-cost-chart"));
-    await expect(panel.first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("personal-usage-page")).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test("案例库:页面渲染", async ({ page }) => {
@@ -119,8 +113,8 @@ test.describe("L2 轻功能", () => {
     await expect(page.getByText(/加载失败|出错了/i)).toHaveCount(0);
   });
 
-  test("聊天输入框可达性:占位文案一致", async ({ page }) => {
+  test("聊天输入框可达性:稳定 testid 可编辑", async ({ page }) => {
     await openAgentChat(page, "course-assistant");
-    await expect(page.getByPlaceholder(CHAT_PLACEHOLDER)).toBeEditable();
+    await expect(page.getByTestId("composer-input")).toBeEditable();
   });
 });

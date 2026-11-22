@@ -38,7 +38,7 @@ pnpm test:e2e:live:l1
 pnpm test:e2e:live:l2
 ```
 
-仅 1 条真实 LLM 调用（"请只回复两个字：收到"），其余是 CRUD 与页面可达性。覆盖：course-assistant 真实 LLM 回复、线程重开消息持久、作品资产页、writer 文档 CRUD 与刷新后持久、声音分身页、控制台用量面板、案例库、输入框占位文案。
+仅 1 条真实 LLM 调用（"请只回复两个字：收到"），其余是 CRUD 与页面可达性。覆盖：course-assistant 真实 LLM 回复、线程重开消息持久、作品资产页、writer 文档 CRUD 与刷新后持久、声音分身页、普通用户控制台个人用量页（`personal-usage-page`）、案例库、输入框稳定 `composer-input` 定位。控制台断言按普通用户契约，不要求管理员专用的 LLM 面板；`LIVE_EMAIL` 应对应被测普通用户身份。
 
 **发现什么**：真实 API 连通性、凭据有效性、持久化写入。
 

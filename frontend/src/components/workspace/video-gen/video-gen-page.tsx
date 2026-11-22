@@ -61,11 +61,10 @@ export { TaskThumbnail } from "./task-thumbnail";
 
 // ── Status badges ───────────────────────────────────────────────────────
 
-/** E16: 活跃态（running/pending/composing）的状态标签。composing 须显示"重新合成中"
- * （修前 fallback 一律显示"排队中"，recompose 时列表页误导）。纯函数便于测试。 */
+/** 活跃态标签；通用 composing 显示「合成中」，主动重合成按钮自行显示 pending 文案。 */
 export function getActiveStatusLabel(status: string): string {
   if (status === "running") return "处理中";
-  if (status === "composing") return "重新合成中";
+  if (status === "composing") return "合成中";
   return "排队中";
 }
 

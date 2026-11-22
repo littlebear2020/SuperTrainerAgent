@@ -58,6 +58,7 @@ import {
   defaultModelForMode,
   modelsForMode,
   normalizeMode,
+  stripDefaultSuffix,
 } from "@/core/models/modes";
 import type { LocalSettings } from "@/core/settings";
 import { useSkills } from "@/core/skills/hooks";
@@ -487,6 +488,7 @@ export function InputBox({
         </PromptInputAttachments>
         <PromptInputBody className="absolute top-0 right-0 left-0 z-3">
           <PromptInputTextarea
+            data-testid="composer-input"
             className={cn(
               "size-full",
               isDark
@@ -627,7 +629,18 @@ export function InputBox({
                 >
                   <div className="flex min-w-0 flex-col items-start text-left">
                     <ModelSelectorName className="text-xs font-normal">
-                      {mounted ? selectedModel?.display_name : ""}
+                      {mounted
+                        ? stripDefaultSuffix(selectedModel?.display_name ?? "")
+                        : ""}
+                      {mounted &&
+                        selectedModel?.name === modeDefaults[currentMode] && (
+                          <span
+                            data-testid="default-model-badge"
+                            className="text-muted-foreground ml-1 rounded border px-1 text-[9px]"
+                          >
+                            默认
+                          </span>
+                        )}
                     </ModelSelectorName>
                   </div>
                 </PromptInputButton>
@@ -642,7 +655,17 @@ export function InputBox({
                       onSelect={() => handleModelSelect(m.name)}
                     >
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <ModelSelectorName>{m.display_name}</ModelSelectorName>
+                        <ModelSelectorName>
+                          {stripDefaultSuffix(m.display_name)}
+                          {m.name === modeDefaults[currentMode] && (
+                            <span
+                              data-testid="default-model-badge"
+                              className="text-muted-foreground ml-1 rounded border px-1 text-[9px]"
+                            >
+                              默认
+                            </span>
+                          )}
+                        </ModelSelectorName>
                         <span className="text-muted-foreground truncate text-[10px]">
                           {m.model}
                         </span>

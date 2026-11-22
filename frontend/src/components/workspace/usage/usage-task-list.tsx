@@ -37,6 +37,7 @@ export function UsageTaskList({
           task.llm_cost !== null &&
           task.media_cost !== null &&
           task.cost !== null;
+        const title = task.title ?? "标题生成中";
         return (
           <article
             key={task.task_key}
@@ -49,7 +50,7 @@ export function UsageTaskList({
               tabIndex={0}
               aria-expanded={isExpanded}
               aria-controls={detailsId}
-              aria-label={`${task.title}: ${isExpanded ? c.collapseDetails : c.expandDetails}`}
+              aria-label={`${title}: ${isExpanded ? c.collapseDetails : c.expandDetails}`}
               className="hover:bg-muted/40 focus-visible:ring-ring flex min-w-0 cursor-pointer flex-wrap items-center gap-3 p-4 outline-none select-none focus-visible:ring-2"
               onClick={() => onToggle(task.task_key)}
               onKeyDown={(event) => {
@@ -66,9 +67,7 @@ export function UsageTaskList({
                 {isExpanded ? "−" : "+"}
               </span>
               <div className="min-w-[180px] flex-1">
-                <h2 className="text-sm font-medium break-words">
-                  {task.title}
-                </h2>
+                <h2 className="text-sm font-medium break-words">{title}</h2>
                 <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <span
                     data-testid={`task-status-${task.status}`}

@@ -7,8 +7,6 @@ import type { Page } from "@playwright/test";
 
 /** Live 套件公共工具:agent 聊天驱动 / 流式等待 / 澄清自动应答 / 产物下载校验。 */
 
-export const CHAT_PLACEHOLDER = "今天我能为你做些什么？";
-
 // ClarificationOptions 容器签名(className="flex flex-col items-start gap-1.5"),
 // :enabled 过滤掉运行中置灰的选项。
 const CLARIFICATION_BUTTONS = "div.flex.flex-col.items-start button:enabled";
@@ -18,12 +16,12 @@ const ARTIFACT_DIR = path.join(process.cwd(), "test-results", "live-artifacts");
 /** 打开某 agent 的新会话页并等待输入框就绪。 */
 export async function openAgentChat(page: Page, agent: string) {
   await page.goto(`/workspace/agents/${agent}/chats/new`);
-  await page.getByPlaceholder(CHAT_PLACEHOLDER).waitFor({ timeout: 30_000 });
+  await page.getByTestId("composer-input").waitFor({ timeout: 30_000 });
 }
 
 /** 在当前会话发送一条消息(Enter 发送)。 */
 export async function sendChatMessage(page: Page, text: string) {
-  const box = page.getByPlaceholder(CHAT_PLACEHOLDER);
+  const box = page.getByTestId("composer-input");
   await box.fill(text);
   await box.press("Enter");
 }

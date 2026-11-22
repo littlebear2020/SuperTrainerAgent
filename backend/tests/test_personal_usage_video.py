@@ -318,3 +318,15 @@ async def test_personal_usage_summary_reconciles_across_pagination(db):
         assert result.summary.cost == pytest.approx(0.00084, abs=1e-9)
         assert result.summary.currency == "CNY"
         assert result.summary.cost_source == "estimated"
+
+
+@pytest.mark.anyio
+async def test_video_missing_title_returns_none_instead_of_task_id(db):
+    missing = task("missing")
+    missing.title = None
+    async with db() as session:
+        session.add(missing)
+        await session.commit()
+
+    result = (await videos(db))[0]
+    assert result.title is None
