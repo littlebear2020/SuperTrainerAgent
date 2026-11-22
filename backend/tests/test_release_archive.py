@@ -301,10 +301,13 @@ def test_upload_uses_pack_sidecar_and_runs_from_repo_root() -> None:
         assert "包摘要与侧车校验通过" in script
 
 
-def add_lfs_pointer(repo: Path, payload: bytes) -> str:
+def add_lfs_pointer(repo: Path, payload: bytes, relative: str = "binary.dat") -> str:
     oid = hashlib.sha256(payload).hexdigest()
-    (repo / ".gitattributes").write_text("binary.dat filter=lfs\n", encoding="utf-8")
-    (repo / "binary.dat").write_text(
+    pattern = relative.replace("\\", "\\\\").replace('"', '\\"')
+    (repo / ".gitattributes").write_text(f'"{pattern}" filter=lfs\n', encoding="utf-8")
+    path = repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         f"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize {len(payload)}\n",
         encoding="utf-8",
     )
@@ -387,3 +390,28 @@ def test_lfs_attributes_are_read_from_source_commit_not_worktree(tmp_path: Path)
         member = bundle.extractfile("binary.dat")
         assert member is not None
         assert member.read() == payload
+
+
+def test_lfs_path_with_non_ascii_and_spaces_is_materialized(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    relative = "目录/二进制 文件.dat"
+    payload = b"unicode LFS object" * 100
+    add_lfs_pointer(repo, payload, relative)
+    (repo / relative).write_bytes(payload)
+    output = tmp_path / "release.tar.gz"
+
+    result = run_cli(repo, output)
+
+    assert result.returncode == 0, result.stderr
+    with tarfile.open(output, "r:gz") as bundle:
+        member = bundle.extractfile(relative)
+        assert member is not None
+        assert member.read() == payload
+
+
+def test_every_scp_has_explicit_failure_handling() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        for line in script.splitlines():
+            if line.strip().startswith("scp "):
+                assert "||" in line

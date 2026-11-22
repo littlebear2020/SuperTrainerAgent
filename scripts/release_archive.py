@@ -60,11 +60,11 @@ LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 
 def _lfs_paths(root: Path, source_sha: str) -> set[str]:
-    tracked = _git(root, "ls-tree", "-r", "--name-only", source_sha)
+    tracked = _git(root, "ls-tree", "-r", "-z", "--name-only", source_sha)
     if tracked.returncode != 0:
         raise ArchiveError(f"读取 Git 文件清单失败：{tracked.stderr.strip()}")
     result = subprocess.run(
-        ["git", "check-attr", f"--source={source_sha}", "--stdin", "filter"],
+        ["git", "check-attr", "-z", f"--source={source_sha}", "--stdin", "filter"],
         cwd=root,
         input=tracked.stdout,
         capture_output=True,
@@ -73,11 +73,15 @@ def _lfs_paths(root: Path, source_sha: str) -> set[str]:
     )
     if result.returncode != 0:
         raise ArchiveError(f"读取 LFS 属性失败：{result.stderr.strip()}")
+    fields = result.stdout.split("\0")
+    if fields[-1]:
+        raise ArchiveError("git check-attr 返回了未终止的记录")
     paths: set[str] = set()
-    for line in result.stdout.splitlines():
-        path, separator, value = line.rpartition(": filter: ")
-        if separator and value == "lfs":
-            paths.add(path)
+    for index in range(0, len(fields) - 1, 3):
+        if index + 2 >= len(fields):
+            raise ArchiveError("git check-attr 返回了不完整的三元组")
+        if fields[index + 2] == "lfs":
+            paths.add(fields[index])
     return paths
 
 

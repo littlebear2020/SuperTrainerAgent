@@ -126,9 +126,9 @@ upload() {
     fi
     echo "  上传源码 SHA: $RELEASE_SHA（包摘要校验通过）"
     echo "  正在上传..."
-    scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/"
-    scp -P "$SSH_PORT" "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/"
-    scp -P "$SSH_PORT" "$LOCAL_DIR/deploy_to_test_server.sh" "${SERVER}:${PROJECT_DIR}/"
+    scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ 发布包上传失败${NC}"; return 1; }
+    scp -P "$SSH_PORT" "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ SHA 侧车上传失败${NC}"; return 1; }
+    scp -P "$SSH_PORT" "$LOCAL_DIR/deploy_to_test_server.sh" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ 部署脚本上传失败${NC}"; return 1; }
 
     echo ""
     echo -e "${GREEN}✅ 上传完成${NC}"

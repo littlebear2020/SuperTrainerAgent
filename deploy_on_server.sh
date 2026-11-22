@@ -97,8 +97,8 @@ upload() {
         return 1
     fi
     echo "   上传源码 SHA: $RELEASE_SHA（包摘要校验通过）"
-    scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/
-    scp -P $SSH_PORT "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/"
+    scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/ || { echo "❌ 发布包上传失败"; return 1; }
+    scp -P $SSH_PORT "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo "❌ SHA 侧车上传失败"; return 1; }
     echo "✅ 上传完成"
 }
 
