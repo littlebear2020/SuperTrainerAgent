@@ -36,63 +36,39 @@ NC='\033[0m'
 # ============================================================
 # pack: 本地打包
 # ============================================================
+release_sha() {
+    tar -xOf "$1" release-manifest.json | python3 -c 'import json, sys; print(json.load(sys.stdin)["source_sha"])'
+}
+
 pack() {
     echo -e "${BLUE}============================================${NC}"
-    echo -e "${BLUE}  打包项目文件（测试环境）${NC}"
+    echo -e "${BLUE}  从指定 Git 提交打包项目文件（测试环境）${NC}"
     echo -e "${BLUE}============================================${NC}"
     echo ""
 
     cd "$LOCAL_DIR"
-
-    # 检查 config.yaml 是否存在
-    if [ ! -f config.yaml ]; then
-        echo -e "${RED}❌ config.yaml 不存在，请先创建配置文件${NC}"
-        exit 1
+    REF="${TEST_DEPLOY_REF:-origin/main}"
+    ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output "$TAR_FILE")
+    if [ "${TEST_ALLOW_UNMERGED:-0}" = "1" ]; then
+        ARCHIVE_ARGS+=(--allow-unmerged)
+        echo -e "${YELLOW}  显式允许测试未合入 ref: $REF${NC}"
     fi
-
-    # 检查 .env 是否存在
-    if [ ! -f .env ]; then
-        echo -e "${RED}❌ .env 不存在，请先创建环境变量文件${NC}"
-        exit 1
+    if [ "${TEST_INCLUDE_LOCAL_CONFIG:-0}" = "1" ]; then
+        ARCHIVE_ARGS+=(--include-local-config)
+        echo -e "${YELLOW}  显式追加本地测试配置${NC}"
     fi
-
-    SANDBOX_OPT=''
     if [ "${1:-}" = "--no-sandbox" ]; then
-        # --no-sandbox 跳过 Chrome 缓存（~260MB），但保留字体文件（~78MB）
-        SANDBOX_OPT='--exclude=docker/sandbox/cache/chrome-linux'
-        echo -e "${YELLOW}  跳过 Chrome 缓存（--no-sandbox），保留字体文件${NC}"
+        ARCHIVE_ARGS+=(--exclude docker/sandbox/cache/chrome-linux)
+        echo -e "${YELLOW}  跳过 Chrome 缓存，保留字体、Python wheels 与 BPE 缓存${NC}"
     fi
 
-    echo "  正在打包..."
-    tar czf "$TAR_FILE" \
-      --exclude='node_modules' \
-      --exclude='.venv' \
-      --exclude='frontend/.next' \
-      --exclude='__pycache__' \
-      --exclude='.git' \
-      --exclude='.claude' \
-      --exclude='.DS_Store' \
-      --exclude='docs/plans' \
-      --exclude='logs' \
-      --exclude='temp' \
-      --exclude='fix-config.py' \
-      --exclude='workspace-redesign.html' \
-      --exclude='backend/.deer-flow/data' \
-      --exclude='backend/.deer-flow/users' \
-      --exclude='backend/.deer-flow/channels' \
-      --exclude='backend/.deer-flow/*.db' \
-      --exclude='backend/.deer-flow/*.json' \
-      --exclude='deer-flow-update.tar.gz' \
-      --exclude='deer-flow-test-update.tar.gz' \
-      --exclude='.superpowers' \
-      --exclude='node_modules' \
-      $SANDBOX_OPT \
-      .
+    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
 
     SIZE=$(ls -lh "$TAR_FILE" | awk '{print $5}')
     echo ""
     echo -e "${GREEN}✅ 打包完成: $SIZE${NC}"
     echo -e "   文件位置: $TAR_FILE"
+    echo "   源码 SHA: $(release_sha "$TAR_FILE")"
 }
 
 # ============================================================
@@ -112,6 +88,7 @@ upload() {
     # 确保目标目录存在
     ssh -p "$SSH_PORT" "$SERVER" "mkdir -p $PROJECT_DIR"
 
+    echo "  上传源码 SHA: $(release_sha "$TAR_FILE")"
     echo "  正在上传..."
     scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/"
     scp -P "$SSH_PORT" "$LOCAL_DIR/deploy_to_test_server.sh" "${SERVER}:${PROJECT_DIR}/"
@@ -176,6 +153,7 @@ deploy() {
     echo "  解压 deer-flow-test-update.tar.gz ..."
     tar xzf deer-flow-test-update.tar.gz
     echo "  ✓ 解压完成"
+    echo "  部署源码 SHA: $(release_sha deer-flow-test-update.tar.gz)"
 
     # ── 步骤 3: 恢复配置 ──
     echo ""
@@ -321,6 +299,9 @@ case "${1:-}" in
         echo "  TEST_SERVER          测试服务器地址（默认: root@<测试服务器IP>）"
         echo "  TEST_SSH_PORT        SSH 端口（默认: 22）"
         echo "  TEST_PROJECT_DIR     部署目录（默认: /opt/trainer-ai-test）"
+        echo "  TEST_DEPLOY_REF      测试发布 ref（默认: origin/main）"
+        echo "  TEST_ALLOW_UNMERGED=1 允许测试未合入 ref"
+        echo "  TEST_INCLUDE_LOCAL_CONFIG=1 显式追加本地测试配置"
         echo ""
         echo "完整流程:"
         echo "  1. 编辑此脚本，修改 SERVER 为测试服务器 IP"

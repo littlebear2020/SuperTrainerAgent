@@ -71,13 +71,13 @@
 - CLI 同名参数加 `--output`、`--allow-unmerged`、`--include-local-config`、可重复 `--exclude`。
 - manifest：`source_sha/requested_ref/base_ref/base_sha/excludes/includes_local_config/config_files`。
 
-- [ ] **Step 1：写发布内容失败测试。** 临时仓库提交内容 A 后改成 B，并添加未跟踪敏感占位文件；打包后断言文件内容为 A，B 与占位文件均不存在，manifest 指向完整提交 SHA。
-- [ ] **Step 2：补参数和原子性失败测试。** 覆盖未合入 ref 默认拒绝、显式允许、exclude 前缀、缺必需配置、仓库内配置符号链接、越界配置、输出已存在时失败不替换。
-- [ ] **Step 3：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_release_archive.py -q`。
-- [ ] **Step 4：实现流式 git archive、manifest 与原子输出。** 普通文件只来自 Git；本地配置仅在显式选项下追加；所有路径归一化，失败清理临时文件。
-- [ ] **Step 5：改造两个包装脚本。** 保持 `pack/upload/deploy` 和产物名；默认 ref=`origin/main`，测试可用 `TEST_DEPLOY_REF` + `TEST_ALLOW_UNMERGED=1`；`--no-sandbox` 只排除 chrome-linux；正式 pack 先跑 pre-deploy；本地配置只经显式环境开关追加；部署后显示 manifest SHA。
-- [ ] **Step 6：重跑测试并做本仓真实打包探针。** 断言 tar 包含 `release-manifest.json` 且 SHA 等于指定提交，不包含当前未跟踪文件；`--no-sandbox` 探针保留 wheels/BPE/fonts。
-- [ ] **Step 7：提交。** `feat(release): 从已审提交生成不可变发布包`
+- [x] **Step 1：写发布内容失败测试。** 临时仓库提交内容 A 后改成 B，并添加未跟踪敏感占位文件；打包后断言文件内容为 A，B 与占位文件均不存在，manifest 指向完整提交 SHA。
+- [x] **Step 2：补参数和原子性失败测试。** 覆盖未合入 ref 默认拒绝、显式允许、exclude 前缀、缺必需配置、仓库内配置符号链接、越界配置、输出已存在时失败不替换。
+- [x] **Step 3：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_release_archive.py -q`。
+- [x] **Step 4：实现流式 git archive、manifest 与原子输出。** 普通文件只来自 Git；本地配置仅在显式选项下追加；所有路径归一化，失败清理临时文件。
+- [x] **Step 5：改造两个包装脚本。** 保持 `pack/upload/deploy` 和产物名；默认 ref=`origin/main`，测试可用 `TEST_DEPLOY_REF` + `TEST_ALLOW_UNMERGED=1`；`--no-sandbox` 只排除 chrome-linux；正式 pack 先跑 pre-deploy；本地配置只经显式环境开关追加；部署后显示 manifest SHA。
+- [x] **Step 6：重跑测试并做本仓真实打包探针。** 断言 tar 包含 `release-manifest.json` 且 SHA 等于指定提交，不包含当前未跟踪文件；`--no-sandbox` 探针保留 wheels/BPE/fonts。
+- [x] **Step 7：提交。** `feat(release): 从已审提交生成不可变发布包`
 
 ### Task 3：部署前风险闭环
 

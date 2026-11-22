@@ -18,43 +18,33 @@ LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 # ============================================================
 # pack: 本地打包（包含沙箱缓存）
 # ============================================================
+release_sha() {
+    tar -xOf "$1" release-manifest.json | python3 -c 'import json, sys; print(json.load(sys.stdin)["source_sha"])'
+}
+
 pack() {
     echo "============================================"
-    echo "  打包项目文件..."
+    echo "  从已审 Git 提交打包项目文件..."
     echo "============================================"
 
     cd "$LOCAL_DIR"
-
-    # --no-sandbox-cache: 跳过沙箱缓存（服务器已有）
-    SANDBOX_OPT=''
+    REF="${DEPLOY_REF:-origin/main}"
+    ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
     if [ "${2:-}" = "--no-sandbox" ]; then
-        SANDBOX_OPT='--exclude=docker/sandbox/cache'
+        ARCHIVE_ARGS+=(--exclude docker/sandbox/cache/chrome-linux)
+        echo "跳过 Chrome 缓存，保留字体、Python wheels 与 BPE 缓存"
+    fi
+    if [ "${DEPLOY_INCLUDE_LOCAL_CONFIG:-0}" = "1" ]; then
+        ARCHIVE_ARGS+=(--include-local-config)
+        echo "显式追加本地配置（仅首次部署或负责人明确需要时使用）"
     fi
 
-    tar czf ../deer-flow-update.tar.gz \
-      --exclude='node_modules' \
-      --exclude='.venv' \
-      --exclude='frontend/.next' \
-      --exclude='__pycache__' \
-      --exclude='.git' \
-      --exclude='.claude' \
-      --exclude='.DS_Store' \
-      --exclude='docs/plans' \
-      --exclude='logs' \
-      --exclude='temp' \
-      --exclude='fix-config.py' \
-      --exclude='workspace-redesign.html' \
-      --exclude='backend/.deer-flow/data' \
-      --exclude='backend/.deer-flow/users' \
-      --exclude='backend/.deer-flow/channels' \
-      --exclude='backend/.deer-flow/*.db' \
-      --exclude='backend/.deer-flow/*.json' \
-      --exclude='deer-flow-update.tar.gz' \
-      $SANDBOX_OPT \
-      .
+    python3 scripts/pre_deploy_check.py
+    python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
 
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"
     echo "   文件位置: ../deer-flow-update.tar.gz"
+    echo "   源码 SHA: $(release_sha ../deer-flow-update.tar.gz)"
 }
 
 # ============================================================
@@ -70,6 +60,7 @@ upload() {
         exit 1
     fi
 
+    echo "   上传源码 SHA: $(release_sha ../deer-flow-update.tar.gz)"
     scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/
     echo "✅ 上传完成"
 }
@@ -94,6 +85,7 @@ deploy() {
     echo "============================================"
     ./scripts/deploy.sh down
     tar xzf deer-flow-update.tar.gz
+    echo "  部署源码 SHA: $(release_sha deer-flow-update.tar.gz)"
 
     echo ""
     echo "============================================"
@@ -198,8 +190,9 @@ case "${1:-}" in
     *)
         echo "用法: $0 {pack|upload|deploy}"
         echo ""
-        echo "  pack    - 本地打包项目文件"
-        echo "            可选: --no-sandbox 跳过沙箱缓存（减小 ~700MB）"
+        echo "  pack    - 从已审 Git 提交打包项目文件"
+        echo "            可选: --no-sandbox 只跳过 Chrome 缓存"
+        echo "            环境: DEPLOY_REF=origin/main；DEPLOY_INCLUDE_LOCAL_CONFIG=1 显式追加本地配置"
         echo "  upload  - 上传到服务器"
         echo "  deploy  - 在服务器上执行部署"
         echo ""
