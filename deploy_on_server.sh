@@ -39,7 +39,7 @@ pack() {
         echo "显式追加本地配置（仅首次部署或负责人明确需要时使用）"
     fi
 
-    python3 scripts/pre_deploy_check.py
+    python3 scripts/pre_deploy_check.py --ref "$REF"
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}"
 
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"

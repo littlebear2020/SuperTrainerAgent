@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-"""部署前检查单（2026-10-14 自动化）：部署公司服务器/测试机前一屏回答三件事——
-
-1. 有无在途工作（open PR / 附加 worktree / 本地 main 未推送/未拉取）——**阻断项**，有则先收尾；
-2. 近 14 天 changelog 的部署动作提示（镜像重建/重启/config patch/warm 池等关键词行）——提示项；
-3. 仓库 `config_version` 当前值——部署端 config 只读挂载、靠版本号触发升级提示，须人工比对。
-
-退出码：1 = 有阻断项；0 = 干净。提示项不影响退出码。
-gh 不可用时 open-PR 检查降级为提示（不静默跳过）。
-"""
+"""正式发布前检查：固定发布 ref，阻断未验收例外，提示其他 Agent 在途工作。"""
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -19,44 +13,94 @@ from datetime import date, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CHANGELOG_DIR = REPO_ROOT / "docs" / "changelog"
 RECENT_DAYS = 14
 DEPLOY_KEYWORDS = re.compile(r"重建|部署|config_version|patcher|patch|重启|nginx|warm|镜像|K1\d")
+BASE_REF = "origin/main"
 
 
-def run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+def run(cmd: list[str], env: dict | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
 
 
-def main() -> int:
-    issues: list[str] = []  # 阻断项：在途工作
-    notes: list[str] = []  # 提示项：部署动作与版本号
+def find_release_blockers(root: Path) -> list[str]:
+    backlog = root / "docs" / "findings-backlog.md"
+    if not backlog.is_file():
+        return []
+    return [line.strip() for line in backlog.read_text(encoding="utf-8", errors="replace").splitlines() if line.startswith("- [ ]") and "[release-blocker]" in line]
 
-    run(["git", "fetch", "origin", "--prune"])  # 失败不致命（离线场景照旧用本地 ref）
 
-    pr = run(["gh", "pr", "list", "--state", "open", "--json", "number,title"])
-    if pr.returncode != 0:
-        notes.append("gh 不可用/未登录——open PR 检查未执行，请人工确认 GitHub 无在途 PR")
+def _resolve_ref(ref: str) -> subprocess.CompletedProcess[str]:
+    return run(["git", "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"])
+
+
+def _validate_release_ref(ref: str, issues: list[str]) -> None:
+    base = _resolve_ref(BASE_REF)
+    source = _resolve_ref(ref)
+    if base.returncode != 0:
+        issues.append(f"无法解析发布基准 {BASE_REF}：{base.stderr.strip()}")
+        return
+    if source.returncode != 0:
+        issues.append(f"无法解析发布 ref {ref}：{source.stderr.strip()}")
+        return
+    source_sha = source.stdout.strip()
+    base_sha = base.stdout.strip()
+    ancestry = run(["git", "merge-base", "--is-ancestor", source_sha, base_sha])
+    if ancestry.returncode != 0:
+        issues.append(f"发布 ref {ref} 未合入 {BASE_REF}，正式发布拒绝使用未审提交")
+
+
+def _github_repo() -> str | None:
+    remote = run(["git", "remote", "get-url", "origin"])
+    if remote.returncode != 0:
+        return None
+    value = remote.stdout.strip().rstrip("/")
+    if value.endswith(".git"):
+        value = value[:-4]
+    match = re.search(r"github\.com[:/]([^/]+/[^/]+)$", value)
+    return match.group(1) if match else None
+
+
+def _append_agent_notes(notes: list[str]) -> None:
+    repository = _github_repo()
+    if repository is None:
+        notes.append("无法从 origin 确定 GH_REPO——开放 PR 检查未执行")
     else:
-        for item in json.loads(pr.stdout or "[]"):
-            issues.append(f"open PR #{item['number']}：{item['title']}——合入或明确不带后再部署")
+        env = {**os.environ, "GH_REPO": repository}
+        pr = run(["gh", "pr", "list", "--state", "open", "--json", "number,title"], env=env)
+        if pr.returncode != 0:
+            notes.append("gh 不可用/未登录——开放 PR 检查未执行，请人工确认")
+        else:
+            try:
+                items = json.loads(pr.stdout or "[]")
+                for item in items:
+                    notes.append(f"开放 PR #{item['number']}：{item['title']}——不会混入固定 ref 发布包")
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                notes.append(f"开放 PR 响应无法解析：{exc}")
 
     wt = run(["git", "worktree", "list", "--porcelain"])
-    worktrees = [line[9:] for line in wt.stdout.splitlines() if line.startswith("worktree ")]
-    for w in worktrees:
-        if Path(w).resolve() != REPO_ROOT:
-            issues.append(f"在途 worktree：{w}——确认其分支已合入（或明确不随本次部署），收尾后 remove")
+    if wt.returncode != 0:
+        notes.append("worktree 列表读取失败")
+    else:
+        worktrees = [line[9:] for line in wt.stdout.splitlines() if line.startswith("worktree ")]
+        for worktree in worktrees:
+            if Path(worktree).resolve() != REPO_ROOT.resolve():
+                notes.append(f"其他 worktree：{worktree}——仅提示，不阻断不可变 ref 发布")
 
-    ahead = run(["git", "rev-list", "--count", "origin/main..main"]).stdout.strip()
-    behind = run(["git", "rev-list", "--count", "main..origin/main"]).stdout.strip()
-    if ahead and ahead != "0":
-        issues.append(f"本地 main 领先 origin/main {ahead} 笔——先 push，部署以远端 main 为准")
-    if behind and behind != "0":
-        notes.append(f"本地 main 落后 origin/main {behind} 笔——部署打包前先 pull")
+    ahead_result = run(["git", "rev-list", "--count", "origin/main..main"])
+    behind_result = run(["git", "rev-list", "--count", "main..origin/main"])
+    ahead = ahead_result.stdout.strip()
+    behind = behind_result.stdout.strip()
+    if ahead_result.returncode == 0 and ahead and ahead != "0":
+        notes.append(f"本地 main 领先 origin/main {ahead} 笔——仅提示，发布以固定 ref 为准")
+    if behind_result.returncode == 0 and behind and behind != "0":
+        notes.append(f"本地 main 落后 origin/main {behind} 笔——仅提示，发布以固定 ref 为准")
 
+
+def _append_changelog_notes(notes: list[str]) -> None:
     cutoff = date.today() - timedelta(days=RECENT_DAYS)
     seen = 0
-    for path in sorted(CHANGELOG_DIR.glob("changelog-*.md"), reverse=True):
+    changelog_dir = REPO_ROOT / "docs" / "changelog"
+    for path in sorted(changelog_dir.glob("changelog-*.md"), reverse=True):
         try:
             file_date = date(int(path.name[10:14]), int(path.name[15:17]), int(path.name[18:20]))
         except ValueError:
@@ -64,40 +108,56 @@ def main() -> int:
         if file_date < cutoff:
             break
         text = path.read_text(encoding="utf-8", errors="replace")
-        tldr = next((ln.strip() for ln in text.splitlines() if "TL;DR" in ln), "")
-        hits = [ln.strip() for ln in text.splitlines() if DEPLOY_KEYWORDS.search(ln) and "TL;DR" not in ln][:5]
+        tldr = next((line.strip() for line in text.splitlines() if "TL;DR" in line), "")
+        hits = [line.strip() for line in text.splitlines() if DEPLOY_KEYWORDS.search(line) and "TL;DR" not in line][:5]
         notes.append(f"· {path.name[10:20]} {path.name[21:-3]}")
         if tldr:
             notes.append(f"  TL;DR：{tldr[:150]}")
-        for ln in hits:
-            notes.append(f"  {ln[:180]}")
+        for line in hits:
+            notes.append(f"  {line[:180]}")
         seen += 1
     if seen == 0:
         notes.append(f"近 {RECENT_DAYS} 天无 changelog——无待部署动作")
 
-    m = re.search(
-        r"^config_version:\s*(\d+)",
-        (REPO_ROOT / "config.example.yaml").read_text(encoding="utf-8", errors="replace"),
-        re.M,
-    )
-    notes.append(
-        f"仓库 config_version 当前 = {m.group(1) if m else '未解析到'}——"
-        "确认部署端 config.yaml 已 patch 到同值（只读挂载靠版本号触发升级提示）"
-    )
+    try:
+        config_text = (REPO_ROOT / "config.example.yaml").read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        notes.append(f"config.example.yaml 读取失败：{exc}")
+        return
+    match = re.search(r"^config_version:\s*(\d+)", config_text, re.M)
+    notes.append(f"仓库 config_version 当前 = {match.group(1) if match else '未解析到'}——仍需核对部署端实际配置；本检查不证明配置已生效")
 
-    print(f"=== 部署前检查（{date.today()}，近 {RECENT_DAYS} 天窗口）===")
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="正式发布前检查")
+    parser.add_argument("--ref", default=BASE_REF)
+    args = parser.parse_args(argv)
+    issues: list[str] = []
+    notes: list[str] = []
+
+    fetch = run(["git", "fetch", "origin", "--prune"])
+    if fetch.returncode != 0:
+        issues.append(f"git fetch 失败，无法核对远端最新状态：{fetch.stderr.strip()}")
+    _validate_release_ref(args.ref, issues)
+    for blocker in find_release_blockers(REPO_ROOT):
+        issues.append(f"开放 release-blocker：{blocker}")
+    _append_agent_notes(notes)
+    _append_changelog_notes(notes)
+
+    print(f"=== 部署前检查（{date.today()}，近 {RECENT_DAYS} 天窗口；发布 ref={args.ref}）===")
     if issues:
         print("[阻断项]")
-        issues and [print(f"  ✗ {i}") for i in issues]
+        for issue in issues:
+            print(f"  ✗ {issue}")
     else:
-        print("[阻断项] 无——无 open PR / 在途 worktree / 未同步 main")
-    print("[部署动作提示]")
-    for n in notes:
-        print(f"  {n}")
+        print("[阻断项] 无——无开放 release-blocker，发布 ref 已核对")
+    print("[部署动作与其他 Agent 提示]")
+    for note in notes:
+        print(f"  {note}")
     if issues:
-        print("结论：有在途工作，先收尾再部署。")
+        print("结论：发布阻断仍存在；关闭例外并重新核对 ref 后再部署。")
         return 1
-    print("结论：无阻断项；按上方提示核对部署动作与 config_version 后可部署。")
+    print("结论：无阻断项；其他 Agent 在途工作不会混入固定 ref 发布包。")
     return 0
 
 

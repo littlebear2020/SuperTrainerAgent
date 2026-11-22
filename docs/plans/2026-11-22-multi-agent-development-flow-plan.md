@@ -90,12 +90,12 @@
 - `find_release_blockers(root: Path) -> list[str]`
 - CLI 增加 `--ref REF`；保留原无参数入口。
 
-- [ ] **Step 1：写失败测试。** 样例 backlog 未勾选 `[release-blocker]` 返回 1，勾选后返回 0；模拟开放 PR、其他 worktree、main ahead/behind 均只进入 notes，不再阻断；ref 解析失败和未合入 ref 阻断。
-- [ ] **Step 2：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_pre_deploy_check.py -q`。
-- [ ] **Step 3：重构 pre-deploy 判定。** 正式发布 fetch 失败阻断；校验 ref 为 `origin/main` 祖先；gh 调用从 origin URL 设置 `GH_REPO`；保留 changelog/config_version 提示。
-- [ ] **Step 4：登记现有例外。** 将 PPT 最终 SOUL 行为未复测、沙箱完整基座重建未执行分别登记为 `[release-blocker]`，指针到现有 changelog；不宣称它们已修复。
-- [ ] **Step 5：重跑测试与真实 CLI 探针。** 确认当前仓库因两条例外阻断，其他 worktree 只显示提示。
-- [ ] **Step 6：提交。** `feat(release): 将未验证例外纳入部署阻断`
+- [x] **Step 1：写失败测试。** 样例 backlog 未勾选 `[release-blocker]` 返回 1，勾选后返回 0；模拟开放 PR、其他 worktree、main ahead/behind 均只进入 notes，不再阻断；ref 解析失败和未合入 ref 阻断。
+- [x] **Step 2：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_pre_deploy_check.py -q`。
+- [x] **Step 3：重构 pre-deploy 判定。** 正式发布 fetch 失败阻断；校验 ref 为 `origin/main` 祖先；gh 调用从 origin URL 设置 `GH_REPO`；保留 changelog/config_version 提示。
+- [x] **Step 4：登记现有例外。** 将 PPT 最终 SOUL 行为未复测、沙箱完整基座重建未执行分别登记为 `[release-blocker]`，指针到现有 changelog；不宣称它们已修复。
+- [x] **Step 5：重跑测试与真实 CLI 探针。** 确认当前仓库因两条例外阻断，其他 worktree 只显示提示。
+- [x] **Step 6：提交。** `feat(release): 将未验证例外纳入部署阻断`
 
 ### Task 4：CI、协作契约与交付
 
