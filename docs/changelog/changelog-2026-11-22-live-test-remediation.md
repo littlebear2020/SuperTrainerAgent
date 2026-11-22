@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛
 
-> **TL;DR**：四个主 PR、Doubao hotfix 与 Sandbox #45 已合入；P6/P7 按证据收口且未开实现 PR；最终复核发现的退役音色重生绕过正在独立 hotfix 验收；不自动部署、不修改真实配置、不执行未授权付费调用。
+> **TL;DR**：四个主 PR、Doubao/Sandbox/重生门禁后续修复均已合入；P6/P7 按证据收口且未开实现 PR；不自动部署、不修改真实配置、不执行未授权付费调用，真实配音与部署后 L1/L2 保持未验证。
 
 ## 当前已落地
 
@@ -13,11 +13,10 @@
 - PR 3 已按四笔提交完成评审与合入。
 - P5/P9/P10/P13（PR #44，已合入）：动态默认徽标、缺标题统一占位、通用合成文案和 composer/live 断言已按 TDD 完成；英文默认徽标 i18n 回归修复后，GitHub 全量 CI 与 OCR 通过。
 - Sandbox（PR #45，已合入）：本地与默认未覆盖的空闲释放统一为 7200 秒，显式配置与 `0=禁用` 保留；部署说明与现行模块文档已同步。
-- 最终复核 hotfix（本地实现）：批量/单帧重生在后台任务、CAS、视觉与 TTS 前同步拒绝退役或目录外音色；缺省 `voice_id` 的历史默认行为不变。
+- 最终复核 hotfix（PR #46，已合入）：批量/单帧重生在后台任务、CAS、视觉与 TTS 前同步拒绝退役或目录外音色；缺省 `voice_id` 的历史默认行为不变。
 
-## 后续固定范围
+## 仍不实施
 
-- 最终复核 TTS 重生 hotfix：完成全量与远端门禁后独立合入；不冒充 P6 已查明根因。
 - Writer、P4、P8、P12、P15 不加回；P6/P7 未取证不开 PR。
 
 ## 验收记录
@@ -65,6 +64,7 @@
 - 整体复核后的文档同步：`config.example.yaml` 仅把空闲释放注释从 600 改为 7200（无结构变化，不递增 `config_version`）；部署指南明确已有显式覆盖仍优先；backend 模块说明移除已删除的 Edge/360 文件与降级链。
 - PR #45 最终 `gh pr checks 45 --watch` → backend-unit-tests、quick-checks、AI Code Review 全 pass，OCR 4 files / 0 findings；已合入，merge commit `4210d612a483475f9c19739c65d0d32db0cdff3b`。
 - 重生门禁 hotfix：退役音色 + CAS 的批量/单帧用例在旧实现均 RED（DID NOT RAISE）；前置统一校验后 2 passed，相关重生与单通道回归 229 passed，本地 OCR 0 findings、根 `make check` 通过；后端全量 **10182 passed / 91 skipped**；未执行真实付费重生。
+- PR #46 `gh pr checks 46 --watch` → backend-unit-tests、quick-checks、AI Code Review 全 pass，OCR 1 file / 0 findings；已合入，merge commit `468850480a73b031ac7b6e06b3e9afd35dab5948`。
 
 ## 阻塞与未执行
 
