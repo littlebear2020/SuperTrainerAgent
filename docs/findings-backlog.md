@@ -24,3 +24,9 @@
 - [ ] 2026-11-21 [OCR #37] `defaultModelForMode` 的全列表首项三级兜底可能跨档且与选择器高亮不一致；定稿明确要求该兜底，后续若改空态需先修订产品契约而非直接删除；指针：`frontend/src/core/models/modes.ts:22-33`、PR #37 review comment `4652058011`。
 - [ ] 2026-11-21 [OCR #37] `reasoningEffortForMode` 已无生产调用且与提交 hooks 内联映射重复，后续删除或统一单一出口；指针：`frontend/src/components/workspace/input-mode.ts:11-13`、`frontend/src/core/threads/hooks.ts`、PR #37 OCR summary `7061233375`。
 - [ ] 2026-11-21 [OCR #37] `input-mode.ts` 已退化为 `InputMode` 薄 re-export 与 `resolveMode` 小函数，后续评估并入 `core/models/modes.ts`，避免双出口漂移；指针：`frontend/src/components/workspace/input-mode.ts:1-9`、PR #37 OCR summary `7061233375`。
+- [ ] 2026-11-22 P2 Writer 版本回滚后继续编辑出现伪“保存冲突”，不属于本批六卡核心范围；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-22 P4 档内模型价格后续由管理端手工维护，本批不做自动计价改造；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-22 P12 账户设置与登录失败文案的中英文混杂整项退出本批；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-22 Writer 分享页英文文案不属于本批六卡核心范围，未修改；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-22 P14 Writer 模块入口保留或下线仍属产品决策，本批不增加入口或删除模块；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-22 P15 普通用户“我的渠道/凭据”入口按既定决策不开放，本批不实现；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。

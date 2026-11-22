@@ -74,7 +74,7 @@
 | **PR 3 / Task 3+4** | 点名的 backend voice_twin/video_gen/shared voice catalog、相关 routers/config/tests、音色相关 frontend、`skills/**` 的 Edge/360 TTS 引用、`docker/sandbox/Dockerfile`、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 AGENTS/常青 docs | 360 非 TTS 能力、Writer、P1/P5/P6/P7/P13、Remotion 模板、无关 provider 包裹链、真实配置与密钥 | **唯一大 PR，同一 PR 整体回滚**；四笔本地提交全部验证后一次性 push；预计 1–2 轮 OCR，范围不得随评审扩大。 |
 | **PR 4 / P5/P9/P10/P13** | `input-box.tsx`、`core/models/**`、personal_usage 的 agent/video/types 与 usage 前端、video status label、live tests/runbook、对应测试 | **PR 1 合入前不得开始**；P12、Writer、`settings/account-settings-page.tsx`、`app/(auth)/login/page.tsx`、`config.example.yaml`、真实 config | 对应单元测试、mock E2E、CI 通过；不含服务器 L1/L2 门禁。 |
 | **P6/P7 条件 PR** | 证据确认后分别点名最小实现与测试文件 | 未取证改实现、整体重写虚拟列表、无关中间件/provider 改动 | 各自根因/复现证据先行；证据不足不开 PR，只更新本计划阻塞状态。 |
-| **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试与本计划/changelog | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
+| **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试、本计划/changelog 与 `docs/findings-backlog.md` | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR 实现 | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
 
 PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色；②调用方去降级；③技能、依赖、配置和镜像清理；④前端停用态。四笔均在本地逐笔验收，全部验证后一次性 push，只能作为一个 PR 评审和合入。
 
@@ -167,19 +167,19 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 
 ### Task 6B / 新增独立 PR：Sandbox 空闲释放 7200 秒
 
-- [ ] 先写默认值与本地未显式覆盖的失败测试，再把统一默认从 600 改为 7200；保留显式自定义与 `0=禁用`。
+- [x] 已先写默认值、本地未显式覆盖与一小时空闲回收失败测试，再把统一默认从 600 改为 7200；显式自定义与 `0=禁用` 对照保留。
 - [ ] 更新相关注释与验收记录；不读取/修改真实 config，不自动部署；独立 OCR、CI 后合入。
 
 ### Task 7：门禁、登记、部署验收
 
-- [ ] 每个实际执行 PR 更新本计划勾选和唯一状态头；按实际执行日创建对应 changelog，含 TL;DR 与「验收记录」，记录真实命令和关键输出。
-- [ ] 按受影响层运行 backend 全量 pytest、frontend `pnpm check && pnpm test`、相关 mock E2E、根 `make check` 和 docs convention；PR 3 另跑 sandbox 镜像与技能复制检查。
-- [ ] 四个主 PR 严格按边界独立评审和合入：PR 1→PR 2→PR 3→PR 4；PR 4 必须等 PR 1 合入。P6/P7 条件 PR 不挤入主批，也不与共享文件并行修改。
-- [ ] 字节直连真实验收仅在另获付费授权后执行一个最短文本和一个目录内 speaker；无授权记 `LIVE_NOT_VERIFIED`，不清空 4 个入口、不切换其他通道。
-- [ ] 执行收尾时把 **P2、P4、P12（账户/登录）、Writer 分享页英文、P14、P15** 分别登记到 `docs/findings-backlog.md`，每项格式为 `- [ ] 2026-11-22 一句话 + 本计划路径`；历史报告和 changelog 不回改。
-- [ ] 部署动作不在本计划自动执行。部署后运行 L1/L2 和对应行为探针；它们不是 GitHub CI 或主 PR 合并门禁。
-- [ ] L1/L2 若因服务器配置漂移失败，只记录漂移与部署证据，不回头修改已经合入的主 PR；确属新产品缺陷时另开后续任务。
-- [ ] PR 3 运行、依赖、配置和镜像必须一起部署/回滚；历史用量和已生成音频不删除。
+- [x] 每个实际执行 PR 均已更新本计划与同一 changelog；TL;DR、「验收记录」和真实命令关键输出齐全。
+- [x] 受影响层验证已完成：Sandbox 最终 backend 全量 10180 passed / 91 skipped；PR 4 frontend 1818 passed、相关 mock E2E 与 GitHub 全量 E2E 通过；各 PR 根 `make check`、docs convention 通过；PR 3 镜像与技能复制检查通过。
+- [x] 四个主 PR 已严格按边界独立评审并依次合入：#40→#41→#42→#44；P6/P7 未开实现 PR，也未并行修改共享文件。
+- [x] 未获字节付费授权，真实配音记 `LIVE_NOT_VERIFIED`；未清空 4 个入口或切换其他通道。
+- [x] P2、P4、P12（账户/登录）、Writer 分享页英文、P14、P15 已分别登记到 `docs/findings-backlog.md`；历史报告未回改。
+- [x] 本计划未自动部署，部署后 L1/L2 与行为探针未执行且不作为 GitHub CI 或主 PR 合并门禁。
+- [x] 本批未部署，故无 L1/L2 配置漂移结果；未因此回改已合入 PR。
+- [x] 已在 changelog 保留 PR 3 运行、依赖、配置和镜像一起部署/回滚的约束；本批未部署，未删除历史用量或已生成音频。
 
 ## 五、完成定义
 
