@@ -312,9 +312,14 @@ def _set_socket_timeout(connection, response, deadline: float) -> None:
         sock.settimeout(timeout)
         return
     fp = getattr(response, "fp", None)
-    raw = getattr(fp, "raw", None)
-    if raw is not None:
-        raw.settimeout(timeout)
+    if fp is None:
+        if response is not None and response.isclosed():
+            return
+        raise PodcastError("URL response has no active socket / 响应缺少活动 socket")
+    raw_socket = getattr(getattr(fp, "raw", None), "_sock", None)
+    if raw_socket is None:
+        raise PodcastError("URL response has no active socket / 响应缺少活动 socket")
+    raw_socket.settimeout(timeout)
 
 
 class PinnedHTTPSConnection(HTTPSConnection):
