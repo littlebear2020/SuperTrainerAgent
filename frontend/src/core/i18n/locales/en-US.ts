@@ -104,6 +104,7 @@ export const enUS: Translations = {
     ultraModeDescription:
       "Strongest mode: multi-subagent collaboration for complex multi-step tasks; takes longer",
     searchModels: "Search models...",
+    defaultModelBadge: "Default",
     surpriseMe: "Surprise",
     surpriseMePrompt: "Surprise me",
     polish: "Polish",

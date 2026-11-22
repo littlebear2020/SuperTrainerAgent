@@ -638,7 +638,7 @@ export function InputBox({
                             data-testid="default-model-badge"
                             className="text-muted-foreground ml-1 rounded border px-1 text-[9px]"
                           >
-                            默认
+                            {t.inputBox.defaultModelBadge}
                           </span>
                         )}
                     </ModelSelectorName>
@@ -662,7 +662,7 @@ export function InputBox({
                               data-testid="default-model-badge"
                               className="text-muted-foreground ml-1 rounded border px-1 text-[9px]"
                             >
-                              默认
+                              {t.inputBox.defaultModelBadge}
                             </span>
                           )}
                         </ModelSelectorName>
