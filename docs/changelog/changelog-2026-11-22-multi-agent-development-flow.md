@@ -1,6 +1,6 @@
 # 单人多 Agent 研发流程优化
 
-> **状态**：本地实施与验收完成；未部署、未运行付费 live；PR CI/OCR 终态以交付页面为准。
+> **状态**：实施与验收完成；[PR #39](https://github.com/littlebear2020/SuperTrainerAgent/pull/39) CI 全绿、OCR 无 Critical/Important/medium，3 条 low deferred，符合 rebase merge 条件；未部署、未运行付费 live。
 > **TL;DR**：新增 Agent 会话基线与不可变 Git 发布包；其他 Agent 在途工作改为提示，未验收 `[release-blocker]` 阻断正式发布；补齐研发基座 CI 路径和 PR/live 三项版本证据。影响面 = 研发约定、CI、打包与部署前检查，不改产品运行代码、不改 config_version。
 
 ## 1. 完成内容
@@ -79,6 +79,12 @@
 - manifest 字段读取统一为 `release_manifest_value`，修复帮助文案和侧车错误提示；显式配置恢复语义保持第三轮结论。
 - 完整真实 Chrome 包验证：`REAL_LFS_ARCHIVE_OK 188087520 5e35986566a4f2c4369db965df03543d6d25d0fc37d6ac2aca83ebccaabc2545`，tar 成员大小与 LFS size 一致、成员 SHA-256 与指针 OID 一致。
 - 第四轮相关回归三件测试文件合计 `32 passed`，两件 Bash 脚本语法检查和 `git diff --check` 通过。
+
+## PR #39 最终评审与 deferred minors
+
+- 最终 CI run `44994542102`（backend）、`44994542191`（lint-frontend）、`44994542174`（quick-checks）、`44994542138`（review）全部 `pass`。
+- 最终 OCR 无 Critical/Important/medium，仅 3 条 low deferred：① `release_archive.py` finally 后的不可达 return；②③ 两件 deploy 的侧车格式预检不如 upload 明确。后两项在格式错误时仍会因摘要/源码不一致阻断，不影响发布安全语义，故不为低优先打磨新增行为改动。
+- 四轮已修发现均保留对应回归；最终三件流程测试文件 `32 passed`，后端全量 `10305 passed, 95 skipped`。
 
 ## 未验证范围
 
