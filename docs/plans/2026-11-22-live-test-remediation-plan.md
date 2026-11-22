@@ -96,17 +96,17 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 - [x] 在 InputBox 外层使用 `onSubmitCapture` 拦截 streaming 时的表单 submit：调用 `onStop`，执行 `preventDefault` 并阻止事件继续传播，确保按钮和 Enter 都不能进入 PromptInput 的 `clear()`。
 - [x] 捕获测试已证明两条路径均被拦截后才移除旧 `handleSubmit` 停止分支；未抛异常冒充停止，删除后定向回归仍绿。
 - [x] 新测试、8 个 InputBox 文件 33 条回归、`pnpm check` 与全量 `pnpm test`（280 files / 1809 tests）均通过；行为验收覆盖“长回复期间边等边写，停止后文字与附件仍在”。
-- [ ] 提交 `fix(chat): 停止生成时保留用户草稿`，只开 PR 1，一轮 CI 通过后合入。
+- [x] 提交 `fix(chat): 停止生成时保留用户草稿`；PR 1=#40，CI 全绿且 GitHub OCR 0 findings，已 rebase 合入。
 
 ### Task 2 / PR 2：播客 URL 抓取（P11）
 
 **Files：** `skills/public/podcast-studio/scripts/podcast_studio.py`、`backend/tests/test_podcast_studio_ingest.py`、必要的 SKILL 行为说明。
 
-- [ ] 新增真实响应形态失败测试：`response.fp.raw` 是 **`socket.SocketIO`**（不是 `http.client.SocketIO`），其实际底层 socket 位于实例属性 `raw._sock`；旧实现必须因 `raw.settimeout` 失败。
-- [ ] 最小修复 `_set_socket_timeout`：活动连接使用连接 socket；响应体仍开启时使用 `raw._sock`；EOF 且 `fp is None` 时安全结束；响应体仍开启却找不到活动 socket 时响亮失败。
-- [ ] 保留并运行非公网 IP、混合 DNS、重定向逐跳复查、HTTPS 降级拒绝、Host/SNI/TLS、大小/超时和 HTML 消毒测试，一项不得删除。
-- [ ] 新增 `Connection: close`、分块响应、EOF 和重定向后 EOF 回归；在本机 Python 3.12 与沙箱 Python 3.10 验证相同语义。
-- [ ] 用本地受控 HTTP 服务跑完整 `fetch_url()`，再在实际沙箱执行一次公开 URL intake；断言 `requested_url/final_url/mime` 正确且安全链真实经过。
+- [x] 新增真实响应形态失败测试：`response.fp.raw` 为 **`socket.SocketIO`**，旧实现因 `raw.settimeout` 失败；直接 socketpair 与真实 HTTPResponse 均复现。
+- [x] 最小修复 `_set_socket_timeout`：活动连接使用连接 socket；响应体仍开启时使用 `raw._sock`；EOF 且 `fp is None` 时安全结束；响应体仍开启却找不到活动 socket 时响亮失败。
+- [x] 非公网 IP、混合 DNS、重定向逐跳复查、HTTPS 降级拒绝、Host/SNI/TLS、大小/超时和 HTML 消毒测试全部保留并随 47 条套件通过。
+- [x] `Connection: close`、分块、EOF、重定向后 EOF 已覆盖；本机 Python 3.12.13 与沙箱 Python 3.10.12 探针均通过，见 `temp/live-test-remediation-20261122/p11-evidence.md`。
+- [x] 本地受控 HTTP 完整 `fetch_url()` 与实际沙箱公开 URL intake 均通过；公开探针 `requested_url=https://1.1.1.1`、`final_url=https://one.one.one.one/`、`mime=text/html`，DNS 环境特判仅在探针且每跳仍执行公网校验。
 - [ ] 安全测试随 PR 2 提交，完成核心路径 OCR 和 CI 后合入。
 
 ### Task 3 / PR 3-A：TTS 目录、统一入口和调用方只走字节（P3 运行批）
