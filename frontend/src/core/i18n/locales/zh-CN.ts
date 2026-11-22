@@ -100,6 +100,7 @@ export const zhCN: Translations = {
     ultraMode: "Ultra",
     ultraModeDescription: "最强档：多子代理协作，适合复杂多步骤任务，耗时更长",
     searchModels: "搜索模型...",
+    defaultModelBadge: "默认",
     surpriseMe: "小惊喜",
     surpriseMePrompt: "给我一个小惊喜吧",
     polish: "润色",

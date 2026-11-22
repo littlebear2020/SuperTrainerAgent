@@ -109,6 +109,7 @@ export interface Translations {
     ultraMode: string;
     ultraModeDescription: string;
     searchModels: string;
+    defaultModelBadge: string;
     surpriseMe: string;
     surpriseMePrompt: string;
     polish: string;

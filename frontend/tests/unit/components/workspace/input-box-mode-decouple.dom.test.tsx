@@ -311,7 +311,7 @@ describe("P5 动态默认模型徽标", () => {
       document.querySelectorAll<HTMLButtonElement>("button"),
     ).find((button) => button.textContent?.includes("Claude Sonnet"));
     expect(trigger).toBeDefined();
-    expect(trigger!.textContent).toContain("默认");
+    expect(trigger!.textContent).toContain("Default");
     expect(trigger!.textContent).not.toContain("(默认)");
 
     await act(async () => {

@@ -54,6 +54,7 @@
 - PR 4 P13 RED → 无稳定 composer testid；GREEN → InputBox 7 条与 typecheck 通过；live `--list` → 20 tests / 8 files，仅列出不执行。
 - PR 4 rebase 后最终全量：backend `uv run pytest tests/ -q` → **10176 passed, 91 skipped**；frontend `pnpm test` → **281 files / 1818 tests passed**；相关 mock E2E → **8 passed**；根 `make check` 与 docs convention 通过。
 - PR 4 本地 OCR → 11 files / 4 findings；默认徽标仍严格按 `mode_defaults`，不把配置缺失后的临时回退误标为默认；终态缺标题占位遵循 D12；重复徽标样式 low 建议 deferred，未扩大范围。
+- PR #44 首轮 GitHub E2E → 119 passed / 1 flaky / 2 skipped / 1 failed；英文 PPT 导览因新徽标硬编码中文“默认”稳定失败，本地同用例 RED 复现。徽标接入 `inputBox.defaultModelBadge` 后同用例 GREEN，InputBox 7 passed、typecheck/i18n 通过；前端全量仍为 281 files / 1818 tests passed，根 `make check` 通过。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
 ## 阻塞与未执行
