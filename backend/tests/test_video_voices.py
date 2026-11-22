@@ -22,7 +22,7 @@ requires_real_config = pytest.mark.skipif(not _REAL_CONFIG_EXISTS, reason="ä¾èµ
 
 def test_curated_voices_structure():
     """All curated voices have required fields."""
-    assert len(CURATED_VOICES) >= 5
+    assert len(CURATED_VOICES) == 4
     for v in CURATED_VOICES:
         assert v["id"]
         assert v["name"]
@@ -42,10 +42,8 @@ def test_curated_voices_includes_chinese():
     assert len(zh) >= 3
 
 
-def test_curated_voices_includes_english():
-    """Curated list includes English voices."""
-    en = [v for v in CURATED_VOICES if v["locale"].startswith("en")]
-    assert len(en) >= 2
+def test_curated_voices_excludes_retired_edge_languages():
+    assert {v["locale"] for v in CURATED_VOICES} == {"zh-CN"}
 
 
 @pytest.mark.asyncio

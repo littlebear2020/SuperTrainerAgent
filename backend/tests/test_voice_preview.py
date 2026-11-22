@@ -24,14 +24,14 @@ def test_preview_with_custom_text(client):
     """Preview with custom text returns audio (or 404 if TTS unavailable)."""
     with patch("app.gateway.video_gen.orchestration.tts.synthesize", new_callable=AsyncMock) as mock_tts:
         mock_tts.return_value = type("R", (), {"audio_path": "/tmp/test.mp3"})()
-        resp = client.get("/api/video/voices/zh-CN-YunjianNeural/preview?text=%E6%B5%8B%E8%AF%95%E6%96%87%E6%9C%AC")
+        resp = client.get("/api/video/voices/doubao:zh_female_vv_uranus_bigtts/preview?text=%E6%B5%8B%E8%AF%95%E6%96%87%E6%9C%AC")
         # Accept 200 (success) / 404 (mock 路径非真实文件) / 503（07-28 起 preview 合成失败诚实化）
         assert resp.status_code in (200, 404, 503)
 
 
 def test_preview_without_text(client):
     """Preview without text uses default text."""
-    resp = client.get("/api/video/voices/zh-CN-YunjianNeural/preview")
+    resp = client.get("/api/video/voices/doubao:zh_female_vv_uranus_bigtts/preview")
     assert resp.status_code in (200, 404, 503)  # 503 = preview 失败新契约（Task 5）
 
 
@@ -40,7 +40,7 @@ def test_preview_text_truncated(tmp_path, client):
     with patch("app.gateway.video_gen.orchestration.tts.synthesize", new_callable=AsyncMock) as mock_tts:
         mock_tts.return_value = type("R", (), {"audio_path": "/tmp/test.mp3"})()
         long_text = "测试" * 100  # 200 chars
-        client.get(f"/api/video/voices/zh-CN-YunjianNeural/preview?text={long_text}")
+        client.get(f"/api/video/voices/doubao:zh_female_vv_uranus_bigtts/preview?text={long_text}")
         if mock_tts.called:
             call_text = mock_tts.call_args[0][0]
             assert len(call_text) <= 100
@@ -166,7 +166,38 @@ def test_preview_cache_hit_deleted_voice_returns_404(preview_cache_dir):
     svc.preview_voice.assert_not_called()
 
 
-@pytest.mark.parametrize(("voice_id", "ext"), [("preset:146", "wav"), ("doubao:zh_female_qingxin", "mp3")])
+@pytest.mark.parametrize("voice_id", ["preset:146", "edge:zh-CN-XiaoxiaoNeural"])
+def test_preview_cache_hit_retired_voice_is_rejected(preview_cache_dir, voice_id):
+    svc = _make_production_svc(None)
+    _seed_preview_cache(preview_cache_dir, voice_id, "mp3")
+
+    app = _make_production_app(_make_user("anyone"), svc)
+    with TestClient(app) as client:
+        resp = client.get(f"/api/voice-twins/production/voices/{voice_id}/preview")
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "原音色已停用，请改选字节直连音色"
+    svc.preview_voice.assert_not_called()
+    svc.voice_service.repo.get_by_id.assert_not_called()
+
+
+def test_video_preview_cache_hit_retired_voice_is_rejected(tmp_path, client, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.gateway.routers import video_gen
+    from app.gateway.routers.voice_twin_production import _safe_cache_voice_id
+
+    monkeypatch.setattr(video_gen, "get_paths", lambda: SimpleNamespace(base_dir=tmp_path))
+    voice_id = "edge:zh-CN-XiaoxiaoNeural"
+    cache_dir = tmp_path / "video-gen" / "voice_previews"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / f"{_safe_cache_voice_id(voice_id)}_default.mp3").write_bytes(b"CACHED-AUDIO")
+
+    resp = client.get(f"/api/video/voices/{voice_id}/preview")
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "原音色已停用，请改选字节直连音色"
+
+
+@pytest.mark.parametrize(("voice_id", "ext"), [("doubao:zh_female_vv_uranus_bigtts", "mp3")])
 def test_preview_cache_hit_unowned_voice_types_skip_ownership(preview_cache_dir, voice_id, ext):
     """preset/doubao 音色无归属概念：缓存命中直接放行，不查 repo。"""
     svc = _make_production_svc(None)

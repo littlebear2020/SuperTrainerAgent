@@ -167,7 +167,7 @@ async def test_create_vimax_doubao_allowed():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.post(
             "/api/video/create",
-            json={"video_type": "vimax", "mode": "generate", "topic": "课程主题", "voice_id": "doubao:zh_male_A"},
+            json={"video_type": "vimax", "mode": "generate", "topic": "课程主题", "voice_id": "doubao:zh_male_m191_uranus_bigtts"},
         )
     assert resp.status_code == 200, f"ViMax+doubao 须放行，实际 {resp.status_code}: {resp.text}"
     svc.submit.assert_awaited_once()
@@ -300,7 +300,7 @@ async def test_vimax_draft_doubao_failure_edge_behavior(tmp_path, edge_ok, expec
         _json.dumps(
             {
                 "title": "t",
-                "config": {"video_type": "vimax", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_A", "tts_speed": 1.2},
+                "config": {"video_type": "vimax", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_m191_uranus_bigtts", "tts_speed": 1.2},
                 "frames": [{"index": 0, "narration": "课程第一句", "duration": 2.0}],
             }
         )
@@ -513,7 +513,9 @@ async def test_resume_draft_vimax_doubao_allowed_and_dispatches(tmp_path):
     svc.repo.update = AsyncMock()
     task_dir = tmp_path / get_effective_user_id() / "tasks" / "t1"
     task_dir.mkdir(parents=True)
-    (task_dir / "storyboard.json").write_text(_json.dumps({"title": "t", "config": {"video_type": "vimax", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_A"}, "frames": [{"index": 0, "narration": "正文一句", "duration": 2.0}]}))
+    (task_dir / "storyboard.json").write_text(
+        _json.dumps({"title": "t", "config": {"video_type": "vimax", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_m191_uranus_bigtts"}, "frames": [{"index": 0, "narration": "正文一句", "duration": 2.0}]})
+    )
     dispatched: list = []
 
     async def _fake_wrap(*a, **kw):
@@ -592,7 +594,7 @@ async def test_resume_draft_vimax_project_inherited_doubao_allowed_and_dispatche
     task.payload = _json.dumps({"course_project_id": "proj-1"})
     svc.repo.get = AsyncMock(return_value=task)
     svc.repo.update = AsyncMock()
-    svc._read_course_project = lambda pid, *, user_id="default": SimpleNamespace(voice_id="doubao:zh_male_A") if pid == "proj-1" else None
+    svc._read_course_project = lambda pid, *, user_id="default": SimpleNamespace(voice_id="doubao:zh_male_m191_uranus_bigtts") if pid == "proj-1" else None
     task_dir = tmp_path / get_effective_user_id() / "tasks" / "t1"
     task_dir.mkdir(parents=True)
     (task_dir / "storyboard.json").write_text(_json.dumps({"title": "t", "config": {"video_type": "vimax", "width": 1080, "height": 1920}, "frames": [{"index": 0, "narration": "正文一句", "duration": 2.0}]}))

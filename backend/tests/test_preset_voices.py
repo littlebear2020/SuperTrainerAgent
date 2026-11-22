@@ -134,13 +134,10 @@ class TestPreviewCacheKeySanitize:
 
 class TestGetPresetVoiceName:
     def test_known_voice(self) -> None:
-        """目录内音色返回共享目录名（A1：以共享目录名为准，含「（360）」后缀）。"""
-        name = get_preset_voice_name("preset:146")
-        assert name == "知性女声（360）"
+        assert get_preset_voice_name("preset:146") is None
 
     def test_known_male_voice(self) -> None:
-        name = get_preset_voice_name("preset:340")
-        assert name == "儒雅公子（360）"
+        assert get_preset_voice_name("preset:340") is None
 
     def test_old_whitelist_only_voice_now_unknown(self) -> None:
         """旧 6 条白名单里目录外的 id（284/292/142）→ None，调用方有兜底文案。"""
@@ -154,10 +151,10 @@ class TestGetPresetVoiceName:
 
 
 class TestSharedCatalog:
-    """共享目录结构性断言（35 条、字段齐全、id 带前缀唯一）。"""
+    """共享目录只有四条中文字节直连音色。"""
 
     def test_count(self) -> None:
-        assert len(CURATED_VOICES) == 35
+        assert len(CURATED_VOICES) == 4
 
     def test_ids_unique_and_prefixed(self) -> None:
         ids = [v.id for v in CURATED_VOICES]
@@ -168,7 +165,7 @@ class TestSharedCatalog:
 
     def test_all_providers_present(self) -> None:
         providers = {v.provider for v in CURATED_VOICES}
-        assert providers == {"edge-tts", "qihu", "doubao"}
+        assert providers == {"doubao"}
 
     def test_all_have_required_fields(self) -> None:
         for voice in CURATED_VOICES:
@@ -181,9 +178,7 @@ class TestSharedCatalog:
             assert voice.tone, voice.id
 
     def test_locale_coverage(self) -> None:
-        """7 语言覆盖（zh/en/ja/ko/fr/de/es）。"""
-        locales = {v.locale.split("-")[0] for v in CURATED_VOICES}
-        assert {"zh", "en", "ja", "ko", "fr", "de", "es"} <= locales
+        assert {v.locale for v in CURATED_VOICES} == {"zh-CN"}
 
 
 class TestPresetVoicesEndpoint:
@@ -212,43 +207,38 @@ class TestPresetVoicesEndpoint:
             resp = client.get("/api/voice-twins/preset-voices")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 35
+        assert len(data) == 4
         providers = {v["provider"] for v in data}
-        assert providers == {"edge-tts", "qihu", "doubao"}
+        assert providers == {"doubao"}
         for v in data:
-            assert v["id"].startswith(("edge:", "preset:", "doubao:"))
+            assert v["id"].startswith("doubao:")
             assert v["gender"] in ("male", "female")
             assert v["scenario"] and v["tone"]
 
     def test_qihu_unconfigured_still_returns_others(self) -> None:
-        """qihu 未配置 → 仍返回 edge+doubao 子集（修复静默空列表）。"""
         from fastapi.testclient import TestClient
 
         with TestClient(self._make_app(qihu=False, doubao=True)) as client:
             resp = client.get("/api/voice-twins/preset-voices")
         data = resp.json()
-        assert len(data) == 35 - 12
-        assert "qihu" not in {v["provider"] for v in data}
-        assert {"edge-tts", "doubao"} == {v["provider"] for v in data}
+        assert len(data) == 4
+        assert {v["provider"] for v in data} == {"doubao"}
 
     def test_only_edge_when_no_credentials(self) -> None:
         from fastapi.testclient import TestClient
 
         with TestClient(self._make_app(qihu=False, doubao=False)) as client:
             resp = client.get("/api/voice-twins/preset-voices")
-        data = resp.json()
-        assert data, "edge 组无需凭证，始终可见"
-        assert {v["provider"] for v in data} == {"edge-tts"}
+        assert resp.json() == []
 
     def test_edge_disabled_hides_edge_group(self) -> None:
-        """edge_tts.enabled=false（edge_client=None）→ edge 组也不列出。"""
         from fastapi.testclient import TestClient
 
         with TestClient(self._make_app(qihu=True, doubao=True, edge=False)) as client:
             resp = client.get("/api/voice-twins/preset-voices")
         data = resp.json()
-        assert "edge-tts" not in {v["provider"] for v in data}
-        assert {v["provider"] for v in data} == {"qihu", "doubao"}
+        assert len(data) == 4
+        assert {v["provider"] for v in data} == {"doubao"}
 
     def test_service_disabled_returns_empty(self) -> None:
         from fastapi import FastAPI
@@ -266,39 +256,18 @@ class TestPresetVoicesEndpoint:
 
 
 class TestVideoGenLegacyReExport:
-    """video-gen 侧 legacy 形态零回归（/api/video/voices 响应逐字节不变）。"""
-
     def test_legacy_shape(self) -> None:
         from app.gateway.video_gen.orchestration.voices import CURATED_VOICES as LEGACY
 
-        assert len(LEGACY) == 35
+        assert len(LEGACY) == 4
         for v in LEGACY:
             assert set(v.keys()) == {"id", "name", "locale", "gender", "provider"}
             assert v["gender"] in ("Male", "Female")
-
-    def test_legacy_edge_ids_unprefixed(self) -> None:
-        from app.gateway.video_gen.orchestration.voices import CURATED_VOICES as LEGACY
-
-        edge = [v for v in LEGACY if v["provider"] == "edge-tts"]
-        assert edge, "edge voices must exist"
-        for v in edge:
-            assert not v["id"].startswith("edge:"), v["id"]
-
-    def test_legacy_cloud_ids_prefixed(self) -> None:
-        from app.gateway.video_gen.orchestration.voices import CURATED_VOICES as LEGACY
-
-        for v in LEGACY:
-            if v["provider"] == "qihu":
-                assert v["id"].startswith("preset:")
-            elif v["provider"] == "doubao":
-                assert v["id"].startswith("doubao:")
+            assert v["id"].startswith("doubao:")
 
     def test_legacy_names_unchanged(self) -> None:
-        """抽查若干条目与迁移前逐字节一致。"""
         from app.gateway.video_gen.orchestration.voices import CURATED_VOICES as LEGACY
 
         by_id = {v["id"]: v for v in LEGACY}
-        assert by_id["zh-CN-YunjianNeural"]["name"] == "云健（男）"
-        assert by_id["preset:146"]["name"] == "知性女声（360）"
-        assert by_id["preset:146"]["gender"] == "Female"
         assert by_id["doubao:zh_female_vv_uranus_bigtts"]["name"] == "Vivi2.0（女·字节）"
+        assert by_id["doubao:zh_male_m191_uranus_bigtts"]["gender"] == "Male"

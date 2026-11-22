@@ -980,46 +980,6 @@ class TestClonePathRetry:
             await svc.synthesize("vt-r2", "hello")
         assert svc.client.synthesize_sse.call_count == 1
 
-    @pytest.mark.asyncio
-    async def test_synthesize_edge_voice(self, tmp_path):
-        """A2：service.synthesize 识别 edge: 音色（无 DB 行）。"""
-        svc = self._build_service(tmp_path)
-        edge = MagicMock()
-        edge.synthesize = AsyncMock(return_value=b"edge_mp3")
-        svc.edge_client = edge
-
-        out = await svc.synthesize("edge:zh-CN-XiaoxiaoNeural", "hello")
-        edge.synthesize.assert_awaited_once()
-        assert edge.synthesize.call_args.kwargs["voice"] == "zh-CN-XiaoxiaoNeural"
-        assert out.endswith(".mp3")
-
-    @pytest.mark.asyncio
-    async def test_synthesize_edge_unconfigured(self, tmp_path):
-        svc = self._build_service(tmp_path)
-        svc.edge_client = None
-        with pytest.raises(ValueError, match="edge TTS"):
-            await svc.synthesize("edge:zh-CN-XiaoxiaoNeural", "hello")
-
-    @pytest.mark.asyncio
-    async def test_synthesize_edge_no_outer_retry(self, tmp_path):
-        """edge voice 不走 call_with_tts_retry（service.py #4 同构修复）。
-
-        edge_client.synthesize 内部已有 tenacity 3× 重试，外层再包会 3×3=9 次。
-        """
-        from app.gateway.voice_twin import service as svc_mod
-
-        svc = self._build_service(tmp_path)
-        edge = MagicMock()
-        edge.synthesize = AsyncMock(return_value=b"edge_mp3")
-        svc.edge_client = edge
-
-        with patch.object(svc_mod, "call_with_tts_retry", wraps=svc_mod.call_with_tts_retry) as spy:
-            out = await svc.synthesize("edge:zh-CN-XiaoxiaoNeural", "hello")
-
-        assert out.endswith(".mp3")
-        spy.assert_not_called()  # edge path bypasses call_with_tts_retry
-        edge.synthesize.assert_awaited_once()
-
 
 class TestDemoCacheBestEffort:
     """demo 音频下载失败不得阻断训练状态推进（submit / poll 均 best-effort）。"""

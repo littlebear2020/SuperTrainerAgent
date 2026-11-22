@@ -508,22 +508,9 @@ class VoiceCloneService:
         return str(demo_path)
 
     async def synthesize(self, voice_id: str, text: str, output_format: str = "mp3", speed_ratio: float = 1.0) -> str:
-        from app.gateway.voice_twin.preset_voices import is_edge_voice_id, parse_edge_voice_id
+        from app.gateway._shared.voice_catalog import ensure_voice_id_supported
 
-        if is_edge_voice_id(voice_id):
-            # A2：edge: 音色直接走 edge 客户端（无 DB 行、无归属概念）。
-            # edge_client.synthesize 内部已有 tenacity 3× 重试——不走 call_with_tts_retry
-            # 外层包装（否则 3×3=9 次 retry² 嵌套，与 production_service #4 同构修复）。
-            edge_client = self.edge_client
-            if edge_client is None:
-                raise ValueError("edge TTS service not configured")
-            audio_bytes = await edge_client.synthesize(
-                text=text,
-                voice=parse_edge_voice_id(voice_id),
-                speed=speed_ratio,
-            )
-            return await self._write_synth_output(audio_bytes, output_format, source_format="mp3")
-
+        ensure_voice_id_supported(voice_id)
         if self.repo is None:
             raise RuntimeError("Repository not initialized")
 
@@ -548,7 +535,7 @@ class VoiceCloneService:
         return await self._write_synth_output(audio_bytes, output_format)
 
     async def _write_synth_output(self, audio_bytes: bytes, output_format: str, source_format: str | None = None) -> str:
-        """落盘合成产物；source_format 与目标不符时 ffmpeg 转码（edge 恒产 mp3）。"""
+        """落盘合成产物；source_format 与目标不符时 ffmpeg 转码。"""
         source_format = source_format or output_format
         base = self._get_storage_base()
         output_id = uuid.uuid4().hex[:12]
