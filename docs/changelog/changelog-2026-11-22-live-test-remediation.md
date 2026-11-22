@@ -57,6 +57,10 @@
 - PR #44 第二轮 `gh pr checks 44 --watch` → backend/frontend/E2E/perf/lint/quick-checks/AI-review 全部 pass；GitHub OCR 4 条 low，无 Critical/Important；已 rebase 合入，merge commit `6441bf55b487a35fdcdd92f70f60311bb2cf1da3`。
 - `python3 scripts/check_docs_convention.py` → OK 仓库治理约定全过。
 
+- Sandbox 7200 TDD：`uv run pytest tests/test_sandbox_idle_timeout.py -q` 在旧实现为 2 failed / 2 passed（缺省 600、一小时空闲被回收）；改为 7200 后，新测试及相关 Sandbox 回归 53 passed / 1 skipped，显式 30/0 均保留。
+- Sandbox 7200 本地 OCR → 3 files / 0 findings；根 `make check` 与 docs convention 通过；未读取或修改真实 config，未部署。
+- Sandbox 最终后端全量 `uv run pytest tests/ -q` → **10180 passed, 91 skipped**；P2/P4/P12/Writer 分享页/P14/P15 已分别登记 `docs/findings-backlog.md`，无对应产品代码 diff。
+
 ## 阻塞与未执行
 
 - P6：目标 run 终止记录与 checkpoint 未保留，无法确认免费恢复；外部阻塞、未重跑、未开 PR。
