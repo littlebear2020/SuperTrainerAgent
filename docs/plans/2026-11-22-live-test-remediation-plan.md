@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛实施计划
 
-> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1=#40、PR 2=#41、PR 3=#42 已合入；PR 4 本地提交已实现，Doubao 直连 hotfix 独立 PR 先行；PR 3 为同一 PR 四笔提交；新增 Sandbox 7200 秒独立后续 PR；P6/P7 未取证不开 PR；不授权自动部署、付费调用或修改服务器配置）。
+> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1=#40、PR 2=#41、PR 3=#42 已合入；PR 4 本地提交与全量验证已完成，Doubao 直连 hotfix=#43 已合入；PR 3 为同一 PR 四笔提交；新增 Sandbox 7200 秒独立后续 PR；P6/P7 未取证不开 PR；不授权自动部署、付费调用或修改服务器配置）。
 > **TL;DR**：四个主 PR 分别修复停止清草稿、播客 URL 抓取、字节 TTS 单通道，以及默认徽标、用量标题、合成文案和 live 断言；P12、Writer、P4、P8、P15 退出。P6/P7 证据不足则记录阻塞且不开 PR；不自动部署，不修改服务器配置。
 
 > **For agentic workers：** 使用 `executing-plans`，单执行者按 Task 0→7 串行执行并逐项勾选；每项先写失败测试、确认功能原因失败、最小实现、定向回归，再提交。主批只允许本计划定义的四个 PR，P6/P7 各自取证后才能另开独立 PR；不在当前分叉工作区直接实施。
@@ -149,13 +149,13 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 
 **Files：** InputBox/core models、personal_usage agent/video/types 与 usage 前端、video status label、live tests/runbook及对应测试。禁止修改 P12 文件和任何 config。
 
-- [ ] P5 单测注入 `mode_defaults={flash: qwen3.8-flash, standard: claude-sonnet-5-5, ultra: qwen4-max}`；选中按钮和列表按当前档画唯一默认徽标，DeepSeek 不标默认。
-- [ ] 展示前仅剥离 `display_name` **末尾**的全角/半角“（默认）/(默认)”后缀，再添加动态徽标，避免两枚“默认”；不改 `config.example.yaml` 或真实 config，不把名称中间包含 default 的模型误删字。
-- [ ] P9 先覆盖 `display_name=None`，并将 `display_name == thread_id` 的占位形态也按缺标题处理；随后把 `agent.py` 标题表达式的末级 `thread.thread_id` 回退改为 `None`，保留 `latest_run.first_human_message` 回退。`personal_usage/video.py` 的 `task.title or task.id` 同步改为缺标题 `None`。
-- [ ] `personal_usage/types.py` 和前端 `UsageTask.title` 从必填 `str` 改为可空；UsageTaskList 在可见标题和 aria-label 中统一显示“标题生成中”，正常 Agent/视频标题不变。
-- [ ] P10 更新旧文案断言：通用 `composing` 徽章显示“合成中”；主动 recompose 的 mutation pending 按钮仍可显示“重新合成中”。
-- [ ] P13 为 composer 增加稳定 testid，替代通用占位文案定位；L2 控制台按普通用户断言 `personal-usage-page` 等现行契约，runbook 明确身份；不改既有 Writer CRUD 用例。
-- [ ] 跑相关单元测试、mock E2E 和 CI后合入 PR 4；服务器 L1/L2 留到 Task 7，不作为本 PR 合并条件。
+- [x] P5 单测注入各档不同 `mode_defaults`；选中按钮和列表按当前档画唯一默认徽标，DeepSeek 在非默认档不标默认。
+- [x] 展示前仅剥离 `display_name` 末尾的全角/半角“（默认）/(默认)”后缀，再添加动态徽标；未改 `config.example.yaml` 或真实 config，名称中间的“默认版”保留。
+- [x] P9 已覆盖 `display_name=None` 与 `display_name == thread_id`；Agent 末级不再回退 thread_id，保留首条用户消息回退；视频缺标题同样为 `None`。
+- [x] `personal_usage/types.py`、路由响应和前端 `UsageTask.title` 均可空；UsageTaskList 可见标题与 aria-label 统一显示“标题生成中”，正常标题不变。
+- [x] P10 通用 `composing` 徽章已改“合成中”并更新断言；主动 recompose 的 pending 按钮文案未改。
+- [x] P13 composer 新增 `composer-input` testid，live L1/L2 已改用稳定定位；L2 控制台断言 `personal-usage-page`，runbook 明确普通用户身份；未改 Writer CRUD 用例。
+- [x] 相关单元测试已完成 RED→GREEN；live 仅 `--list` 20 条、未执行；全量与 mock E2E/CI 结果在 Task 7 验收记录持续登记，服务器 L1/L2 不作为本 PR 合并门禁。
 
 ### Task 6：P6/P7 条件实现与允许阻塞收口
 

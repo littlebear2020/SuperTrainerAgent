@@ -91,7 +91,7 @@ async def aggregate_video_usage(session, *, user_id: str, window: UsageWindow, c
                 task_key=f"video:{task.id}",
                 source_id=task.id,
                 capability=task.task_type,
-                title=task.title or task.id,
+                title=task.title or None,
                 status=normalize_usage_status(task.status),
                 cost=cost,
                 llm_cost=llm.cost,

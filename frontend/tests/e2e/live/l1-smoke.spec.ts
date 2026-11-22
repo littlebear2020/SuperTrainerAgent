@@ -1,7 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-import { CHAT_PLACEHOLDER } from "./helpers";
-
 /**
  * L1 冒烟:登录态 + 首页 6 能力入口 + 受保护路由。零 AI API 消耗。
  * 对应测试范围清单 §一(6 卡横向断言)与 §四(部署验收)。
@@ -87,9 +85,7 @@ test.describe("L1 冒烟", () => {
         new RegExp(`/workspace/agents/${card.agent}/chats/new$`),
         { timeout: 20_000 },
       );
-      await page
-        .getByPlaceholder(CHAT_PLACEHOLDER)
-        .waitFor({ timeout: 30_000 });
+      await page.getByTestId("composer-input").waitFor({ timeout: 30_000 });
     }
   });
 

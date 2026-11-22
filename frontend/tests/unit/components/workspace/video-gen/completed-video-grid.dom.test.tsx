@@ -279,7 +279,7 @@ describe("CompletedVideoGrid", () => {
 
   it.each([
     ["running", "处理中"],
-    ["composing", "重新合成中"],
+    ["composing", "合成中"],
     ["qc_repair", "质检修复中"],
     ["pending", "排队中"],
     ["cancelled", "排队中"],

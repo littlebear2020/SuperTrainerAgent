@@ -20,7 +20,7 @@ export function getVideoTaskStatusLabel(
     case "running":
       return "处理中";
     case "composing":
-      return "重新合成中";
+      return "合成中";
     // T-C2（R14，2026-09-09 feedback-round1）：qc_repair 前端建模——修前落到
     // default「排队中」（worker 质检检出异常画面、gateway watcher 重生中）
     case "qc_repair":

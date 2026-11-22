@@ -69,9 +69,10 @@ describe("StatusBadge", () => {
     ).toBe(false);
   });
 
-  it("composing：indigo 转圈 + E16 文案「重新合成中」", async () => {
+  it("composing：indigo 转圈 + 通用文案「合成中」", async () => {
     const el = await renderBadge("composing");
     expect(el.className).toContain("bg-indigo-100");
-    expect(el.textContent).toContain("重新合成中");
+    expect(el.textContent).toContain("合成中");
+    expect(el.textContent).not.toContain("重新合成中");
   });
 });

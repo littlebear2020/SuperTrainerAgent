@@ -43,7 +43,7 @@ class UsageTask:
     task_key: str
     source_id: str
     capability: UsageCapability
-    title: str
+    title: str | None
     status: UsageStatus
     cost: float | None
     llm_cost: float | None

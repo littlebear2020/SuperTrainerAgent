@@ -3,10 +3,8 @@ import { describe, expect, it } from "vitest";
 import { getActiveStatusLabel } from "@/components/workspace/video-gen/video-gen-page";
 
 describe("getActiveStatusLabel", () => {
-  // E16: composing 在列表页 StatusBadge 误显示"排队中"；应显示"重新合成中"。
-
-  it("composing → 重新合成中", () => {
-    expect(getActiveStatusLabel("composing")).toBe("重新合成中");
+  it("composing 通用徽标 → 合成中", () => {
+    expect(getActiveStatusLabel("composing")).toBe("合成中");
   });
 
   it("running → 处理中", () => {

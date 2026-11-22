@@ -230,4 +230,21 @@ describe("UsageTaskList", () => {
         ?.textContent,
     ).toContain("20");
   });
+
+  it("缺标题在可见文本和 aria-label 中显示标题生成中，正常标题不变", async () => {
+    await render([
+      task("missing", { title: null }),
+      task("normal", { title: "正常课程" }),
+    ]);
+    const missingRow = container.querySelector(
+      "[data-testid='task-row-missing']",
+    )!;
+    const normalRow = container.querySelector(
+      "[data-testid='task-row-normal']",
+    )!;
+    expect(missingRow.textContent).toContain("标题生成中");
+    expect(missingRow.getAttribute("aria-label")).toContain("标题生成中");
+    expect(normalRow.textContent).toContain("正常课程");
+    expect(normalRow.textContent).not.toContain("标题生成中");
+  });
 });

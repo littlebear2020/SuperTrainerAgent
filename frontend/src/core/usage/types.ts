@@ -20,7 +20,7 @@ export interface UsageTask {
   task_key: string;
   source_id: string;
   capability: UsageCapability;
-  title: string;
+  title: string | null;
   status: UsageStatus;
   cost: number | null;
   llm_cost: number | null;
