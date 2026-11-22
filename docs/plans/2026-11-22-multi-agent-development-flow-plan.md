@@ -53,11 +53,11 @@
 - `build_context(root: Path, base_ref: str, spec: str | None) -> dict`
 - CLI：`python3 scripts/agent_context.py [--base origin/main] [--spec PATH] [--require-clean] [--require-head] [--expect-spec-sha256 HEX] [--json]`
 
-- [ ] **Step 1：写真实临时仓库失败测试。** 覆盖完整 SHA、ahead/behind、脏路径、worktree 列表、计划 blob/sha256；构造一个 cherry-pick 等价分支和一个真实分叉分支；分别断言 `patch_equivalent_to_base=True/False`。
-- [ ] **Step 2：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_agent_context.py -q`；预期因脚本不存在而失败。
-- [ ] **Step 3：实现只读上下文与失败语义。** 所有 Git 失败非零；`--require-clean` 拒绝任何 tracked/untracked 变更，`--require-head` 拒绝 HEAD 偏离 base，计划缺失和预期哈希不符非零；默认只报告，不限制开发中的脏树。
-- [ ] **Step 4：重跑测试确认 GREEN，并运行 CLI 探针。** 断言 JSON 可解析、人可读模式含 HEAD/base/spec 关键行。
-- [ ] **Step 5：提交。** `feat(agents): 增加会话基线与计划哈希护栏`
+- [x] **Step 1：写真实临时仓库失败测试。** 覆盖完整 SHA、ahead/behind、脏路径、worktree 列表、计划 blob/sha256；构造一个 cherry-pick 等价分支和一个真实分叉分支；分别断言 `patch_equivalent_to_base=True/False`。
+- [x] **Step 2：运行 pytest 确认 RED。** 命令：`cd backend && uv run pytest tests/test_agent_context.py -q`；预期因脚本不存在而失败。
+- [x] **Step 3：实现只读上下文与失败语义。** 所有 Git 失败非零；`--require-clean` 拒绝任何 tracked/untracked 变更，`--require-head` 拒绝 HEAD 偏离 base，计划缺失和预期哈希不符非零；默认只报告，不限制开发中的脏树。
+- [x] **Step 4：重跑测试确认 GREEN，并运行 CLI 探针。** 断言 JSON 可解析、人可读模式含 HEAD/base/spec 关键行。
+- [x] **Step 5：提交。** `feat(agents): 增加会话基线与计划哈希护栏`
 
 ### Task 2：不可变发布包与包装脚本
 
