@@ -240,12 +240,14 @@ class ProductionService(BaseTaskService):
         memory edge-tts-reachable-on-company-server）。
         **克隆音色永不降级**——静默换成别人的声音比任务失败更糟（诚实性）。
         """
+        from app.gateway._shared.voice_catalog import ensure_voice_id_supported
         from app.gateway.voice_twin.preset_voices import (
             is_doubao_voice_id,
             is_edge_voice_id,
             is_preset_voice_id,
         )
 
+        ensure_voice_id_supported(voice_id)
         is_cloned = not (is_preset_voice_id(voice_id) or is_doubao_voice_id(voice_id) or is_edge_voice_id(voice_id))
         primary_err: Exception | None = None
         try:

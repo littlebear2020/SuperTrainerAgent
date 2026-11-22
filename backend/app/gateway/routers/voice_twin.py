@@ -99,31 +99,14 @@ async def list_voices(request: Request, service: VoiceCloneService = Depends(_ge
 
 @router.get("/preset-voices")
 async def list_preset_voices(request: Request):
-    """列出共享音色目录（35 条，与 video-gen 同一数据源，2026-08-09 A1）。
-
-    按凭证过滤引擎分组：qihu 组需 qihu_client（QIHU_API_KEY），doubao 组需
-    doubao_client（VOLCENGINE_VOICE_ACCESS_KEY），edge-tts 组需 edge_client
-    （config.yaml 的 edge_tts.enabled=true）。此前 qihu 未配置时**整个端点**
-    静默返回 []——edge/doubao 音色也被连坐隐藏；现在只过滤对应分组。
-    服务整体未启用（svc is None）才返回空。
-    """
+    """列出四个字节直连音色；未配置字节客户端时返回空。"""
     svc: VoiceCloneService | None = getattr(request.app.state, "voice_clone_service", None)
-    if svc is None:
+    if svc is None or svc.doubao_client is None:
         return []
 
     from app.gateway._shared.voice_catalog import CURATED_VOICES
 
-    dropped: list[str] = []
-    if svc.qihu_client is None:
-        dropped.append("qihu")
-    if svc.doubao_client is None:
-        dropped.append("doubao")
-    if getattr(svc, "edge_client", None) is None:
-        dropped.append("edge-tts")  # edge_tts.enabled=false 的部署不列 edge 音色
-    if dropped:
-        logger.info("preset-voices: hiding provider groups without credentials: %s", ",".join(dropped))
-
-    return [v.model_dump() for v in CURATED_VOICES if v.provider not in dropped]
+    return [voice.model_dump() for voice in CURATED_VOICES]
 
 
 @router.get("/{voice_id}/status", response_model=VoiceTwinStatusResponse)

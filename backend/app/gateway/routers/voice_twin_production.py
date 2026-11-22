@@ -107,6 +107,13 @@ async def preview_voice(request: Request, voice_id: str, text: str | None = None
     svc = _get_service(request)
     user_id = get_effective_user_id()
 
+    from app.gateway._shared.voice_catalog import ensure_voice_id_supported
+
+    try:
+        ensure_voice_id_supported(voice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     preview_text = (text or DEFAULT_PREVIEW_TEXT)[:MAX_PREVIEW_CHARS]
 
     from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, is_edge_voice_id, is_preset_voice_id

@@ -935,40 +935,12 @@ def _visible_doubao_voice_ids() -> set[str]:
 
 @router.get("/voices")
 async def list_voices_endpoint(lang: str | None = None):
-    """List available TTS voices, optionally filtered by language prefix."""
-    import os
-
-    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES, list_voices_cached
+    """List visible Doubao voices, optionally filtered by language prefix."""
+    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES
 
     doubao_ids = _visible_doubao_voice_ids()
-    qihu_visible = bool(os.environ.get("QIHU_API_KEY"))
-
-    def _visible(cv: dict) -> bool:
-        provider = cv.get("provider")
-        if provider == "doubao":
-            return cv.get("id") in doubao_ids
-        if provider == "qihu":
-            return qihu_visible  # 无 key 时 360 音色必失败（链末端 edge 国内不可达）→ 不列出
-        return True
-
-    if lang:
-        lang_lower = lang.lower()
-        voices = await list_voices_cached(lang)
-        result = [
-            {
-                "id": v["ShortName"],
-                "name": v["FriendlyName"] if "FriendlyName" in v else v["ShortName"],
-                "locale": v["Locale"],
-                "gender": v["Gender"],
-                "provider": "edge-tts",
-            }
-            for v in voices
-        ]
-        # Append curated cloud-TTS voices (360 preset + doubao seed-tts-2.0) matching the lang.
-        result.extend(cv for cv in CURATED_VOICES if cv.get("locale", "").lower().startswith(lang_lower) and cv.get("provider") in ("qihu", "doubao") and _visible(cv))
-        return result
-
-    return [cv for cv in CURATED_VOICES if _visible(cv)]
+    lang_lower = lang.lower() if lang else None
+    return [voice for voice in CURATED_VOICES if voice["id"] in doubao_ids and (lang_lower is None or voice["locale"].lower().startswith(lang_lower))]
 
 
 @router.get("/voices/default")
@@ -1005,6 +977,13 @@ async def preview_voice(voice_id: str, text: str | None = None, task_type: str |
     import hashlib
     import shutil
     import tempfile
+
+    from app.gateway._shared.voice_catalog import ensure_voice_id_supported
+
+    try:
+        ensure_voice_id_supported(voice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     storage = get_paths().base_dir / "video-gen/voice_previews"  # C8：CWD 相对改基址
     storage.mkdir(parents=True, exist_ok=True)

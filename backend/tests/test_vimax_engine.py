@@ -357,7 +357,7 @@ async def test_render_passes_characters_to_narration(tmp_path):
 
     ctx = _ctx(
         tmp_path,
-        voice_id="doubao:zh_male_A",  # Plan B：ViMax 禁 preset，改用授权豆包男声
+        voice_id="doubao:zh_male_m191_uranus_bigtts",  # Plan B：ViMax 禁 preset，改用授权豆包男声
         style="Cartoon",
         request={"script": "a script", "mode": "fixed"},
     )
@@ -401,7 +401,7 @@ async def test_render_writes_warning_when_characters_empty(tmp_path):
         narration_llm_factory=lambda: object(),
     )
 
-    ctx = _ctx(tmp_path, voice_id="doubao:zh_male_A", style="Cartoon", request={"script": "a script", "mode": "fixed"})
+    ctx = _ctx(tmp_path, voice_id="doubao:zh_male_m191_uranus_bigtts", style="Cartoon", request={"script": "a script", "mode": "fixed"})
     working = tmp_path / "vimax_working"
     working.mkdir(parents=True)
     (working / "characters.json").write_text("[]")  # 空表——degenerate 编剧输出

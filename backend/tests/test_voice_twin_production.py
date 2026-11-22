@@ -1392,11 +1392,11 @@ class TestDoubaoTtsSynthesis:
         mock_doubao.synthesize_sse = AsyncMock(return_value=b"doubao_audio")
         async_production_svc.voice_service.doubao_client = mock_doubao
 
-        result = await async_production_svc._do_tts_synthesis("doubao:zh_female_qingxin", "你好世界")
+        result = await async_production_svc._do_tts_synthesis("doubao:zh_female_vv_uranus_bigtts", "你好世界")
         assert result == b"doubao_audio"
         mock_doubao.synthesize_sse.assert_called_once()
         call_kwargs = mock_doubao.synthesize_sse.call_args.kwargs
-        assert call_kwargs["speaker"] == "zh_female_qingxin"
+        assert call_kwargs["speaker"] == "zh_female_vv_uranus_bigtts"
         assert call_kwargs["text"] == "你好世界"
 
     @pytest.mark.asyncio
@@ -1410,8 +1410,8 @@ class TestDoubaoTtsSynthesis:
         async_production_svc.voice_service.qihu_client = None
         async_production_svc.voice_service.edge_client = None
 
-        with pytest.raises(RuntimeError, match="edge fallback unavailable"):
-            await async_production_svc._do_tts_synthesis("doubao:zh_female_qingxin", "hello")
+        with pytest.raises(RuntimeError, match="doubao TTS service not configured"):
+            await async_production_svc._do_tts_synthesis("doubao:zh_female_vv_uranus_bigtts", "hello")
 
     @pytest.mark.asyncio
     async def test_doubao_retries_on_rate_limit(self, async_production_svc: ProductionService):
@@ -1426,7 +1426,7 @@ class TestDoubaoTtsSynthesis:
         async_production_svc.voice_service.doubao_client = mock_doubao
         async_production_svc._TTS_RETRY_BASE_DELAY = 0.01
 
-        result = await async_production_svc._do_tts_synthesis("doubao:spk1", "hello")
+        result = await async_production_svc._do_tts_synthesis("doubao:zh_female_vv_uranus_bigtts", "hello")
         assert result == b"doubao_audio"
         assert mock_doubao.synthesize_sse.call_count == 2
 
@@ -1443,7 +1443,7 @@ class TestDoubaoTtsSynthesis:
         async_production_svc.voice_service.doubao_client = mock_doubao
         async_production_svc._TTS_RETRY_BASE_DELAY = 0.01
 
-        result = await async_production_svc._do_tts_synthesis("doubao:spk1", "hello")
+        result = await async_production_svc._do_tts_synthesis("doubao:zh_female_vv_uranus_bigtts", "hello")
         assert result == b"doubao_audio"
         assert mock_doubao.synthesize_sse.call_count == 2
 
@@ -1479,7 +1479,7 @@ class TestIsDoubaoVoiceId:
     def test_doubao_prefix_returns_true(self):
         from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
 
-        assert is_doubao_voice_id("doubao:zh_female_qingxin") is True
+        assert is_doubao_voice_id("doubao:zh_female_vv_uranus_bigtts") is True
 
     def test_preset_prefix_returns_false(self):
         from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
@@ -2261,9 +2261,9 @@ class TestVerifyVoice:
         """doubao: 音色提交生产任务不再 404（合成层 preview/pipeline 均支持）。"""
         from app.gateway.routers.voice_twin_production import _verify_voice
 
-        voice = await _verify_voice(async_production_svc, "doubao:zh_female_qingxin", "user_a")
-        assert voice.voice_name == "豆包音色 zh_female_qingxin"
-        assert voice.speaker_id == "doubao:zh_female_qingxin"
+        voice = await _verify_voice(async_production_svc, "doubao:zh_female_vv_uranus_bigtts", "user_a")
+        assert voice.voice_name == "豆包音色 zh_female_vv_uranus_bigtts"
+        assert voice.speaker_id == "doubao:zh_female_vv_uranus_bigtts"
         assert voice.user_id == "user_a"
         # doubao 分支不得触碰克隆音色 repo
         async_production_svc.voice_service.repo.get_by_id.assert_not_called()
