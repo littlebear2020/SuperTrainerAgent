@@ -58,7 +58,9 @@ pack() {
     rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
     echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${TEST_DEPLOY_REF:-origin/main}"
-    ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output "$TAR_FILE")
+    echo "测试链路明确豁免 release-blocker 与其他 worktree 检查，仅执行 ref 祖先校验"
+    RESOLVED_REF="$(git rev-parse --verify --end-of-options "${REF}^{commit}")" || { echo -e "${RED}❌ 无法解析测试发布 ref：$REF${NC}"; return 1; }
+    ARCHIVE_ARGS=(--ref "$RESOLVED_REF" --base-ref origin/main --output "$TAR_FILE")
     if [ "${TEST_ALLOW_UNMERGED:-0}" = "1" ]; then
         ARCHIVE_ARGS+=(--allow-unmerged)
         echo -e "${YELLOW}  显式允许测试未合入 ref: $REF${NC}"

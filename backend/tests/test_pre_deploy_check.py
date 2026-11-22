@@ -143,7 +143,7 @@ def test_collaboration_contract_separates_expected_and_deployed_versions() -> No
     assert "已携带计划提交" in conventions
     assert "scripts/agent_context.py" in conventions
     assert "[release-blocker]" in conventions
-    assert 'pre_deploy_check.py --ref "$REF"' in production
+    assert 'pre_deploy_check.py --ref "$RESOLVED_REF"' in production
 
 
 def test_missing_backlog_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

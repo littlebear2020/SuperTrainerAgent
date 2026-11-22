@@ -62,7 +62,7 @@ live 报告还需单独记录部署包中的 `release-manifest.json` SHA；本�
 
 输入为 `--ref` 和输出路径：
 
-- 解析完整提交 SHA；默认要求该提交是 `origin/main` 的祖先，测试服务器显式 `--allow-unmerged` 才可打包未合入提交。
+- 包装脚本先把 ref 冻结为完整提交 SHA，pre-deploy 与 archive 共用；默认要求该提交是 `origin/main` 的祖先，测试服务器显式 `--allow-unmerged` 才可打包未合入提交。
 - 通过 `GIT_LFS_SKIP_SMUDGE=1 git archive` 流式读取已提交文件，普通本地修改和未跟踪文件没有进入通道；LFS 路径由 `git check-attr -z --source=<source_sha>` 与对应 `git ls-tree -z` 的 NUL 分隔记录确定，仅允许用工作区中 size/OID 完全匹配的真实对象替换指针，缺失或修改即失败。
 - 生成根目录 `release-manifest.json`，至少记录源码 SHA、完整 ref、构建所用 Git 基准、排除路径和是否包含本地配置。
 - 只有显式 `--include-local-config` 才追加本地配置：`config.yaml` 与 `.env` 必须存在，`frontend/.env` 与 `extensions_config.json` 存在时才追加；必需文件缺失或路径越界直接失败。

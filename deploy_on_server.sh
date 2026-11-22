@@ -39,7 +39,8 @@ pack() {
     rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
     echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${DEPLOY_REF:-origin/main}"
-    ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
+    RESOLVED_REF="$(git rev-parse --verify --end-of-options "${REF}^{commit}")" || { echo "❌ 无法解析发布 ref：$REF"; return 1; }
+    ARCHIVE_ARGS=(--ref "$RESOLVED_REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
     if [ "${1:-}" = "--no-sandbox" ]; then
         ARCHIVE_ARGS+=(--exclude docker/sandbox/cache/chrome-linux)
         echo "跳过 Chrome 缓存，保留字体、Python wheels 与 BPE 缓存"
@@ -51,7 +52,7 @@ pack() {
         echo "提示：本包不含 config.yaml/.env，依赖服务器现有配置（首次部署需设 DEPLOY_INCLUDE_LOCAL_CONFIG=1）"
     fi
 
-    python3 scripts/pre_deploy_check.py --ref "$REF" || { echo "❌ 部署前检查存在阻断项，已停止打包"; return 1; }
+    python3 scripts/pre_deploy_check.py --ref "$RESOLVED_REF" || { echo "❌ 部署前检查存在阻断项，已停止打包"; return 1; }
     python3 scripts/release_archive.py "${ARCHIVE_ARGS[@]}" || { echo "❌ 打包失败，旧包未替换"; return 1; }
 
     MANIFEST_VALUES="$(release_manifest_values ../deer-flow-update.tar.gz)" || { echo "❌ 发布包缺少有效 manifest，请检查打包错误"; return 1; }

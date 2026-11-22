@@ -2,6 +2,7 @@ name: Unit Tests
 
 # 路径清单与 quick-checks.yml 的 lint-backend 检测互守；push/pull_request 一致性由
 # backend/tests/test_release_archive.py 机械断言。GitHub Actions 不使用 YAML anchor。
+# GitHub paths 的 * 不跨目录，根 config*.yaml 已限定根目录，不能画蛇添足加前导斜杠。
 on:
   push:
     branches: [ 'main' ]
@@ -9,7 +10,7 @@ on:
       - 'backend/**'
       - 'skills/**'
       - 'docker/**'
-      - '/config*.yaml'
+      - 'config*.yaml'
       - 'scripts/agent_context.py'
       - 'scripts/release_archive.py'
       - 'scripts/pre_deploy_check.py'
@@ -24,7 +25,7 @@ on:
       - 'backend/**'
       - 'skills/**'
       - 'docker/**'
-      - '/config*.yaml'
+      - 'config*.yaml'
       - 'scripts/agent_context.py'
       - 'scripts/release_archive.py'
       - 'scripts/pre_deploy_check.py'

@@ -435,7 +435,8 @@ def test_cache_provenance_and_sensitive_archive_cleanup_are_explicit() -> None:
 
 def test_workflow_config_glob_is_anchored_to_repo_root() -> None:
     workflow = (REPO_ROOT / ".github/workflows/backend-unit-tests.yml").read_text(encoding="utf-8")
-    assert "'/config*.yaml'" in workflow
+    assert "- 'config*.yaml'" in workflow
+    assert "- '/config*.yaml'" not in workflow
 
 
 def test_production_pack_forwards_single_optional_argument() -> None:
@@ -465,3 +466,14 @@ def test_lfs_pointer_size_is_checked_before_reading() -> None:
 def test_git_error_is_only_attributed_for_nonzero_process() -> None:
     script = (REPO_ROOT / "scripts/release_archive.py").read_text(encoding="utf-8")
     assert "process.returncode not in (None, 0)" in script
+
+
+def test_pack_freezes_ref_for_check_and_archive() -> None:
+    production = (REPO_ROOT / "deploy_on_server.sh").read_text(encoding="utf-8")
+    test = (REPO_ROOT / "deploy_to_test_server.sh").read_text(encoding="utf-8")
+    assert 'RESOLVED_REF="$(git rev-parse' in production
+    assert 'pre_deploy_check.py --ref "$RESOLVED_REF"' in production
+    assert 'ARCHIVE_ARGS=(--ref "$RESOLVED_REF"' in production
+    assert 'RESOLVED_REF="$(git rev-parse' in test
+    assert 'ARCHIVE_ARGS=(--ref "$RESOLVED_REF"' in test
+    assert "测试链路明确豁免 release-blocker" in test

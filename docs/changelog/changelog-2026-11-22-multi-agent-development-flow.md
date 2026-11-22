@@ -110,6 +110,13 @@
 - git archive 只有在进程返回码非零时才把 stderr 归因为 git 失败，gzip/磁盘/替换等原始异常不再被掩盖；多余 pack 参数显式拒绝。
 - 本轮相关回归三件测试文件合计 `41 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
 
+## 最终一致性与测试豁免边界（PR #39 复审）
+
+- GitHub 官方 paths 文档确认 `*` 不跨目录，根 `config*.yaml` 写法已恢复正确；不采用前导斜杠。依据：[Workflow syntax](https://docs.github.com/actions/using-workflows/workflow-syntax-for-github-actions)。
+- pre-deploy 与 release_archive 改为共用同一完整 SHA，消除 ref 在检查后移动导致验收/打包对象不一致的窗口。
+- 测试链路显式输出“豁免 release-blocker 与其他 worktree 检查，仅执行 ref 祖先校验”，保留未验证修复的测试部署通道；正式 pre-deploy 语义不变。
+- 本轮相关回归三件测试文件合计 `42 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。
