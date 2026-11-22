@@ -40,7 +40,6 @@ from app.gateway.video_gen.engines.vimax.dialogue import (
     parse_dialogue,
     strip_unrecognized_tags,
 )
-from app.gateway.video_gen.engines.vimax.voice_policy import VIMAX_TTS_POLICY
 from app.gateway.video_gen.orchestration import DEFAULT_LLM_TIMEOUT, _invoke_llm_bounded
 from app.gateway.video_gen.orchestration import tts as tts_mod
 
@@ -593,7 +592,6 @@ async def generate_vimax_narration(
                         voice_id=segment_voice,
                         speed=speed,
                         output_path=str(chunk_path),
-                        policy=VIMAX_TTS_POLICY,
                         **emotion_kwargs,
                     )
                     # 十轮（bug·high）：原始时长须在**对齐前**探测——_align_chunk_to_shot

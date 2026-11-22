@@ -22,7 +22,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from app.gateway._shared.executors import run_ffmpeg
 from app.gateway._shared.task_framework.metrics import metrics
@@ -31,9 +31,6 @@ from app.gateway._shared.task_framework.schemas import DRAFT, STORY_READY, ensur
 from app.gateway._shared.task_framework.service import BaseTaskService, ProgressUpdater
 from deerflow.config.paths import get_paths
 from deerflow.runtime.user_context import get_effective_user_id
-
-if TYPE_CHECKING:
-    from app.gateway.video_gen.orchestration.tts import TTSPolicy
 
 from .audio_flow import (  # noqa: F401  (re-export: 既有调用点与测试按 service 上的私名引用/patch)
     _RECONCILE_TOLERANCE_SEC,
@@ -57,16 +54,6 @@ from .visual_factory import has_mixed_sources, make_visual_budget, make_visual_s
 from .visual_sources.remotion_course_visuals import residual_visual_regen_block_reason
 
 logger = logging.getLogger(__name__)
-
-
-def _vimax_tts_policy_for(task: Any):
-    """Plan B（2026-10-19，D4）：按 ``task.task_type``（非 payload video_type 猜测）
-    返回 ViMax 专用 TTS 策略；其他任务 None = 完全旧链路。"""
-    if getattr(task, "task_type", "") == "vimax":
-        from app.gateway.video_gen.engines.vimax.voice_policy import VIMAX_TTS_POLICY
-
-        return VIMAX_TTS_POLICY
-    return None
 
 
 # Plan A Task 3（2026-10-18）：草稿音频失败阶段 → 中文文案（payload audio_error 用）。
@@ -1102,19 +1089,16 @@ class _SynthFrameCtx:
     收编、P2-14 actual-voice 归位、KIND_VOICE_FALLBACK 留痕、G1 spf 补静音。
     """
 
-    def __init__(self, *, task_dir, audio_dir, voice_id, tts_speed, fallback_voice, semaphore, cas_key_locks, cas_results, seconds_per_frame, section_id, tts_mod, policy=None):
+    def __init__(self, *, task_dir, audio_dir, voice_id, tts_speed, semaphore, cas_key_locks, cas_results, seconds_per_frame, section_id, tts_mod):
         self.task_dir = task_dir
         self.audio_dir = audio_dir
         self.voice_id = voice_id
         self.tts_speed = tts_speed
-        self.fallback_voice = fallback_voice
         self.semaphore = semaphore
         self.cas_key_locks = cas_key_locks
         self.cas_results = cas_results
         self.seconds_per_frame = seconds_per_frame
         self.section_id = section_id
-        # Plan B（2026-10-19）：ViMax 任务传 VIMAX_TTS_POLICY，其他任务 None（旧链路）
-        self.policy = policy
         self.tts_mod = tts_mod
 
 
@@ -1165,8 +1149,6 @@ async def _synth_frame_cas(ctx: _SynthFrameCtx, frame) -> None:
                 voice_id=ctx.voice_id,
                 speed=ctx.tts_speed,
                 output_path=str(out),
-                fallback_voice=ctx.fallback_voice,
-                policy=ctx.policy,
                 # T-E11：section_id 仅挂项目任务传（None 不传——窄签名桩/
                 # 旧客户端零变化；与 entity_roster 同款条件 kwargs 惯用法）
                 **({"section_id": ctx.section_id} if ctx.section_id else {}),
@@ -2062,14 +2044,12 @@ class VideoGenService(BaseTaskService):
                 audio_dir=audio_dir,
                 voice_id=voice_id,
                 tts_speed=storyboard.config.tts_speed,
-                fallback_voice=self._config.tts_fallback_voice,
                 semaphore=asyncio.Semaphore(_tts_concurrency(voice_id or "")),
                 cas_key_locks={},
                 cas_results={},
                 seconds_per_frame=None,  # 成片任务不重施 spf（与单帧重生口径一致）
                 section_id=_section_id,
                 tts_mod=tts_mod,
-                policy=_vimax_tts_policy_for(task),
             )
             for frame in storyboard.frames:
                 await self._set_regen_state(task_dir, frame.index, "running")
@@ -3385,7 +3365,6 @@ class VideoGenService(BaseTaskService):
         task_id: str | None = None,
         section_id: str | None = None,
         stage_hook: Callable[[str], None] | None = None,
-        policy: TTSPolicy | None = None,
     ) -> tuple[str, str]:
         """Parallel TTS synthesis + audio concat + SRT generation.
 
@@ -3400,7 +3379,7 @@ class VideoGenService(BaseTaskService):
         tts|concat|subtitle），草稿音频失败诊断用；缺省 None 不改变其他调用方。
         """
         async with _synth_lock_guard(str(task_dir)):
-            return await self._synthesize_audio_locked(storyboard, task_dir, voice_id, seconds_per_frame=seconds_per_frame, task_id=task_id, section_id=section_id, stage_hook=stage_hook, policy=policy)
+            return await self._synthesize_audio_locked(storyboard, task_dir, voice_id, seconds_per_frame=seconds_per_frame, task_id=task_id, section_id=section_id, stage_hook=stage_hook)
 
     async def _synthesize_audio_locked(
         self,
@@ -3412,25 +3391,15 @@ class VideoGenService(BaseTaskService):
         task_id: str | None = None,
         section_id: str | None = None,
         stage_hook: Callable[[str], None] | None = None,
-        policy: TTSPolicy | None = None,
     ) -> tuple[str, str]:
         """Parallel TTS synthesis + audio concat + SRT generation.
 
         Shared by _prepare_storyboard_video and _render_from_draft.
         Returns (audio_concat_path, subtitle_path).
         """
-        # Ensure QIHU_API_KEY is available for preset voices
-        import os
-
         from .orchestration import tts as tts_mod
 
-        # C3: 设置 task_dir 上下文，使 record_tts_degradation 能写入 sidecar
         tts_mod.set_tts_degradation_context(task_dir)
-
-        if self._config.qihu_api_key:
-            current = os.environ.get("QIHU_API_KEY", "")
-            if not current:
-                os.environ["QIHU_API_KEY"] = self._config.qihu_api_key
 
         # W2（2026-08-24 活性重构）：TTS 整批阶段挂滴答（60 帧健康最坏 60×n≈50min，
         # 帧间无写库远超 P1=120s）。阶段级包一层：gather/concat/SRT/字幕预切共享一个
@@ -3468,14 +3437,12 @@ class VideoGenService(BaseTaskService):
                 audio_dir=audio_dir,
                 voice_id=voice_id,
                 tts_speed=storyboard.config.tts_speed,
-                fallback_voice=self._config.tts_fallback_voice,
                 semaphore=semaphore,
                 cas_key_locks=cas_key_locks,
                 cas_results=cas_results,
                 seconds_per_frame=seconds_per_frame,
                 section_id=section_id,
                 tts_mod=tts_mod,
-                policy=policy,
             )
 
             async def synth_one(frame):
@@ -3781,7 +3748,6 @@ class VideoGenService(BaseTaskService):
                         seconds_per_frame=pl.get("seconds_per_frame"),
                         task_id=task_id,
                         stage_hook=_stage_hook,
-                        policy=_vimax_tts_policy_for(task),
                         **({"section_id": pl.get("course_project_id")} if pl.get("course_project_id") else {}),
                     )
                     stage["current"] = "merge"
@@ -4007,9 +3973,16 @@ class VideoGenService(BaseTaskService):
                 from .orchestration.voices import resolve_default_voice
 
                 default_voice = resolve_default_voice(lang)
-                voice_id = default_voice or self._config.tts_voice
-                source = "lang_default" if default_voice else "config"
-        elif task_type == "vimax":
+                if not default_voice and lang != "zh":
+                    raise ValueError("非中文任务暂无默认字节直连音色，请使用中文或显式选择目录内音色")
+                if not default_voice:
+                    from .orchestration.voices import visible_doubao_voice_ids
+
+                    if not visible_doubao_voice_ids():
+                        raise ValueError("当前白名单没有可用的字节直连音色，请检查 DOUBAO_TTS_ENABLED_SPEAKERS")
+                voice_id = default_voice
+                source = "lang_default"
+        else:
             from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
 
             ensure_vimax_voice_allowed(voice_id)
@@ -5032,7 +5005,6 @@ class VideoGenService(BaseTaskService):
                             voice_id=voice_id,
                             speed=storyboard.config.tts_speed,
                             output_path=str(out),
-                            fallback_voice=self._config.tts_fallback_voice,
                             **({"section_id": _tts_section_id} if _tts_section_id else {}),
                         )
                         if not Path(r.audio_path).exists():

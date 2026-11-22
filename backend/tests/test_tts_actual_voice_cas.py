@@ -12,6 +12,7 @@ import asyncio
 import json
 import types
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -35,17 +36,13 @@ def test_tts_result_has_actual_voice_id():
 
 
 def test_qihu_fallback_marks_actual_voice(tmp_path, monkeypatch):
-    """doubao 失败降级 360 → actual_voice_id='preset:146'。"""
-
-    async def fake_qihu(text, voice_id, speed, output_path, **kwargs):
-        Path(output_path).write_bytes(b"fake")
-        return tts_mod.TTSResult(audio_path=output_path, srt="", duration=1.0, actual_voice_id="preset:146")
-
+    fake_qihu = AsyncMock()
     monkeypatch.setattr(tts_mod, "_synthesize_qihu", fake_qihu)
-    monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "")  # 触发 access_key 空 → 直接降级
+    monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "")
     out = str(tmp_path / "o.mp3")
-    r = asyncio.run(tts_mod._synthesize_doubao("你好", "doubao:speaker1", 1.0, out))
-    assert r.actual_voice_id == "preset:146"
+    with pytest.raises(RuntimeError, match="VOLCENGINE_VOICE_ACCESS_KEY"):
+        asyncio.run(tts_mod._synthesize_doubao("你好", "doubao:speaker1", 1.0, out))
+    fake_qihu.assert_not_awaited()
 
 
 @pytest.mark.asyncio

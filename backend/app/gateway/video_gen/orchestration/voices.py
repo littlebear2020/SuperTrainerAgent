@@ -14,6 +14,7 @@ from app.gateway._shared.voice_catalog import CatalogVoice
 
 logger = logging.getLogger(__name__)
 
+
 # Cache: (voices_list, timestamp)
 _cache: tuple[list[dict[str, Any]], float] | None = None
 _CACHE_TTL = 3600  # 1 hour
@@ -75,11 +76,22 @@ LANG_LOCALE_MAP: dict[str, str] = {
 DEFAULT_VOICES: dict[str, str] = {}
 
 
+def visible_doubao_voice_ids() -> list[str]:
+    catalog_ids = {voice.id for voice in _SHARED_CATALOG}
+    whitelist = [item.strip() for item in os.environ.get("DOUBAO_TTS_ENABLED_SPEAKERS", "").split(",") if item.strip()]
+    if not whitelist:
+        return [voice.id for voice in _SHARED_CATALOG]
+    return [f"doubao:{speaker}" for speaker in whitelist if f"doubao:{speaker}" in catalog_ids]
+
+
 def resolve_default_voice(lang: str) -> str | None:
     if lang != "zh":
         return None
-    speaker = os.environ.get("DOUBAO_TTS_DEFAULT_SPEAKER", "")
+    allowed = visible_doubao_voice_ids()
+    speaker = os.environ.get("DOUBAO_TTS_DEFAULT_SPEAKER", "").strip()
     candidate = f"doubao:{speaker}" if speaker else ""
-    if any(voice.id == candidate for voice in _SHARED_CATALOG):
+    if candidate in allowed:
         return candidate
-    return _SHARED_CATALOG[0].id
+    if speaker:
+        logger.warning("DOUBAO_TTS_DEFAULT_SPEAKER=%s 不在当前可用目录/白名单内，将使用目录默认音色", speaker)
+    return allowed[0] if allowed else None
