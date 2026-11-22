@@ -20,7 +20,7 @@ def test_storyboard_total_duration_sum():
 def test_config_defaults():
     cfg = StoryboardConfig(video_type="ai_image", width=1080, height=1920)
     assert cfg.fps == 30
-    assert cfg.voice_id == "preset:146"
+    assert cfg.voice_id == "doubao:zh_female_vv_uranus_bigtts"
     assert cfg.subtitle_enabled is True
     assert cfg.subtitle_style == "default"
 

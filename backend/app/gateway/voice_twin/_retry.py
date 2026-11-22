@@ -35,8 +35,7 @@ def tts_sse_timeout() -> float:
     T1（2026-08-14）：httpx 标量 timeout 的 read 语义是"等下一块数据"的间隔——
     完全停滞（零字节）会触发 read timeout；慢滴（间隔 < 阈值、断续有字节）不触发，
     由 ``asyncio.wait_for`` 包整个 SSE 消费循环兜底整调用上限。超时抛
-    ``asyncio.TimeoutError``（∈ TRANSPORT_TTS_ERRORS → 自动重试 + 降级链）。
-    120s 是决策 D2：doubao 是主力路径，40 字以内拆分段足够，且避免误降级全片换音色。
+    ``asyncio.TimeoutError``（∈ TRANSPORT_TTS_ERRORS → 自动重试，耗尽即失败）。
     """
     return float(os.environ.get("TTS_SSE_TIMEOUT", "120"))
 
@@ -52,12 +51,11 @@ def volcengine_sse_timeout() -> float:
 
 
 def structured_tts_http_errors() -> tuple[type[Exception], ...]:
-    """三家 TTS 客户端的结构化 HTTP 错误类型（D5）。延迟 import 防循环。"""
+    """字节直连与既有克隆客户端的结构化 HTTP 错误类型。"""
     from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSHTTPError
-    from app.gateway.voice_twin.qihu_tts_client import QihuTTSHTTPError
     from app.gateway.voice_twin.volcengine_client import VolcengineTTSHTTPError
 
-    return (DoubaoTTSHTTPError, VolcengineTTSHTTPError, QihuTTSHTTPError)
+    return (DoubaoTTSHTTPError, VolcengineTTSHTTPError)
 
 
 def is_retryable_tts_error(e: BaseException) -> bool:
@@ -90,7 +88,7 @@ async def call_with_tts_retry[T](
     """对一次 TTS 客户端调用做瞬时重试。
 
     重试耗尽后抛 ``RuntimeError("{label} failed after {n} retries")``，
-    原始错误挂在 ``__cause__`` 上（降级链按 cause 分类）。不可重试错误
+    原始错误挂在 ``__cause__`` 上。不可重试错误
     （4xx/业务码/参数错）立即原样抛出。
     """
     last_err: Exception | None = None

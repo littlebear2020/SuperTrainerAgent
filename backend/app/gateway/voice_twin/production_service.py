@@ -20,8 +20,6 @@ from app.gateway._shared.task_framework.service import BaseTaskService, Progress
 
 # D2（2026-08-09）：传输错误组与重试策略已抽公共 helper（voice_twin/_retry.py）；
 # `_TRANSPORT_TTS_ERRORS` 别名保留兼容既有 import。
-from app.gateway.voice_twin._retry import TRANSPORT_TTS_ERRORS as _TRANSPORT_TTS_ERRORS
-from app.gateway.voice_twin._retry import is_retryable_tts_error
 
 logger = logging.getLogger(__name__)
 
@@ -140,54 +138,9 @@ def split_text(text: str, max_chars: int = 5000) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _iter_cause_chain(e: BaseException) -> Any:
-    """沿 __cause__ 链展开（重试耗尽的外层包装无分类特征，原因在 cause 上）。"""
-    seen: set[int] = set()
-    current: BaseException | None = e
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        yield current
-        current = current.__cause__
-
-
-def _is_degradable_tts_error(e: Exception) -> bool:
-    """该错误是否允许进入降级链（doubao→qihu→edge）。
-
-    仅基础设施类故障可降级：传输层瞬断、结构化 429/5xx、引擎未配置。4xx 鉴权/
-    参数错误与 SSE 业务码错误不可降级——降级会掩盖配置问题且换音色也救不了。
-    （2026-08-09 D5：正则分类已彻底移除，改 isinstance + status_code。）
-    """
-    for err in _iter_cause_chain(e):
-        if isinstance(err, _TRANSPORT_TTS_ERRORS):
-            return True
-        if "not configured" in str(err):
-            return True
-        if is_retryable_tts_error(err):
-            return True
-    return False
-
-
 def _looks_like_mp3(audio: bytes) -> bool:
-    """按内容嗅探容器：360 给 WAV（RIFF 头）；edge/doubao 给 mp3（ID3 或 0xFF 同步帧）。
-
-    降级链末端产物是 edge mp3——按请求音色推格式会在降级时错位（容器/扩展名不符），
-    必须按实际字节判定。
-    """
+    """按实际字节嗅探容器，避免转码和扩展名错位。"""
     return audio[:4] != b"RIFF"
-
-
-def _edge_fallback_voice_for(voice_id: str) -> str:
-    """为降级选 edge 音色：同 locale 同性别的目录 edge 音色优先，否则按性别回退中文默认。"""
-    from app.gateway._shared.voice_catalog import CURATED_VOICES, get_catalog_voice
-    from app.gateway.voice_twin.preset_voices import parse_edge_voice_id
-
-    entry = get_catalog_voice(voice_id)
-    gender = entry.gender if entry else "female"
-    locale = entry.locale if entry else "zh-CN"
-    for c in CURATED_VOICES:
-        if c.provider == "edge-tts" and c.locale == locale and c.gender == gender:
-            return parse_edge_voice_id(c.id)
-    return "zh-CN-XiaoxiaoNeural" if gender == "female" else "zh-CN-YunjianNeural"
 
 
 class ProductionService(BaseTaskService):
@@ -246,39 +199,9 @@ class ProductionService(BaseTaskService):
         speed_ratio: float = 1.0,
         row: Any = None,
     ) -> bytes:
-        """Single-engine TTS with retry (no degradation — that's _do_tts_synthesis).
-
-        For doubao voices (voice_id starts with 'doubao:'), routes to DoubaoTTSClient.
-        For preset voices (voice_id starts with 'preset:'), routes to QihuTTSClient.
-        For edge voices (voice_id starts with 'edge:'), routes to EdgeTTSClient (mp3).
-        For cloned voices, uses the existing Volcengine path via row parameters.
-
-        Edge voices are handled **before** ``call_with_tts_retry`` — the edge client
-        has its own tenacity 3× retry internally, so wrapping it again would create
-        a 3×3=9 retry nest (fix #4, 2026-08-10).
-        """
+        """Retry the requested Doubao or cloned voice without changing engines."""
         from app.gateway.voice_twin._retry import call_with_tts_retry
-        from app.gateway.voice_twin.preset_voices import (
-            is_doubao_voice_id,
-            is_edge_voice_id,
-            is_preset_voice_id,
-            parse_doubao_voice_id,
-            parse_edge_voice_id,
-            parse_preset_voice_id,
-        )
-
-        # Edge voices: edge_client.synthesize already has tenacity 3× retry.
-        # Don't double-wrap with call_with_tts_retry (would be 3×3=9 retries).
-        if is_edge_voice_id(voice_id):
-            edge_client = getattr(self.voice_service, "edge_client", None)
-            if edge_client is None:
-                raise RuntimeError("edge TTS service not configured")
-            async with self._tts_semaphore:
-                return await edge_client.synthesize(
-                    text=text,
-                    voice=parse_edge_voice_id(voice_id),
-                    speed=speed_ratio,
-                )
+        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, parse_doubao_voice_id
 
         async def _call() -> bytes:
             async with self._tts_semaphore:
@@ -291,13 +214,6 @@ class ProductionService(BaseTaskService):
                         text=text,
                         output_format=output_format,
                         speed_ratio=speed_ratio,
-                    )
-                elif is_preset_voice_id(voice_id):
-                    if self.voice_service.qihu_client is None:
-                        raise RuntimeError("360 TTS service not configured")
-                    return await self.voice_service.qihu_client.synthesize_sse(
-                        text=text,
-                        voice=parse_preset_voice_id(voice_id),
                     )
                 else:
                     if row is None:
@@ -328,21 +244,18 @@ class ProductionService(BaseTaskService):
     ) -> tuple[bytes, str]:
         """Generate a short preview clip for a voice. Returns (audio_bytes, media_type).
 
-        Preset voices (``preset:{int}``) route to the 360/qihu client and yield WAV.
-        Cloned voices route to the Volcengine client and yield MP3, after ownership
+        Catalog voices use Doubao. Cloned voices use the existing Volcengine path after ownership
         and readiness checks (mirrors the production ``_verify_voice`` guarantees
         but local to preview so we never expose another user's voice).
         Reuses ``_do_tts_synthesis`` for synthesis so retry/concurrency are shared.
         """
-        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, is_edge_voice_id, is_preset_voice_id
+        from app.gateway._shared.voice_catalog import ensure_voice_id_supported
+        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
 
-        if is_preset_voice_id(voice_id) or is_doubao_voice_id(voice_id) or is_edge_voice_id(voice_id):
+        ensure_voice_id_supported(voice_id)
+        if is_doubao_voice_id(voice_id):
             audio = await self._do_tts_synthesis(voice_id, text)
-            # Preset (360) returns WAV; doubao/edge return mp3。
-            # 注意：若走了 edge 降级兜底，实际产物是 mp3——按实际音色判定媒体类型
-            # 不能只看请求的 voice_id（曾按请求音色定 ext，降级后容器/扩展名错位）。
-            # 按实际字节判定媒体类型（不查请求 voice_id）——降级链 doubao→qihu
-            # 会把 mp3 请求变成 WAV 产物，必须内容嗅探（fix #1, 2026-08-10）。
+            # 按实际字节判定媒体类型，不根据 voice_id 猜容器。
             if not _looks_like_mp3(audio):
                 return audio, "audio/wav"
             return audio, "audio/mpeg"
@@ -502,10 +415,10 @@ class ProductionService(BaseTaskService):
         await progress(status="synthesizing", progress=5)
 
         # Resolve voice: preset/doubao/edge voices skip DB lookup
-        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, is_edge_voice_id, is_preset_voice_id
+        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
 
         row = None
-        if not is_preset_voice_id(voice_id) and not is_doubao_voice_id(voice_id) and not is_edge_voice_id(voice_id):
+        if not is_doubao_voice_id(voice_id):
             if self.voice_service.repo is None:
                 raise RuntimeError("Voice clone repository not initialized")
             row = await self.voice_service.repo.get_by_id(voice_id)
@@ -516,11 +429,7 @@ class ProductionService(BaseTaskService):
             if row.status != "ready":
                 raise ValueError(f"Voice is not ready (status={row.status})")
 
-        # 360 TTS (preset voices) returns WAV bytes regardless of output_format;
-        # Volcengine (cloned voices) and doubao return the requested format;
-        # edge-tts returns mp3. 降级链 doubao→qihu 会把 mp3 请求变成 WAV 产物，
-        # preset→edge 会把 WAV 请求变成 mp3——按实际字节判定是否转码，不查请求
-        # voice_id（fix #1, 2026-08-10）。
+        # 按实际音频字节决定是否转码，不按 voice_id 猜容器格式。
 
         chunks = split_text(text, max_chars=5000)
         total = len(chunks)
@@ -616,10 +525,10 @@ class ProductionService(BaseTaskService):
         # ── Step 1: Extract (extracting) ──
         await progress(status="extracting", progress=5)
 
-        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, is_edge_voice_id, is_preset_voice_id
+        from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
 
         row = None
-        if not is_preset_voice_id(voice_id) and not is_doubao_voice_id(voice_id) and not is_edge_voice_id(voice_id):
+        if not is_doubao_voice_id(voice_id):
             if self.voice_service.repo is None:
                 raise RuntimeError("Voice clone repository not initialized")
             row = await self.voice_service.repo.get_by_id(voice_id)

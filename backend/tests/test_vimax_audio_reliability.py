@@ -95,28 +95,22 @@ def test_dialogue_still_uses_character_voice():
 
 
 def test_voice_pool_excludes_doubao_without_key(monkeypatch):
-    """无 VOLCENGINE_VOICE_ACCESS_KEY 时池子必须剔除 doubao 音色
-    （曾静默塌缩成 preset:146，多角色听起来像一个人）。
-    注：每性别池前 6 位是 qihu preset——须 >6 个同性别角色才会分到 doubao 槽位，
-    故用 8 男 + 8 女（16 角色）让 doubao 槽位无门控时必然被分到。"""
+    """无 key 时也保留目录角色分配；实际合成在缺 key 时响亮失败。"""
     monkeypatch.delenv("VOLCENGINE_VOICE_ACCESS_KEY", raising=False)
     from app.gateway.video_gen.engines.vimax.dialogue import build_speaker_voice_map
 
     characters = [{"identifier_in_scene": f"角色{i}", "static_features": "男性" if i % 2 == 0 else "女性"} for i in range(16)]
-    voice_map = build_speaker_voice_map(characters, default_voice="preset:146", narrator_voice="preset:146")
+    voice_map = build_speaker_voice_map(characters, default_voice="doubao:zh_female_vv_uranus_bigtts", narrator_voice="doubao:zh_female_vv_uranus_bigtts")
     assigned = set(voice_map.by_speaker.values())
-    assert not any(v.startswith("doubao:") for v in assigned), assigned
+    assert any(v.startswith("doubao:") for v in assigned), assigned
 
 
 def test_voice_pool_includes_doubao_with_key(monkeypatch):
-    """有 key 时 doubao 音色留在池内（容量不缩）。"""
+    """有无 key 都只影响合成结果，不改变目录角色分配池。"""
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "test-key")
     from app.gateway.video_gen.engines.vimax.dialogue import _zh_voice_pool
 
-    pool = _zh_voice_pool("Male", include_doubao=True)
-    # 有 key 时 include_doubao=True 与默认行为一致（不断言一定有 doubao——池构成可变，
-    # 只断言函数不炸且非空；门控语义由上个用例锁定）
-    assert pool
+    assert _zh_voice_pool("Male")
 
 
 # ---------------------------------------------------------------------------

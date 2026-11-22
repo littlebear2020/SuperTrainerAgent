@@ -104,7 +104,7 @@ def test_example_config_version_is_32() -> None:
     with open(REPO_ROOT / "config.example.yaml", encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
 
-    assert config["config_version"] == 32
+    assert config["config_version"] == 33
 
 
 def test_user_config_version_is_32() -> None:
@@ -114,7 +114,7 @@ def test_user_config_version_is_32() -> None:
     with open(config_path, encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
 
-    assert config["config_version"] == 32
+    assert config["config_version"] == 33
 
 
 EXPECTED_MODES = {

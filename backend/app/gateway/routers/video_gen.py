@@ -826,9 +826,8 @@ async def create_video(request: Request, body: CreateVideoRequest):
 
     payload = body.model_dump()
 
-    # Plan B（2026-10-19，D4）：ViMax 新建显式 preset 在后台任务启动（submit）前
-    # 可读拒绝；其他 video_type 的 preset 照常受理。
-    if body.video_type == "vimax" and body.voice_id:
+    # 所有任务类型都在后台任务启动前拒绝退役音色。
+    if body.voice_id:
         from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
 
         try:
@@ -940,18 +939,14 @@ async def list_voices_endpoint(lang: str | None = None):
 
 @router.get("/voices/default")
 async def get_default_voice(lang: str = "zh", task_type: str | None = None):
-    """FP1-5: 返回与成品一致的解析默认音色（doubao:<speaker> 或 preset:146），
-    供试听选择器「默认」选项预览——修前试听恒 edge-tts YunjianNeural，成品却是
-    doubao/preset，试听满意≠成品声音。
-
-    Plan B（2026-10-19）：可选 ``task_type=vimax`` 返回 ViMax 策略解析（env
-    speaker > 白名单首项 > Edge 语言默认——zh 兜底不再是 preset:146）；缺省
-    query 的 URL/响应不变。
-    """
+    """返回与成品一致的目录内字节默认音色；ViMax 使用同一目录。"""
     if task_type == "vimax":
         from app.gateway.video_gen.engines.vimax.voice_policy import resolve_vimax_default_voice
 
-        return {"voice_id": resolve_vimax_default_voice(lang)}
+        voice_id = resolve_vimax_default_voice(lang)
+        if not voice_id:
+            raise HTTPException(status_code=404, detail=f"no default voice for lang '{lang}'")
+        return {"voice_id": voice_id}
 
     from app.gateway.video_gen.orchestration.voices import resolve_default_voice
 
@@ -963,12 +958,7 @@ async def get_default_voice(lang: str = "zh", task_type: str | None = None):
 
 @router.get("/voices/{voice_id}/preview")
 async def preview_voice(voice_id: str, text: str | None = None, task_type: str | None = None):
-    """Generate a short preview audio for a given voice using edge-tts.
-
-    边界收口（2026-10-19 P1-1）：可选 ``task_type=vimax``——试听走 ViMax 策略
-    （缺字节 key 的 doubao 直落同性别 Edge，preset 可读拒绝），不触 360。缺省
-    ``task_type`` 行为不变（其他类型 preset 试听照常）。
-    """
+    """Generate a short preview using the requested supported voice."""
     import hashlib
     import shutil
     import tempfile
@@ -1509,9 +1499,8 @@ async def update_storyboard_config(
     if not edits and not _explicit_voice_null:
         raise HTTPException(status_code=400, detail="No config fields provided")
 
-    # Plan B（2026-10-19，D4）：ViMax 任务保存 preset 音色在落盘前可读拒绝（按
-    # task.task_type；ai_image 等其他类型不受影响）。显式 null（清空回退）放行。
-    if getattr(task, "task_type", "") == "vimax" and edits.get("voice_id"):
+    # 所有任务都在落盘前拒绝退役音色；显式 null（清空回退）放行。
+    if edits.get("voice_id"):
         from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
 
         try:
@@ -3285,26 +3274,21 @@ async def trigger_draft_audio(task_id: str, request: Request):
         raise HTTPException(status_code=400, detail=f"Task is {task.status}, must be draft")
 
     payload = json.loads(task.payload) if isinstance(task.payload, str) else (task.payload or {})
-    # Plan B（2026-10-19，D4）：存量 ViMax 草稿的显式 preset 在后台 TTS 派发前
-    # 可读拒绝（按 task.task_type 判定）。
-    if getattr(task, "task_type", "") == "vimax":
-        from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
+    # 所有存量任务在后台 TTS 派发前检查 payload 与盘面 config 两源。
+    from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
 
-        # 评审修复（2026-10-19）：后台合成读的是 storyboard.config.voice_id——
-        # 存量 preset 常只存在于盘面 config（payload 无 voice 键），只校验 payload
-        # 会让门形同虚设。两源同门校验。
-        _sb_path = Path(svc._storage_dir) / user_id / "tasks" / task_id / "storyboard.json"
-        _cfg_voice = None
-        if _sb_path.exists():
-            try:
-                _cfg_voice = (json.loads(_sb_path.read_text(encoding="utf-8")) or {}).get("config", {}).get("voice_id")
-            except Exception:
-                _cfg_voice = None
+    _sb_path = Path(svc._storage_dir) / user_id / "tasks" / task_id / "storyboard.json"
+    _cfg_voice = None
+    if _sb_path.exists():
         try:
-            ensure_vimax_voice_allowed(payload.get("voice_id"))
-            ensure_vimax_voice_allowed(_cfg_voice)
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            _cfg_voice = (json.loads(_sb_path.read_text(encoding="utf-8")) or {}).get("config", {}).get("voice_id")
+        except Exception:
+            _cfg_voice = None
+    try:
+        ensure_vimax_voice_allowed(payload.get("voice_id"))
+        ensure_vimax_voice_allowed(_cfg_voice)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     if payload.get("audio_ready"):
         return {"status": "already_ready", "total_duration": payload.get("total_duration")}
 

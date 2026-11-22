@@ -68,7 +68,7 @@ ThreadData → Uploads → WorkspaceInventory → Sandbox → DanglingToolCall �
 - **视频时长**：音频是时间轴唯一真相（`audio_flow.reconcile_durations_with_audio`）；下发 provider 的时长经 `duration_policy` 向上对齐栅格；提示词里写"9 秒"无效（duration 是独立 API 参数）。
 - **H3 与 Hailuo 共用 `QihuVideoProvider` 但请求体不同**：H3 强制扁平 `extra_body.resolution`（仅 768P/2K）+ `extra_body.ratio`，缺即 400——`extra_body` 按模型门控（`_is_h3_model`）。
 - **子代理链的 SandboxMiddleware 必须 `release_on_exit=False`**（子代理继承父沙箱，退出释放会拆父容器）；lead 链保持 True。
-- **TTS 降级链** doubao→qihu→edge，但**克隆音色永不降级**（静默换音色比任务失败更糟）。
+- **TTS 单通道**：在线配音仅 4 个目录内字节直连音色与既有克隆；字节重试耗尽即失败，**克隆与字节均不降级、不静默换声**。
 - **沙箱 bash 输出**中间截断（`sandbox.bash_output_max_chars`，默认 20000），完整版落 `<workspace>/.tool-results/`。
 - MCP：stdio 工具 session 池化；HTTP/SSE 不池化（cancel scope 限制）。
 - `seed` 的 agent 集只增不删：退役壳的运行时目录（`.deer-flow/agents/`）须手动清理。

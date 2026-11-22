@@ -3,7 +3,7 @@ from app.gateway.video_gen.config import VideoGenConfig
 
 def test_tts_defaults():
     cfg = VideoGenConfig()
-    assert cfg.tts_voice == "preset:146"
+    assert cfg.tts_voice == "doubao:zh_female_vv_uranus_bigtts"
     assert cfg.tts_speed == 1.2
     assert cfg.default_aspect == "16:9"
     assert cfg.frame_concurrency == 3
@@ -129,27 +129,6 @@ def test_vimax_llm_api_key_routes_to_qihu_when_base_url_is_360():
         qihu_api_key="qihu-yyy",
     )
     assert cfg.vimax_llm_api_key() == "qihu-yyy"
-
-
-# ── Stage 2a (breadth): doubao TTS config fields ─────────────────────────────
-# See backend/docs/BYTEDANCE_MODELS_INTEGRATION_PLAN.md §阶段 2a.
-# tts_fallback_voice is the 360 fallback when doubao fails (NOT the default —
-# the doubao flip happens via resolve_default_voice + env, not code default).
-# It is wired into tts.synthesize(fallback_voice=...) at the service call sites.
-# (doubao_tts_resource_id was deleted 2026-07-28 — dead config, the resource id
-# is fixed inside DoubaoTTSClient.)
-
-
-def test_tts_fallback_voice_default():
-    """tts_fallback_voice defaults to preset:146 (360, rollback-safe fallback)."""
-    cfg = VideoGenConfig()
-    assert cfg.tts_fallback_voice == "preset:146"
-
-
-def test_tts_fallback_voice_override():
-    """tts_fallback_voice can be overridden via config.yaml."""
-    cfg = VideoGenConfig(tts_fallback_voice="preset:158")
-    assert cfg.tts_fallback_voice == "preset:158"
 
 
 # ── Task 0 (闸0): Gateway orchestration concurrency ──────────────────────────

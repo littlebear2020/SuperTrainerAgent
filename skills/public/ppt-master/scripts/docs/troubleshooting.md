@@ -80,7 +80,7 @@ pip install -r requirements.txt
 
 Important optional packages:
 - `python-pptx` for PPTX export
-- `edge-tts` for `notes_to_audio.py` recorded narration audio
+- `VOLCENGINE_VOICE_ACCESS_KEY` for the default TrainerAI narration backend
 - `Pillow` for image utilities
 - `numpy` for watermark removal
 - `PyMuPDF` for PDF conversion

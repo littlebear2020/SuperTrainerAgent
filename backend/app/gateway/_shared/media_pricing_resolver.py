@@ -58,7 +58,6 @@ DEFAULT_MEDIA_PRICING: list[dict] = [
     {"provider": "seedance", "media_type": "video", "unit": "per_kilo_token", "unit_price": 0.046, "currency": "CNY"},
     {"provider": "minimax-h3", "media_type": "video", "unit": "per_second", "unit_price": 0.58, "currency": "CNY"},
     {"provider": "doubao_tts", "media_type": "tts", "unit": "per_kilo_char", "unit_price": 0.12, "currency": "CNY"},
-    {"provider": "qihu_tts", "media_type": "tts", "unit": "per_kilo_char", "unit_price": 0.3, "currency": "CNY"},
 ]
 
 # ---------------------------------------------------------------------------

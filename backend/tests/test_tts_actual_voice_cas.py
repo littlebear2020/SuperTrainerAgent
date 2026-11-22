@@ -37,7 +37,7 @@ def test_tts_result_has_actual_voice_id():
 
 def test_qihu_fallback_marks_actual_voice(tmp_path, monkeypatch):
     fake_qihu = AsyncMock()
-    monkeypatch.setattr(tts_mod, "_synthesize_qihu", fake_qihu)
+    monkeypatch.setattr(tts_mod, "_synthesize_qihu", fake_qihu, raising=False)
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "")
     out = str(tmp_path / "o.mp3")
     with pytest.raises(RuntimeError, match="VOLCENGINE_VOICE_ACCESS_KEY"):
@@ -47,49 +47,21 @@ def test_qihu_fallback_marks_actual_voice(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_provider_endpoints_mark_actual_voice(tmp_path, monkeypatch):
-    """三末端成功路径各自标记实际音色（谁实际产出谁标记）。"""
-
-    # edge 末端
-    class _FakeCommunicate:
-        def __init__(self, text, voice, rate="+0%"):
-            pass
-
-        async def stream(self):
-            yield {"type": "audio", "data": b"AUDIO"}
-            yield {"type": "WordBoundary", "offset": 0, "duration": 10_000_000, "text": "你"}
-
-    monkeypatch.setattr(tts_mod.edge_tts, "Communicate", _FakeCommunicate)
-    out = str(tmp_path / "e.mp3")
-    r = await tts_mod._synthesize_edge("你好", "zh-CN-YunjianNeural", 1.0, out)
-    assert r.actual_voice_id == "zh-CN-YunjianNeural"
-
-    # qihu 末端（stub 掉 360 调用 + ffprobe）
-    monkeypatch.setenv("QIHU_API_KEY", "k")
-
-    async def fake_360(*, client, text, preset_id, output_path, speed=None, **kwargs):
-        Path(output_path).write_bytes(b"QIHU")
-
-    async def fake_run_ffmpeg(func, *args, **kwargs):
-        return func(*args)
-
-    monkeypatch.setattr(tts_mod, "_call_360_with_retry", fake_360)
-    monkeypatch.setattr(tts_mod, "_get_audio_duration", lambda p: 1.5)
-    monkeypatch.setattr(tts_mod, "run_ffmpeg", fake_run_ffmpeg)
-    out = str(tmp_path / "q.mp3")
-    r = await tts_mod._synthesize_qihu("你好", "preset:146", 1.0, out)
-    assert r.actual_voice_id == "preset:146"
-
-    # doubao 末端
+    """字节成功结果显式标记实际音色。"""
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "k")
 
-    async def fake_doubao_sse(*a, **kw):
+    async def fake_doubao_sse(*args, **kwargs):
         return b"DOUBAO"
+
+    async def fake_duration(*args, **kwargs):
+        return 1.5
 
     monkeypatch.setattr("app.gateway.voice_twin.doubao_tts_client.DoubaoTTSClient.synthesize_sse", fake_doubao_sse)
     monkeypatch.setattr("app.gateway.voice_twin.doubao_tts_client.DoubaoTTSClient.synthesize_sse_with_timestamps", _ts_adapter(fake_doubao_sse))
+    monkeypatch.setattr(tts_mod, "run_ffmpeg", fake_duration)
     out = str(tmp_path / "d.mp3")
-    r = await tts_mod._synthesize_doubao("你好", "doubao:spk1", 1.0, out)
-    assert r.actual_voice_id == "doubao:spk1"
+    result = await tts_mod._synthesize_doubao("你好", "doubao:spk1", 1.0, out)
+    assert result.actual_voice_id == "doubao:spk1"
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +74,7 @@ def _make_bare_service(tmp_path, monkeypatch):
 
     svc = VideoGenService.__new__(VideoGenService)
     svc._storage_dir = str(tmp_path)
-    svc._config = types.SimpleNamespace(qihu_api_key="", ai_image_provider="seedream", tts_fallback_voice="preset:146")
+    svc._config = types.SimpleNamespace(qihu_api_key="", ai_image_provider="seedream")
     svc._sb_write_lock = asyncio.Lock()
     return svc
 

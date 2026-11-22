@@ -45,40 +45,6 @@ async def test_generate_draft_audio_uses_read_merge_write():
     assert merged["topic"] == "test course"
 
 
-@pytest.mark.asyncio
-async def test_synthesize_qihu_passes_api_key():
-    """_synthesize_qihu should construct QihuTTSClient with api_key from env."""
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-
-    with patch.dict("os.environ", {"QIHU_API_KEY": "test-key-123"}, clear=False), patch("app.gateway.voice_twin.qihu_tts_client.QihuTTSClient") as MockClient:
-        mock_inst = MockClient.return_value
-        mock_inst.synthesize_sse = AsyncMock(return_value=b"fake")
-        with patch.object(tts_mod, "_wav_to_mp3"), patch.object(tts_mod, "_get_audio_duration", return_value=2.0):
-            await tts_mod._synthesize_qihu("test", "preset:146", 1.0, "/tmp/test.mp3")
-        MockClient.assert_called_once_with(api_key="test-key-123")
-
-
-@pytest.mark.asyncio
-async def test_synthesize_qihu_warns_on_empty_api_key(caplog):
-    """_synthesize_qihu should warn when QIHU_API_KEY is empty."""
-    import logging
-
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-
-    with patch.dict("os.environ", {"QIHU_API_KEY": ""}, clear=False), patch("app.gateway.voice_twin.qihu_tts_client.QihuTTSClient") as MockClient:
-        mock_inst = MockClient.return_value
-        mock_inst.synthesize_sse = AsyncMock(side_effect=Exception("401 Unauthorized"))
-        with patch.object(tts_mod, "_synthesize_edge", new_callable=AsyncMock) as mock_edge:
-            from app.gateway.video_gen.orchestration.tts import TTSResult
-
-            mock_edge.return_value = TTSResult(audio_path="/tmp/out.mp3", srt="", duration=1.0)
-            with caplog.at_level(logging.WARNING):
-                await tts_mod._synthesize_qihu("test", "preset:146", 1.0, "/tmp/out.mp3")
-
-    assert any("QIHU_API_KEY is empty" in r.message for r in caplog.records)
-    mock_edge.assert_called_once()
-
-
 def test_make_visual_source_ai_image_accepts_concurrency():
     """_make_visual_source should pass concurrency to AIImageVisualSource."""
     from app.gateway.video_gen.service import VideoGenService

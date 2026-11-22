@@ -1,6 +1,6 @@
 """TTS orchestration: synthesize narration → audio file + SRT + duration.
 
-Routes between doubao (zh default) / 360 preset / edge-tts based on voice_id prefix.
+Routes only to Doubao or an existing cloned voice.
 """
 
 from __future__ import annotations
@@ -9,12 +9,8 @@ import asyncio
 import logging
 import re
 import subprocess
-from contextvars import ContextVar
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
 
-import edge_tts
 import httpx
 import tenacity
 
@@ -25,7 +21,7 @@ _RETRYABLE_TTS_ERRORS = (
     httpx.ConnectError,
     httpx.ReadError,
     httpx.ReadTimeout,
-    asyncio.TimeoutError,  # C4: edge stream 超时（wait_for 包裹）须被 tenacity 重试
+    asyncio.TimeoutError,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,12 +32,11 @@ class TTSResult:
     audio_path: str
     srt: str
     duration: float  # seconds
-    # P2-14: 降级链末端填实际使用音色（如 doubao 请求→360 preset:146 产出）；
-    # None = 与请求一致。CAS 键按此落盘，杜绝"错误音色顶着请求音色键"的永久缓存污染。
+    # 实际音色随结果显式携带，供 CAS 与调用方核对；None = 与请求一致。
     actual_voice_id: str | None = None
     # T7c（2026-10-14 配音修复批）：doubao 字级时间戳 [(word, start_s, end_s)]
     # （chunk/session 局部秒）。vimax narration 用它驱动字幕 cue（替换宽度估算）；
-    # 其他调用方忽略（None）。preset/edge 无此通道。
+    # 不支持时间戳的调用方忽略（None）。
     word_cues: list[tuple[str, float, float]] | None = None
 
 
@@ -113,65 +108,6 @@ def resolve_doubao_emotion(annotation: str) -> str | None:
     return None
 
 
-def speed_to_rate(speed: float) -> str:
-    """Convert speed multiplier (1.0 = normal) to edge-tts rate string like '+20%'."""
-    pct = round((speed - 1.0) * 100)
-    sign = "+" if pct >= 0 else "-"
-    return f"{sign}{abs(pct)}%"
-
-
-def _edge_fallback_disabled() -> bool:
-    """国内仅可达部署（edge-tts 被墙）应设 TTS_DISABLE_EDGE_FALLBACK=1：
-    360/doubao 失败直接 fail-loud，不再走必死的 edge 回退链。"""
-    import os
-
-    return os.environ.get("TTS_DISABLE_EDGE_FALLBACK", "").strip().lower() in ("1", "true", "yes")
-
-
-def _edge_fallback_voice_for(voice_id: str) -> str:
-    """按原音色性别选 edge 回退音色（曾硬编码 Yunjian 男声→女声 preset 静默变男声）。
-
-    评审修复（2026-10-19，计划 B）：目录查不到时按 speaker id 前缀判性别——
-    ``DOUBAO_TTS_DEFAULT_SPEAKER``/白名单是自由字符串，绝大多数 seed-tts speaker
-    不在 4 音色目录里（目录查不到一律落男声 = 历史缺陷类在自由 speaker 源上复发）。
-    """
-    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES
-
-    gender = next((v.get("gender") for v in CURATED_VOICES if v.get("id") == voice_id), None)
-    if gender is None:
-        token = voice_id.rsplit(":", 1)[-1].lower()
-        if "female" in token or "女" in token:
-            gender = "Female"
-        elif "male" in token or "男" in token:
-            gender = "Male"
-    return "zh-CN-XiaoxiaoNeural" if gender == "Female" else "zh-CN-YunjianNeural"
-
-
-@dataclass(frozen=True)
-class TTSPolicy:
-    """可选 TTS 策略开关（Plan B，2026-10-19）。``policy=None``（缺省）= 完全旧链路，
-    共享 TTS 的所有既有调用方语义零变化。
-
-    - ``qihu``: "allow"（默认）｜"reject"——reject 时 ``preset:*`` 在进入 360 前抛
-      可读 ValueError（防漏底线；入口级的统一可读文案见 ViMax voice_policy）。
-    - ``doubao_failure``: "qihu_then_edge"（默认，豆包可降级故障 → 360 fallback_voice，
-      360 再失败自身回落 edge）｜"edge"——直接同性别 Edge 音色（不经 360）。
-      仅作用于**可降级**故障（429/5xx/传输/缺 key/瞬时 RuntimeError）；4xx、
-      55000000 speaker mismatch、clone 失败在任何 policy 下都不降级。
-    """
-
-    qihu: Literal["allow", "reject"] = "allow"
-    doubao_failure: Literal["qihu_then_edge", "edge"] = "qihu_then_edge"
-
-
-def _parse_preset_id(voice_id: str) -> int:
-    """Parse ``preset:N`` → ``int(N)``；非数字/缺 N → ValueError（曾裸 int() 抛 500）。"""
-    try:
-        return int(voice_id.split(":", 1)[1])
-    except (IndexError, ValueError) as exc:
-        raise ValueError(f"invalid preset voice_id: {voice_id!r}") from exc
-
-
 async def synthesize(
     text: str,
     *,
@@ -190,178 +126,6 @@ async def synthesize(
     if voice_id.startswith("clone:"):
         return await _synthesize_clone(text, voice_id, speed, output_path, section_id=section_id)
     raise ValueError("不支持的音色 ID；请改选字节直连音色")
-
-
-async def _synthesize_edge(
-    text: str,
-    voice_id: str,
-    speed: float,
-    output_path: str,
-) -> TTSResult:
-    """edge-tts synthesis with WordBoundary word-level SRT (transport errors retried 3x)."""
-    return await _call_edge_with_retry(text=text, voice_id=voice_id, speed=speed, output_path=output_path)
-
-
-@tenacity.retry(
-    retry=tenacity.retry_if_exception_type(_RETRYABLE_TTS_ERRORS),
-    wait=tenacity.wait_fixed(2),
-    stop=tenacity.stop_after_attempt(3),
-    reraise=True,
-)
-async def _call_edge_with_retry(*, text, voice_id, speed, output_path) -> TTSResult:
-    """Call edge-tts, retrying transport errors + timeout (same policy as 360). Non-transport errors propagate.
-
-    C4: edge stream is wrapped in ``asyncio.wait_for`` with a 60s explicit timeout
-    (configurable via ``TTS_EDGE_TIMEOUT`` env). Without this, a half-open TCP
-    connection (edge server reachable but never sending data) blocks indefinitely —
-    tenacity never catches it because it's not a transport error. The 60s default
-    is generous because edge is the last-resort fallback; we'd rather wait a bit
-    than loud-fail the frame. Worst case: ~3min (3 attempts × 60s + backoff).
-    """
-    import os
-
-    edge_timeout = float(os.environ.get("TTS_EDGE_TIMEOUT", "60"))
-    rate = speed_to_rate(speed)
-    communicate = edge_tts.Communicate(text, voice_id, rate=rate)
-    submaker = edge_tts.SubMaker()
-
-    audio_bytes = bytearray()
-    last_end_100ns = 0
-
-    async def _consume_stream() -> None:
-        nonlocal last_end_100ns
-        async for chunk in communicate.stream():
-            ctype = chunk["type"]
-            if ctype == "audio":
-                audio_bytes.extend(chunk["data"])
-            elif ctype == "WordBoundary":
-                submaker.feed(chunk)
-                last_end_100ns = chunk["offset"] + chunk["duration"]
-
-    await asyncio.wait_for(_consume_stream(), timeout=edge_timeout)
-
-    with open(output_path, "wb") as f:
-        f.write(bytes(audio_bytes))
-
-    duration = last_end_100ns / 10_000_000  # 100ns → seconds
-    try:
-        srt = submaker.get_srt()
-    except Exception:
-        srt = ""
-
-    return TTSResult(audio_path=output_path, srt=srt, duration=duration, actual_voice_id=voice_id)
-
-
-@tenacity.retry(
-    retry=tenacity.retry_if_exception_type(_RETRYABLE_TTS_ERRORS),
-    wait=tenacity.wait_fixed(2),
-    stop=tenacity.stop_after_attempt(3),
-    reraise=True,
-)
-async def _call_360_with_retry(*, client, text, preset_id, output_path, speed=1.0):
-    """Call 360 TTS, retrying transport errors. Non-transport errors propagate."""
-    import os
-
-    api_level_speed = None if os.environ.get("QIHU_TTS_SPEED_ATEMPO", "") == "1" else speed
-    wav_bytes = await client.synthesize_sse(text=text, voice=preset_id, speed=api_level_speed)
-    wav_path = output_path.replace(".mp3", ".wav")
-    Path(wav_path).write_bytes(wav_bytes)
-    if api_level_speed is None and abs(speed - 1.0) > 1e-6:
-        # 兜底：360 API 不支持 speed 时用 ffmpeg atempo 后处理（保调变速）。
-        # atempo 合法区间 [0.5, 100]；UI 语速范围 0.5–2.0 内无需链式。
-        await run_ffmpeg(_wav_atempo, wav_path, min(max(speed, 0.5), 2.0))
-    await run_ffmpeg(_wav_to_mp3, wav_path, output_path)
-    Path(wav_path).unlink(missing_ok=True)
-
-
-async def _synthesize_qihu(
-    text: str,
-    voice_id: str,
-    speed: float,
-    output_path: str,
-) -> TTSResult:
-    """360 TTS synthesis. Retries transport errors 3x, then falls back to edge-tts.
-
-    srt stays empty — _write_storyboard_srt() fallback creates sentence-level subtitles.
-    """
-    import os
-
-    preset_id = _parse_preset_id(voice_id)
-
-    api_key = os.environ.get("QIHU_API_KEY", "")
-    if not api_key:
-        if _edge_fallback_disabled():
-            raise RuntimeError("QIHU_API_KEY is empty and edge fallback disabled (TTS_DISABLE_EDGE_FALLBACK=1)")
-        logger.warning("QIHU_API_KEY is empty — falling back to edge-tts (%s)", _edge_fallback_voice_for(voice_id))
-        # C3 补接（2026-08-09 评审）：360 key 缺失直落 edge，同样留痕
-        record_tts_degradation(
-            requested_voice=voice_id,
-            actual_voice=_edge_fallback_voice_for(voice_id),
-            detail="QIHU_API_KEY 未配置，360 音色降级为 edge-tts 备用音色",
-        )
-        return await _synthesize_edge(text, _edge_fallback_voice_for(voice_id), speed, output_path)
-
-    try:
-        from app.gateway.voice_twin.qihu_tts_client import QihuTTSClient
-
-        client = QihuTTSClient(api_key=api_key)
-        await _call_360_with_retry(
-            client=client,
-            text=text,
-            preset_id=preset_id,
-            output_path=output_path,
-            speed=speed,
-        )
-    except Exception:
-        if _edge_fallback_disabled():
-            raise
-        logger.exception("360 TTS failed after retries, falling back to edge-tts")
-        # C3 补接（2026-08-09 评审）：360→edge 是最严重的降级（全片音色/性别都可能变），
-        # 必须留痕——修前此路径零记录，用户拿到变声成片完全无感。
-        record_tts_degradation(
-            requested_voice=voice_id,
-            actual_voice=_edge_fallback_voice_for(voice_id),
-            detail="360 TTS 重试后仍失败，降级为 edge-tts 备用音色",
-        )
-        return await _synthesize_edge(text, _edge_fallback_voice_for(voice_id), speed, output_path)
-
-    duration = await run_ffmpeg(_get_audio_duration, output_path)
-    return TTSResult(audio_path=output_path, srt="", duration=duration, actual_voice_id=voice_id)
-
-
-def record_tts_degradation(**fields) -> None:
-    """记录一次 TTS 降级事实（C3 接线）。
-
-    写入 degradations sidecar（如有 task_dir 上下文），使前端能显示
-    「本片音色被降级」。无上下文时退化为纯日志（monkeypatch 友好）。
-    """
-    logger.warning("TTS degradation: %s", fields)
-    task_dir = _tts_task_dir.get()
-    if task_dir is not None:
-        from ..degradations import KIND_VOICE_FALLBACK, record_degradation
-
-        record_degradation(
-            task_dir,
-            kind=fields.get("kind", KIND_VOICE_FALLBACK),
-            detail=str(fields.get("detail", fields.get("requested_voice", ""))),
-            # Plan B 评审修复（2026-10-19）：结构化音色字段透传进 sidecar（引擎正式
-            # 渲染路径的降级也留结构化痕，不只 detail 文本）。
-            requested_voice=fields.get("requested_voice"),
-            actual_voice=fields.get("actual_voice"),
-        )
-
-
-#: C3: TTS 降级留痕的 task_dir 上下文。由 service.py 在 TTS 处理前设置。
-_tts_task_dir: ContextVar[Path | None] = ContextVar("tts_task_dir", default=None)
-
-
-def set_tts_degradation_context(task_dir: Path | str | None) -> None:
-    """设置当前 TTS 处理的 task_dir，使降级记录能写入 sidecar。
-
-    service.py 在逐帧 TTS 处理前调用：``set_tts_degradation_context(working_dir)``。
-    传 None 清除上下文（TTS 处理结束后或无需留痕时）。
-    """
-    _tts_task_dir.set(Path(task_dir) if task_dir else None)
 
 
 def _is_retryable_doubao_error(exc: BaseException) -> bool:
@@ -385,11 +149,7 @@ def _is_retryable_doubao_error(exc: BaseException) -> bool:
     reraise=True,
 )
 async def _call_doubao_with_retry(*, client, speaker: str, text: str, speed: float, section_id: str | None = None, collect_words: bool = False, emotion: str | None = None):
-    """调豆包 TTS，瞬时错误重试 3 次（策略对齐 360 / edge）。
-
-    C1 根因：此前这里是裸调 —— 豆包**首次** 429/5xx/超时就立刻降级 360，
-    导致该帧音色与全片不同，用户听到视频中段突然换人。360 与 edge 两条路径
-    早就有 3 次重试，只有豆包没有。
+    """调豆包 TTS；429/5xx、传输与超时最多重试 3 次，耗尽后原样失败。
     T10：``collect_words=True`` 走 synthesize_sse_with_timestamps（event 364 字级
     时间戳）；tenacity 重试安全——每次尝试是独立 SSE 会话，words 由返回值携带
     （不共享可变收集器，重试不产生重复词条）。
@@ -398,24 +158,6 @@ async def _call_doubao_with_retry(*, client, speaker: str, text: str, speed: flo
     if collect_words:
         return await client.synthesize_sse_with_timestamps(speaker=speaker, text=text, speed_ratio=speed, section_id=section_id, emotion=emotion)
     return await client.synthesize_sse(speaker=speaker, text=text, speed_ratio=speed, section_id=section_id, emotion=emotion)
-
-
-async def _fallback_doubao_to_edge(text: str, original_voice_id: str, speed: float, output_path: str, *, reason: str) -> TTSResult:
-    """Plan B（2026-10-19）：``doubao_failure="edge"`` 策略下豆包可降级故障 → 直接同性别 Edge。
-
-    与旧 ``qihu_then_edge`` 链的本质差异：不经 360（该策略的调用方——如 ViMax——
-    已整体禁用 360 音色）。**成功返回后**才写「已降级」留痕（actual_voice = 实际
-    Edge 音色）；Edge 失败原样上抛、不留任何成功留痕——「开始降级」≠「降级成功」，
-    sidecar 不得把失败写成成功。
-    """
-    edge_voice = _edge_fallback_voice_for(original_voice_id)
-    result = await _synthesize_edge(text, edge_voice, speed, output_path)
-    record_tts_degradation(
-        requested_voice=original_voice_id,
-        actual_voice=edge_voice,
-        detail=f"豆包 TTS {reason}（请求 {original_voice_id}），已降级为 Edge 备用音色（{edge_voice}）",
-    )
-    return result
 
 
 async def _synthesize_doubao(
@@ -534,41 +276,6 @@ async def _synthesize_clone(
         f.write(audio_bytes)
     duration = await run_ffmpeg(_get_audio_duration, output_path)
     return TTSResult(audio_path=output_path, srt="", duration=duration, actual_voice_id=voice_id)
-
-
-def _wav_to_mp3(wav_path: str, mp3_path: str) -> None:
-    """Convert WAV to MP3 using ffmpeg."""
-    r = subprocess.run(
-        ["ffmpeg", "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path],
-        capture_output=True,
-        timeout=30,
-    )
-    if r.returncode != 0:
-        # 曾静默返回——mp3 空/缺 + 调用方紧接删掉唯一 WAV 副本 → 既无 WAV 也无有效
-        # MP3，后续 concat 才响亮失败（2026-07-27 复核补查）。
-        raise RuntimeError(f"ffmpeg wav->mp3 failed: {r.stderr.decode(errors='replace')[:200]}")
-    if not Path(mp3_path).exists():
-        # rc=0 但产物缺失（异常 ffmpeg/磁盘满）同样响亮化——曾静默 → duration 0.0 → 音画漂移
-        raise RuntimeError(f"ffmpeg wav->mp3 output missing: {mp3_path}")
-
-
-def _wav_atempo(wav_path: str, factor: float) -> None:
-    """ffmpeg atempo 就地变速（保调不变 pitch）——360 API 不支持 speed 时的兜底。
-
-    与 _wav_to_mp3 同约定：sync 函数、run_ffmpeg 在线程池执行。输出临时文件再
-    os.replace 回原路径。atempo 合法区间 [0.5, 100]，调用方负责钳制。
-    """
-    import os
-
-    out = wav_path + ".atempo.wav"
-    r = subprocess.run(
-        ["ffmpeg", "-y", "-i", wav_path, "-filter:a", f"atempo={factor}", out],
-        capture_output=True,
-        timeout=30,
-    )
-    if r.returncode != 0:
-        raise RuntimeError(f"ffmpeg atempo failed: {r.stderr.decode(errors='replace')[:200]}")
-    os.replace(out, wav_path)
 
 
 def _get_audio_duration(path: str) -> float:

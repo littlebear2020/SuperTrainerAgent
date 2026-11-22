@@ -55,7 +55,6 @@ def test_retired_voice_rejected_with_shared_message():
 
 def test_voice_pool_contains_only_doubao():
     assert _zh_voice_pool("Male") == [YUNZHOU, "doubao:zh_male_liufei_uranus_bigtts"]
-    assert _zh_voice_pool("Male", include_doubao=False) == []
 
 
 def test_voice_pool_respects_doubao_whitelist(monkeypatch):

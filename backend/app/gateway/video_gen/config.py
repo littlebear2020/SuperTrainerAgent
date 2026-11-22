@@ -188,14 +188,8 @@ class VideoGenConfig(BaseModel):
     # matches the "每人最多同时跑 3 个" requirement; raise if a power user needs more.
     max_tasks_per_user: int = 6  # T-G4（D5）：同上（3→6）
 
-    # TTS (360 preset = higher quality; edge-tts = free fallback)
-    tts_voice: str = "preset:146"  # 360 TTS 知性女声（培训场景默认）
+    tts_voice: str = "doubao:zh_female_vv_uranus_bigtts"
     tts_speed: float = 1.2
-    # Stage 2a: 360 fallback voice for when doubao TTS fails (used by orchestration
-    # fallback chain). NOT the default — the doubao flip happens via
-    # resolve_default_voice + DOUBAO_TTS_DEFAULT_SPEAKER env. See
-    # backend/docs/BYTEDANCE_MODELS_INTEGRATION_PLAN.md §阶段 2a.
-    tts_fallback_voice: str = "preset:146"
 
     # Orchestration
     default_aspect: str = "16:9"

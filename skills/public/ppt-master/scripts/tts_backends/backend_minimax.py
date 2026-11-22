@@ -16,7 +16,7 @@ from tts_backends.backend_common import (
     publish_audio_subtitle,
     read_api_key,
 )
-from tts_backends.backend_edge import (
+from tts_backends.subtitle_timing import (
     DEFAULT_SUBTITLE_MAX_CHARS,
     format_word_timed_srt,
 )

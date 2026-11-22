@@ -27,7 +27,7 @@ def _make_ctx(task_dir: Path) -> EngineContext:
         user_id="u1",
         task_id="t1",
         task_dir=task_dir,
-        voice_id="zh-CN-YunjianNeural",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         request={"script": "hello", "user_requirement_extra": ""},
     )
 

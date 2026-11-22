@@ -86,36 +86,6 @@ def test_make_visual_source_mixed_skips_remotion():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_voice_api_no_lang_returns_curated():
-    """Without lang param, should return curated voices directly."""
-    from app.gateway.routers.video_gen import list_voices_endpoint
-
-    result = await list_voices_endpoint(lang=None)
-    assert isinstance(result, list)
-    assert len(result) > 0
-
-
-@pytest.mark.asyncio
-async def test_voice_api_lang_includes_preset_and_provider(monkeypatch):
-    """With lang param, result should include provider field for each voice."""
-    from app.gateway.routers.video_gen import list_voices_endpoint
-
-    # Worktree/CI 没有 .env 时也必须验证 qihu 分支，不能依赖宿主真实 key。
-    monkeypatch.setenv("QIHU_API_KEY", "test-key")
-    with patch("app.gateway.video_gen.orchestration.voices.list_voices_cached", new_callable=AsyncMock) as mock_list:
-        mock_list.return_value = [
-            {"ShortName": "zh-CN-XiaoxiaoNeural", "FriendlyName": "Xiaoxiao", "Locale": "zh-CN", "Gender": "Female"},
-        ]
-        result = await list_voices_endpoint(lang="zh")
-
-    # Each result item should have provider field
-    assert all("provider" in v for v in result)
-    providers = {v["provider"] for v in result}
-    assert "edge-tts" in providers
-    assert "qihu" in providers  # CURATED_VOICES has zh-CN qihu presets
-
-
 # ---------------------------------------------------------------------------
 # Task 3: pipeline_version integration verification
 # ---------------------------------------------------------------------------
@@ -179,61 +149,3 @@ async def test_pipeline_version_integration_calls_probe_and_decide(monkeypatch):
 # ---------------------------------------------------------------------------
 # Task 4: QihuTTS interface verification
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_qihu_tts_preset_voice_id_passed_as_int(tmp_path, monkeypatch, tts_wav_bytes):
-    """QihuTTSClient should receive voice_id as int when prefixed with 'preset:'.
-
-    2026-10-12 CI 修复：无 QIHU_API_KEY 环境（GitHub runner）此前走 no-key 分支
-    直落真 edge-tts（对 runner 持续 403）；本地因 import 期 load_dotenv() 恒有
-    真 key 从未暴露。现显式 setenv 固定分支 + mock 返回合法 WAV（b"wav_bytes"
-    假数据会在 wav→mp3 转码抛错、被 except 吞掉后静默外呼 edge）+ edge tripwire。
-    """
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-    from app.gateway.video_gen.orchestration.tts import _synthesize_qihu
-
-    monkeypatch.setenv("QIHU_API_KEY", "test-key")
-
-    async def _edge_tripwire(*args, **kwargs):
-        raise AssertionError("不应触发 edge 回退（QIHU_API_KEY 已设 + 客户端已 mock）")
-
-    monkeypatch.setattr(tts_mod, "_synthesize_edge", _edge_tripwire)
-
-    output = str(tmp_path / "out.mp3")
-    with patch("app.gateway.voice_twin.qihu_tts_client.QihuTTSClient") as MockClient:
-        mock_instance = MagicMock()
-        mock_instance.synthesize_sse = AsyncMock(return_value=tts_wav_bytes())
-        MockClient.return_value = mock_instance
-
-        await _synthesize_qihu("hello world", "preset:123456", 1.0, output)
-
-        # speed 现随调用下发（QIHU_TTS_SPEED_ATEMPO=1 时传 None 走 atempo 后处理）
-        mock_instance.synthesize_sse.assert_called_once_with(text="hello world", voice=123456, speed=1.0)
-
-
-@pytest.mark.asyncio
-async def test_qihu_tts_speed_silently_ignored(tmp_path, monkeypatch, tts_wav_bytes):
-    """QihuTTS should accept speed param without error.
-
-    同上 2026-10-12 离线化：setenv 固定 qihu 分支 + 合法 WAV + edge tripwire。
-    """
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-    from app.gateway.video_gen.orchestration.tts import _synthesize_qihu
-
-    monkeypatch.setenv("QIHU_API_KEY", "test-key")
-
-    async def _edge_tripwire(*args, **kwargs):
-        raise AssertionError("不应触发 edge 回退（QIHU_API_KEY 已设 + 客户端已 mock）")
-
-    monkeypatch.setattr(tts_mod, "_synthesize_edge", _edge_tripwire)
-
-    output = str(tmp_path / "out.mp3")
-    with patch("app.gateway.voice_twin.qihu_tts_client.QihuTTSClient") as MockClient:
-        mock_instance = MagicMock()
-        mock_instance.synthesize_sse = AsyncMock(return_value=tts_wav_bytes())
-        MockClient.return_value = mock_instance
-
-        # Various speed values should not raise
-        await _synthesize_qihu("text", "preset:100", 0.5, output)
-        await _synthesize_qihu("text", "preset:100", 2.0, output)

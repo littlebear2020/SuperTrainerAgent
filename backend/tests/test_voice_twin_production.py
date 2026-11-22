@@ -752,7 +752,7 @@ class TestFontGatePipelineIntegration:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         progress = ProgressUpdater(svc.repo, task.id)
 
@@ -779,7 +779,7 @@ class TestFontGatePipelineIntegration:
             await svc._run_ppt_to_video(
                 task_id=task.id,
                 user_id="user_a",
-                payload={"voice_id": "preset:146", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": False},
+                payload={"voice_id": "doubao:zh_female_vv_uranus_bigtts", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": False},
                 task_dir=tmp_path,
                 progress=progress,
             )
@@ -804,7 +804,7 @@ class TestFontGatePipelineIntegration:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         progress = ProgressUpdater(svc.repo, task.id)
 
@@ -836,7 +836,7 @@ class TestFontGatePipelineIntegration:
             await svc._run_ppt_to_video(
                 task_id=task.id,
                 user_id="user_a",
-                payload={"voice_id": "preset:146", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": True},
+                payload={"voice_id": "doubao:zh_female_vv_uranus_bigtts", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": True},
                 task_dir=tmp_path,
                 progress=progress,
             )
@@ -860,7 +860,7 @@ class TestPptSubtitleZeroDuration:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         progress = ProgressUpdater(svc.repo, task.id)
 
@@ -885,7 +885,7 @@ class TestPptSubtitleZeroDuration:
         await svc._run_ppt_to_video(
             task_id=task.id,
             user_id="user_a",
-            payload={"voice_id": "preset:146", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": True, "accept_layout_diff": True},
+            payload={"voice_id": "doubao:zh_female_vv_uranus_bigtts", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": True, "accept_layout_diff": True},
             task_dir=tmp_path,
             progress=progress,
         )
@@ -941,7 +941,7 @@ class TestPptSlideTtsConcurrency:
         return await svc._run_ppt_to_video(
             task_id=task.id,
             user_id="user_a",
-            payload={"voice_id": "preset:146", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": True},
+            payload={"voice_id": "doubao:zh_female_vv_uranus_bigtts", "voice_name": "T", "pptx_path": str(tmp_path / "x.pptx"), "preset": "none", "subtitle": False, "accept_layout_diff": True},
             task_dir=tmp_path,
             progress=progress,
         )
@@ -956,7 +956,7 @@ class TestPptSlideTtsConcurrency:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         self._wire_ppt(monkeypatch, tmp_path, 4)
 
@@ -1000,7 +1000,7 @@ class TestPptSlideTtsConcurrency:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         self._wire_ppt(monkeypatch, tmp_path, 2)
 
@@ -1036,7 +1036,7 @@ class TestPptSlideTtsConcurrency:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         self._wire_ppt(monkeypatch, tmp_path, 3)
 
@@ -1064,7 +1064,7 @@ class TestPptSlideTtsConcurrency:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         self._wire_ppt(monkeypatch, tmp_path, 3)
 
@@ -1100,7 +1100,7 @@ class TestPptSlideTtsConcurrency:
             user_id="user_a",
             domain=svc.domain,
             task_type="ppt_to_video",
-            payload=json.dumps({"voice_id": "preset:146", "pptx_path": str(tmp_path / "x.pptx")}),
+            payload=json.dumps({"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": str(tmp_path / "x.pptx")}),
         )
         self._wire_ppt(monkeypatch, tmp_path, 5)
 

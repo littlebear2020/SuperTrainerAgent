@@ -311,33 +311,6 @@ async def test_known_chinese_format_no_drift_record(tmp_path):
     assert not (tmp_path / "degradations.json").exists() or all(rec["kind"] != "format_drift" for rec in json.loads((tmp_path / "degradations.json").read_text(encoding="utf-8"))["items"])
 
 
-@pytest.mark.asyncio
-async def test_tts_degradation_context_set_for_vimax(tmp_path):
-    """T7a：narration 的 TTS 降级从此进 sidecar（修前 vimax 从不设上下文）。"""
-    working = tmp_path / "vimax_working"
-    _write_storyboard(working, [{"idx": 0, "audio_desc": "[说话人] 船夫 （焦急） 快停桨"}])
-
-    from app.gateway.video_gen.orchestration import tts as real_tts_mod
-
-    async def fake_degrading(text, *, voice_id, speed, output_path, **kwargs):
-        Path(output_path).write_bytes(b"mp3data")
-        real_tts_mod.record_tts_degradation(requested_voice=voice_id, actual_voice="preset:146", detail="豆包 TTS 瞬时错误，本帧降级")
-        return TTSResult(audio_path=output_path, srt="", duration=1.0)
-
-    with (
-        patch("app.gateway.video_gen.engines.vimax.narration_generator.build_speaker_voice_map", return_value=_VOICE_MAP),
-        patch("app.gateway.video_gen.engines.vimax.narration_generator.tts_mod.synthesize", side_effect=fake_degrading),
-        patch("app.gateway.video_gen.engines.vimax.narration_generator.run_ffmpeg", new=AsyncMock()),
-    ):
-        await generate_vimax_narration(working_dir=working, task_dir=tmp_path, original_script="故事", llm=MagicMock(), voice_id="preset:146", characters=[{"identifier_in_scene": "船夫", "static_features": "男性"}])
-    deg = json.loads((tmp_path / "degradations.json").read_text(encoding="utf-8"))["items"]
-    assert any(rec["kind"] == "voice_fallback" for rec in deg), f"vimax 降级须进 sidecar：{deg}"
-    # 上下文用后清理，不泄漏到后续调用
-    from app.gateway.video_gen.orchestration.tts import _tts_task_dir
-
-    assert _tts_task_dir.get() is None
-
-
 class TestEnforceSequential:
     """T2：相邻 cue 硬约束 end_i <= start_{i+1}（字幕重影修复）。"""
 
@@ -490,7 +463,7 @@ async def test_mixed_three_voices_cues_no_overlap(tmp_path):
             task_dir=tmp_path,
             original_script="故事",
             llm=MagicMock(),
-            voice_id="zh-CN-YunjianNeural",
+            voice_id="doubao:zh_female_vv_uranus_bigtts",
             characters=[{"identifier_in_scene": "甲", "static_features": "女"}, {"identifier_in_scene": "乙", "static_features": "男"}, {"identifier_in_scene": "丙", "static_features": "女"}],
         )
     cues = _parse_cues((tmp_path / "subtitle.srt").read_text(encoding="utf-8"))
@@ -716,7 +689,7 @@ async def test_engine_ctx_tts_speed_wins_over_payload(tmp_path):
         user_id="u",
         task_id="t",
         task_dir=tmp_path,
-        voice_id="zh-CN-YunjianNeural",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         style="Cartoon",
         request={"script": "x"},
         tts_speed=0.8,
@@ -729,7 +702,7 @@ async def test_engine_ctx_tts_speed_wins_over_payload(tmp_path):
     assert mock_gen.call_args.kwargs["speed"] == 0.8
 
     # 兼容路径：旧调用方/测试无 ctx.tts_speed → 回落 payload 再落 1.2
-    ctx2 = EngineContext(user_id="u", task_id="t", task_dir=tmp_path, voice_id="zh-CN-YunjianNeural", request={"script": "x"})
+    ctx2 = EngineContext(user_id="u", task_id="t", task_dir=tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts", request={"script": "x"})
     (tmp_path / "vimax_working").mkdir(exist_ok=True)
     with patch(
         "app.gateway.video_gen.engines.vimax.narration_generator.generate_vimax_narration",

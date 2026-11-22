@@ -100,16 +100,6 @@ class VoiceCloneService:
             domain=config.domain,
             status_query_timeout=config.status_query_timeout,
         )
-        self.qihu_client = None
-        qihu_key = config.qihu_tts.api_key
-        if not qihu_key and config.qihu_tts.enabled:
-            import os
-
-            qihu_key = os.environ.get("QIHU_API_KEY", "")
-        if qihu_key and config.qihu_tts.enabled:
-            from app.gateway.voice_twin.qihu_tts_client import QihuTTSClient
-
-            self.qihu_client = QihuTTSClient(api_key=qihu_key)
         # Stage 2a: doubao seed-tts-2.0 client (openspeech V3 SSE, same access_key
         # as voice clone — single openspeech account). Created when access_key is
         # available and doubao_tts is enabled. See
@@ -119,12 +109,6 @@ class VoiceCloneService:
             from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSClient
 
             self.doubao_client = DoubaoTTSClient(access_key=config.access_key)
-        # A2：edge-tts 客户端（免费多语种音色 + 降级链末端兜底）。默认开启。
-        self.edge_client = None
-        if config.edge_tts.enabled:
-            from app.gateway.voice_twin.edge_tts_client import EdgeTTSClient
-
-            self.edge_client = EdgeTTSClient(timeout=config.edge_tts.timeout)
         self._ffmpeg_available = _check_ffmpeg()
         if not self._ffmpeg_available:
             logger.warning("ffmpeg not found in PATH. WebM transcoding will fail.")

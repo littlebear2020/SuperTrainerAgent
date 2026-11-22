@@ -304,6 +304,7 @@ def test_example_yaml_contains_new_models() -> None:
 
 
 def test_example_config_version_bumped(example_yaml: dict) -> None:
+    # 33=TTS 单通道（2026-11-22，删除 qihu_tts/edge_tts 配置结构）；
     # 32=模型模式阶梯（2026-11-21，modes/mode_defaults 与模式花名册）；
     # 31=本地模型与 Aio 执行就绪批（2026-11-11）；30 保留给 pending W2
     # （declarative-reasoning-profile），本批不占用该预留版本。
@@ -312,7 +313,7 @@ def test_example_config_version_bumped(example_yaml: dict) -> None:
     # 27=花名册调整批（2026-10-12）；26=OPS-2 删全局 channels.feishu（D6，2026-10-07）；
     # 25=上传白名单（R2-1）；24=skill 机制优化批 A；23=审计整改批 C4；22=中断修复批 P1；
     # 21=长任务稳定性批。
-    assert example_yaml.get("config_version") == 32, "config_version 应为 32（2026-11-21 模型模式阶梯）"
+    assert example_yaml.get("config_version") == 33, "config_version 应为 33（2026-11-22 TTS 单通道）"
 
 
 def test_user_config_version_bumped(example_yaml: dict) -> None:

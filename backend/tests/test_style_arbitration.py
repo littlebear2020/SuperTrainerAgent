@@ -249,7 +249,7 @@ def _request_with_svc(svc):
 async def test_tc_c3_07_voice_subtitle_source_trace(tmp_path, monkeypatch):
     """三态 → effective_voice_source / effective_subtitle_source 正确。"""
     svc = _make_service(tmp_path)
-    pid = _seed_project(tmp_path, voice_id="preset:332", subtitle_style="bold-yellow")
+    pid = _seed_project(tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts", subtitle_style="bold-yellow")
     monkeypatch.setattr("app.gateway.video_gen.service.create_script_llm", lambda p, c: MagicMock())
     monkeypatch.setattr(
         "app.gateway.video_gen.orchestration.storyboard_planner.plan_course",
@@ -262,7 +262,7 @@ async def test_tc_c3_07_voice_subtitle_source_trace(tmp_path, monkeypatch):
         return d
 
     # ① 显式（task）
-    p1 = {"script": "显式旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "preset:111", "subtitle_style": "clean-white"}
+    p1 = {"script": "显式旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "doubao:zh_female_yingyujiaoxue_uranus_bigtts", "subtitle_style": "clean-white"}
     await svc._generate_draft("ai_image", p1, _task_dir(1), _prog, user_id="default", task_id="vg_c307_1")
     assert p1["effective_voice_source"] == "task"
     assert p1["effective_subtitle_source"] == "task"
@@ -287,7 +287,7 @@ async def test_tc_c3_07_generate_path_voice_source_trace(tmp_path, monkeypatch):
     一期评审发现该路径漏写 effective_voice_source（draft/re_render 均写了）；
     skip_tts=True 跳过 TTS 重段，仅验证留痕。"""
     svc = _make_service(tmp_path)
-    pid = _seed_project(tmp_path, voice_id="preset:332")
+    pid = _seed_project(tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts")
     monkeypatch.setattr("app.gateway.video_gen.service.create_script_llm", lambda p, c: MagicMock())
     monkeypatch.setattr(
         "app.gateway.video_gen.orchestration.storyboard_planner.plan_course",
@@ -300,7 +300,7 @@ async def test_tc_c3_07_generate_path_voice_source_trace(tmp_path, monkeypatch):
         await svc._prepare_storyboard_and_audio("ai_image", payload, d, _prog, user_id="default", task_id=f"vg_c307g_{i}", skip_tts=True)
 
     # ① 显式（task）
-    p1 = {"script": "显式旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "preset:111"}
+    p1 = {"script": "显式旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "doubao:zh_female_yingyujiaoxue_uranus_bigtts"}
     await _run(p1, 1)
     assert p1["effective_voice_source"] == "task"
 
@@ -417,7 +417,7 @@ async def test_tc_c9_02_follow_re_render_re_resolves_project_settings(tmp_path, 
     """跟随任务改项目锚图/音色后重渲染 → 未显式部分重取。"""
     pid = _seed_project(
         tmp_path,
-        voice_id="preset:332",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         subtitle_style="bold-yellow",
         character_sheets=[{"name": "小明", "front_url": "/f.png", "side_url": "/s.png", "back_url": "/b.png", "features": ""}],
     )
@@ -428,7 +428,7 @@ async def test_tc_c9_02_follow_re_render_re_resolves_project_settings(tmp_path, 
     await finish()
 
     p = seen[0]
-    assert p["voice_id"] == "preset:332", "未显式指定 → 重取项目音色"
+    assert p["voice_id"] == "doubao:zh_female_vv_uranus_bigtts", "未显式指定 → 重取项目音色"
     assert p["subtitle_style"] == "bold-yellow", "未显式指定 → 重取项目字幕样式"
     assert p.get("character_sheets"), "跟随任务重渲染 force 重注项目 sheets"
     assert p["effective_style_source"] == "project"
@@ -437,10 +437,10 @@ async def test_tc_c9_02_follow_re_render_re_resolves_project_settings(tmp_path, 
 @pytest.mark.asyncio
 async def test_tc_c9_03_re_render_refreshes_source_trace(tmp_path, monkeypatch):
     """重渲染后 effective_*_source 与当前仲裁一致（显式音色优先 + 跟随风格）。"""
-    pid = _seed_project(tmp_path, voice_id="preset:332", subtitle_style="bold-yellow")
+    pid = _seed_project(tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts", subtitle_style="bold-yellow")
     svc = _bare_service_for_re_render(
         tmp_path,
-        {"course_project_id": pid, "style": None, "voice_id": "preset:111", "subtitle_style": "default"},
+        {"course_project_id": pid, "style": None, "voice_id": "doubao:zh_female_yingyujiaoxue_uranus_bigtts", "subtitle_style": "default"},
     )
     seen, finish = _capture_pipeline(svc, monkeypatch)
 
@@ -451,5 +451,5 @@ async def test_tc_c9_03_re_render_refreshes_source_trace(tmp_path, monkeypatch):
     assert p["effective_style_source"] == "project", "风格未显式 → 跟随项目"
     assert p["effective_voice_source"] == "task", "音色显式选择优先（不重取）"
     assert p["effective_subtitle_source"] == "project", "字幕 default 视为未设置 → 重取项目"
-    assert p["voice_id"] == "preset:111"
+    assert p["voice_id"] == "doubao:zh_female_yingyujiaoxue_uranus_bigtts"
     assert p["subtitle_style"] == "bold-yellow"

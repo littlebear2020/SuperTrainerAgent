@@ -341,16 +341,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.exception("Failed to initialize voice clone service")
             app.state.voice_clone_service = None
 
-        # Startup honesty check: DOUBAO_TTS_DEFAULT_SPEAKER without the openspeech
-        # access key silently degrades every doubao TTS call to the 360 fallback
-        # (tts_fallback_voice). Surface it at boot instead of letting users wonder
-        # why cloned/doubao voices all sound like the 360 preset.
-        if os.environ.get("DOUBAO_TTS_DEFAULT_SPEAKER") and not os.environ.get("VOLCENGINE_VOICE_ACCESS_KEY"):
-            logger.warning(
-                "DOUBAO_TTS_DEFAULT_SPEAKER=%s set but VOLCENGINE_VOICE_ACCESS_KEY missing — doubao TTS will degrade to 360 preset (check sandbox.environment whitelist)",
-                os.environ["DOUBAO_TTS_DEFAULT_SPEAKER"],
-            )
-
         # Initialize shared task framework + Production service
         try:
             from app.gateway._shared.task_framework.repository import TaskRepository

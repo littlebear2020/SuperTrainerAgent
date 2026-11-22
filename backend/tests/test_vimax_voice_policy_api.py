@@ -91,30 +91,30 @@ async def test_voices_default_without_task_type_unchanged(monkeypatch):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.get("/api/video/voices/default", params={"lang": "zh"})
     assert resp.status_code == 200
-    assert resp.json() == {"voice_id": "preset:146"}
+    assert resp.json() == {"voice_id": "doubao:zh_female_vv_uranus_bigtts"}
 
 
 @pytest.mark.asyncio
 async def test_voices_default_vimax_env_speaker(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "k")
-    monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", "speaker_x")
+    monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", "zh_male_m191_uranus_bigtts")
     monkeypatch.delenv("DOUBAO_TTS_ENABLED_SPEAKERS", raising=False)
     app = _app(_fake_svc())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.get("/api/video/voices/default", params={"lang": "zh", "task_type": "vimax"})
     assert resp.status_code == 200
-    assert resp.json() == {"voice_id": "doubao:speaker_x"}
+    assert resp.json() == {"voice_id": "doubao:zh_male_m191_uranus_bigtts"}
 
 
 @pytest.mark.asyncio
 async def test_voices_default_vimax_whitelist_first(monkeypatch):
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "k")
     monkeypatch.delenv("DOUBAO_TTS_DEFAULT_SPEAKER", raising=False)
-    monkeypatch.setenv("DOUBAO_TTS_ENABLED_SPEAKERS", "spk_b,spk_c")
+    monkeypatch.setenv("DOUBAO_TTS_ENABLED_SPEAKERS", "zh_male_m191_uranus_bigtts,zh_female_vv_uranus_bigtts")
     app = _app(_fake_svc())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.get("/api/video/voices/default", params={"lang": "zh", "task_type": "vimax"})
-    assert resp.json() == {"voice_id": "doubao:spk_b"}
+    assert resp.json() == {"voice_id": "doubao:zh_male_m191_uranus_bigtts"}
 
 
 @pytest.mark.asyncio
@@ -124,7 +124,7 @@ async def test_voices_default_vimax_nothing_falls_to_edge(monkeypatch):
     app = _app(_fake_svc())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.get("/api/video/voices/default", params={"lang": "zh", "task_type": "vimax"})
-    assert resp.json() == {"voice_id": "zh-CN-YunjianNeural"}
+    assert resp.json() == {"voice_id": "doubao:zh_female_vv_uranus_bigtts"}
 
 
 # ── 入口付费前拒绝 ─────────────────────────────────────────────────────────
@@ -141,13 +141,13 @@ async def test_create_vimax_preset_rejected_before_submit():
             json={"video_type": "vimax", "mode": "generate", "topic": "课程主题", "voice_id": "preset:332"},
         )
     assert resp.status_code == 422, f"ViMax+preset 须可读拒绝，实际 {resp.status_code}: {resp.text}"
-    assert "ViMax" in resp.json()["detail"]
+    assert "原音色已停用" in resp.json()["detail"]
     svc.submit.assert_not_awaited(), "preset 不得触达 submit（后台付费任务入口）"
 
 
 @pytest.mark.asyncio
 async def test_create_ai_image_preset_still_allowed():
-    """同字段用于 ai_image：preset 照常受理（其他视频类型语义不变）。"""
+    """所有任务类型都在 submit 前拒绝退役音色。"""
     svc = _fake_svc()
     app = _app(svc)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
@@ -155,8 +155,9 @@ async def test_create_ai_image_preset_still_allowed():
             "/api/video/create",
             json={"video_type": "ai_image", "mode": "generate", "topic": "主题", "voice_id": "preset:332"},
         )
-    assert resp.status_code == 200, f"ai_image+preset 须放行，实际 {resp.status_code}: {resp.text}"
-    svc.submit.assert_awaited_once()
+    assert resp.status_code == 422
+    assert "原音色已停用" in resp.json()["detail"]
+    svc.submit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -183,7 +184,7 @@ async def test_generate_audio_vimax_stale_preset_rejected(tmp_path, monkeypatch)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.post("/api/video/tasks/t1/generate-audio")
     assert resp.status_code == 422, f"存量 preset 须在后台 TTS 启动前拒绝，实际 {resp.status_code}: {resp.text}"
-    assert "ViMax" in resp.json()["detail"]
+    assert "原音色已停用" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -200,7 +201,7 @@ async def test_update_config_vimax_preset_rejected(tmp_path):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.put("/api/video/tasks/t1/storyboard/config", json={"voice_id": "preset:332"})
     assert resp.status_code == 422, f"ViMax 设置保存 preset 须可读拒绝，实际 {resp.status_code}: {resp.text}"
-    assert "ViMax" in resp.json()["detail"]
+    assert "原音色已停用" in resp.json()["detail"]
 
 
 # ── Plan B Task 4：draft storyboard 的 audio_degradation_warning ────────────
@@ -267,10 +268,7 @@ async def test_storyboard_no_warning_from_attempt_only_or_clean(tmp_path):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "edge_ok,expect",
-    [
-        (True, "degraded_ready"),  # doubao 429 → Edge 成功 → audioReady + 实际音色警告
-        (False, "error_no_warning"),  # Edge 再失败 → audioError（tts 阶段）+ 无成功警告
-    ],
+    [(False, "error_no_warning")],
 )
 async def test_vimax_draft_doubao_failure_edge_behavior(tmp_path, edge_ok, expect):
     """同一 ViMax 草稿：doubao 临时故障自动 Edge；audioReady 与实际音色警告一致；
@@ -332,7 +330,6 @@ async def test_vimax_draft_doubao_failure_edge_behavior(tmp_path, edge_ok, expec
         patch.object(DoubaoTTSClient, "synthesize_sse_with_timestamps", doubao_429),
         patch.dict("os.environ", {"VOLCENGINE_VOICE_ACCESS_KEY": "k"}),
         patch.object(tts_mod._call_doubao_with_retry.retry, "wait", tts_mod.tenacity.wait_none()),
-        patch.object(tts_mod, "_synthesize_edge", fake_edge),
         patch("app.gateway.video_gen.service.run_ffmpeg", new=AsyncMock()),
         patch("app.gateway.video_gen.service._write_storyboard_srt"),
         patch("app.gateway.video_gen.service._get_audio_duration", new=fake_dur),
@@ -384,10 +381,10 @@ async def test_generate_draft_vimax_default_voice_not_preset(tmp_path, monkeypat
     svc._resolve_voice_id = spy_resolve
     # 直接驱动提取出的 vimax 感知解析 helper（_generate_draft 与 _prepare 共用）
     voice_id, source = svc._resolve_voice_with_vimax_gate("vimax", {"lang": "zh"}, user_id="u")
-    assert voice_id == "zh-CN-YunjianNeural", f"vimax 缺省不得落 preset:146，实际 {voice_id!r}"
+    assert voice_id == "doubao:zh_female_vv_uranus_bigtts"
     assert source == "lang_default"
     voice_id2, _ = svc._resolve_voice_with_vimax_gate("ai_image", {"lang": "zh"}, user_id="u")
-    assert voice_id2 == "preset:146", "非 vimax 缺省链必须保持共享语义（preset:146）"
+    assert voice_id2 == "doubao:zh_female_vv_uranus_bigtts"
 
 
 @pytest.mark.asyncio
@@ -403,7 +400,7 @@ async def test_generate_draft_vimax_inherited_preset_rejected(tmp_path, monkeypa
     svc = VideoGenService(repo=MagicMock(), config=cfg, providers=ProviderRegistry(cfg), storage_dir=str(tmp_path), sandbox_provider=AsyncMock())
     monkeypatch.setattr(svc, "_resolve_voice_id", lambda pv, pid, *, user_id="default": "preset:332")
 
-    with pytest.raises(ValueError, match="ViMax"):
+    with pytest.raises(ValueError, match="原音色已停用"):
         svc._resolve_voice_with_vimax_gate("vimax", {}, user_id="u")
 
 
@@ -423,7 +420,7 @@ async def test_generate_audio_vimax_config_only_preset_rejected(tmp_path):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         resp = await c.post("/api/video/tasks/t1/generate-audio")
     assert resp.status_code == 422, f"config-only 存量 preset 须可读拒绝，实际 {resp.status_code}: {resp.text}"
-    assert "ViMax" in resp.json()["detail"]
+    assert "原音色已停用" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -485,7 +482,7 @@ async def test_resume_draft_vimax_config_only_preset_rejected(tmp_path):
         dispatched.append(a)
 
     with patch.object(svc, "_wrap_pipeline", new=_fake_wrap):
-        with pytest.raises(ValueError, match="ViMax"):
+        with pytest.raises(ValueError, match="原音色已停用"):
             await svc.resume_draft("t1", get_effective_user_id())
     assert not dispatched, "拒绝必须发生在渲染管线派发（付费/LLM）之前"
 
@@ -566,7 +563,7 @@ async def test_resume_draft_vimax_project_inherited_preset_rejected_before_dispa
         dispatched.append(a)
 
     with patch.object(svc, "_wrap_pipeline", new=_fake_wrap):
-        with pytest.raises(ValueError, match="ViMax"):
+        with pytest.raises(ValueError, match="原音色已停用"):
             await svc.resume_draft("t1", get_effective_user_id())
     assert not dispatched, "拒绝必须发生在渲染管线派发（付费/LLM）之前"
     assert svc.repo.update.await_count == 0, "拒绝须先于任何 payload 变更/派发登记"

@@ -32,7 +32,6 @@ Dependencies:
 from __future__ import annotations
 
 import argparse
-import asyncio
 import hashlib
 import json
 import os
@@ -52,17 +51,16 @@ from pptx_workspace import (
 from slide_roster import discover_slide_svgs
 from tts_backends import (
     backend_cosyvoice,
-    backend_edge,
     backend_elevenlabs,
     backend_minimax,
     backend_qwen,
     backend_trainerai,  # TrainerAI patch P8: ByteDance seed-tts-2.0, no edge-tts
 )
 from tts_backends.backend_common import temporary_path
+from tts_backends.subtitle_timing import DEFAULT_SUBTITLE_MAX_CHARS
 
 configure_utf8_stdio()
 
-DEFAULT_EDGE_CONCURRENCY = 3
 SUPPORTED_AUDIO_EXTENSIONS = frozenset({".m4a", ".mp3", ".wav"})
 
 
@@ -286,10 +284,6 @@ def _provider_manifest_details(
     args: argparse.Namespace,
     backend: AudioBackend,
 ) -> tuple[str, dict[str, object]]:
-    if backend.provider == "edge":
-        return "edge-tts", {
-            "rate": args.rate,
-        }
     if backend.provider == "elevenlabs":
         return args.elevenlabs_model, {
             "stability": args.elevenlabs_stability,
@@ -335,9 +329,7 @@ def _narration_manifest(
         for key, value in raw_settings.items()
         if value is not None
     }
-    voice_ref = backend.voice_id
-    if backend.provider != "edge":
-        voice_ref = f"sha256:{_sha256_text(voice_ref)}"
+    voice_ref = f"sha256:{_sha256_text(backend.voice_id)}"
 
     manifest: dict[str, object] = {
         "schema": "ppt-master.narration.v1",
@@ -383,39 +375,6 @@ def _publish_manifest(path: Path, manifest: dict[str, object]) -> None:
         staged_path.unlink(missing_ok=True)
 
 
-async def _generate_edge_jobs(
-    jobs: list[AudioJob],
-    subtitle_dir: Path,
-    *,
-    voice: str,
-    rate: str,
-    subtitle_max_chars: int,
-    concurrency: int,
-) -> list[BaseException | None]:
-    """Generate ordered Edge jobs with bounded slide-level concurrency."""
-    semaphore = asyncio.Semaphore(concurrency)
-
-    async def generate_job(job: AudioJob) -> None:
-        async with semaphore:
-            await backend_edge.generate(
-                job.text,
-                job.output_path,
-                voice=voice,
-                rate=rate,
-                subtitle_path=subtitle_dir / f"{job.output_path.stem}.srt",
-                subtitle_max_chars=subtitle_max_chars,
-            )
-
-    raw_results = await asyncio.gather(
-        *(generate_job(job) for job in jobs),
-        return_exceptions=True,
-    )
-    return [
-        result if isinstance(result, BaseException) else None
-        for result in raw_results
-    ]
-
-
 def main() -> int:
     _load_tts_env_file()
 
@@ -427,14 +386,14 @@ def main() -> int:
     parser.add_argument("-o", "--output", type=Path, default=None)
     parser.add_argument(
         "--provider",
-        choices=["edge", "elevenlabs", "minimax", "qwen", "cosyvoice", "trainerai"],
+        choices=["elevenlabs", "minimax", "qwen", "cosyvoice", "trainerai"],
         default="trainerai",
         help="audio generation backend (default: trainerai — TrainerAI patch P8)",
     )
     parser.add_argument(
         "--voice",
         default=None,
-        help="edge-tts voice ShortName. For elevenlabs, --voice-id is preferred.",
+        help="provider voice ID/name; --voice-id is preferred for cloud providers.",
     )
     parser.add_argument(
         "--voice-id",
@@ -442,20 +401,9 @@ def main() -> int:
         help="provider voice ID/name. If omitted for cloud providers, --voice is used as a fallback.",
     )
     parser.add_argument(
-        "--rate",
-        default="+0%",
-        help='edge-tts speaking rate, e.g. "+0%%", "-10%%", "+15%%" (default: +0%%). Ignored by cloud providers.',
-    )
-    parser.add_argument(
-        "--concurrency",
-        type=int,
-        default=DEFAULT_EDGE_CONCURRENCY,
-        help="maximum concurrent Edge slide requests (default: 3; ignored by cloud providers)",
-    )
-    parser.add_argument(
         "--subtitle-max-chars",
         type=int,
-        default=backend_edge.DEFAULT_SUBTITLE_MAX_CHARS,
+        default=DEFAULT_SUBTITLE_MAX_CHARS,
         help="maximum visible characters per provider-timed subtitle cue (default: 20)",
     )
     parser.add_argument(
@@ -566,14 +514,8 @@ def main() -> int:
             "support them"
         ),
     )
-    parser.add_argument("--list-common-voices", action="store_true", help="print a curated voice list and exit")
     parser.add_argument("--list-voices", action="store_true", help="query provider voices and exit")
-    parser.add_argument("--locale", default=None, help='filter --list-voices by locale, e.g. "zh-CN"')
     args = parser.parse_args()
-
-    if args.list_common_voices:
-        backend_edge.print_common_voices()
-        return 0
 
     if args.list_voices:
         try:
@@ -590,15 +532,13 @@ def main() -> int:
             elif args.provider == "trainerai":
                 # TrainerAI patch P8: 固定 seed-tts-2.0 默认音色，不列旧 360 预置表。
                 print(f"{backend_trainerai.DEFAULT_SPEAKER}	豆包 seed-tts-2.0 默认男声（云舟 2.0）")
-            else:
-                asyncio.run(backend_edge.print_voices(args.locale))
         except Exception as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
         return 0
 
     if args.project_path is None:
-        parser.error("project_path is required unless --list-voices or --list-common-voices is used")
+        parser.error("project_path is required unless --list-voices is used")
 
     voice_id = args.voice_id or args.voice
 
@@ -606,15 +546,7 @@ def main() -> int:
         # TrainerAI patch P8: 未传 voice 时使用字节固定默认 speaker。
         voice_id = voice_id or backend_trainerai.DEFAULT_SPEAKER
 
-    if args.provider == "edge" and not args.voice:
-        parser.error(
-            "--voice is required for --provider edge. Run --list-voices --locale <locale> to discover voices "
-            "(e.g. --locale zh-CN), or follow skills/ppt-master/workflows/stages/generate-audio.md "
-            "for an AI-curated recommendation."
-        )
-        raise AssertionError("unreachable")
-
-    if args.provider != "edge" and not voice_id:
+    if not voice_id:
         parser.error(f"--voice-id is required for --provider {args.provider}")
         raise AssertionError("unreachable")
 
@@ -622,9 +554,6 @@ def main() -> int:
         parser.error("--subtitle-max-chars must be at least 1")
         raise AssertionError("unreachable")
 
-    if args.concurrency < 1:
-        parser.error("--concurrency must be at least 1")
-        raise AssertionError("unreachable")
 
     for option, value, minimum, maximum in (
         ("--elevenlabs-stability", args.elevenlabs_stability, 0.0, 1.0),
@@ -718,18 +647,13 @@ def main() -> int:
             voice_id=voice_id,
         )
     else:
-        backend = AudioBackend(
-            provider=args.provider,
-            extension=backend_edge.edge_output_extension(),
-            voice_id=args.voice,
-        )
+        raise AssertionError("unreachable provider")
 
     project = args.project_path
     notes_dir = project / "notes"
     output_dir = args.output or (project / "audio")
     subtitle_dir = output_dir
     writes_subtitles = backend.provider in {
-        "edge",
         "elevenlabs",
         "minimax",
     } or (
@@ -760,144 +684,100 @@ def main() -> int:
         return 1
 
     generated = 0
-    if backend.provider == "edge":
-        print(
-            f"[Edge] Generating {len(jobs)} audio/SRT pair(s) "
-            f"with concurrency={args.concurrency}"
-        )
+    for job in jobs:
+        output_path = job.output_path
+        text = job.text
+        subtitle_path: Path | None = None
         try:
-            results = asyncio.run(_generate_edge_jobs(
-                jobs,
-                subtitle_dir,
-                voice=args.voice,
-                rate=args.rate,
-                subtitle_max_chars=args.subtitle_max_chars,
-                concurrency=args.concurrency,
-            ))
+            if backend.provider == "elevenlabs":
+                if writes_subtitles:
+                    subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
+                backend_elevenlabs.generate(
+                    text,
+                    output_path,
+                    api_key=backend.api_key,
+                    voice_id=backend.voice_id,
+                    model=args.elevenlabs_model,
+                    output_format=args.elevenlabs_output_format,
+                    stability=args.elevenlabs_stability,
+                    similarity_boost=args.elevenlabs_similarity_boost,
+                    style=args.elevenlabs_style,
+                    speed=args.elevenlabs_speed,
+                    speaker_boost=args.elevenlabs_speaker_boost,
+                    subtitle_path=subtitle_path,
+                    subtitle_max_chars=args.subtitle_max_chars,
+                )
+            elif backend.provider == "minimax":
+                if writes_subtitles:
+                    subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
+                backend_minimax.generate(
+                    text,
+                    output_path,
+                    api_key=backend.api_key,
+                    voice_id=backend.voice_id,
+                    model=args.minimax_model,
+                    audio_format=args.minimax_output_format,
+                    sample_rate=args.minimax_sample_rate,
+                    bitrate=args.minimax_bitrate,
+                    channel=args.minimax_channel,
+                    speed=args.minimax_speed,
+                    volume=args.minimax_volume,
+                    pitch=args.minimax_pitch,
+                    language_boost=args.minimax_language_boost,
+                    base_url=args.minimax_base_url,
+                    subtitle_path=subtitle_path,
+                    subtitle_max_chars=args.subtitle_max_chars,
+                )
+            elif backend.provider == "qwen":
+                backend_qwen.generate(
+                    text,
+                    output_path,
+                    api_key=backend.api_key,
+                    voice_id=backend.voice_id,
+                    model=args.qwen_model,
+                    language_type=args.qwen_language_type,
+                    instructions=args.qwen_instructions,
+                    optimize_instructions=args.qwen_optimize_instructions,
+                    base_url=args.qwen_base_url,
+                )
+            elif backend.provider == "cosyvoice":
+                if writes_subtitles:
+                    subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
+                backend_cosyvoice.generate(
+                    text,
+                    output_path,
+                    api_key=backend.api_key,
+                    voice_id=backend.voice_id,
+                    model=args.cosyvoice_model,
+                    audio_format=args.cosyvoice_output_format,
+                    sample_rate=args.cosyvoice_sample_rate,
+                    volume=args.cosyvoice_volume,
+                    rate=args.cosyvoice_rate,
+                    pitch=args.cosyvoice_pitch,
+                    instruction=args.cosyvoice_instruction,
+                    language_hint=args.cosyvoice_language_hint,
+                    base_url=args.cosyvoice_base_url,
+                    subtitle_path=subtitle_path,
+                    subtitle_max_chars=args.subtitle_max_chars,
+                )
+            elif backend.provider == "trainerai":
+                # TrainerAI patch P8
+                backend_trainerai.generate(
+                    text,
+                    output_path,
+                    api_key=backend.api_key,
+                    voice_id=backend.voice_id,
+                )
+            _remove_stale_audio_variants(output_path)
+            if not writes_subtitles:
+                output_path.with_suffix(".srt").unlink(missing_ok=True)
         except Exception as exc:
-            print(f"error: Edge audio generation failed: {exc}", file=sys.stderr)
+            print(f"error: failed to generate {output_path}: {exc}", file=sys.stderr)
             return 1
-
-        failed = False
-        for job, result in zip(jobs, results):
-            subtitle_path = subtitle_dir / f"{job.output_path.stem}.srt"
-            if result is not None:
-                print(
-                    f"error: failed to generate {job.output_path}: {result}",
-                    file=sys.stderr,
-                )
-                failed = True
-                continue
-            try:
-                _remove_stale_audio_variants(job.output_path)
-            except OSError as exc:
-                print(
-                    f"error: failed to remove stale audio for "
-                    f"{job.output_path.stem}: {exc}",
-                    file=sys.stderr,
-                )
-                failed = True
-                continue
-            generated += 1
-            print(f"[OK] {job.output_path}")
+        generated += 1
+        print(f"[OK] {output_path}")
+        if subtitle_path is not None:
             print(f"     {subtitle_path}")
-        if failed:
-            return 1
-    else:
-        for job in jobs:
-            output_path = job.output_path
-            text = job.text
-            subtitle_path: Path | None = None
-            try:
-                if backend.provider == "elevenlabs":
-                    if writes_subtitles:
-                        subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
-                    backend_elevenlabs.generate(
-                        text,
-                        output_path,
-                        api_key=backend.api_key,
-                        voice_id=backend.voice_id,
-                        model=args.elevenlabs_model,
-                        output_format=args.elevenlabs_output_format,
-                        stability=args.elevenlabs_stability,
-                        similarity_boost=args.elevenlabs_similarity_boost,
-                        style=args.elevenlabs_style,
-                        speed=args.elevenlabs_speed,
-                        speaker_boost=args.elevenlabs_speaker_boost,
-                        subtitle_path=subtitle_path,
-                        subtitle_max_chars=args.subtitle_max_chars,
-                    )
-                elif backend.provider == "minimax":
-                    if writes_subtitles:
-                        subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
-                    backend_minimax.generate(
-                        text,
-                        output_path,
-                        api_key=backend.api_key,
-                        voice_id=backend.voice_id,
-                        model=args.minimax_model,
-                        audio_format=args.minimax_output_format,
-                        sample_rate=args.minimax_sample_rate,
-                        bitrate=args.minimax_bitrate,
-                        channel=args.minimax_channel,
-                        speed=args.minimax_speed,
-                        volume=args.minimax_volume,
-                        pitch=args.minimax_pitch,
-                        language_boost=args.minimax_language_boost,
-                        base_url=args.minimax_base_url,
-                        subtitle_path=subtitle_path,
-                        subtitle_max_chars=args.subtitle_max_chars,
-                    )
-                elif backend.provider == "qwen":
-                    backend_qwen.generate(
-                        text,
-                        output_path,
-                        api_key=backend.api_key,
-                        voice_id=backend.voice_id,
-                        model=args.qwen_model,
-                        language_type=args.qwen_language_type,
-                        instructions=args.qwen_instructions,
-                        optimize_instructions=args.qwen_optimize_instructions,
-                        base_url=args.qwen_base_url,
-                    )
-                elif backend.provider == "cosyvoice":
-                    if writes_subtitles:
-                        subtitle_path = subtitle_dir / f"{output_path.stem}.srt"
-                    backend_cosyvoice.generate(
-                        text,
-                        output_path,
-                        api_key=backend.api_key,
-                        voice_id=backend.voice_id,
-                        model=args.cosyvoice_model,
-                        audio_format=args.cosyvoice_output_format,
-                        sample_rate=args.cosyvoice_sample_rate,
-                        volume=args.cosyvoice_volume,
-                        rate=args.cosyvoice_rate,
-                        pitch=args.cosyvoice_pitch,
-                        instruction=args.cosyvoice_instruction,
-                        language_hint=args.cosyvoice_language_hint,
-                        base_url=args.cosyvoice_base_url,
-                        subtitle_path=subtitle_path,
-                        subtitle_max_chars=args.subtitle_max_chars,
-                    )
-                elif backend.provider == "trainerai":
-                    # TrainerAI patch P8
-                    backend_trainerai.generate(
-                        text,
-                        output_path,
-                        api_key=backend.api_key,
-                        voice_id=backend.voice_id,
-                    )
-                _remove_stale_audio_variants(output_path)
-                if not writes_subtitles:
-                    output_path.with_suffix(".srt").unlink(missing_ok=True)
-            except Exception as exc:
-                print(f"error: failed to generate {output_path}: {exc}", file=sys.stderr)
-                return 1
-            generated += 1
-            print(f"[OK] {output_path}")
-            if subtitle_path is not None:
-                print(f"     {subtitle_path}")
 
     try:
         _publish_manifest(

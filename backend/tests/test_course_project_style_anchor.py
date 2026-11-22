@@ -786,7 +786,7 @@ async def test_tc_c6_09_jpeg_data_uri_returns_actual_suffix(tmp_path, monkeypatc
 async def test_tc_c7_01_project_voice_subtitle_followed_by_task(tmp_path, monkeypatch):
     """项目设置音色/字幕 → 跟随项目任务生效；显式覆盖 → 任务值优先。"""
     svc = _make_service(tmp_path)
-    pid = _seed_project(tmp_path, pid="cp_c70000000001", voice_id="preset:332", subtitle_style="bold-yellow")
+    pid = _seed_project(tmp_path, pid="cp_c70000000001", voice_id="doubao:zh_female_vv_uranus_bigtts", subtitle_style="bold-yellow")
     monkeypatch.setattr("app.gateway.video_gen.service.create_script_llm", lambda p, c: MagicMock())
     monkeypatch.setattr(
         "app.gateway.video_gen.orchestration.storyboard_planner.plan_course",
@@ -805,15 +805,15 @@ async def test_tc_c7_01_project_voice_subtitle_followed_by_task(tmp_path, monkey
     d1 = _task_dir("vg_c701a")
     await svc._generate_draft("ai_image", p1, d1, _noop_prog, user_id=_u, task_id="vg_c701a")
     cfg1 = json.loads((d1 / "storyboard.json").read_text(encoding="utf-8"))["config"]
-    assert cfg1["voice_id"] == "preset:332"
+    assert cfg1["voice_id"] == "doubao:zh_female_vv_uranus_bigtts"
     assert cfg1["subtitle_style"] == "bold-yellow"
 
     # 显式覆盖 → 任务值优先
-    p2 = {"script": "显式覆盖旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "preset:111", "subtitle_style": "clean-white"}
+    p2 = {"script": "显式覆盖旁白。", "ai_normalize_script": False, "course_project_id": pid, "voice_id": "doubao:zh_female_yingyujiaoxue_uranus_bigtts", "subtitle_style": "clean-white"}
     d2 = _task_dir("vg_c701b")
     await svc._generate_draft("ai_image", p2, d2, _noop_prog, user_id=_u, task_id="vg_c701b")
     cfg2 = json.loads((d2 / "storyboard.json").read_text(encoding="utf-8"))["config"]
-    assert cfg2["voice_id"] == "preset:111"
+    assert cfg2["voice_id"] == "doubao:zh_female_yingyujiaoxue_uranus_bigtts"
     assert cfg2["subtitle_style"] == "clean-white"
 
 

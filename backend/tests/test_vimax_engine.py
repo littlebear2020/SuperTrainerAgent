@@ -483,13 +483,13 @@ async def test_engine_rejects_preset_voice_before_pipeline_factory(tmp_path):
         return AsyncMock()
 
     engine = VimaxEngine(config_factory=lambda wd, req: {"working_dir": str(wd)}, pipeline_factory=factory)
-    with pytest.raises(ValueError, match="ViMax"):
+    with pytest.raises(ValueError, match="原音色已停用"):
         await engine.render(_ctx(tmp_path, voice_id="preset:332"))
     assert factory_called["n"] == 0, "preset 不得触达 pipeline factory（付费生成入口）"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("voice", ["doubao:zh_male_A", "zh-CN-YunjianNeural", "clone:xyz", "v"])
+@pytest.mark.parametrize("voice", ["doubao:zh_male_m191_uranus_bigtts", "clone:xyz", "v"])
 async def test_engine_allows_non_preset_voices(tmp_path, voice):
     """doubao/Edge/clone/其他非 preset 值不因此被错误拒绝。"""
     pipeline = AsyncMock()
@@ -505,13 +505,13 @@ async def test_engine_empty_voice_id_uses_vimax_default_by_lang(tmp_path, monkey
     from unittest.mock import patch
 
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "k")  # P1-1：无 key 时 doubao 候选被跳过
-    monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", "zh_male_A")
+    monkeypatch.setenv("DOUBAO_TTS_DEFAULT_SPEAKER", "zh_male_m191_uranus_bigtts")
     monkeypatch.delenv("DOUBAO_TTS_ENABLED_SPEAKERS", raising=False)
     pipeline = AsyncMock()
     engine = VimaxEngine(config_factory=lambda wd, req: {"working_dir": str(wd)}, pipeline_factory=lambda _: pipeline, narration_llm_factory=lambda: AsyncMock())
     with patch("app.gateway.video_gen.engines.vimax.narration_generator.generate_vimax_narration", new=AsyncMock(return_value=None)) as ng_mock:
         await engine.render(_ctx(tmp_path, voice_id="", request={"script": "剧本", "lang": "zh"}))
-    assert ng_mock.call_args.kwargs["voice_id"] == "doubao:zh_male_A"
+    assert ng_mock.call_args.kwargs["voice_id"] == "doubao:zh_male_m191_uranus_bigtts"
 
 
 # ── 边界收口 Task 4（P1-3）：拆批剥离整剧 scene 约束 ───────────────────────
