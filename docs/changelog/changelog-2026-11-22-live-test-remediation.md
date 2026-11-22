@@ -60,6 +60,7 @@
 - Sandbox 7200 TDD：`uv run pytest tests/test_sandbox_idle_timeout.py -q` 在旧实现为 2 failed / 2 passed（缺省 600、一小时空闲被回收）；改为 7200 后，新测试及相关 Sandbox 回归 53 passed / 1 skipped，显式 30/0 均保留。
 - Sandbox 7200 本地 OCR → 3 files / 0 findings；根 `make check` 与 docs convention 通过；未读取或修改真实 config，未部署。
 - Sandbox 最终后端全量 `uv run pytest tests/ -q` → **10180 passed, 91 skipped**；P2/P4/P12/Writer 分享页/P14/P15 已分别登记 `docs/findings-backlog.md`，无对应产品代码 diff。
+- 整体复核后的文档同步：`config.example.yaml` 仅把空闲释放注释从 600 改为 7200（无结构变化，不递增 `config_version`）；部署指南明确已有显式覆盖仍优先；backend 模块说明移除已删除的 Edge/360 文件与降级链。
 
 ## 阻塞与未执行
 
