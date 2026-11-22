@@ -1,6 +1,6 @@
 """Tests for Week 5: TTS routing, 360 voices, and mixed visual sources."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,50 +15,9 @@ from app.gateway.video_gen.storyboard import (
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_tts_routes_to_edge_by_default():
-    """Default voice_id should route to edge-tts."""
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-
-    with patch.object(tts_mod, "_synthesize_edge", new_callable=AsyncMock) as mock_edge:
-        from app.gateway.video_gen.orchestration.tts import TTSResult
-
-        mock_edge.return_value = TTSResult(audio_path="/tmp/test.mp3", srt="srt", duration=2.0)
-        await tts_mod.synthesize("test", voice_id="zh-CN-YunjianNeural", speed=1.0, output_path="/tmp/test.mp3")
-        assert mock_edge.called
-
-
-@pytest.mark.asyncio
-async def test_tts_routes_to_qihu_for_preset_prefix():
-    """voice_id starting with 'preset:' should route to 360 TTS."""
-    from app.gateway.video_gen.orchestration import tts as tts_mod
-
-    with patch.object(tts_mod, "_synthesize_qihu", new_callable=AsyncMock) as mock_qihu:
-        from app.gateway.video_gen.orchestration.tts import TTSResult
-
-        mock_qihu.return_value = TTSResult(audio_path="/tmp/test.mp3", srt="", duration=2.0)
-        await tts_mod.synthesize("test", voice_id="preset:146", speed=1.0, output_path="/tmp/test.mp3")
-        assert mock_qihu.called
-
-
 # ---------------------------------------------------------------------------
 # 360 preset voices in curated list
 # ---------------------------------------------------------------------------
-
-
-def test_curated_voices_include_qihu_presets():
-    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES
-
-    qihu_voices = [v for v in CURATED_VOICES if v.get("provider") == "qihu"]
-    assert len(qihu_voices) >= 6
-    assert all(v["id"].startswith("preset:") for v in qihu_voices)
-
-
-def test_curated_voices_include_edge_tts():
-    from app.gateway.video_gen.orchestration.voices import CURATED_VOICES
-
-    edge_voices = [v for v in CURATED_VOICES if v.get("provider") == "edge-tts"]
-    assert len(edge_voices) >= 10
 
 
 # ---------------------------------------------------------------------------

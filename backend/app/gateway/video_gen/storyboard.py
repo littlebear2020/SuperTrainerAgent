@@ -29,7 +29,7 @@ class StoryboardFrame:
     duration: float = 0.0
     visual_url: str | None = None
     visual_type: str | None = None  # "image" | "video"
-    srt: str = ""  # Word-level SRT from TTS (edge-tts WordBoundary events)
+    srt: str = ""  # SRT generated from provider timing or narration fallback
     speech_duration: float | None = None  # 真实 TTS 语音时长（字幕配比基准，不含 spf 补的静音）；None = 与 duration 相同
     local_visual_path: str | None = None  # user-uploaded local visual (relative to task_dir)
     # 2026-08-03 (Task 1): 生成后 ffprobe 实测的视觉时长。None = 未探测（旧 storyboard
@@ -101,7 +101,7 @@ class StoryboardConfig:
     width: int
     height: int
     fps: int = 30
-    voice_id: str = "preset:146"  # 360 fallback (doubao is the default via resolve_default_voice, not the fallback)
+    voice_id: str = "doubao:zh_female_vv_uranus_bigtts"
     tts_speed: float = 1.2
     subtitle_enabled: bool = True
     subtitle_style: str = "default"

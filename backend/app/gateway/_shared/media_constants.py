@@ -36,8 +36,7 @@ FREE_METHODS: frozenset[str] = frozenset({"voice_clone_upload"})
 #: - ViMax video 桥写 **backend 名**（如 ``seedance-ark``，即注册名兼 backend 名）。
 #: 另有存量 ``provider="qihu"`` 历史行 model=``minimax-h3``（A15 实测修正）。
 #:
-#: 刻意**不映射**：``preset:*``（qihu_tts 的音色 id，非模型名——必须回落
-#: provider 级行）；``nano-banana``/``seed-icl-2.0``（实测不在场且已弃用，
+#: 刻意**不映射**：退役 ``preset:*`` 音色 id（非模型名）；``nano-banana``/``seed-icl-2.0``（实测不在场且已弃用，
 #: 落 unpriced 计数可见）。
 PROVIDER_MODEL_ALIASES: dict[str, tuple[str, str]] = {
     # seedance 系（360 通道 + Ark 直连同模型两通道，§一 三档价）

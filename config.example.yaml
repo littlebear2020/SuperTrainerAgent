@@ -12,7 +12,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 32
+config_version: 33
 
 # ============================================================================
 # Run Recursion Budget
@@ -1570,12 +1570,8 @@ gallery:
 #   training_reaper_interval_minutes: 5   # 训练行巡检间隔（分钟），0=关闭 reaper
 #   status_query_timeout: 30.0            # 训练状态查询 HTTP 超时（秒）
 #   storage_dir: .deer-flow/voice-twins  # Local storage for audio files
-#   qihu_tts:
-#     api_key: $QIHU_API_KEY        # 360 TTS API key (shared with Qihu image/video providers)
-#     enabled: true                  # Enable 360 TTS preset voices
-#   edge_tts:
-#     enabled: true                  # edge-tts 免费音色 + 降级链末端兜底（默认开，服务器实测可达）
-#     timeout: 60.0                  # edge-tts 流式超时（秒）
+#   doubao_tts:
+#     enabled: true                  # 字节直连音色；失败响亮，不切换其他通道
 
 # ============================================================================
 # Video generation: script → storyboard → TTS → visual → compose.
@@ -1655,7 +1651,6 @@ gallery:
 #                                    # + qihu 凭据）| "ark"（Ark 直连，回滚位）。⚠️ "360" 必须带引号——YAML 裸 360 是 int。
 #   subtitle_llm_enabled: true      # T8 (2026-08-13): LLM 语义重切字幕（D3 默认开启；失败回退规则链）⚠️ restart-required
 #   subtitle_llm_model: qwen3.8-flash             # 字幕 LLM 模型（2026-10-12 起=代码默认值，随 deepseek-v4-flash-vision-exp 删册迁移；gemini 系 360 通道实测双模态停顿失格管线默认）
-#   TTS_DISABLE_EDGE_FALLBACK: "1"  # 国内仅可达部署推荐：360/doubao 失败 fail-loud 而非死链 edge 回退（env-only——须设在 .env；在 config.yaml 取消注释无效，config 层不读此键）
 
 
 

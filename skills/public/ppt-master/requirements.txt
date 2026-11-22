@@ -27,7 +27,6 @@ uharfbuzz>=0.50.0
 # Recorded narration / 录制计时和旁白
 # notes_to_audio.py generates per-slide narration audio on macOS/Linux/Windows.
 # notes_to_audio.py 用于在 macOS/Linux/Windows 上生成逐页旁白音频。
-edge-tts>=7.2.8
 
 # ─────────────────────────────────────────────────────────────
 # PDF to Markdown tool / PDF 转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/pdf_to_md.py)

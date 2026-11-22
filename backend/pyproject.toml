@@ -30,7 +30,6 @@ dependencies = [
     "weasyprint>=60",
     "markdown>=3.5",
     "aiolimiter>=1.2.1",
-    "edge-tts>=7.2.8",
     "faiss-cpu>=1.14.3",
     "langchain-community>=0.4.2",
     # graphic 视觉源（content-match 2026-08-14）：Pillow 确定性渲染 text_card/big_number/steps。

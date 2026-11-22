@@ -28,7 +28,7 @@ def _write_storyboard(tmp_path, task_id="vg_cfg", config_extra=None):
         "video_type": "ai_image",
         "width": 1080,
         "height": 1920,
-        "voice_id": "preset:146",
+        "voice_id": "doubao:zh_male_m191_uranus_bigtts",
         "tts_speed": 1.2,
         "bgm_volume": 0.15,
     }
@@ -69,13 +69,13 @@ async def test_update_config_persists_allowed_fields(tmp_path):
     from app.gateway.routers import video_gen as vg
 
     task_dir = _write_storyboard(tmp_path)
-    body = vg.UpdateStoryboardConfigRequest(voice_id="preset:200", tts_speed=1.5, bgm_volume=0.3)
+    body = vg.UpdateStoryboardConfigRequest(voice_id="doubao:zh_male_liufei_uranus_bigtts", tts_speed=1.5, bgm_volume=0.3)
     result = await vg.update_storyboard_config(_make_request(_Svc(tmp_path)), "vg_cfg", body)
-    assert result["config"]["voice_id"] == "preset:200"
+    assert result["config"]["voice_id"] == "doubao:zh_male_liufei_uranus_bigtts"
     assert result["config"]["tts_speed"] == 1.5
     assert result["config"]["bgm_volume"] == 0.3
     on_disk = json.loads((task_dir / "storyboard.json").read_text(encoding="utf-8"))
-    assert on_disk["config"]["voice_id"] == "preset:200"
+    assert on_disk["config"]["voice_id"] == "doubao:zh_male_liufei_uranus_bigtts"
 
 
 def test_update_config_validates_ranges():

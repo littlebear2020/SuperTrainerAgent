@@ -903,7 +903,7 @@ Behavior:
   Both map to native picture crop/geometry when possible.
 - The default Generate flow embeds speaker notes automatically unless `--no-notes` is used; Quick Generate defaults them off and enables them with `--with-notes`
 - Recorded narration is opt-in:
-  - `notes_to_audio.py` uses `edge-tts` by default, or a configured cloud TTS provider (`elevenlabs`, `minimax`, `qwen`, `cosyvoice`), and generates one audio file per slide into `audio/`
+  - `notes_to_audio.py` uses TrainerAI/ByteDance by default, or a configured cloud TTS provider (`elevenlabs`, `minimax`, `qwen`, `cosyvoice`), and generates one audio file per slide into `audio/`
   - Narration text is read strictly from the matching `notes/*.md` file; the script only skips Markdown heading lines (`# ...`) and does not summarize, rewrite, or filter delivery notes
   - `--recorded-narration audio` prepares PowerPoint's "recorded timings and narrations": every slide must have matching `m4a` / `mp3` / `wav` audio, `ffprobe` must read every duration, and `--animation-trigger on-click` is rejected
   - `--recorded-narration audio` keeps speaker notes, embeds each matching audio file, and writes slide auto-advance timings from page-start lead-in + audio duration + page-tail padding. `--narration-start-floor` and `--narration-padding` are independent optional seconds; their defaults are `0.8` and `0.5`, and the post-transition lead-in is `max(0, start floor - transition duration)`
@@ -915,7 +915,7 @@ Behavior:
   - Either narration flag names the default-flow export `<project_name>_<timestamp>_narrated.pptx`, telling it apart from silent exports in the same directory
   - This is intended for direct PowerPoint video export with "Use recorded timings and narrations"
   - Long-audio import and automatic long-audio splitting are not supported; keep narration assets page-level
-  - Voice choices can be listed with `python3 scripts/notes_to_audio.py --list-common-voices`, `python3 scripts/notes_to_audio.py --list-voices --locale zh-CN`, or provider-specific `--provider <name> --list-voices`
+  - TrainerAI's default voice can be shown with `python3 scripts/notes_to_audio.py --provider trainerai --list-voices`; other providers use `--provider <name> --list-voices` only when that provider supports listing
 - Page transitions are controlled by `-t/--transition`; per-element object animations are controlled by `-a/--animation`
 - Per-element animation applies to ordinary top-level SVG `<g id="...">` groups; each group is a PowerPoint shape-target anchor, not necessarily one Animation Pane row. Use one group per logical Slide-local content unit rather than targeting a group count
 - For chrome defaults, static role/placeholder overrides, and structural exclusions, see [`animations.md`](../../references/animations.md) §5

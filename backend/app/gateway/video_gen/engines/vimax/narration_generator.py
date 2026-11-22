@@ -445,11 +445,6 @@ async def generate_vimax_narration(
             if seg is not None and seg.is_dialogue and seg.speaker:
                 spoken_speakers.add(seg.speaker)
 
-    # T7a（2026-10-14）：设置 TTS 降级上下文，使 record_tts_degradation 能把
-    # vimax 音色降级写进 degradations sidecar（前端可见）。对齐 service.py 两处
-    # 既有形态（:1976/:3303）；TTS 只发生在下方循环内，循环后清除上下文。
-    tts_mod.set_tts_degradation_context(task_dir)
-
     # P2: resolve the per-speaker voice map. In dialogue mode, load characters.json
     # (working_dir/characters.json) unless the caller passed an explicit list.
     voice_map = None
@@ -476,168 +471,162 @@ async def generate_vimax_narration(
     cumulative_start = 0.0
     chunk_idx = 0
 
-    # AI 评审 #6（2026-10-14）：主循环包 try/finally 清降级上下文——
-    # 异常穿出（engine 兜住）也不残留；正常路径语义不变。
-    try:
-        for sb_path, shots in preloaded_shots:
-            scene_dir = sb_path.parent
-            for shot in shots:
-                shot_idx = shot.get("idx", shot.get("index", chunk_idx))
-                # ViMax's ShotBriefDescription uses `visual_desc` (rich scene description)
-                # and `audio_desc` (sound/dialogue) — NOT `description`/`shot_description`.
-                visual = shot.get("visual_desc") or shot.get("description") or shot.get("shot_description") or ""
-                audio = shot.get("audio_desc") or ""
-                video_path = scene_dir / "shots" / str(shot_idx) / "video.mp4"
-                # T4（Lane 2, 2026-10-15）：ffprobe 改经线程池——sync 直调在 N 镜循环里
-                # 逐次阻塞事件循环。用 asyncio.to_thread 而非 run_ffmpeg：存量测试把
-                # ng.run_ffmpeg 桩成 fire-and-forget（不执行 fn 恒返 None），本处返回值
-                # 承重会碎；to_thread 同为 off-loop（:551 已有先例）且真执行。
-                shot_duration = await asyncio.to_thread(_get_shot_duration, video_path) if video_path.exists() else _DEFAULT_SHOT_SECONDS
+    for sb_path, shots in preloaded_shots:
+        scene_dir = sb_path.parent
+        for shot in shots:
+            shot_idx = shot.get("idx", shot.get("index", chunk_idx))
+            # ViMax's ShotBriefDescription uses `visual_desc` (rich scene description)
+            # and `audio_desc` (sound/dialogue) — NOT `description`/`shot_description`.
+            visual = shot.get("visual_desc") or shot.get("description") or shot.get("shot_description") or ""
+            audio = shot.get("audio_desc") or ""
+            video_path = scene_dir / "shots" / str(shot_idx) / "video.mp4"
+            # T4（Lane 2, 2026-10-15）：ffprobe 改经线程池——sync 直调在 N 镜循环里
+            # 逐次阻塞事件循环。用 asyncio.to_thread 而非 run_ffmpeg：存量测试把
+            # ng.run_ffmpeg 桩成 fire-and-forget（不执行 fn 恒返 None），本处返回值
+            # 承重会碎；to_thread 同为 off-loop（:551 已有先例）且真执行。
+            shot_duration = await asyncio.to_thread(_get_shot_duration, video_path) if video_path.exists() else _DEFAULT_SHOT_SECONDS
 
-                # Resolve narration text + voice for this shot.
-                # T6（2026-10-16 收口批）：sidecar 镜号口径统一为**全局 chunk_idx**——
-                # 与 frame_index、vimax_shots manifest 的全局连续 gid 同口径（修前
-                # detail 用 scene 局部 idx、frame_index 用全局，前端按 frame_index
-                # 定位多场景会错镜——PR#19 评审十一轮 low 收口）。
-                segment_emotion = ""
-                fellthrough_tag_stripped = False
-                if voice_map is not None:
-                    # 八轮 low：每镜只解析一次——seg 同时喂解析与 T6 占比统计
-                    # （此前 _is_dialogue_text 二次解析，词表改动会静默分叉）
-                    seg = parse_dialogue(audio)
-                    fellthrough_tag_stripped = seg is not None and getattr(seg, "tag_fellthrough", False)
-                    narration_text, segment_voice, segment_emotion = _resolve_dialogue_segment(audio, voice_map, visual, seg=seg)
-                    # T4：无标签启发式音效命中（已静音）→ sidecar 留痕（可审计，防误杀旁白）。
-                    # 仅记**无标签**路径——带 [音效] 标签是既有语义，compact 后常同 hit
-                    # 启发式（如 "[音效] 小刀刻木声…" ≤20 字以声结尾），不记防噪声。
-                    if narration_text == "" and is_heuristic_sound_effect(audio) and not is_sound_effect_tagged(audio):
-                        record_degradation(
-                            task_dir,
-                            kind=KIND_SFX_HEURISTIC,
-                            detail=f"第 {chunk_idx + 1} 镜无标签音效描述按音效静音：{audio.strip()[:60]}",
-                            frame_index=chunk_idx,
-                        )
-                    if narration_text and not seg.is_dialogue:
-                        narration_fallback_shots += 1
-                else:
-                    # Legacy LLM-narration path.
-                    shot_desc = f"{visual}\n[音频] {audio}" if audio else visual
-                    # N-3 (Task 8b): LLM 调用必须自带 except。此前它在 per-shot try
-                    # **之外**（try 只包 TTS），且 _generate_narration_text 内部无
-                    # try/except → 第 30 镜 LLM 超时会穿出整个循环 → engine 的 except
-                    # 兜住 → narration_audio=None → **前 29 镜已成功的 TTS 全部丢弃**。
-                    # 回落 shot_desc[:50] 的逻辑本就存在，只是够不着。
-                    try:
-                        narration_text = await _generate_narration_text(llm, shot_desc, original_script)
-                    except Exception:
-                        logger.exception(
-                            "narration LLM failed for shot %d; falling back to shot description",
-                            chunk_idx,
-                        )
-                        narration_text = ""
-                    if not narration_text:
-                        narration_text = shot_desc[:50]
-                    segment_voice = voice_id
-
-                # T6：未识别 [...] 前缀标签 → 剥离后再念（宁剥错不念出），并记 drift。
-                # 八轮（bug·medium）：在两分支**汇合处**统一做——legacy 分支的 LLM 旁白
-                # /shot_desc 回落同样不得念出漂移标签（修前只覆盖 dialogue 模式）。
-                # T6（2026-10-16 收口批）：已知标签 fallthrough 剥标签（parse_dialogue
-                # 内已剥，此处 narration_text 无标签可剥）同样记 drift——修前只
-                # logger.warning，可审计留痕断链。
-                if narration_text:
-                    cleaned, drift_tags = strip_unrecognized_tags(narration_text)
-                    if drift_tags:
-                        drift_shots += 1
-                        record_degradation(
-                            task_dir,
-                            kind=KIND_FORMAT_DRIFT,
-                            detail=f"第 {chunk_idx + 1} 镜配音格式漂移：{'/'.join(drift_tags)}；样本：{(audio or narration_text).strip()[:80]}",
-                            frame_index=chunk_idx,
-                        )
-                        narration_text = cleaned
-                    elif fellthrough_tag_stripped:
-                        drift_shots += 1
-                        record_degradation(
-                            task_dir,
-                            kind=KIND_FORMAT_DRIFT,
-                            detail=f"第 {chunk_idx + 1} 镜配音格式漂移：已知对白标签三级解析未命中，已剥标签回落旁白；样本：{(audio or '').strip()[:80]}",
-                            frame_index=chunk_idx,
-                        )
-
-                if not narration_text:
-                    # No audio content → silence matching the shot duration.
-                    # T4：静音生成（ffmpeg）经线程池（to_thread 口径见上方时长探测注释）。
-                    await asyncio.to_thread(_append_silence_chunk, task_dir, chunk_idx, video_path, audio_chunks)
-                    cumulative_start += shot_duration
-                    chunk_idx += 1
-                    continue
-
-                # N-1: 记录「本镜有话要说」——用于区分「全片纯音效（正常）」与
-                # 「有台词但全部 TTS 失败（故障）」。
-                attempted_speech += 1
-                chunk_path = task_dir / f"narration_chunk_{chunk_idx:04d}.mp3"
-                # T5：解析出的情绪标注 → doubao emotion 参数（仅 doubao 音色且映射表
-                # 命中才下发；clone:/preset:/edge 静默忽略，行为不变；降级路径自动丢弃）。
-                emotion_kwargs: dict[str, Any] = {}
-                if segment_emotion and segment_voice.startswith("doubao:"):
-                    mapped_emotion = tts_mod.resolve_doubao_emotion(segment_emotion)
-                    if mapped_emotion:
-                        emotion_kwargs["emotion"] = mapped_emotion
-                try:
-                    # Plan B（2026-10-19，D4）：正式 narration 显式携带 ViMax 策略——
-                    # preset 防漏底线 + 豆包可降级故障直落同性别 Edge（不经 360）。
-                    result = await tts_mod.synthesize(
-                        narration_text,
-                        voice_id=segment_voice,
-                        speed=speed,
-                        output_path=str(chunk_path),
-                        **emotion_kwargs,
+            # Resolve narration text + voice for this shot.
+            # T6（2026-10-16 收口批）：sidecar 镜号口径统一为**全局 chunk_idx**——
+            # 与 frame_index、vimax_shots manifest 的全局连续 gid 同口径（修前
+            # detail 用 scene 局部 idx、frame_index 用全局，前端按 frame_index
+            # 定位多场景会错镜——PR#19 评审十一轮 low 收口）。
+            segment_emotion = ""
+            fellthrough_tag_stripped = False
+            if voice_map is not None:
+                # 八轮 low：每镜只解析一次——seg 同时喂解析与 T6 占比统计
+                # （此前 _is_dialogue_text 二次解析，词表改动会静默分叉）
+                seg = parse_dialogue(audio)
+                fellthrough_tag_stripped = seg is not None and getattr(seg, "tag_fellthrough", False)
+                narration_text, segment_voice, segment_emotion = _resolve_dialogue_segment(audio, voice_map, visual, seg=seg)
+                # T4：无标签启发式音效命中（已静音）→ sidecar 留痕（可审计，防误杀旁白）。
+                # 仅记**无标签**路径——带 [音效] 标签是既有语义，compact 后常同 hit
+                # 启发式（如 "[音效] 小刀刻木声…" ≤20 字以声结尾），不记防噪声。
+                if narration_text == "" and is_heuristic_sound_effect(audio) and not is_sound_effect_tagged(audio):
+                    record_degradation(
+                        task_dir,
+                        kind=KIND_SFX_HEURISTIC,
+                        detail=f"第 {chunk_idx + 1} 镜无标签音效描述按音效静音：{audio.strip()[:60]}",
+                        frame_index=chunk_idx,
                     )
-                    # 十轮（bug·high）：原始时长须在**对齐前**探测——_align_chunk_to_shot
-                    # 成功后会 unlink 原 chunk，事后探测恒得 0.0 → cue_scale 恒 1.0，
-                    # atempo 缩放永不生效（字级字幕系统性晚于音频）。仅 doubao（有
-                    # word_cues）才探测，保持其余路径零开销。
-                    word_cues_raw = getattr(result, "word_cues", None)
-                    orig_chunk_dur = 0.0
-                    if word_cues_raw:
-                        orig_chunk_dur = await asyncio.to_thread(_probe_audio_duration, Path(result.audio_path))
-                    # T4：对齐 ffmpeg 命令（timeout=120 的 sync 直调）经线程池（to_thread 口径见上方注释）。
-                    aligned_path = await asyncio.to_thread(_align_chunk_to_shot, Path(result.audio_path), shot_duration, task_dir, chunk_idx)
-                    audio_chunks.append(aligned_path)
-                    # T7c：doubao chunk 的字级时间戳（chunk 局部秒）→ 全片时间轴。
-                    # 对齐可能 atempo 加速（audio 压缩 factor=atempo）→ 字级时间同除；
-                    # 超出镜窗口（-t 截断/apad）钳到镜边界。
-                    word_cues_global: list[tuple[str, float, float]] | None = None
-                    if word_cues_raw:
-                        shot_start = cumulative_start
-                        # 九轮（bug·medium）：scale 与 _align_chunk_to_shot **同式**
-                        # min(orig/target, _ATEMPO_CAP)——「封顶 + -t 截断」分支的实际
-                        # 加速是 cap 而非 ratio（截断只切尾部，存留词时间轴 = word/cap）。
-                        # 对齐失败（沿用原路径）→ 恒 1.0。
-                        cue_scale = 1.0
-                        if aligned_path != str(result.audio_path) and orig_chunk_dur - shot_duration >= 0.1:
-                            cue_scale = min(orig_chunk_dur / shot_duration, _ATEMPO_CAP)
-                        word_cues_global = []
-                        for w, ws, we in result.word_cues:
-                            gs = shot_start + min(ws / cue_scale, shot_duration)
-                            ge = shot_start + min(we / cue_scale, shot_duration)
-                            if ge > gs:
-                                word_cues_global.append((w, gs, ge))
-                        if not word_cues_global:
-                            word_cues_global = None
-                    # SRT cue 只在 TTS 成功后入列——失败镜是静音，烧出台词字幕=音字不符
-                    srt_entries.append((narration_text, cumulative_start, cumulative_start + shot_duration, word_cues_global))
+                if narration_text and not seg.is_dialogue:
+                    narration_fallback_shots += 1
+            else:
+                # Legacy LLM-narration path.
+                shot_desc = f"{visual}\n[音频] {audio}" if audio else visual
+                # N-3 (Task 8b): LLM 调用必须自带 except。此前它在 per-shot try
+                # **之外**（try 只包 TTS），且 _generate_narration_text 内部无
+                # try/except → 第 30 镜 LLM 超时会穿出整个循环 → engine 的 except
+                # 兜住 → narration_audio=None → **前 29 镜已成功的 TTS 全部丢弃**。
+                # 回落 shot_desc[:50] 的逻辑本就存在，只是够不着。
+                try:
+                    narration_text = await _generate_narration_text(llm, shot_desc, original_script)
                 except Exception:
-                    logger.exception("TTS failed for shot %d; inserting silence", chunk_idx)
-                    # T4：静音生成经线程池（to_thread 口径见上方注释）。
-                    await asyncio.to_thread(_append_silence_chunk, task_dir, chunk_idx, video_path, audio_chunks)
+                    logger.exception(
+                        "narration LLM failed for shot %d; falling back to shot description",
+                        chunk_idx,
+                    )
+                    narration_text = ""
+                if not narration_text:
+                    narration_text = shot_desc[:50]
+                segment_voice = voice_id
 
+            # T6：未识别 [...] 前缀标签 → 剥离后再念（宁剥错不念出），并记 drift。
+            # 八轮（bug·medium）：在两分支**汇合处**统一做——legacy 分支的 LLM 旁白
+            # /shot_desc 回落同样不得念出漂移标签（修前只覆盖 dialogue 模式）。
+            # T6（2026-10-16 收口批）：已知标签 fallthrough 剥标签（parse_dialogue
+            # 内已剥，此处 narration_text 无标签可剥）同样记 drift——修前只
+            # logger.warning，可审计留痕断链。
+            if narration_text:
+                cleaned, drift_tags = strip_unrecognized_tags(narration_text)
+                if drift_tags:
+                    drift_shots += 1
+                    record_degradation(
+                        task_dir,
+                        kind=KIND_FORMAT_DRIFT,
+                        detail=f"第 {chunk_idx + 1} 镜配音格式漂移：{'/'.join(drift_tags)}；样本：{(audio or narration_text).strip()[:80]}",
+                        frame_index=chunk_idx,
+                    )
+                    narration_text = cleaned
+                elif fellthrough_tag_stripped:
+                    drift_shots += 1
+                    record_degradation(
+                        task_dir,
+                        kind=KIND_FORMAT_DRIFT,
+                        detail=f"第 {chunk_idx + 1} 镜配音格式漂移：已知对白标签三级解析未命中，已剥标签回落旁白；样本：{(audio or '').strip()[:80]}",
+                        frame_index=chunk_idx,
+                    )
+
+            if not narration_text:
+                # No audio content → silence matching the shot duration.
+                # T4：静音生成（ffmpeg）经线程池（to_thread 口径见上方时长探测注释）。
+                await asyncio.to_thread(_append_silence_chunk, task_dir, chunk_idx, video_path, audio_chunks)
                 cumulative_start += shot_duration
                 chunk_idx += 1
+                continue
 
-    finally:
-        tts_mod.set_tts_degradation_context(None)
+            # N-1: 记录「本镜有话要说」——用于区分「全片纯音效（正常）」与
+            # 「有台词但全部 TTS 失败（故障）」。
+            attempted_speech += 1
+            chunk_path = task_dir / f"narration_chunk_{chunk_idx:04d}.mp3"
+            # T5：解析出的情绪标注 → doubao emotion 参数（仅 doubao 音色且映射表
+            # 命中才下发；clone:/preset:/edge 静默忽略，行为不变；降级路径自动丢弃）。
+            emotion_kwargs: dict[str, Any] = {}
+            if segment_emotion and segment_voice.startswith("doubao:"):
+                mapped_emotion = tts_mod.resolve_doubao_emotion(segment_emotion)
+                if mapped_emotion:
+                    emotion_kwargs["emotion"] = mapped_emotion
+            try:
+                # Plan B（2026-10-19，D4）：正式 narration 显式携带 ViMax 策略——
+                # preset 防漏底线 + 豆包可降级故障直落同性别 Edge（不经 360）。
+                result = await tts_mod.synthesize(
+                    narration_text,
+                    voice_id=segment_voice,
+                    speed=speed,
+                    output_path=str(chunk_path),
+                    **emotion_kwargs,
+                )
+                # 十轮（bug·high）：原始时长须在**对齐前**探测——_align_chunk_to_shot
+                # 成功后会 unlink 原 chunk，事后探测恒得 0.0 → cue_scale 恒 1.0，
+                # atempo 缩放永不生效（字级字幕系统性晚于音频）。仅 doubao（有
+                # word_cues）才探测，保持其余路径零开销。
+                word_cues_raw = getattr(result, "word_cues", None)
+                orig_chunk_dur = 0.0
+                if word_cues_raw:
+                    orig_chunk_dur = await asyncio.to_thread(_probe_audio_duration, Path(result.audio_path))
+                # T4：对齐 ffmpeg 命令（timeout=120 的 sync 直调）经线程池（to_thread 口径见上方注释）。
+                aligned_path = await asyncio.to_thread(_align_chunk_to_shot, Path(result.audio_path), shot_duration, task_dir, chunk_idx)
+                audio_chunks.append(aligned_path)
+                # T7c：doubao chunk 的字级时间戳（chunk 局部秒）→ 全片时间轴。
+                # 对齐可能 atempo 加速（audio 压缩 factor=atempo）→ 字级时间同除；
+                # 超出镜窗口（-t 截断/apad）钳到镜边界。
+                word_cues_global: list[tuple[str, float, float]] | None = None
+                if word_cues_raw:
+                    shot_start = cumulative_start
+                    # 九轮（bug·medium）：scale 与 _align_chunk_to_shot **同式**
+                    # min(orig/target, _ATEMPO_CAP)——「封顶 + -t 截断」分支的实际
+                    # 加速是 cap 而非 ratio（截断只切尾部，存留词时间轴 = word/cap）。
+                    # 对齐失败（沿用原路径）→ 恒 1.0。
+                    cue_scale = 1.0
+                    if aligned_path != str(result.audio_path) and orig_chunk_dur - shot_duration >= 0.1:
+                        cue_scale = min(orig_chunk_dur / shot_duration, _ATEMPO_CAP)
+                    word_cues_global = []
+                    for w, ws, we in result.word_cues:
+                        gs = shot_start + min(ws / cue_scale, shot_duration)
+                        ge = shot_start + min(we / cue_scale, shot_duration)
+                        if ge > gs:
+                            word_cues_global.append((w, gs, ge))
+                    if not word_cues_global:
+                        word_cues_global = None
+                # SRT cue 只在 TTS 成功后入列——失败镜是静音，烧出台词字幕=音字不符
+                srt_entries.append((narration_text, cumulative_start, cumulative_start + shot_duration, word_cues_global))
+            except Exception:
+                logger.exception("TTS failed for shot %d; inserting silence", chunk_idx)
+                # T4：静音生成经线程池（to_thread 口径见上方注释）。
+                await asyncio.to_thread(_append_silence_chunk, task_dir, chunk_idx, video_path, audio_chunks)
+
+            cumulative_start += shot_duration
+            chunk_idx += 1
 
     if not audio_chunks:
         return _fallback_trainerai_audio(task_dir, working_dir)

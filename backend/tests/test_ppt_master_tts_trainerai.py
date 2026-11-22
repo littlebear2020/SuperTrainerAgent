@@ -519,7 +519,7 @@ def test_default_command_uses_bytedance_speaker_and_writes_mp3(tmp_path, monkeyp
 def test_notes_to_audio_registers_trainerai_provider():
     source = NOTES_MOD_PATH.read_text(encoding="utf-8")
     assert "backend_trainerai" in source, "notes_to_audio.py 未 import backend_trainerai"
-    assert 'choices=["edge", "elevenlabs", "minimax", "qwen", "cosyvoice", "trainerai"]' in source, "--provider choices 缺 trainerai"
+    assert 'choices=["elevenlabs", "minimax", "qwen", "cosyvoice", "trainerai"]' in source, "--provider choices 缺 trainerai"
     assert 'default="trainerai"' in source, "--provider 默认值不是 trainerai"
     assert 'args.provider == "trainerai"' in source, "构造分支缺 trainerai"
     assert 'backend.provider == "trainerai"' in source, "生成分发分支缺 trainerai"

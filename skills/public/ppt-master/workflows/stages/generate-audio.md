@@ -45,14 +45,14 @@ The AI already knows it from writing the notes — no detection script. Identify
 
 ## Step 2: Choose audio backend and pull the voice catalog
 
-Default to **edge** unless the user asks for a cloud provider, higher-quality cloud narration, or a cloned voice.
+In TrainerAI, default to **trainerai** (direct ByteDance). Other configured cloud providers or an existing cloned voice remain explicit choices; never route through Edge.
 
 ```bash
-python3 skills/ppt-master/scripts/notes_to_audio.py --list-voices --locale <locale>
+python3 skills/ppt-master/scripts/notes_to_audio.py --provider trainerai --list-voices
 python3 skills/ppt-master/scripts/notes_to_audio.py --provider <elevenlabs|minimax|qwen|cosyvoice> --list-voices
 ```
 
-From the flat list, pick **3–6 candidates**: cover both genders when the locale has them; for edge prefer the curated `COMMON_VOICES` set; for ElevenLabs prefer voices already in the user's account and never override a user-supplied `voice_id`; for MiniMax / Qwen / CosyVoice use a supplied cloned `voice_id` directly and never attempt cloning here; for CosyVoice subtitles use a timestamp-capable model/voice pair, and `--cosyvoice-audio-only` only when the user accepts no page-local SRT. Match the deck's tone — a Chinese consultant / financial deck leans a steady male (`zh-CN-YunjianNeural`) or clear female (`zh-CN-XiaoxiaoNeural`) voice; teaching / product decks a bright female or young male (`zh-CN-XiaoyiNeural` / `zh-CN-YunxiNeural`); launch / broadcast decks `zh-CN-YunyangNeural`; English consultant decks `en-US-GuyNeural` or `en-US-JennyNeural`; Japanese / Korean from `ja-JP-*` / `ko-KR-*` with gender + tone noted. Describe each candidate in one line in the user's chat language (gender · tone · best-fit scenario), with the exact name/ID to pass to `--voice-id` for cloud providers.
+From the provider-supported list, pick **3–6 candidates** when that provider exposes a catalog; TrainerAI uses its configured ByteDance speaker and does not offer an Edge catalog. For ElevenLabs prefer voices already in the user's account and never override a user-supplied `voice_id`; for MiniMax / Qwen / CosyVoice use a supplied cloned `voice_id` directly and never attempt cloning here. For CosyVoice subtitles use a timestamp-capable model/voice pair, and `--cosyvoice-audio-only` only when the user accepts no page-local SRT. Describe each candidate in one line in the user's chat language (gender · tone · best-fit scenario), with the exact ID to pass to `--voice-id` for cloud providers.
 
 ---
 
@@ -66,7 +66,7 @@ From the flat list, pick **3–6 candidates**: cover both genders when the local
 
 > 检测到 notes 主语言为 **<语言>**（locale: `<locale>`）。基于 deck 调性（<风格>），我推荐以下配置：
 >
-> **生成模式**：⭐ 推荐 `<edge|elevenlabs|minimax|qwen|cosyvoice>`（理由：<一句话>）。
+> **生成模式**：⭐ 推荐 `<trainerai|elevenlabs|minimax|qwen|cosyvoice>`（理由：<一句话>）。
 >
 > **音色**：
 > - **[1] <ShortName>** — <性别·调性·适用场景> ⭐ **推荐**
@@ -82,7 +82,7 @@ From the flat list, pick **3–6 candidates**: cover both genders when the local
 >
 > 直接回"好"用全部推荐值，或告诉我想改的部分（如"音色 2，语速 -5%"或"用 MiniMax 的 voice_id xxx"）。
 
-**Recommended-value rules**: mode — `edge` by default, the user's named provider/voice otherwise; never recommend Qwen when page-local SRT, subtitle animation, or video subtitles are needed, and if the user insists state that only audio is delivered. Voice — the Step 2 candidate that best fits the tone. Rate — edge `+0%`; `-5%` for dense notes (>4 long sentences per page), `+5%` for short tight notes, anything beyond needs a stated reason; cloud providers keep defaults unless asked. Embed — yes unless the user has a customized PPTX they do not want overwritten. Video — native encoding when `--check` succeeds; slideshow capture only on explicit choice; when automation is unavailable, deliver the narrated PPTX and never switch to screen recording or a third-party renderer.
+**Recommended-value rules**: mode — `trainerai` by default in TrainerAI, the user's named provider/voice otherwise; never recommend Qwen when page-local SRT, subtitle animation, or video subtitles are needed, and if the user insists state that only audio is delivered. Voice — the Step 2 candidate that best fits the tone. Rate — keep the selected provider's defaults; do not use the removed Edge `--rate` flag. Embed — yes unless the user has a customized PPTX they do not want overwritten. Video — native encoding when `--check` succeeds; slideshow capture only on explicit choice; when automation is unavailable, deliver the narrated PPTX and never switch to screen recording or a third-party renderer.
 
 ---
 
@@ -92,7 +92,7 @@ From the flat list, pick **3–6 candidates**: cover both genders when the local
 
 ```bash
 # 1. Generate audio (one provider form; flags in narration.md)
-python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --voice <ShortName> --rate <rate>
+python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider trainerai
 python3 skills/ppt-master/scripts/notes_to_audio.py <project_path> --provider <elevenlabs|minimax|qwen|cosyvoice> --voice-id <id> [provider model flag]
 
 # 2A. Only when narration-cue sync is selected and page SRT + animations.json exist

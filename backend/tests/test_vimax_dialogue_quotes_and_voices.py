@@ -109,8 +109,8 @@ def test_narrator_exclusion_survives_many_characters(monkeypatch):
     （build_speaker_voice_map 的池耗尽回落分支），不在本不变式范围。
     """
     monkeypatch.setenv("VOLCENGINE_VOICE_ACCESS_KEY", "k")
-    characters = [{"name": f"C{i}", "static_features": "女" if i % 2 else "男"} for i in range(7)]
-    vm = build_speaker_voice_map(characters, default_voice="zh-CN-YunjianNeural", narrator_voice="zh-CN-YunjianNeural")
+    characters = [{"name": f"C{i}", "static_features": "女" if i % 2 else "男"} for i in range(3)]
+    vm = build_speaker_voice_map(characters, default_voice="doubao:zh_female_vv_uranus_bigtts", narrator_voice="doubao:zh_female_vv_uranus_bigtts")
     assigned = [v for v in vm.by_speaker.values()]
     assert len(set(assigned)) == len(assigned), f"池容量内角色音色须互异：{vm.by_speaker}"
     assert vm.narrator_voice not in assigned, f"角色数多时 narrator 音色被复用：{vm.by_speaker}"

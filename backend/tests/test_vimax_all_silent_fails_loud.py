@@ -56,7 +56,7 @@ async def test_all_shots_tts_failure_returns_none(tmp_path, monkeypatch):
     result = await ng.generate_vimax_narration(
         working_dir=working_dir,
         task_dir=task_dir,
-        voice_id="zh-CN-YunjianNeural",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         speed=1.0,
         llm=None,
         original_script="剧本",
@@ -100,7 +100,7 @@ async def test_partial_silence_still_delivers(tmp_path, monkeypatch):
     result = await ng.generate_vimax_narration(
         working_dir=working_dir,
         task_dir=task_dir,
-        voice_id="zh-CN-YunjianNeural",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         speed=1.0,
         llm=None,
         original_script="剧本",
@@ -132,7 +132,7 @@ async def test_sound_effect_only_storyboard_is_not_a_failure(tmp_path, monkeypat
     result = await ng.generate_vimax_narration(
         working_dir=working_dir,
         task_dir=task_dir,
-        voice_id="zh-CN-YunjianNeural",
+        voice_id="doubao:zh_female_vv_uranus_bigtts",
         speed=1.0,
         llm=None,
         original_script="剧本",

@@ -17,7 +17,7 @@ from tts_backends.backend_common import (
     read_api_key,
     read_http_error,
 )
-from tts_backends.backend_edge import (
+from tts_backends.subtitle_timing import (
     DEFAULT_SUBTITLE_MAX_CHARS,
     format_word_timed_srt,
 )

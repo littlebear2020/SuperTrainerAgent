@@ -349,7 +349,7 @@ def build_speaker_voice_map(
 ) -> SpeakerVoiceMap:
     """Assign a distinct voice to each character by inferred gender.
 
-    - Known gender: rotate through that gender's pool (qihu first, edge-tts overflow).
+    - Known gender: rotate through that gender's Doubao catalog pool.
     - Unknown gender: rotate through whichever pool has more remaining, so the
       character still gets a distinct voice rather than colliding on default
       (which would also collide with other unknowns + the narrator). Logged info.

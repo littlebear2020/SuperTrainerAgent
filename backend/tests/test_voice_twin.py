@@ -70,12 +70,6 @@ class TestVoiceCloneConfig:
         assert cfg.enabled is True
         assert cfg.appid == "test_app"
 
-    def test_edge_tts_config_defaults(self):
-        """A2：edge-tts 默认开启（兜底链安全网），超时 60s。"""
-        cfg = VoiceCloneConfig()
-        assert cfg.edge_tts.enabled is True
-        assert cfg.edge_tts.timeout == 60.0
-
     def test_training_reaper_config_defaults(self):
         """D1：训练超时 30min / 巡检 5min 默认值。"""
         cfg = VoiceCloneConfig()

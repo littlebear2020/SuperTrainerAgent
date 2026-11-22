@@ -124,20 +124,13 @@ def _minimal_wav_bytes(duration_s: float = 0.2) -> bytes:
 
 @pytest.fixture()
 def tts_wav_bytes():
-    """暴露最小 WAV 构造——给需要走真实 ``_synthesize_qihu`` 代码路径的用例。"""
+    """暴露最小 WAV 构造给音频转码用例。"""
     return _minimal_wav_bytes
 
 
 @pytest.fixture()
 def hermetic_tts(monkeypatch):
-    """拦截 orchestration.tts 全部四条合成外呼（doubao/clone/qihu/edge）。
-
-    假合成写最小 WAV 落盘并返回 TTSResult；任何未被拦净的真实外呼会被
-    ``edge_tts.Communicate`` / ``QihuTTSClient`` tripwire 以 AssertionError
-    响亮失败——不再允许「静默依赖外部服务」的假绿。需要验证 _synthesize_qihu
-    真实内部逻辑的用例（如 test_week5_remediation 的参数形状断言）请勿用本
-    fixture（它会整体替换掉被测对象），改用 tts_wav_bytes + 自行 mock 客户端。
-    """
+    """拦截 orchestration.tts 的字节与克隆合成外呼并写最小 WAV。"""
     from app.gateway.video_gen.orchestration import tts as tts_mod
 
     async def _fake(text, voice_id, speed, output_path, **kwargs):
@@ -145,14 +138,6 @@ def hermetic_tts(monkeypatch):
         Path(output_path).write_bytes(_minimal_wav_bytes())
         return tts_mod.TTSResult(audio_path=output_path, srt="", duration=0.2, actual_voice_id=None)
 
-    for fn in ("_synthesize_doubao", "_synthesize_clone", "_synthesize_qihu", "_synthesize_edge"):
+    for fn in ("_synthesize_doubao", "_synthesize_clone"):
         monkeypatch.setattr(tts_mod, fn, _fake)
-
-    def _tripwire(*args, **kwargs):
-        raise AssertionError("真实 TTS 外呼未拦截干净（hermetic_tts tripwire）——检查新增合成入口是否绕过 orchestration.tts 四路径")
-
-    monkeypatch.setattr("edge_tts.Communicate", _tripwire)
-    from app.gateway.voice_twin import qihu_tts_client as _qtc
-
-    monkeypatch.setattr(_qtc, "QihuTTSClient", _tripwire)
     return tts_mod

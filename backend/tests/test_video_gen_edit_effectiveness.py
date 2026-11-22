@@ -61,7 +61,7 @@ def _task_dir(tmp_path, task_id="vg_edit") -> Path:
 
 
 def _write_storyboard(task_dir: Path, config_extra: dict | None = None, frames: list | None = None, subtitle_locked: bool | None = None) -> dict:
-    cfg = {"video_type": "ai_image", "width": 1080, "height": 1920, "voice_id": "preset:146", "tts_speed": 1.2, "bgm_volume": 0.15}
+    cfg = {"video_type": "ai_image", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_m191_uranus_bigtts", "tts_speed": 1.2, "bgm_volume": 0.15}
     cfg.update(config_extra or {})
     sb = {
         "title": "t",
@@ -473,33 +473,33 @@ async def test_t5a_put_config_voice_dual_writes_payload(tmp_path):
     svc.get_task = AsyncMock(return_value=SimpleNamespace(status="ready", task_type="ai_image", payload=json.dumps(task_payload)))
     svc.repo.update = AsyncMock()
     task_dir = _task_dir(tmp_path)
-    _write_storyboard(task_dir)  # config.voice_id = preset:146
+    _write_storyboard(task_dir)  # config.voice_id = doubao:zh_male_m191_uranus_bigtts
 
-    await vg.update_storyboard_config(_fake_request(svc), "vg_edit", vg.UpdateStoryboardConfigRequest(voice_id="preset:200"))
+    await vg.update_storyboard_config(_fake_request(svc), "vg_edit", vg.UpdateStoryboardConfigRequest(voice_id="doubao:zh_male_liufei_uranus_bigtts"))
 
     assert svc.repo.update.await_count == 1, "voice 实际变化须双写 DB payload"
     pl = json.loads(svc.repo.update.await_args.kwargs["payload"])
-    assert pl["voice_id"] == "preset:200"
+    assert pl["voice_id"] == "doubao:zh_male_liufei_uranus_bigtts"
     assert pl["bgm_volume"] == 0.15, "双写不得覆盖 payload 其他键"
     sb = json.loads((task_dir / "storyboard.json").read_text(encoding="utf-8"))
-    assert sb["config"]["voice_id"] == "preset:200"
+    assert sb["config"]["voice_id"] == "doubao:zh_male_liufei_uranus_bigtts"
 
 
 @pytest.mark.asyncio
 async def test_t5a_re_render_keeps_user_voice_after_dual_write(tmp_path, monkeypatch):
     """T5a 后半：双写后的 payload 喂 re-render → 管线拾取用户音色、盘面 config 不被旧快照改回。"""
-    dual_written = {"voice_id": "preset:200", "bgm_volume": 0.15}
-    storyboard = {"title": "t", "config": {"video_type": "ai_image", "width": 1080, "height": 1920, "voice_id": "preset:200"}, "frames": []}
+    dual_written = {"voice_id": "doubao:zh_male_liufei_uranus_bigtts", "bgm_volume": 0.15}
+    storyboard = {"title": "t", "config": {"video_type": "ai_image", "width": 1080, "height": 1920, "voice_id": "doubao:zh_male_liufei_uranus_bigtts"}, "frames": []}
     svc = _bare_re_render_service(tmp_path, dual_written, storyboard)
     seen, finish = _capture_re_render(svc, monkeypatch)
 
     await svc.re_render_task("vg_edit", USER)
     await finish()
 
-    assert seen[0]["voice_id"] == "preset:200", "re-render 管线须拾取用户显式音色（payload=用户最新意图）"
+    assert seen[0]["voice_id"] == "doubao:zh_male_liufei_uranus_bigtts", "re-render 管线须拾取用户显式音色（payload=用户最新意图）"
     task_dir = Path(tmp_path) / USER / "tasks" / "vg_edit"
     cfg = json.loads((task_dir / "storyboard.json").read_text(encoding="utf-8"))["config"]
-    assert cfg.get("voice_id") == "preset:200", "_settings_updater 回写不得把用户值改回旧快照"
+    assert cfg.get("voice_id") == "doubao:zh_male_liufei_uranus_bigtts", "_settings_updater 回写不得把用户值改回旧快照"
 
 
 @pytest.mark.asyncio
@@ -507,14 +507,14 @@ async def test_t5b_follow_task_bgm_only_re_render_re_resolves(tmp_path, monkeypa
     """T5b：跟随任务（payload 未显式音色）BGM-only 保存 → re-render 仍重取项目音色。"""
     from app.gateway.routers import video_gen as vg
 
-    pid = _seed_project(tmp_path, voice_id="preset:332")
+    pid = _seed_project(tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts")
     payload = {"course_project_id": pid, "voice_id": None, "bgm_volume": 0.15}
 
     svc = _make_service(tmp_path)
     svc.get_task = AsyncMock(return_value=SimpleNamespace(status="ready", task_type="ai_image", payload=json.dumps(payload)))
     svc.repo.update = AsyncMock()
     task_dir = _task_dir(tmp_path)
-    _write_storyboard(task_dir, config_extra={"voice_id": "preset:146"})
+    _write_storyboard(task_dir, config_extra={"voice_id": "doubao:zh_male_m191_uranus_bigtts"})
 
     await vg.update_storyboard_config(_fake_request(svc), "vg_edit", vg.UpdateStoryboardConfigRequest(bgm_volume=0.9))
     assert svc.repo.update.await_count == 0, "BGM-only 保存不得写 payload（tts_speed/bgm_volume 不双写）"
@@ -523,7 +523,7 @@ async def test_t5b_follow_task_bgm_only_re_render_re_resolves(tmp_path, monkeypa
     seen, finish = _capture_re_render(svc2, monkeypatch)
     await svc2.re_render_task("vg_edit", USER)
     await finish()
-    assert seen[0]["voice_id"] == "preset:332", "未显式 → 重取项目音色（P2-15 不被误杀）"
+    assert seen[0]["voice_id"] == "doubao:zh_female_vv_uranus_bigtts", "未显式 → 重取项目音色（P2-15 不被误杀）"
 
 
 @pytest.mark.asyncio
@@ -532,11 +532,11 @@ async def test_t5c_explicit_null_voice_clears_config_and_payload(tmp_path):
     from app.gateway.routers import video_gen as vg
 
     svc = _make_service(tmp_path)
-    payload = {"voice_id": "preset:146", "bgm_volume": 0.15}
+    payload = {"voice_id": "doubao:zh_male_m191_uranus_bigtts", "bgm_volume": 0.15}
     svc.get_task = AsyncMock(return_value=SimpleNamespace(status="ready", task_type="ai_image", payload=json.dumps(payload)))
     svc.repo.update = AsyncMock()
     task_dir = _task_dir(tmp_path)
-    _write_storyboard(task_dir)  # config.voice_id = preset:146
+    _write_storyboard(task_dir)  # config.voice_id = doubao:zh_male_m191_uranus_bigtts
 
     body = vg.UpdateStoryboardConfigRequest.model_validate({"voice_id": None})
     assert "voice_id" in body.model_fields_set, "前置：null 须被识别为显式设置"
@@ -558,17 +558,17 @@ async def test_t5d_bgm_only_save_with_same_voice_keeps_follow_semantics(tmp_path
     → payload.voice_id 不被写入（保持 None）→ re-render 仍重取项目音色。"""
     from app.gateway.routers import video_gen as vg
 
-    pid = _seed_project(tmp_path, voice_id="preset:332")
+    pid = _seed_project(tmp_path, voice_id="doubao:zh_female_vv_uranus_bigtts")
     payload = {"course_project_id": pid, "voice_id": None, "bgm_volume": 0.15}
 
     svc = _make_service(tmp_path)
     svc.get_task = AsyncMock(return_value=SimpleNamespace(status="ready", task_type="ai_image", payload=json.dumps(payload)))
     svc.repo.update = AsyncMock()
     task_dir = _task_dir(tmp_path)
-    _write_storyboard(task_dir, config_extra={"voice_id": "preset:146"})  # 创建期解析值
+    _write_storyboard(task_dir, config_extra={"voice_id": "doubao:zh_male_m191_uranus_bigtts"})  # 创建期解析值
 
     # 前端全量提交：voice_id=当前 config 同值 + bgm 变化
-    await vg.update_storyboard_config(_fake_request(svc), "vg_edit", vg.UpdateStoryboardConfigRequest(voice_id="preset:146", bgm_volume=0.9))
+    await vg.update_storyboard_config(_fake_request(svc), "vg_edit", vg.UpdateStoryboardConfigRequest(voice_id="doubao:zh_male_m191_uranus_bigtts", bgm_volume=0.9))
 
     assert svc.repo.update.await_count == 0, "voice 同值提交不得写 payload（diff 门控）——否则 _had_explicit_voice 误 True"
     sb = json.loads((task_dir / "storyboard.json").read_text(encoding="utf-8"))
@@ -578,7 +578,7 @@ async def test_t5d_bgm_only_save_with_same_voice_keeps_follow_semantics(tmp_path
     seen, finish = _capture_re_render(svc2, monkeypatch)
     await svc2.re_render_task("vg_edit", USER)
     await finish()
-    assert seen[0]["voice_id"] == "preset:332", "跟随语义须保留：项目改音色 → re-render 重取"
+    assert seen[0]["voice_id"] == "doubao:zh_female_vv_uranus_bigtts", "跟随语义须保留：项目改音色 → re-render 重取"
 
 
 # ---------------------------------------------------------------------------
@@ -659,7 +659,7 @@ async def _ffmpeg_fake(fn, args, out, **kw):
     Path(out).write_bytes(b"concat")
 
 
-def _seed_regen_task(tmp_path, voice="preset:146", pending=None, locked=False, task_type="ai_image"):
+def _seed_regen_task(tmp_path, voice="doubao:zh_male_m191_uranus_bigtts", pending=None, locked=False, task_type="ai_image"):
     task_dir = _task_dir(tmp_path)
     from app.gateway.video_gen.service import _audio_cache_key
 
@@ -698,7 +698,7 @@ async def test_t6a_regenerate_all_audio_full_chain(tmp_path, monkeypatch):
 
     task_dir, sb = _seed_regen_task(tmp_path, pending=[0])
     # 用户已改音色（PUT config 已保存 config.voice_id）
-    sb["config"]["voice_id"] = "preset:200"
+    sb["config"]["voice_id"] = "doubao:zh_male_liufei_uranus_bigtts"
     (task_dir / "storyboard.json").write_text(json.dumps(sb, ensure_ascii=False), encoding="utf-8")
     old_paths = [f["audio_path"] for f in sb["frames"]]
 
@@ -709,7 +709,7 @@ async def test_t6a_regenerate_all_audio_full_chain(tmp_path, monkeypatch):
     disk = json.loads((task_dir / "storyboard.json").read_text(encoding="utf-8"))
     for i, fr in enumerate(disk["frames"]):
         assert fr["audio_path"] != old_paths[i], "CAS miss 须指向新文件"
-        expected = task_dir / "audio" / f"{_audio_cache_key(fr['narration'], 'preset:200', 1.2)}.mp3"
+        expected = task_dir / "audio" / f"{_audio_cache_key(fr['narration'], 'doubao:zh_male_liufei_uranus_bigtts', 1.2)}.mp3"
         assert fr["audio_path"] == str(expected), "新文件名 = 新音色 CAS 键"
         assert expected.exists()
     assert (task_dir / "audio.mp3").exists(), "拼接产物须重建"

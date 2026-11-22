@@ -63,7 +63,7 @@ class TestSubtitleTextConsistency:
 
             async def set_result(self, **kwargs): ...
 
-        payload = {"voice_id": "preset:146", "pptx_path": "fake.pptx", "subtitle": True, "preset": "none"}
+        payload = {"voice_id": "doubao:zh_female_vv_uranus_bigtts", "pptx_path": "fake.pptx", "subtitle": True, "preset": "none"}
         await svc._run_ppt_to_video("task1", "user1", payload, tmp_path, _Progress())
         return tts_spy
 

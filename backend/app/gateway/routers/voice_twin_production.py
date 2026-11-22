@@ -116,9 +116,9 @@ async def preview_voice(request: Request, voice_id: str, text: str | None = None
 
     preview_text = (text or DEFAULT_PREVIEW_TEXT)[:MAX_PREVIEW_CHARS]
 
-    from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, is_edge_voice_id, is_preset_voice_id
+    from app.gateway.voice_twin.preset_voices import is_doubao_voice_id
 
-    is_cloud = is_preset_voice_id(voice_id) or is_doubao_voice_id(voice_id) or is_edge_voice_id(voice_id)
+    is_cloud = is_doubao_voice_id(voice_id)
 
     voice_id_safe = _safe_cache_voice_id(voice_id)
     cache_key = f"{voice_id_safe}_{hashlib.md5(preview_text.encode('utf-8')).hexdigest()[:8]}"
@@ -188,28 +188,12 @@ async def submit_script_to_audio(request: Request, body: ScriptToAudioRequest):
 async def _verify_voice(svc: ProductionService, voice_id: str, user_id: str):
     """Common voice validation for cloned and catalog voices."""
     from app.gateway._shared.voice_catalog import ensure_voice_id_supported
-    from app.gateway.voice_twin.preset_voices import (
-        get_preset_voice_name,
-        is_doubao_voice_id,
-        is_edge_voice_id,
-        is_preset_voice_id,
-        parse_doubao_voice_id,
-        parse_edge_voice_id,
-        parse_preset_voice_id,
-    )
+    from app.gateway.voice_twin.preset_voices import is_doubao_voice_id, parse_doubao_voice_id
 
     try:
         ensure_voice_id_supported(voice_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-
-    if is_preset_voice_id(voice_id):
-        name = get_preset_voice_name(voice_id) or f"360 预设音色 {parse_preset_voice_id(voice_id)}"
-        voice = _PseudoVoice()
-        voice.voice_name = name
-        voice.speaker_id = voice_id
-        voice.user_id = user_id
-        return voice
 
     if is_doubao_voice_id(voice_id):
         try:
@@ -219,13 +203,6 @@ async def _verify_voice(svc: ProductionService, voice_id: str, user_id: str):
             raise HTTPException(status_code=400, detail="Invalid doubao voice id")
         voice = _PseudoVoice()
         voice.voice_name = f"豆包音色 {speaker}"
-        voice.speaker_id = voice_id
-        voice.user_id = user_id
-        return voice
-
-    if is_edge_voice_id(voice_id):
-        voice = _PseudoVoice()
-        voice.voice_name = f"Edge 音色 {parse_edge_voice_id(voice_id)}"
         voice.speaker_id = voice_id
         voice.user_id = user_id
         return voice

@@ -6,7 +6,6 @@
 #   httpx, docx2txt, python-pptx, uvicorn, lxml, Pillow, requests
 #
 # This layer adds:
-#   - edge-tts:        auto-video-flow (Microsoft Edge TTS)
 #   - pysrt:           SRT subtitle parsing
 #   - duckdb:          data-analysis (in-process SQL analytics)
 #   - openpyxl:        data-analysis + xlsx (Excel file reading)
@@ -73,7 +72,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3.10-venv
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir --break-system-packages setuptools wheel && \
     pip3 install --no-cache-dir --break-system-packages \
-    edge-tts \
     pysrt \
     defusedxml \
     duckdb \
@@ -93,7 +91,6 @@ RUN echo "=== Skills dependency check ===" \
     && ffprobe -version 2>&1 | head -1 \
     && yt-dlp --version \
     && python3 -c "import pysrt; print('pysrt OK')" \
-    && python3 -c "import edge_tts; print('edge-tts OK')" \
     && python3 -c "import duckdb; print('duckdb OK')" \
     && python3 -c "import openpyxl; print('openpyxl OK')" \
     && python3 -c "import docx; print('python-docx OK')" \

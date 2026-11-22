@@ -1,6 +1,6 @@
 # 服务器实测问题修复与 TTS 单通道收敛实施计划
 
-> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1→2→3→4 串行，P6/P7 未取证不开 PR；PR 3 改为同一 PR 四笔本地提交；changelog 将登记为 `docs/changelog/changelog-2026-11-22-live-test-remediation.md`；不授权自动部署、付费调用或修改服务器配置）。
+> **状态**：未执行完成（2026-11-22 开始，当前执行中；PR 1=#40、PR 2=#41 已合入，PR 3/4 串行进行中；PR 3 为同一 PR 四笔本地提交；新增 Sandbox 7200 秒独立后续 PR；P6/P7 未取证不开 PR；不授权自动部署、付费调用或修改服务器配置）。
 > **TL;DR**：四个主 PR 分别修复停止清草稿、播客 URL 抓取、字节 TTS 单通道，以及默认徽标、用量标题、合成文案和 live 断言；P12、Writer、P4、P8、P15 退出。P6/P7 证据不足则记录阻塞且不开 PR；不自动部署，不修改服务器配置。
 
 > **For agentic workers：** 使用 `executing-plans`，单执行者按 Task 0→7 串行执行并逐项勾选；每项先写失败测试、确认功能原因失败、最小实现、定向回归，再提交。主批只允许本计划定义的四个 PR，P6/P7 各自取证后才能另开独立 PR；不在当前分叉工作区直接实施。
@@ -36,6 +36,7 @@
 | D11 | 基准 `config.example.yaml` 的 `config_version` 为 **32**；只有实际删除 `qihu_tts`/`edge_tts` 配置结构时才加 1。服务器配置与示例不是同一版本谱系，部署按字段合并，不按版本号大小覆盖。 |
 | D12 | P9 同时修 Agent 和视频用量：缺标题返回 `null`，保留 Agent 首条消息回退，前端统一显示“标题生成中”。 |
 | D13 | P6 原 run 不能免费恢复且无新付费授权时，以“外部阻塞、未重跑、未开 PR”完成本任务；P7 同样允许以“证据不足、未开 PR”收口。 |
+| D14 | 用户 2026-11-22 补充：Sandbox 空闲释放在本地与部署环境统一为 7200 秒；该新增范围走独立后续 PR，不混入 PR 1–4，也不冒充 P6 根因已查明。 |
 
 ## 二、范围与 Review Focus
 
@@ -73,6 +74,7 @@
 | **PR 3 / Task 3+4** | 点名的 backend voice_twin/video_gen/shared voice catalog、相关 routers/config/tests、音色相关 frontend、`skills/**` 的 Edge/360 TTS 引用、`docker/sandbox/Dockerfile`、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 AGENTS/常青 docs | 360 非 TTS 能力、Writer、P1/P5/P6/P7/P13、Remotion 模板、无关 provider 包裹链、真实配置与密钥 | **唯一大 PR，同一 PR 整体回滚**；四笔本地提交全部验证后一次性 push；预计 1–2 轮 OCR，范围不得随评审扩大。 |
 | **PR 4 / P5/P9/P10/P13** | `input-box.tsx`、`core/models/**`、personal_usage 的 agent/video/types 与 usage 前端、video status label、live tests/runbook、对应测试 | **PR 1 合入前不得开始**；P12、Writer、`settings/account-settings-page.tsx`、`app/(auth)/login/page.tsx`、`config.example.yaml`、真实 config | 对应单元测试、mock E2E、CI 通过；不含服务器 L1/L2 门禁。 |
 | **P6/P7 条件 PR** | 证据确认后分别点名最小实现与测试文件 | 未取证改实现、整体重写虚拟列表、无关中间件/provider 改动 | 各自根因/复现证据先行；证据不足不开 PR，只更新本计划阻塞状态。 |
+| **新增独立 Sandbox PR** | `warm_pool_lifecycle.py`、`sandbox_config.py`、`aio_sandbox_provider.py`、对应测试与本计划/changelog | 不修改真实 config、不自动部署、不混入 P6/P7 或四个主 PR | 默认与本地未显式覆盖时均为 7200 秒；TDD + OCR + CI 后合入。 |
 
 PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色；②调用方去降级；③技能、依赖、配置和镜像清理；④前端停用态。四笔均在本地逐笔验收，全部验证后一次性 push，只能作为一个 PR 评审和合入。
 
@@ -107,7 +109,7 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 - [x] 非公网 IP、混合 DNS、重定向逐跳复查、HTTPS 降级拒绝、Host/SNI/TLS、大小/超时和 HTML 消毒测试全部保留并随 47 条套件通过。
 - [x] `Connection: close`、分块、EOF、重定向后 EOF 已覆盖；本机 Python 3.12.13 与沙箱 Python 3.10.12 探针均通过，见 `temp/live-test-remediation-20261122/p11-evidence.md`。
 - [x] 本地受控 HTTP 完整 `fetch_url()` 与实际沙箱公开 URL intake 均通过；公开探针 `requested_url=https://1.1.1.1`、`final_url=https://one.one.one.one/`、`mime=text/html`，DNS 环境特判仅在探针且每跳仍执行公网校验。
-- [ ] 安全测试随 PR 2 提交，完成核心路径 OCR 和 CI 后合入。
+- [x] 安全测试随 PR 2=#41 提交；本地 OCR 0 findings，GitHub OCR 仅 1 条 low（私有 `_sock` 说明，未改实现），CI 全绿，已 rebase 合入。
 
 ### Task 3 / PR 3-A：TTS 目录、统一入口和调用方只走字节（P3 运行批）
 
@@ -120,12 +122,12 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 
 **Files：** shared voice catalog、voice_twin service/production/config/schema、video_gen orchestration 与实际消费方、音色相关前端和测试；只改完成单通道所需文件。
 
-- [ ] 第一笔提交先写目录/入口失败测试：两个音色 API 只剩上述 4 条；`preset:*`、`edge:*` 和裸 Edge ShortName 在任何网络调用前得到可读错误。
-- [ ] 在 shared catalog 与统一 `synthesize()` 实施拒绝，保留 `doubao:*`、既有克隆、字节重试、字级时间戳、情绪、section_id、缓存和 SRT 行为。
-- [ ] 第二笔提交只移除实际调用方的 doubao→qihu→edge、qihu→edge 和仅为旧降级存在的策略；字节 429/5xx/传输错误重试耗尽后失败，不换声、不伪装降级成功。
-- [ ] 克隆上传、训练、试听、合成保持现状，克隆失败仍不降级。
-- [ ] 默认音色只从上述目录选择；英、日、韩、法、西、德不再保留 Edge 默认或新建入口。未获付费授权只记 `LIVE_NOT_VERIFIED`，不因此清空中文入口或新开语言。
-- [ ] 历史音频和用量不迁移；旧任务含退役音色时，试听、重配、重生或重渲在提交前提示“原音色已停用，请改选字节直连音色”。
+- [x] 第一笔提交 `2b2256de`：目录/入口失败测试先行；两个音色 API 只剩 4 条；`preset:*`、`edge:*` 与裸 Edge ShortName 在任何网络/缓存读取前得到可读错误。
+- [x] shared catalog 与统一 `synthesize()` 已实施拒绝；字节重试、字级时间戳、情绪、section_id、缓存和 SRT 相关回归保留。
+- [x] 第二笔提交 `afb7c6b7`：实际调用方移除 doubao→qihu→edge、qihu→edge 与 ViMax 旧策略；429/5xx、传输和瞬时错误均不换声，组合回归 259 passed。
+- [x] 克隆上传、训练、试听、合成保持现状；克隆失败不降级，归属/缓存安全测试保留。
+- [x] 默认音色只从 4 项目录选择；非中文默认返回 None，前端语言入口留第四笔；真实字节配音记 `LIVE_NOT_VERIFIED`。
+- [x] 历史音频和用量未迁移；退役音色在试听缓存与提交前均以“原音色已停用，请改选字节直连音色”拒绝，不自动替换。
 - [ ] 第四笔提交在 Task 4 的第三笔清理通过后进行：先写前端失败测试，再清理 provider 类型、分组、筛选和残留值禁用态；新建 UI 只剩上述 4 条，旧任务仍可见原值与停用原因，不能自动变成另一音色。
 - [ ] 运行相关 backend/frontend 测试和 mock E2E，证明 360 LLM/生图/视频无行为 diff。
 
@@ -133,15 +135,15 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 
 **Files：** Edge/Qihu 客户端及专属测试、`backend/pyproject.toml`、`backend/uv.lock`、`.env.example`、`config.example.yaml`、相关 skills、`docker/sandbox/Dockerfile`、`backend/AGENTS.md` 和常青模块文档。
 
-- [ ] 全仓分类检索 `edge_tts`、`edge-tts`、`edge:`、`preset:`、Qihu TTS 和旧 TTS 开关；历史报告/changelog 不改，现行运行代码与常青文档不得继续承诺旧通道。
-- [ ] PPT Master 先把 `DEFAULT_SUBTITLE_MAX_CHARS`、`format_word_timed_srt` 及其专用辅助函数迁到中性 `tts_backends/subtitle_timing.py`，更新 CosyVoice、ElevenLabs、MiniMax imports 并跑字幕/import 回归。
-- [ ] 上述回归通过后，才删除 `notes_to_audio.py` 的 Edge import、`backend_edge.generate` 分发、CLI 列表/默认引用和 Edge 合成 backend/依赖；禁止直接整文件删除导致其他后端坏 import。
-- [ ] 所有 vendored 改动登记 `TRAINERAI_PATCHES.md`；保留其他后端现有非 Edge 能力和字节 `backend_trainerai`，不顺手重构。
-- [ ] 删除 backend/sandbox 的 Edge 依赖、import、自检与旧重试帮助器；删除 360 TTS 配置/价格解析，保留 Qihu 其他媒体配置与价格。
-- [ ] 基准 `config_version=32`。仅当真正删除 `qihu_tts`/`edge_tts` 配置结构时同步示例并升到 33；若只删注释/死配置引用则不升。
-- [ ] 部署配置按字段合并，不比较服务器与示例的版本号大小，不自动覆盖真实 config。
-- [ ] 更新 `backend/AGENTS.md` 为“字节直连，失败响亮；克隆不降级”，同步其他现行注释；历史文档不改。
-- [ ] 第三笔提交完成上述清理并重建本地 sandbox 镜像，证明 Edge 包已移除且字节脚本/FFmpeg 可用；随后完成 Task 3 的第四笔前端提交，Task 3+4 全部验证后一次性 push，只开 PR 3，四笔提交整体 OCR、CI 和合入。
+- [x] 已分类检索旧 TTS 引用；历史报告/changelog 未回改，现行代码只保留退役拒绝与历史用量读取，不承诺旧合成通道。
+- [x] PPT Master 已将 `DEFAULT_SUBTITLE_MAX_CHARS`、`format_word_timed_srt` 及辅助函数迁至中性 `tts_backends/subtitle_timing.py`；CosyVoice、ElevenLabs、MiniMax import 与 5 条字幕测试通过。
+- [x] 上述回归通过后删除 `notes_to_audio.py` Edge import、生成分发、CLI 列表/默认引用和 `backend_edge.py`/依赖；其他后端生成逻辑保留。
+- [x] vendored 改动已登记 `TRAINERAI_PATCHES.md` P33；保留其他非 Edge 后端与字节 `backend_trainerai`。
+- [x] backend/sandbox 的 Edge 依赖、import、自检与旧重试引用已清理；360 TTS 配置/价格解析删除，360 LLM/生图/视频配置保留。
+- [x] 已实际删除 `qihu_tts`/`edge_tts` 示例结构，`config.example.yaml` 从 32 升到 33；相关版本断言同步。
+- [x] 本计划/changelog 明确要求部署按字段合并，不比较服务器与示例版本号大小；未读取或覆盖真实 config。
+- [x] `backend/AGENTS.md` 已改为“字节直连，失败响亮；克隆不降级”，相关现行注释同步；历史文档未回改。
+- [x] 第三笔清理已重建本地 sandbox 镜像 `deerflow-sandbox:tts-single-channel-20261122`（ID `sha256:6fcb9108898f…`）；镜像内 `edge_tts` 不存在、FFmpeg 可用，复制后的 PPT 技能可导入字节后端与中性字幕模块；随后完成 Task 3 的第四笔前端提交，Task 3+4 全部验证后一次性 push，只开 PR 3，四笔提交整体 OCR、CI 和合入。
 
 ### Task 5 / PR 4：P5、P9、P10、P13（PR 1 合入后开始）
 
@@ -162,6 +164,11 @@ PR 3 四笔本地提交固定为：①目录和统一入口拒绝非字节音色
 - [ ] P7 只有稳定复现后才开独立 PR；加入重开落底、切线程和跨账号隔离对照，最小修复锚定/测量逻辑，不整体重写。
 - [ ] P7 修复后真实浏览器重复滚动至少 20 轮，不跳顶、不白屏、不截断，最新与最早历史均可达；happy-dom 不冒充真实布局证据。
 - [ ] P7 若仍无法稳定复现，保留诊断用例和观察记录，以“证据不足、未开 PR”完成，不宣称修复。
+
+### Task 6B / 新增独立 PR：Sandbox 空闲释放 7200 秒
+
+- [ ] 先写默认值与本地未显式覆盖的失败测试，再把统一默认从 600 改为 7200；保留显式自定义与 `0=禁用`。
+- [ ] 更新相关注释与验收记录；不读取/修改真实 config，不自动部署；独立 OCR、CI 后合入。
 
 ### Task 7：门禁、登记、部署验收
 

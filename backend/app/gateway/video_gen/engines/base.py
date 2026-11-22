@@ -51,7 +51,7 @@ class EngineContext(BaseModel):
     user_id: str
     task_id: str
     task_dir: Path
-    voice_id: str = "zh-CN-YunjianNeural"
+    voice_id: str = "doubao:zh_female_vv_uranus_bigtts"
     subtitle_style: str = "default"  # B6c: 字幕样式（B2 从项目解析进 storyboard.config，ctx 携带供 vimax overlay 烧录）
     # T7b（2026-10-14 配音修复批）：service 层三级解析后的语速（任务显式 > 项目 >
     # config 缺省，storyboard.config.tts_speed）。修前 engine 只读 ctx.request 的

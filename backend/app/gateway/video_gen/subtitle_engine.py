@@ -1080,7 +1080,7 @@ def srt_to_ass(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# T5: edge-tts token 重对齐
+# T5: TTS token 重对齐
 # ═══════════════════════════════════════════════════════════════════════════
 
 # 标点吸附前置集 / 后置集（Whisper merge_punctuations 思路）
@@ -1092,7 +1092,7 @@ def normalize_word_cues(
     word_cues: list[tuple[str, float, float]],
     reference_text: str,
 ) -> list[tuple[str, float, float]] | None:
-    """把 edge-tts 的逐词 cue 规范化后返回，或失配返回 None。
+    """把 TTS 的逐词 cue 规范化后返回，或失配返回 None。
 
     三步：
     1. 拆词合并：相邻 token end≈start (<20ms) 且拼接后匹配 reference 中同一英文词 → 合并

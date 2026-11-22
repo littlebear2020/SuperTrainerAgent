@@ -200,7 +200,7 @@ def _tts_concurrency(voice_id: str) -> int:
     """Determine TTS concurrency based on voice provider.
 
     Paid cloud TTS providers (360 preset, doubao seed-tts-2.0) get concurrency 3
-    to avoid rate limits. Free edge-tts and clone voices get 5.
+    to avoid rate limits. Existing clone voices get 5.
     """
     if voice_id.startswith(("preset:", "doubao:")):
         return 3
@@ -945,7 +945,7 @@ def _write_storyboard_srt(
 ) -> None:
     """Build one SRT (canonical) + derived ASS spanning all frames.
 
-    Uses the subtitle_engine.segment() for both edge-tts (word_cues) and
+    Uses the subtitle_engine.segment() for provider word_cues and
     doubao/360 (width-ratio) paths. ``subtitle_locked`` guard preserves
     user-edited SRT; ASS is still derived from the locked SRT via srt_to_ass.
 
@@ -2024,7 +2024,6 @@ class VideoGenService(BaseTaskService):
 
         from .orchestration import tts as tts_mod
 
-        tts_mod.set_tts_degradation_context(task_dir)
         payload = json.loads(task.payload) if isinstance(task.payload, str) else (task.payload or {})
         _section_id = payload.get("course_project_id")
 
@@ -3399,8 +3398,6 @@ class VideoGenService(BaseTaskService):
         """
         from .orchestration import tts as tts_mod
 
-        tts_mod.set_tts_degradation_context(task_dir)
-
         # W2（2026-08-24 活性重构）：TTS 整批阶段挂滴答（60 帧健康最坏 60×n≈50min，
         # 帧间无写库远超 P1=120s）。阶段级包一层：gather/concat/SRT/字幕预切共享一个
         # tick task；预算 = margin × _tts_gather_timeout(n)（W4 公式，配置变预算自动变）。
@@ -3946,16 +3943,7 @@ class VideoGenService(BaseTaskService):
         return None
 
     def _resolve_voice_with_vimax_gate(self, task_type: str, payload: dict, *, user_id: str = "default") -> tuple[str | None, str]:
-        """voice 三级解析 + Plan B（2026-10-19）vimax 门。
-
-        ``_prepare_storyboard_and_audio`` 与 ``_generate_draft`` 共用——评审修复：
-        修前 vimax 分支只落在 _prepare，UI 默认草稿路径（auto_render=false →
-        ``_generate_draft``）仍把共享链的 ``preset:146`` 兜底写进
-        storyboard.config.voice_id，后台草稿 TTS 被 reject 策略整体炸成通用错误
-        循环。vimax：缺省走 ``resolve_vimax_default_voice``（zh 兜底不再
-        preset:146）；显式/项目继承 preset 抛可读 ValueError（ensure 统一文案）。
-        非 vimax：完全旧链。返回 (voice_id, effective_source)。
-        """
+        """解析任务、项目与默认音色，并在进入管线前拒绝不可用值。"""
         voice_id = self._resolve_voice_id(payload.get("voice_id"), payload.get("course_project_id"), user_id=user_id)
         source = ""
         if payload.get("voice_id") and payload.get("voice_id") != _STYLE_SENTINEL:
@@ -3968,6 +3956,8 @@ class VideoGenService(BaseTaskService):
                 from app.gateway.video_gen.engines.vimax.voice_policy import resolve_vimax_default_voice
 
                 voice_id = resolve_vimax_default_voice(lang)
+                if not voice_id:
+                    raise ValueError("非中文任务暂无默认字节直连音色，请使用中文或显式选择目录内音色")
                 source = "lang_default"
             else:
                 from .orchestration.voices import resolve_default_voice
@@ -4476,21 +4466,15 @@ class VideoGenService(BaseTaskService):
         except json.JSONDecodeError:
             raise ValueError("任务数据损坏，无法继续渲染，请重建任务") from None
 
-        # 边界收口（2026-10-19 P1-2）+ 边界热修复（2026-10-20 P1，PR#36 复审 Warning③）：
-        # ViMax confirm 门覆盖**三源**——payload 显式、项目继承（course_project.voice_id
-        # 经 _resolve_voice_id 三级链，修前漏拦直到引擎侧才炸）、盘面 storyboard.config
-        # 存量。复用 _resolve_voice_with_vimax_gate（payload/项目/缺省解析三链 + preset
-        # 门统一文案），盘面 config 源沿用 ensure——三源全在派发渲染（任何 LLM/付费）
-        # 前同步可读拒绝（与 generate-audio 门对称），不静默换声。
-        if task.task_type == "vimax":
-            from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
+        # 所有任务在派发渲染前检查 payload、项目继承与盘面 config 三源。
+        from app.gateway.video_gen.engines.vimax.voice_policy import ensure_vimax_voice_allowed
 
-            _cfg_voice = (_sb_payload or {}).get("config", {}).get("voice_id")
-            try:
-                self._resolve_voice_with_vimax_gate(task.task_type, payload, user_id=user_id)
-                ensure_vimax_voice_allowed(_cfg_voice)
-            except ValueError as e:
-                raise ValueError(str(e)) from None
+        _cfg_voice = (_sb_payload or {}).get("config", {}).get("voice_id")
+        try:
+            self._resolve_voice_with_vimax_gate(task.task_type, payload, user_id=user_id)
+            ensure_vimax_voice_allowed(_cfg_voice)
+        except ValueError as e:
+            raise ValueError(str(e)) from None
 
         # 2026-10-20 Task 1（已拍板）：确认渲染固化全局镜头预算——显式
         # vimax_global_shot_budget > target_duration > 草稿 storyboard.total_duration。
