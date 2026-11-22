@@ -1,13 +1,16 @@
 import hashlib
+import http.server
 import importlib.util
 import ipaddress
 import json
 import socket
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,6 +22,9 @@ SPEC = importlib.util.spec_from_file_location("podcast_studio", MODULE_PATH)
 ps = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = ps
 SPEC.loader.exec_module(ps)
+REAL_CREATE_CONNECTION = socket.create_connection
+REAL_GETADDRINFO = socket.getaddrinfo
+REAL_SOCKET_CONNECT = socket.socket.connect
 
 
 @pytest.fixture(autouse=True)
@@ -299,12 +305,17 @@ class FakeConnection:
     responses = []
     instances = []
 
+    class Socket:
+        def settimeout(self, value):
+            pass
+
     def __init__(self, host, port=None, timeout=None, **kwargs):
         self.host = host
         self.port = port
         self.timeout = timeout
         self.kwargs = kwargs
         self.requests = []
+        self.sock = self.Socket()
         self.__class__.instances.append(self)
 
     def request(self, method, target, headers=None):
@@ -614,3 +625,128 @@ def test_response_socket_timeout_shrinks_with_remaining_budget(monkeypatch):
     timeouts = TimeoutConnection.instances[-1].sock.timeouts
     assert len(timeouts) >= 3
     assert 0 < timeouts[-1] < timeouts[0]
+
+
+def test_response_socket_io_uses_its_underlying_socket():
+    left, right = socket.socketpair()
+    raw = socket.SocketIO(left, "r")
+    response = SimpleNamespace(fp=SimpleNamespace(raw=raw))
+    try:
+        ps._set_socket_timeout(SimpleNamespace(sock=None), response, time.monotonic() + 5)
+        assert 0 < left.gettimeout() <= 5
+    finally:
+        raw.close()
+        left.close()
+        right.close()
+
+
+def test_response_socket_timeout_handles_eof_and_rejects_open_socketless_response():
+    closed = SimpleNamespace(fp=None, isclosed=lambda: True)
+    ps._set_socket_timeout(SimpleNamespace(sock=None), closed, time.monotonic() + 5)
+
+    open_without_socket = SimpleNamespace(fp=SimpleNamespace(raw=object()), isclosed=lambda: False)
+    with pytest.raises(ps.PodcastError, match="socket|Socket"):
+        ps._set_socket_timeout(SimpleNamespace(sock=None), open_without_socket, time.monotonic() + 5)
+
+
+@pytest.fixture
+def controlled_http_server():
+    class Handler(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        requests = []
+
+        def do_GET(self):
+            type(self).requests.append((self.path, self.headers.get("Host"), self.headers.get("Connection")))
+            if self.path == "/redirect":
+                self.send_response(302)
+                self.send_header("Location", "/final")
+                self.send_header("Content-Length", "0")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                return
+            if self.path == "/chunked":
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Transfer-Encoding", "chunked")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                for chunk in (b"chunk-", b"body"):
+                    self.wfile.write(f"{len(chunk):X}\r\n".encode("ascii") + chunk + b"\r\n")
+                self.wfile.write(b"0\r\n\r\n")
+                self.close_connection = True
+                return
+            if self.path not in {"/close", "/final"}:
+                self.send_error(404)
+                return
+            body = b"final-body" if self.path == "/final" else b"close-body"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            self.close_connection = True
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def controlled_fetch(monkeypatch, server, path):
+    monkeypatch.setattr(socket, "create_connection", REAL_CREATE_CONNECTION)
+    monkeypatch.setattr(socket.socket, "connect", REAL_SOCKET_CONNECT)
+
+    def controlled_dns(host, port, *args, **kwargs):
+        if host == "example.com":
+            return public_dns(host, port)
+        return REAL_GETADDRINFO(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(ps.socket, "getaddrinfo", controlled_dns)
+    validated = []
+    validate = ps.validate_public_ip
+
+    def record_validation(address):
+        validated.append(str(address))
+        validate(address)
+
+    class LocalConnection(ps.HTTPConnection):
+        def __init__(self, _pinned_ip, _port=None, **kwargs):
+            super().__init__("127.0.0.1", server.server_port, **kwargs)
+
+    monkeypatch.setattr(ps, "validate_public_ip", record_validation)
+    monkeypatch.setattr(ps, "HTTPConnection", LocalConnection)
+    url = f"http://example.com:{server.server_port}{path}"
+    return ps.fetch_url(url), url, validated
+
+
+def test_fetch_url_connection_close_reads_real_response(monkeypatch, controlled_http_server):
+    result, requested, validated = controlled_fetch(monkeypatch, controlled_http_server, "/close")
+    assert result.raw == b"close-body"
+    assert result.requested_url == requested
+    assert result.final_url == requested
+    assert result.mime == "text/plain"
+    assert validated == ["93.184.216.34"]
+    assert controlled_http_server.RequestHandlerClass.requests[-1][1:] == (f"example.com:{controlled_http_server.server_port}", "close")
+
+
+def test_fetch_url_chunked_response_and_eof(monkeypatch, controlled_http_server):
+    result, requested, _ = controlled_fetch(monkeypatch, controlled_http_server, "/chunked")
+    assert result.raw == b"chunk-body"
+    assert result.requested_url == result.final_url == requested
+
+
+def test_fetch_url_redirect_then_final_eof(monkeypatch, controlled_http_server):
+    result, requested, validated = controlled_fetch(monkeypatch, controlled_http_server, "/redirect")
+    assert result.raw == b"final-body"
+    assert result.requested_url == requested
+    assert result.final_url == requested.replace("/redirect", "/final")
+    assert validated == ["93.184.216.34", "93.184.216.34"]
