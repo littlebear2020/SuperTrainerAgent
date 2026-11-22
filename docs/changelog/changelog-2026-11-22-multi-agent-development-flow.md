@@ -86,6 +86,14 @@
 - 最终 OCR 无 Critical/Important/medium，仅 3 条 low deferred：① `release_archive.py` finally 后的不可达 return；②③ 两件 deploy 的侧车格式预检不如 upload 明确。后两项在格式错误时仍会因摘要/源码不一致阻断，不影响发布安全语义，故不为低优先打磨新增行为改动。
 - 四轮已修发现均保留对应回归；最终三件流程测试文件 `32 passed`，后端全量 `10305 passed, 95 skipped`。
 
+## 缓存与敏感配置边界（PR #39 复审）
+
+- 两件 pack 均明确提示“缓存以 Git 提交内版本为准”，本地未提交、忽略目录或重新下载的更新不会静默入包；需要升级缓存必须先走受控提交。
+- 本地发布包和侧车均 `chmod 600`；scp 成功后再收紧服务器权限。显式 `includes_local_config=true` 的包在 deploy 成功后删除 tar 与侧车，失败时仅以 0600 保留用于排障。
+- 根 config workflow pattern 改为 `/config*.yaml`，与 quick-checks 根目录语义一致；生产 pack 参数转发统一为单个可选 `--no-sandbox`。
+- `ls-tree -z` high 评论经原始输出证伪：实际形态为 `<mode> blob <sha>\t<path>\0`，metadata/path 之间仍保留 TAB，现有解析与已跟踪计划测试正确，未按误报修改。
+- 本轮相关回归三件测试文件合计 `38 passed`，两件 Bash 脚本语法检查与 `git diff --check` 通过。
+
 ## 未验证范围
 
 - 未向真实服务器 upload/deploy，未验证服务器配置恢复或实际运行配置是否一致；本批只提供不可变包与版本证据。

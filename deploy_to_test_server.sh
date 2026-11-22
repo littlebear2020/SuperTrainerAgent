@@ -57,6 +57,7 @@ pack() {
 
     cd "$LOCAL_DIR"
     rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
+    echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${TEST_DEPLOY_REF:-origin/main}"
     ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output "$TAR_FILE")
     if [ "${TEST_ALLOW_UNMERGED:-0}" = "1" ]; then
@@ -79,6 +80,7 @@ pack() {
     RELEASE_SHA="$(release_sha "$TAR_FILE")" || { echo -e "${RED}❌ 发布包缺少有效 manifest，请检查打包错误${NC}"; return 1; }
     ARCHIVE_DIGEST="$(archive_sha256 "$TAR_FILE")" || { echo -e "${RED}❌ 无法计算发布包摘要${NC}"; return 1; }
     printf '%s\n%s\n' "$RELEASE_SHA" "$ARCHIVE_DIGEST" > "$ARCHIVE_SHA_FILE.tmp" && mv "$ARCHIVE_SHA_FILE.tmp" "$ARCHIVE_SHA_FILE"
+    chmod 600 "$TAR_FILE" "$ARCHIVE_SHA_FILE"
     SIZE=$(ls -lh "$TAR_FILE" | awk '{print $5}')
     echo ""
     echo -e "${GREEN}✅ 打包完成: $SIZE${NC}"
@@ -129,6 +131,7 @@ upload() {
     scp -P "$SSH_PORT" "$TAR_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ 发布包上传失败${NC}"; return 1; }
     scp -P "$SSH_PORT" "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ SHA 侧车上传失败${NC}"; return 1; }
     scp -P "$SSH_PORT" "$LOCAL_DIR/deploy_to_test_server.sh" "${SERVER}:${PROJECT_DIR}/" || { echo -e "${RED}❌ 部署脚本上传失败${NC}"; return 1; }
+    ssh -p "$SSH_PORT" "$SERVER" "chmod 600 '$PROJECT_DIR/deer-flow-test-update.tar.gz' '$PROJECT_DIR/deer-flow-test-update.tar.gz.sha'" || { echo -e "${RED}❌ 服务器发布文件权限收紧失败${NC}"; return 1; }
 
     echo ""
     echo -e "${GREEN}✅ 上传完成${NC}"
@@ -313,6 +316,10 @@ deploy() {
 
     # 启动服务
     bash scripts/deploy.sh
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        rm -f "$PROJECT_DIR/deer-flow-test-update.tar.gz" "$ARCHIVE_SHA_FILE"
+        echo -e "${GREEN}✓ 已删除含本地配置的发布包与 SHA 侧车${NC}"
+    fi
 
     echo ""
     echo -e "${GREEN}============================================${NC}"

@@ -38,9 +38,10 @@ pack() {
 
     cd "$LOCAL_DIR"
     rm -f "$ARCHIVE_SHA_FILE" "$ARCHIVE_SHA_FILE.tmp"
+    echo "缓存以 Git 提交内版本为准；本地未提交或忽略目录中的更新不会进入发布包"
     REF="${DEPLOY_REF:-origin/main}"
     ARCHIVE_ARGS=(--ref "$REF" --base-ref origin/main --output ../deer-flow-update.tar.gz)
-    if [ "${2:-}" = "--no-sandbox" ]; then
+    if [ "${1:-}" = "--no-sandbox" ]; then
         ARCHIVE_ARGS+=(--exclude docker/sandbox/cache/chrome-linux)
         echo "跳过 Chrome 缓存，保留字体、Python wheels 与 BPE 缓存"
     fi
@@ -57,6 +58,7 @@ pack() {
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 发布包缺少有效 manifest，请检查打包错误"; return 1; }
     ARCHIVE_DIGEST="$(archive_sha256 ../deer-flow-update.tar.gz)" || { echo "❌ 无法计算发布包摘要"; return 1; }
     printf '%s\n%s\n' "$RELEASE_SHA" "$ARCHIVE_DIGEST" > "$ARCHIVE_SHA_FILE.tmp" && mv "$ARCHIVE_SHA_FILE.tmp" "$ARCHIVE_SHA_FILE"
+    chmod 600 ../deer-flow-update.tar.gz "$ARCHIVE_SHA_FILE"
     echo "✅ 打包完成: $(ls -lh ../deer-flow-update.tar.gz | awk '{print $5}')"
     echo "   文件位置: ../deer-flow-update.tar.gz"
     echo "   源码 SHA: $RELEASE_SHA"
@@ -73,7 +75,7 @@ upload() {
 
     if [ ! -f ../deer-flow-update.tar.gz ]; then
         echo "❌ 未找到打包文件，先执行: ./deploy_on_server.sh pack"
-        exit 1
+        return 1
     fi
 
     RELEASE_SHA="$(release_sha ../deer-flow-update.tar.gz)" || { echo "❌ 压缩包缺少 release-manifest.json，请用新流程重新 pack"; return 1; }
@@ -99,6 +101,7 @@ upload() {
     echo "   上传源码 SHA: $RELEASE_SHA（包摘要校验通过）"
     scp -P $SSH_PORT ../deer-flow-update.tar.gz ${SERVER}:${PROJECT_DIR}/ || { echo "❌ 发布包上传失败"; return 1; }
     scp -P $SSH_PORT "$ARCHIVE_SHA_FILE" "${SERVER}:${PROJECT_DIR}/" || { echo "❌ SHA 侧车上传失败"; return 1; }
+    ssh -p $SSH_PORT "$SERVER" "chmod 600 '$PROJECT_DIR/deer-flow-update.tar.gz' '$PROJECT_DIR/deer-flow-update.tar.gz.sha'" || { echo "❌ 服务器发布文件权限收紧失败"; return 1; }
     echo "✅ 上传完成"
 }
 
@@ -209,6 +212,10 @@ deploy() {
     docker system prune -f 2>/dev/null || true
 
     ./scripts/deploy.sh
+    if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then
+        rm -f "$PROJECT_DIR/deer-flow-update.tar.gz" "$ARCHIVE_SHA_FILE"
+        echo "  已删除含本地配置的发布包与 SHA 侧车"
+    fi
 
     echo ""
     echo "============================================"
@@ -234,7 +241,7 @@ deploy() {
 # ============================================================
 case "${1:-}" in
     pack)
-        pack "$@"
+        pack "${2:-}"
         ;;
     upload)
         upload

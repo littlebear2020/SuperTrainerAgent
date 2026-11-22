@@ -415,3 +415,22 @@ def test_every_scp_has_explicit_failure_handling() -> None:
         for line in script.splitlines():
             if line.strip().startswith("scp "):
                 assert "||" in line
+
+
+def test_cache_provenance_and_sensitive_archive_cleanup_are_explicit() -> None:
+    for name in ("deploy_on_server.sh", "deploy_to_test_server.sh"):
+        script = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "缓存以 Git 提交内版本为准" in script
+        assert "chmod 600" in script
+        assert 'if [ "$CONFIG_FROM_ARCHIVE" = "true" ]; then\n        rm -f' in script
+
+
+def test_workflow_config_glob_is_anchored_to_repo_root() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/backend-unit-tests.yml").read_text(encoding="utf-8")
+    assert "'/config*.yaml'" in workflow
+
+
+def test_production_pack_forwards_single_optional_argument() -> None:
+    script = (REPO_ROOT / "deploy_on_server.sh").read_text(encoding="utf-8")
+    assert 'if [ "${1:-}" = "--no-sandbox" ]' in script
+    assert 'pack "${2:-}"' in script
