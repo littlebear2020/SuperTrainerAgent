@@ -1,6 +1,6 @@
 # 首页六卡媒体计量与计价接入实施计划
 
-> **状态**：未执行；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅修订计划，未修改产品代码、未部署。执行前先从最新 `origin/main` 评估漂移，再移回 `docs/plans/`。
+> **状态**：未执行（执行中：直接计价）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅修订计划，未修改产品代码、未部署。执行前先从最新 `origin/main` 评估漂移，再移回 `docs/plans/`。
 > **TL;DR**：只覆盖首页六张卡片的新任务，按“直接计价修复 → 休眠账本基座 → 技能发射接入”三个串行 PR 实施。Agent 媒体事件追加到线程工作区 `.usage/media-usage.jsonl`（生产仅支持本地 Aio 容器沙箱），worker 在 run 结束后读取并按当前线程/用户落库；不扫 bash 回显、不依赖 RunJournal；复用现有表和价目，不改 schema、不回填历史账。防护只做保证功能可用的最小底线，不新增 CI 工作流；Writer/ViMax/语音克隆等非首页能力不要求统计。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准后使用 `executing-plans` 单执行者按 Task 0→5 串行执行并逐项勾选；实现先写真实失败测试，再写最小实现。三个 PR 严格按 PR 1→2→3 合入，禁止并行派发。状态只修改顶部原行，依次使用 `未执行（执行中：直接计价）`、`未执行（执行中：账本基座）`、`未执行（执行中：技能接入）`，三条 PR 都合入后才改为 `已执行`，不得另起状态头。
 
@@ -69,18 +69,18 @@ AI 生图/生视频任务的旁白经 `orchestration.tts.synthesize` 默认走�
 
 ### Task 0：漂移检查、服务器基线与执行准备
 
-- [ ] **Step 1：检查最新基线。** 用户批准后运行 `git fetch origin main`、`git diff --stat 52c316763dc15e60649f1dc6eb0faf52b50013d4..origin/main`，复核 sink、worker、六卡 provider、五份 `_doubao_tts.py` 和补丁序号；当前 P34 已占用，下一为 P35，漂移时先更新计划。
-- [ ] **Step 2：建立干净执行 worktree。** 从最新 main 建单一 worktree/分支，将本计划移回 `docs/plans/` 并建立批次 changelog；开始 PR 1 时只把原状态行改为 `未执行（执行中：直接计价）`。测试使用干净 worktree，不继承主 clone 的本地 `config.yaml` 造成的假失败。
-- [ ] **Step 3：只读核对部署与价目。** 核对数据库类型（SQLite/Postgres）、`sandbox.use` 与实际沙箱形态（本地 Aio 容器 / provisioner 远端 / 普通 LocalSandbox）及 gateway 能否读到线程 workspace、迁移、`seedream-360/image`、`gpt-image-2/image`、`seedance/video`、`doubao_tts/tts` 价目（含 seedream-360 有无模型级行）与实际 `ai_image_provider`，以及 `QIHU_IMAGE_MODEL` 是否覆盖默认模型；不得修改管理员价格。沙箱不是本地 Aio 容器时，PR 1 照常执行，PR 2/3 暂停交用户决定。无法访问服务器时记 `SERVER_BASELINE_NOT_VERIFIED`，按部署手册的 Aio 形态继续、由 Task 5 Step 1 实测兜底，不伪造结果。
-- [ ] **Step 4：把证据放到执行 worktree 之外。** 固定使用主 clone 的 gitignored 绝对路径 `/Users/littlebear/Documents/SuperTrainerAgent/temp/2026-11-23-six-core-media-usage/`，避免 `git worktree remove` 删除证据；不得提交账号、密钥、签名 URL、运行数据库、真实任务正文或任何 run/thread/任务 ID。
-- [ ] **Step 5：锁定统一门禁。** 每个 PR 跑定向回归和根 `make check`；backend 全量统一用 `cd backend && make test`，长命令后台执行并在干净 worktree 运行，不再以串行 `uv run pytest tests/ -q` 代替。每个 PR 的 OCR 最多 3 轮 push/评审，逐轮在 PR 评论记录发现与处置；3 轮后仍有 Critical/Important 则停下交用户。
+- [x] **Step 1：检查最新基线。** 用户批准后运行 `git fetch origin main`、`git diff --stat 52c316763dc15e60649f1dc6eb0faf52b50013d4..origin/main`，复核 sink、worker、六卡 provider、五份 `_doubao_tts.py` 和补丁序号；当前 P34 已占用，下一为 P35，漂移时先更新计划。
+- [x] **Step 2：建立干净执行 worktree。** 从最新 main 建单一 worktree/分支，将本计划移回 `docs/plans/` 并建立批次 changelog；开始 PR 1 时只把原状态行改为 `未执行（执行中：直接计价）`。测试使用干净 worktree，不继承主 clone 的本地 `config.yaml` 造成的假失败。
+- [x] **Step 3：只读核对部署与价目。** 核对数据库类型（SQLite/Postgres）、`sandbox.use` 与实际沙箱形态（本地 Aio 容器 / provisioner 远端 / 普通 LocalSandbox）及 gateway 能否读到线程 workspace、迁移、`seedream-360/image`、`gpt-image-2/image`、`seedance/video`、`doubao_tts/tts` 价目（含 seedream-360 有无模型级行）与实际 `ai_image_provider`，以及 `QIHU_IMAGE_MODEL` 是否覆盖默认模型；不得修改管理员价格。沙箱不是本地 Aio 容器时，PR 1 照常执行，PR 2/3 暂停交用户决定。无法访问服务器时记 `SERVER_BASELINE_NOT_VERIFIED`，按部署手册的 Aio 形态继续、由 Task 5 Step 1 实测兜底，不伪造结果。
+- [x] **Step 4：把证据放到执行 worktree 之外。** 固定使用主 clone 的 gitignored 绝对路径 `/Users/littlebear/Documents/SuperTrainerAgent/temp/2026-11-23-six-core-media-usage/`，避免 `git worktree remove` 删除证据；不得提交账号、密钥、签名 URL、运行数据库、真实任务正文或任何 run/thread/任务 ID。
+- [x] **Step 5：锁定统一门禁。** 每个 PR 跑定向回归和根 `make check`；backend 全量统一用 `cd backend && make test`，长命令后台执行并在干净 worktree 运行，不再以串行 `uv run pytest tests/ -q` 代替。每个 PR 的 OCR 最多 3 轮 push/评审，逐轮在 PR 评论记录发现与处置；3 轮后仍有 Critical/Important 则停下交用户。
 
 ### Task 1 / PR 1：先补齐直接媒体计价
 
-- [ ] **Step 1：写字幕 TTS 失败测试。** `test_doubao_tts_client.py` 对 `synthesize_sse_with_timestamps` 的成功/失败记录断言 `model=seed-tts-2.0`、`char_count=len(text)`；普通版不变，失败不估算。
-- [ ] **Step 2：写 usage 与估算失败测试。** `test_throttle_amount_passthrough.py` 断言 completion/total 都进入 metadata；`test_media_pricing.py` 验证 completion 优先、仅 total 回退、两者皆缺 unpriced、amount 优先，且 completion+total 不相加。
-- [ ] **Step 3：最小实现。** 字幕版补与普通版一致的 extra；throttle 传播两个 token 字段；`_estimate_call_cost()` 依次读取 completion→total。不得把 duration 当 token 或修改单价。
-- [ ] **Step 4：参数化验证直接任务。** `test_personal_usage_video.py` 覆盖：seedream/seedream-360 的 per-image、gpt-image-2 的 per-kilo-token；AI 视频只有 completion 时计费、无 token 为 `media_cost=null`；带 `char_count` 的字幕 TTS 行（任务旁白）按千字计入；LLM + 媒体总额和来源。运行上述四个定向文件全绿。
+- [x] **Step 1：写字幕 TTS 失败测试。** `test_doubao_tts_client.py` 对 `synthesize_sse_with_timestamps` 的成功/失败记录断言 `model=seed-tts-2.0`、`char_count=len(text)`；普通版不变，失败不估算。
+- [x] **Step 2：写 usage 与估算失败测试。** `test_throttle_amount_passthrough.py` 断言 completion/total 都进入 metadata；`test_media_pricing.py` 验证 completion 优先、仅 total 回退、两者皆缺 unpriced、amount 优先，且 completion+total 不相加。
+- [x] **Step 3：最小实现。** 字幕版补与普通版一致的 extra；throttle 传播两个 token 字段；`_estimate_call_cost()` 依次读取 completion→total。不得把 duration 当 token 或修改单价。
+- [x] **Step 4：参数化验证直接任务。** `test_personal_usage_video.py` 覆盖：seedream/seedream-360 的 per-image、gpt-image-2 的 per-kilo-token；AI 视频只有 completion 时计费、无 token 为 `media_cost=null`；带 `char_count` 的字幕 TTS 行（任务旁白）按千字计入；LLM + 媒体总额和来源。运行上述四个定向文件全绿。
 - [ ] **Step 5：按 Task 0 统一门禁合入。** 提交 `fix(usage): 补齐直接媒体计价字段`，CI/OCR 无 Critical/Important 后 rebase 合入；随后只把原状态行改为 `未执行（执行中：账本基座）`。findings 中字幕 TTS 项验证后勾掉；ViMax 项保持未勾选并注明“共享计价器 completion 优先已完成，ViMax amount/usage 透传仍不做”。
 
 ### Task 2 / PR 2：建立休眠账本、幂等 sink 与部分计价 API
