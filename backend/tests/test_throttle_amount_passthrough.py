@@ -89,3 +89,73 @@ async def test_no_amount_when_ref_has_none(captured_sink):
     assert len(captured_sink) == 1
     assert captured_sink[0]["amount"] is None
     assert captured_sink[0]["provider"] == "gpt-image-2"
+
+
+class _TokenVideoInner:
+    """Provider that reports usage.tokens with completion (and optionally total)."""
+
+    def __init__(self, raw_usage: dict) -> None:
+        self._raw_usage = raw_usage
+
+    async def submit_video(self, prompt, *, duration=5.0, **kwargs):  # noqa: ANN001, ANN202
+        return "task-tokens"
+
+    async def poll_video(self, task_id, *, duration=5.0):  # noqa: ANN001, ANN202
+        return VideoRef(url="http://x/tokens.mp4", duration=duration, source="seedance", raw_usage=self._raw_usage)
+
+
+class _TokenImageInner:
+    def __init__(self, raw_usage: dict) -> None:
+        self._raw_usage = raw_usage
+
+    async def generate_image(self, prompt, **kwargs):  # noqa: ANN001, ANN202
+        return ImageRef(url="http://x/tokens.png", source="gpt-image-2", raw_usage=self._raw_usage)
+
+
+async def _flush_sink() -> None:
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_video_passes_completion_and_total_tokens_to_sink(captured_sink):
+    """修前只透传 total_tokens：仅回传 completion_tokens 的成功视频行永远估不出价。"""
+    t = ThrottledAIVideoProvider(_TokenVideoInner({"completion_tokens": 460, "total_tokens": 121000}), qps=100, max_retries=0)
+    await t.generate_video("p", duration=5.0)
+    await _flush_sink()
+    assert len(captured_sink) == 1
+    extra = captured_sink[0]["extra"]
+    assert extra["completion_tokens"] == 460
+    assert extra["total_tokens"] == 121000
+
+
+@pytest.mark.asyncio
+async def test_video_without_completion_tokens_keeps_sparse_extra(captured_sink):
+    """供应商未给 completion → extra 只有 total_tokens，不写稀疏键。"""
+    t = ThrottledAIVideoProvider(_TokenVideoInner({"total_tokens": 87300}), qps=100, max_retries=0)
+    await t.generate_video("p", duration=4.0)
+    await _flush_sink()
+    extra = captured_sink[0]["extra"]
+    assert extra["total_tokens"] == 87300
+    assert "completion_tokens" not in extra
+
+
+@pytest.mark.asyncio
+async def test_video_string_token_values_are_normalized_to_int(captured_sink):
+    t = ThrottledAIVideoProvider(_TokenVideoInner({"completion_tokens": "460"}), qps=100, max_retries=0)
+    await t.generate_video("p", duration=5.0)
+    await _flush_sink()
+    extra = captured_sink[0]["extra"]
+    assert extra["completion_tokens"] == 460
+    assert isinstance(extra["completion_tokens"], int)
+
+
+@pytest.mark.asyncio
+async def test_image_passes_completion_tokens_to_sink(captured_sink):
+    """共享的 _build_extra_from_ref——image 路径同样透传 completion_tokens。"""
+    t = ThrottledAIImageProvider(_TokenImageInner({"completion_tokens": 1000}), qps=100, max_retries=0)
+    await t.generate_image("p")
+    await _flush_sink()
+    extra = captured_sink[0]["extra"]
+    assert extra["completion_tokens"] == 1000
+    assert "total_tokens" not in extra

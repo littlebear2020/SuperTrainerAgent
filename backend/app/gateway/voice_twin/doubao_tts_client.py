@@ -257,6 +257,9 @@ class DoubaoTTSClient:
                     provider="doubao_tts",
                     method="synthesize_sse_with_timestamps",
                     status=_tts_status,
+                    # 与普通版同一份 extra：缺 model/char_count 时千字价目估不出
+                    # （线上字幕版行 metadata_json=None，媒体计量计划 PR 1 补齐）。
+                    extra={"model": "seed-tts-2.0", "char_count": len(text)},
                 )
             except Exception:
                 pass

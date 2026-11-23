@@ -330,3 +330,130 @@ async def test_video_missing_title_returns_none_instead_of_task_id(db):
 
     result = (await videos(db))[0]
     assert result.title is None
+
+
+# ---------------------------------------------------------------------------
+# 直接两卡（AI 生图 / AI 生视频）的价目单位——媒体计量计划 PR 1 Step 4
+# ---------------------------------------------------------------------------
+
+
+def media_row(
+    call_id: str,
+    task_id: str,
+    *,
+    provider: str,
+    method: str,
+    status: str = "ok",
+    metadata: dict | None = None,
+    created_at: datetime = IN_WINDOW,
+) -> ExternalApiCallRow:
+    return ExternalApiCallRow(call_id=call_id, user_id=USER, task_id=task_id, provider=provider, method=method, status=status, metadata_json=metadata or {}, created_at=created_at)
+
+
+async def seed_media_pricing(session) -> None:
+    """估算只读 DB 行（DEFAULT_MEDIA_PRICING 仅展示兜底），显式落种子价。"""
+    session.add_all(
+        [
+            MediaPricingRow(provider="seedream", media_type="image", unit="per_image", unit_price=0.5, currency="CNY"),
+            MediaPricingRow(provider="seedream-360", media_type="image", unit="per_image", unit_price=0.5, currency="CNY"),
+            MediaPricingRow(provider="gpt-image-2", media_type="image", unit="per_kilo_token", unit_price=0.204, currency="CNY"),
+            MediaPricingRow(provider="seedance", media_type="video", unit="per_kilo_token", unit_price=0.046, currency="CNY"),
+            MediaPricingRow(provider="doubao_tts", media_type="tts", unit="per_kilo_char", unit_price=0.12, currency="CNY"),
+        ]
+    )
+
+
+DIRECT_MEDIA_CASES = [
+    # case_id, provider, method, status, metadata, expected media_cost（None = 无法计价）
+    ("seedream-per-image", "seedream", "generate_image", "ok", {"model": "doubao-seedream-5-0-pro-260628", "width": 2048, "height": 1152}, 0.5),
+    ("seedream-360-per-image-via-sink-model", "qihu", "generate_image", "ok", {"model": "seedream-360", "width": 2048, "height": 1152}, 0.5),
+    ("gpt-image-2-per-kilo-token-completion", "gpt-image-2", "generate_image", "ok", {"model": "gpt-image-2", "completion_tokens": 1000}, 0.204),
+    ("gpt-image-2-per-kilo-token-total-fallback", "gpt-image-2", "generate_image", "ok", {"model": "gpt-image-2", "total_tokens": 500}, 0.102),
+    ("seedance-completion-only", "seedance", "generate_video", "ok", {"model": "seedance", "completion_tokens": 460}, 0.02116),
+    ("seedance-total-fallback", "seedance", "generate_video", "ok", {"model": "seedance", "total_tokens": 108900}, 5.0094),
+    ("subtitle-tts-per-kilo-char", "doubao_tts", "synthesize_sse_with_timestamps", "success", {"model": "seed-tts-2.0", "char_count": 1500}, 0.18),
+    ("seedance-no-tokens-unpriced", "seedance", "generate_video", "ok", {"model": "seedance", "duration": 5.0}, None),
+    ("subtitle-tts-failed-row-not-estimated", "doubao_tts", "synthesize_sse_with_timestamps", "error", {"model": "seed-tts-2.0", "char_count": 1500}, None),
+]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("case_id", "provider", "method", "status", "metadata", "expected"), DIRECT_MEDIA_CASES, ids=[case[0] for case in DIRECT_MEDIA_CASES])
+async def test_direct_media_pricing_units(db, case_id, provider, method, status, metadata, expected):
+    async with db() as session:
+        await seed_media_pricing(session)
+        session.add(task(case_id, task_type="ai_video" if method != "generate_image" else "ai_image"))
+        session.add(media_row(f"{case_id}-call", case_id, provider=provider, method=method, status=status, metadata=metadata))
+        await session.commit()
+    invalidate_media_pricing_cache()
+
+    result = (await videos(db))[0]
+    assert result.source_id == case_id
+    if expected is None:
+        assert result.media_cost is None
+        assert result.cost is None
+        assert result.cost_source is None
+        return
+    assert result.media_cost == pytest.approx(expected, abs=1e-9)
+    assert result.cost == pytest.approx(expected, abs=1e-9)
+    assert result.cost_source == "estimated"
+    assert result.currency == "CNY"
+
+
+@pytest.mark.anyio
+async def test_direct_task_llm_plus_media_sum_and_source(db):
+    """AI 视频任务的 LLM 费 + 视频费（completion）+ 字幕旁白 TTS 费（千字）求和。
+
+    ``cost_source`` 语义（C4）：real=全真账 / estimated=全估算 / mixed=两者皆有。
+    LLM 按 token×价目、媒体按价目单位都属估算 → 全估算任务为 ``estimated``；
+    再加一条供应商真账 ``amount`` 行才是 ``mixed``。汇总与任务级口径一致。
+    """
+    async with db() as session:
+        await price(session)
+        await seed_media_pricing(session)
+        session.add_all(
+            [
+                task("narrated-clip", "ai_video"),
+                llm_run("narrated-clip-llm", "narrated-clip", input_tokens=120, output_tokens=80),
+                media_row("narrated-clip-video", "narrated-clip", provider="seedance", method="generate_video", metadata={"model": "seedance", "completion_tokens": 460}),
+                media_row("narrated-clip-tts", "narrated-clip", provider="doubao_tts", method="synthesize_sse_with_timestamps", status="success", metadata={"model": "seed-tts-2.0", "char_count": 2000}),
+            ]
+        )
+        await session.commit()
+    invalidate_media_pricing_cache()
+
+    result = (await videos(db))[0]
+    assert result.llm_cost == pytest.approx(0.0036, abs=1e-9)  # 120*10/1e6 + 80*30/1e6
+    assert result.media_cost == pytest.approx(0.02116 + 0.24, abs=1e-9)  # 0.46*0.046 + 2.0*0.12
+    assert result.cost == pytest.approx(0.0036 + 0.02116 + 0.24, abs=1e-9)
+    assert result.cost_source == "estimated"
+    assert result.currency == "CNY"
+
+    summary = await get_personal_usage(db, user_id=USER, days=7, tz_offset_minutes=0)
+    assert summary.total_tasks == 1
+    assert summary.summary.cost == pytest.approx(result.cost, abs=1e-9)
+    assert summary.summary.cost_source == "estimated"
+
+
+@pytest.mark.anyio
+async def test_direct_task_with_real_amount_row_is_mixed_source(db):
+    """供应商真账 amount 行（真账优先于 token 估算）+ 估算行 → mixed。"""
+    async with db() as session:
+        await seed_media_pricing(session)
+        session.add_all(
+            [
+                task("real-billed-clip", "ai_video"),
+                media_row("real-billed-clip-video", "real-billed-clip", provider="seedance", method="generate_video", metadata={"model": "seedance", "completion_tokens": 460, "amount": 0.9}),
+                media_row("real-billed-clip-tts", "real-billed-clip", provider="doubao_tts", method="synthesize_sse_with_timestamps", status="success", metadata={"model": "seed-tts-2.0", "char_count": 1000}),
+            ]
+        )
+        await session.commit()
+    invalidate_media_pricing_cache()
+
+    result = (await videos(db))[0]
+    assert result.media_cost == pytest.approx(0.9 + 0.12, abs=1e-9)  # amount wins over 0.02116 estimate
+    assert result.cost_source == "mixed"
+
+    summary = await get_personal_usage(db, user_id=USER, days=7, tz_offset_minutes=0)
+    assert summary.summary.cost_source == "mixed"
+    assert summary.summary.cost == pytest.approx(1.02, abs=1e-9)
