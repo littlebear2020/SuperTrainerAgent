@@ -91,7 +91,13 @@ export function summarizeTurnUsage(
       anchorIndex = index;
     }
     for (const message of group.messages) {
-      if (message.type === "ai") {
+      if (
+        message.type === "ai" &&
+        !(
+          group.type === "assistant" &&
+          message.additional_kwargs?.element === "task"
+        )
+      ) {
         turnMessages.add(message);
       }
     }
