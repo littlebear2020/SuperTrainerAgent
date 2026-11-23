@@ -48,6 +48,10 @@ class UsageTask:
     cost: float | None
     llm_cost: float | None
     media_cost: float | None
+    #: Known unpriced media rows (``source == "unpriced"``) on this task. Required
+    #: (no default) so ``UsageTaskEntry`` inherits cleanly; failed / free rows are
+    #: not counted and un-instrumented channels are invisible here by definition.
+    unpriced_media_calls: int
     currency: str | None
     cost_source: UsageCostSource
     total_tokens: int | None

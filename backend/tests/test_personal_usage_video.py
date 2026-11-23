@@ -457,3 +457,55 @@ async def test_direct_task_with_real_amount_row_is_mixed_source(db):
     summary = await get_personal_usage(db, user_id=USER, days=7, tz_offset_minutes=0)
     assert summary.summary.cost_source == "mixed"
     assert summary.summary.cost == pytest.approx(1.02, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# unpriced_media_calls：已知未计价行数（媒体计量计划 PR 2 Step 5）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_unpriced_media_calls_counts_known_unpriced_rows_only(db):
+    async with db() as session:
+        await seed_media_pricing(session)
+        session.add_all(
+            [
+                task("partial-media", "ai_video"),
+                media_row("partial-priced", "partial-media", provider="seedream-360", method="generate_image", metadata={"model": "seedream-360"}),
+                media_row("partial-unpriced", "partial-media", provider="seedance", method="generate_video", metadata={"model": "seedance", "duration": 5.0}),
+                media_row("partial-failed", "partial-media", provider="seedance", method="generate_video", status="error", metadata={"model": "seedance"}),
+                media_row("partial-free", "partial-media", provider="doubao_tts", method="voice_clone_upload", status="ok", metadata={}),
+                task("no-media", "ai_image"),
+            ]
+        )
+        await session.commit()
+    invalidate_media_pricing_cache()
+
+    by_id = {item.source_id: item for item in await videos(db)}
+    partial = by_id["partial-media"]
+    assert partial.unpriced_media_calls == 1, "只有 source=unpriced 的成功行计数；失败行与免费方法不计"
+    assert partial.media_cost == pytest.approx(0.5, abs=1e-9), "部分计价仍是已知下界，不是 None"
+    assert partial.cost_source == "estimated"
+    assert by_id["no-media"].unpriced_media_calls == 0
+    assert by_id["no-media"].media_cost is None
+
+
+@pytest.mark.anyio
+async def test_all_unpriced_media_rows_are_counted_and_cost_stays_none(db):
+    async with db() as session:
+        await seed_media_pricing(session)
+        session.add_all(
+            [
+                task("all-unpriced", "ai_video"),
+                media_row("u1", "all-unpriced", provider="seedance", method="generate_video", metadata={"model": "seedance", "duration": 4.0}),
+                media_row("u2", "all-unpriced", provider="unknown-provider", method="generate_video", metadata={}),
+            ]
+        )
+        await session.commit()
+    invalidate_media_pricing_cache()
+
+    result = (await videos(db))[0]
+    assert result.unpriced_media_calls == 2
+    assert result.media_cost is None
+    assert result.cost is None
+    assert result.cost_source is None

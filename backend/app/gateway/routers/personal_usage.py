@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.gateway._shared.personal_usage.service import get_personal_usage
 from app.gateway._shared.personal_usage.types import UsageCapability, UsageCostSource, UsageStatus, UsageTask
@@ -46,6 +46,9 @@ class UsageTaskResponse(BaseModel):
     cost: float | None
     llm_cost: float | None
     media_cost: float | None
+    unpriced_media_calls: int = Field(
+        description="已知未计价的媒体调用行数（成功但缺 token/缺价目）。不含未埋点通道；media_cost 是已知可计价记录的估算下界，不是供应商正式账单。",
+    )
     currency: str | None
     cost_source: UsageCostSource
     total_tokens: int | None
@@ -71,6 +74,7 @@ def _task_response(task: UsageTask) -> UsageTaskResponse:
         cost=task.cost,
         llm_cost=task.llm_cost,
         media_cost=task.media_cost,
+        unpriced_media_calls=task.unpriced_media_calls,
         currency=task.currency,
         cost_source=task.cost_source,
         total_tokens=task.total_tokens,

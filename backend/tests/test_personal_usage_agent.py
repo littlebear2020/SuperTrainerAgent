@@ -547,3 +547,30 @@ async def test_agent_missing_title_uses_first_human_then_none(db):
     assert tasks["fallback"].title == "首条用户消息"
     assert tasks["placeholder"].title is None
     assert tasks["missing"].title is None
+
+
+@pytest.mark.anyio
+async def test_agent_unpriced_media_calls_counts_known_unpriced_rows_only(db):
+    """`unpriced_media_calls` = 已知未计价行数（source=unpriced）；失败行、免费方法、已计价行不计（媒体计量计划 PR 2 Step 5）。"""
+    async with db() as session:
+        session.add_all(
+            [
+                thread("thread-priced", assistant_id="creative-studio"),
+                media("priced-1", "thread-priced", amount=0.5),
+                thread("thread-partial", assistant_id="podcast-studio"),
+                media("partial-priced", "thread-partial", amount=0.5),
+                media("partial-unpriced-1", "thread-partial", amount=MISSING),
+                media("partial-unpriced-2", "thread-partial", amount=MISSING),
+                thread("thread-no-media", assistant_id="ppt-master"),
+            ]
+        )
+        await session.commit()
+
+    by_id = {item.source_id: item for item in await aggregate(db)}
+    assert by_id["thread-priced"].unpriced_media_calls == 0
+    assert by_id["thread-priced"].media_cost == pytest.approx(0.5, abs=1e-9)
+    partial = by_id["thread-partial"]
+    assert partial.unpriced_media_calls == 2
+    assert partial.media_cost == pytest.approx(0.5, abs=1e-9), "部分计价仍给出已知下界，不因 unpriced 行变 None"
+    assert by_id["thread-no-media"].unpriced_media_calls == 0
+    assert by_id["thread-no-media"].media_cost is None

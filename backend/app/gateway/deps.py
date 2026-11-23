@@ -11,9 +11,9 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from fastapi import FastAPI, HTTPException, Request
 from langgraph.types import Checkpointer
@@ -301,6 +301,20 @@ def get_thread_store(request: Request) -> ThreadMetaStore:
     return val
 
 
+def _media_usage_sink_if_enabled() -> Callable[..., Awaitable[Any]] | None:
+    """Post-run media-usage ledger drain, only when the switch is exactly ``1``.
+
+    ``DEER_FLOW_MEDIA_USAGE_LEDGER`` is a gateway env var (restart required to
+    flip). Default / any other value keeps the feature asleep: nothing is read
+    from thread workspaces and no ``sandbox_reported`` rows are written.
+    """
+    if os.environ.get("DEER_FLOW_MEDIA_USAGE_LEDGER", "").strip() == "1":
+        from app.gateway._shared.agent_media_usage import drain_agent_media_usage
+
+        return drain_agent_media_usage
+    return None
+
+
 def get_run_context(request: Request) -> RunContext:
     """Build a :class:`RunContext` from ``app.state`` singletons."""
     return RunContext(
@@ -310,6 +324,7 @@ def get_run_context(request: Request) -> RunContext:
         run_events_config=getattr(request.app.state, "run_events_config", None),
         thread_store=get_thread_store(request),
         app_config=get_config(request),
+        media_usage_sink=_media_usage_sink_if_enabled(),
     )
 
 

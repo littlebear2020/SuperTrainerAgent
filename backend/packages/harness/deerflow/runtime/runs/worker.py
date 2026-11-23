@@ -25,6 +25,8 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from langchain_core.messages import HumanMessage
 
 from langgraph.errors import GraphRecursionError
@@ -45,6 +47,11 @@ logger = logging.getLogger(__name__)
 # Valid stream_mode values for LangGraph's graph.astream()
 _VALID_LG_MODES = {"values", "updates", "checkpoints", "tasks", "debug", "messages", "custom"}
 
+#: Whole-call upper bound for the post-run media-usage ledger drain (seconds).
+#: Metering runs after the stream has already ended; it must never hold the
+#: worker longer than this.
+MEDIA_USAGE_DRAIN_TIMEOUT = 10.0
+
 
 @dataclass(frozen=True)
 class RunContext:
@@ -61,6 +68,9 @@ class RunContext:
     run_events_config: Any | None = field(default=None)
     thread_store: Any | None = field(default=None)
     app_config: AppConfig | None = field(default=None)
+    #: Optional post-run media-usage ledger drain, ``await sink(thread_id=...,
+    #: user_id=..., agent_name=...)``. ``None`` (default) = feature asleep.
+    media_usage_sink: Callable[..., Awaitable[Any]] | None = field(default=None)
 
 
 def _compute_agent_factory_supports_app_config(agent_factory: Any) -> bool:
@@ -111,6 +121,11 @@ async def run_agent(
     run_events_config = ctx.run_events_config
     thread_store = ctx.thread_store
     app_config = ctx.app_config
+    # getattr: older callers / tests hand a SimpleNamespace without this field.
+    media_usage_sink = getattr(ctx, "media_usage_sink", None)
+    # Captured at run start — the drain in ``finally`` runs after the stream has
+    # ended and the task-local context may already be unwound.
+    media_usage_user_id = get_effective_user_id()
 
     run_id = record.run_id
     thread_id = record.thread_id
@@ -539,6 +554,33 @@ async def run_agent(
         # RunManager._runs, so evicting is safe. RunManager.get() also falls
         # back to the SQL run_store after eviction, so /runs/{rid} still works.
         asyncio.create_task(run_manager.cleanup(run_id, delay=60))
+
+        # 媒体计量账本 drain（媒体计量计划 PR 2）：publish_end 之后、限时
+        # MEDIA_USAGE_DRAIN_TIMEOUT；失败/超时只 WARNING，不改变 run 状态。
+        # sink 由 deps 按 DEER_FLOW_MEDIA_USAGE_LEDGER=1 注入，默认 None（休眠）。
+        if media_usage_sink is not None:
+            try:
+                await asyncio.wait_for(
+                    media_usage_sink(thread_id=thread_id, user_id=media_usage_user_id, agent_name=_resolve_agent_name(config, record)),
+                    timeout=MEDIA_USAGE_DRAIN_TIMEOUT,
+                )
+            except Exception:
+                logger.warning("Media usage drain failed or timed out for run %s (non-fatal)", run_id, exc_info=True)
+
+
+def _resolve_agent_name(config: dict, record: RunRecord) -> str | None:
+    """The Agent a UI-launched run really executes.
+
+    UI runs carry ``assistant_id="lead_agent"``; the real Agent name lives in
+    ``config["context"]["agent_name"]`` (LangGraph >= 0.6) or
+    ``config["configurable"]["agent_name"]`` — same lookup order as the D3
+    token-budget block above.
+    """
+    for container_name in ("context", "configurable"):
+        container = config.get(container_name)
+        if isinstance(container, dict) and isinstance(container.get("agent_name"), str):
+            return container["agent_name"]
+    return record.assistant_id
 
 
 # ---------------------------------------------------------------------------

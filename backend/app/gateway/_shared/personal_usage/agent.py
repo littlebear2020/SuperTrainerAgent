@@ -196,13 +196,23 @@ def _aggregate_llm_rows(rows: list[RunRow], pricing: dict) -> _LLMUsage:
     return _LLMUsage(total_tokens, cost if has_cost else None, currency, cost_source, models)
 
 
-def _aggregate_media_rows(rows: list[ExternalApiCallRow]) -> tuple[float | None, str | None, UsageCostSource, bool]:
+def _aggregate_media_rows(rows: list[ExternalApiCallRow]) -> tuple[float | None, str | None, UsageCostSource, bool, int]:
+    """→ (cost, currency, source, mixed_currencies, unpriced).
+
+    ``cost`` is the sum of priced rows only (a known lower bound — never None
+    just because some rows are unpriced); ``unpriced`` counts successful rows
+    the estimator could not price, so partial pricing is visible rather than
+    hidden behind ``media_cost=None``.
+    """
     cost = 0.0
     has_cost = False
     currencies: set[str] = set()
     source: UsageCostSource = None
+    unpriced = 0
     for row in rows:
         priced = evaluate_media_call(row.provider, row.method, row.status, row.metadata_json)
+        if priced.source == "unpriced":
+            unpriced += 1
         if priced.cost is None:
             continue
         cost += priced.cost
@@ -212,8 +222,8 @@ def _aggregate_media_rows(rows: list[ExternalApiCallRow]) -> tuple[float | None,
             source = merge_cost_source(source, priced.source)
     mixed_currencies = len(currencies) > 1
     if not has_cost or mixed_currencies:
-        return None, None, source, mixed_currencies
-    return cost, next(iter(currencies)), source, False
+        return None, None, source, mixed_currencies, unpriced
+    return cost, next(iter(currencies)), source, False, unpriced
 
 
 def _combine_costs(
@@ -323,7 +333,7 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
     tasks: list[UsageTaskEntry] = []
     for thread, task_capability in selected_threads:
         llm = _aggregate_llm_rows(runs_by_thread[thread.thread_id], pricing)
-        media_cost, media_currency, media_source, media_mixed = _aggregate_media_rows(media_by_thread[thread.thread_id])
+        media_cost, media_currency, media_source, media_mixed, unpriced_media = _aggregate_media_rows(media_by_thread[thread.thread_id])
         cost, currency = _combine_costs(llm.cost, llm.currency, media_cost, media_currency, media_mixed)
         latest_run = all_runs_by_thread[thread.thread_id][0] if all_runs_by_thread[thread.thread_id] else None
         activity_candidates = [thread.created_at]
@@ -342,6 +352,7 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
                 cost=cost,
                 llm_cost=llm.cost,
                 media_cost=media_cost,
+                unpriced_media_calls=unpriced_media,
                 currency=currency,
                 cost_source=merge_cost_source(llm.cost_source, media_source),
                 total_tokens=llm.total_tokens,
