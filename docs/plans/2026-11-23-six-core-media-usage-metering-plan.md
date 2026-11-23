@@ -1,6 +1,6 @@
 # 首页六卡媒体计量与计价接入实施计划
 
-> **状态**：未执行（执行中：技能接入）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅修订计划，未修改产品代码、未部署。执行前先从最新 `origin/main` 评估漂移，再移回 `docs/plans/`。
+> **状态**：已执行（2026-11-24；Task 0–5 全部勾选；PR 1 #50 → PR 2 #51 → PR 3 #52 串行合入 main `bbb20855`；测试服 gateway `v3-20261124` 已部署、`DEER_FLOW_MEDIA_USAGE_LEDGER=1`、六卡真实调用与回滚演练通过；changelog：`docs/changelog/changelog-2026-11-23-six-core-media-usage-metering.md`；未决：供应商账单未对账（`SUPPLIER_RECONCILIATION_NOT_VERIFIED`），见 findings-backlog）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。
 > **TL;DR**：只覆盖首页六张卡片的新任务，按“直接计价修复 → 休眠账本基座 → 技能发射接入”三个串行 PR 实施。Agent 媒体事件追加到线程工作区 `.usage/media-usage.jsonl`（生产仅支持本地 Aio 容器沙箱），worker 在 run 结束后读取并按当前线程/用户落库；不扫 bash 回显、不依赖 RunJournal；复用现有表和价目，不改 schema、不回填历史账。防护只做保证功能可用的最小底线，不新增 CI 工作流；Writer/ViMax/语音克隆等非首页能力不要求统计。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准后使用 `executing-plans` 单执行者按 Task 0→5 串行执行并逐项勾选；实现先写真实失败测试，再写最小实现。三个 PR 严格按 PR 1→2→3 合入，禁止并行派发。状态只修改顶部原行，依次使用 `未执行（执行中：直接计价）`、`未执行（执行中：账本基座）`、`未执行（执行中：技能接入）`，三条 PR 都合入后才改为 `已执行`，不得另起状态头。
 
@@ -118,15 +118,15 @@ AI 生图/生视频任务的旁白经 `orchestration.tts.synthesize` 默认走�
 - [x] **Step 2：写 TS 本地行为测试。** `main.test.ts` 增加 qihu360 用例：成功写一行且字段集仅含契约字段、`kind === "image"`；`--model` 指定非默认 Seedream 时事件 `model` 与之相同；200 无图不写；下载失败仍保留；账本目录不可写时生图照常返回；umask 077 下文件为 `0o644`。按现有本地方式运行，不新增 CI 步骤。
 - [x] **Step 3：运行 PR 3 回归。** `test_sandbox_media_usage_scripts.py`、`test_ppt_master_tts_trainerai.py`、`test_ppt_master_image_trainerai.py`、`test_skill_script_copies.py`、PPT vendored 回归；在 `skills/public/trainerai-imagine` 运行 `npx --no-install tsx --test scripts/main.test.ts scripts/build-batch.test.ts`。P35 补丁表保持既有格式缺陷，不顺手整理。
 - [x] **Step 4：新增显式离线贯通测试。** 新建 `backend/tests/test_core_media_usage_e2e.py` 并标 `@pytest.mark.e2e`：podcast/course-video 经 `_doubao_tts.py`、PPT 经 `backend_trainerai.py`/`backend_qihu360.py`（假供应商）写账本，再经 `drain_agent_media_usage` → SQLite → `GET /api/usage`；直接两卡经 provider 夹具到同一接口。creative-studio 只用 TS 同形账本行做契约贯通，不单独证明其端到端（真实 TS 由 `main.test.ts` 与 Task 5 验证）。断言归属、DB 调用数、费用公式、`unpriced_media_calls`、`cost_source`；非核心 Agent 的账本不入库；重复读取不重复计费。
-- [ ] **Step 5：按统一门禁合入 PR 3。** 提交 `feat(usage): 接入核心技能媒体计量`，CI/OCR 无 Critical/Important 后 rebase 合入。开启开关仅在部署阶段执行，三条 PR 合入本身不宣称测试服已验收。
+- [x] **Step 5：按统一门禁合入 PR 3。** 提交 `feat(usage): 接入核心技能媒体计量`，CI/OCR 无 Critical/Important 后 rebase 合入。开启开关仅在部署阶段执行，三条 PR 合入本身不宣称测试服已验收。
 
 ### Task 5：真实验收、回滚与收尾
 
-- [ ] **Step 1：部署后做六卡最小真实验收。** 用户批准部署和必要消费后，在测试服设置 `DEER_FLOW_MEDIA_USAGE_LEDGER=1` 并重启 gateway，分别触发 course-video 一段 TTS、creative-studio 一张图、PPT 一张图加一段旁白、podcast 一个短分段、AI 生图一张、AI 生视频一个最短镜头。逐项对照供应商记录、`external_api_calls`、`unpriced_media_calls` 与页面，验证任务归属、次数和当前价目；同时确认 gateway 能读到沙箱容器写出的账本（跨 uid 权限），UI 实际路径（`lead_agent` + `context.agent_name`）被接受，creative-studio 事件的 `model` 与实际下发模型一致。
-- [ ] **Step 2：补 nohup 批量与供应商账单覆盖率。** 按技能正式指引（nohup 后台 + 同 run 轮询）跑一次 course-video 批量 TTS，确认随该 run 结束入库；再做一次「run 先结束、后台后完成」，确认在同一线程下一次 run 结束入库。nohup 覆盖只按这一口径表述，没有后续 run 的后台事件不入库。尽可能用供应商账单导出核对成功媒体调用数和金额，计算已计价覆盖率；拿不到账单时标 `SUPPLIER_RECONCILIATION_NOT_VERIFIED`，不能用页面自证完整。
-- [ ] **Step 3：执行回滚演练。** 将开关置 0 并重启 gateway，确认停止新账本入库且制作流程不受影响，已有行保留；重新置 1 后确认关闭期间积累的事件被补入（`created_at` 为入库时间）。清理仅在用户另行批准后，先备份再按 `metering_source=sandbox_reported` 定向处理，不自动删除历史数据。
-- [ ] **Step 4：运行最终门禁并记录跳升原因。** 在最新 main 的干净 worktree 后台执行 `cd backend && make test`，再跑根 `make check`、Node 补充测试、E2E 和 docs convention；检查 `git status`，删除临时日志，证据仅保留在主 clone 的 gitignored `temp/`。changelog 明示“首次纳入沙箱真实花费，平台媒体总额可能跳升”，逐项记录 RED→GREEN、CI/OCR、服务器查询和实际供应商消费。
-- [ ] **Step 5：完成文档。** findings 保留 ViMax/其他非首页项未勾选，未覆盖 provider 或无 token 的情况登记而非清零；changelog「验收记录」逐行写“命令 → 实际关键输出”。三条 PR 合入且验收完成后，只把顶部原状态行改为 `已执行`；未授权部署/消费或缺少账单时相关项保持未勾选，不宣称完整验收。
+- [x] **Step 1：部署后做六卡最小真实验收。** 用户批准部署和必要消费后，在测试服设置 `DEER_FLOW_MEDIA_USAGE_LEDGER=1` 并重启 gateway，分别触发 course-video 一段 TTS、creative-studio 一张图、PPT 一张图加一段旁白、podcast 一个短分段、AI 生图一张、AI 生视频一个最短镜头。逐项对照供应商记录、`external_api_calls`、`unpriced_media_calls` 与页面，验证任务归属、次数和当前价目；同时确认 gateway 能读到沙箱容器写出的账本（跨 uid 权限），UI 实际路径（`lead_agent` + `context.agent_name`）被接受，creative-studio 事件的 `model` 与实际下发模型一致。
+- [x] **Step 2：补 nohup 批量与供应商账单覆盖率。** 按技能正式指引（nohup 后台 + 同 run 轮询）跑一次 course-video 批量 TTS，确认随该 run 结束入库；再做一次「run 先结束、后台后完成」，确认在同一线程下一次 run 结束入库。nohup 覆盖只按这一口径表述，没有后续 run 的后台事件不入库。尽可能用供应商账单导出核对成功媒体调用数和金额，计算已计价覆盖率；拿不到账单时标 `SUPPLIER_RECONCILIATION_NOT_VERIFIED`，不能用页面自证完整。
+- [x] **Step 3：执行回滚演练。** 将开关置 0 并重启 gateway，确认停止新账本入库且制作流程不受影响，已有行保留；重新置 1 后确认关闭期间积累的事件被补入（`created_at` 为入库时间）。清理仅在用户另行批准后，先备份再按 `metering_source=sandbox_reported` 定向处理，不自动删除历史数据。
+- [x] **Step 4：运行最终门禁并记录跳升原因。** 在最新 main 的干净 worktree 后台执行 `cd backend && make test`，再跑根 `make check`、Node 补充测试、E2E 和 docs convention；检查 `git status`，删除临时日志，证据仅保留在主 clone 的 gitignored `temp/`。changelog 明示“首次纳入沙箱真实花费，平台媒体总额可能跳升”，逐项记录 RED→GREEN、CI/OCR、服务器查询和实际供应商消费。
+- [x] **Step 5：完成文档。** findings 保留 ViMax/其他非首页项未勾选，未覆盖 provider 或无 token 的情况登记而非清零；changelog「验收记录」逐行写“命令 → 实际关键输出”。三条 PR 合入且验收完成后，只把顶部原状态行改为 `已执行`；未授权部署/消费或缺少账单时相关项保持未勾选，不宣称完整验收。
 
 ## 四、回滚与已知限制
 
