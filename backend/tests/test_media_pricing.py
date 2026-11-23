@@ -44,11 +44,17 @@ class TestEstimateCallCost:
         cost = _estimate_call_cost({"completion_tokens": 300, "total_tokens": 1000}, "generate_video", pricing)
         assert cost == pytest.approx(0.0069)  # 300 only; 1300 would be 0.0299
 
-    @pytest.mark.parametrize("completion", [None, "n/a"], ids=["none", "garbage"])
+    @pytest.mark.parametrize("completion", [None, "n/a", 0, "0", -5], ids=["none", "garbage", "zero", "zero-str", "negative"])
     def test_per_kilo_token_falls_back_to_total_when_completion_unusable(self, completion) -> None:
+        """0 与负数同样按缺失处理：provider 失败/空响应常回报 completion_tokens=0 并带有效 total_tokens（评审 #50）。"""
         pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
         cost = _estimate_call_cost({"completion_tokens": completion, "total_tokens": 5000}, "generate_video", pricing)
         assert cost == pytest.approx(0.115)  # 5 * 0.023 via total
+
+    def test_per_kilo_token_zero_completion_without_total_is_unpriced(self) -> None:
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        assert _estimate_call_cost({"completion_tokens": 0}, "generate_video", pricing) is None
+        assert _estimate_call_cost({"completion_tokens": 0, "total_tokens": 0}, "generate_video", pricing) is None
 
     def test_per_kilo_token_no_usable_tokens_is_unpriced(self) -> None:
         pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
