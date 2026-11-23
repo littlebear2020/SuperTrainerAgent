@@ -20,4 +20,13 @@
 - PR #47 `gh pr checks 47 --watch` → backend-unit-tests pass (3m15s)、quick-checks pass、AI Code Review pass；OCR 摘要 1 selected item / **0 findings**；已 rebase 合入为 `9a010c827c9ef8e07819dae34d0e1c00453d448d`。
 - PR 2 SVG RED：`uv run pytest tests/test_ppt_master_svg_quality.py -q` → 1 failed / 8 passed，旧实现没有 sibling overlap 报告；GREEN → 9 passed；与 `test_ppt_master_skill_vendored.py` 相关回归 → 16 passed。
 - PR 2 SVG 基线：真实 `_check_text_bounds()` 扫描 `style_previews/*.svg` + `native_projection/*.svg` → 26 份、1 个候选命中；`15_signing_target.svg` 的「战兴业务」/「223」为 31.0×13.7px，属原生图表 fallback，故最终定为 **warning**；正常相邻行最小非负间隙 0.4px。完整清单与坐标在 gitignored `ppt-svg-baseline.json`。
-- PR 2 PDF 预筛、离线导出行为验收、PR # 待定的 CI/OCR 与最终门禁将在实际执行后回填；未执行项不记为通过。
+- PR 2 PDF RED：`uv run pytest tests/test_ppt_master_pdf_prescreen.py -q` → 7 failed（新脚本缺失）；实现后 7 passed。真实 Poppler XHTML 包装回归先 RED（no pages），修复后完整预筛 8 passed；同 block、`7`/`42` 目检、`123` 与短标签硬失败、转换/解析失败均有断言。
+- PR 2 文档 RED→GREEN：P34 与 Default/Beautify 工作流断言先 2 failed；补齐 SKILL、generate-pptx、TRAINERAI_PATCHES 后，SVG/PDF/vendored 相关回归 → **25 passed**，attribution guard 通过；未改 Quick/Edit Native、SOUL、SEED_VERSION、frontmatter 或 `pptx_delivery_check.py`。
+- 原始咖啡证据：`pdftotext -bbox-layout 咖啡冲泡入门.pdf ...` → 第 2 页「再分段注水」/「偏差信号」**same_block=true**，相交 53.77×6.726pt，`block_delivery`。
+- 脱敏真实生成链：重建两页 SVG → `svg_quality_checker.py --stage final` → `svg_to_pptx.py` → `soffice` → `pdftotext -bbox-layout`。重叠版 PPTX 预筛 `blocking_count=2`；首个修复版又发现「再分段」/「注水」内部行重叠 2.52pt，继续下移源 tspan 后重新导出，最终 `passed=true`、`blocking_count=0`、`manual_review_count=0`。
+- 实际 CLI：`python3 scripts/pptx_text_overlap_prescreen.py <修复后 coffee.pptx> > validation/text-overlap-cli.json` → exit 0，`CLI_PRESCREEN_OK status=passed blocking=0`。两版 PDF、bbox-layout、PPTX、JSON 报告均在 gitignored temp；未运行付费 Agent、未以 PNG/自述替代机械结果。
+- `docs/findings-backlog.md` 已登记 display_name、用量标题 i18n、audio-only、`clone:` 空后缀、Quick/Edit Native 未覆盖及补丁表格式；P7 维持未复现，failure-recovery 既有预算项继续推迟。
+- 实际 CLI 双向结果：重叠版 `pptx_text_overlap_prescreen.py` → exit 1，`CLI_PRESCREEN_BLOCKED status=failed blocking=2`；修复版 → exit 0，`CLI_PRESCREEN_OK status=passed blocking=0`。
+- PR 2 新脚本与 backend 测试定向 `ruff check` → All checks passed；`ruff format --check` → 4 files already formatted。直接以 backend 配置扫描 vendored `checker.py` 会报 400 个存量风格问题（该树本属豁免区），本批未清理或扩大范围。
+- PR 2 全量 `cd backend && make test` → **10204 passed, 91 skipped**；根 `make check` → backend ruff/format、frontend eslint/tsc/prettier/knip/i18n 与 docs convention 全过（既有前端 120 warnings / 0 errors）。
+- PR 2 的 CI/OCR 与合入结果将在实际执行后回填；未执行项不记为通过。

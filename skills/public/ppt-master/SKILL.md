@@ -81,6 +81,11 @@ required-secrets:
 > 11. **磁盘预检与 0 字节即停（P22）**：Step 6 开始前用 `df -h` 检查工作区分区，可用空间
 >    <1GB 立即停并明确报告，不得继续写页；每个 SVG 写完校验大小 >0，发现 0 字节立即删除、
 >    报告并停止；长任务每 5 页顺带复查磁盘。
+> 12. **导出后文字行机械预筛（P34）**：Default/Beautify 在 Step 7.3 导出与 postflight 后运行
+>    `python3 ${SKILL_DIR}/scripts/pptx_text_overlap_prescreen.py <printed_output.pptx> > <validation/text-overlap.json>`，
+>    通过 `soffice` + `pdftotext -bbox-layout` 比较任意文字行框（含同一 block）。仅当命中行整行文本
+>    去除首尾空白后完整匹配 `[0-9]{1,2}` 时归为装饰性大数字，只标记该页目检并记录结论；其余文字重叠
+>    （含短标签）均阻止交付。Agent 自述与看图不能替代机械结果；Quick/Edit Native 不在本批覆盖范围。
 
 # PPT Master Skill
 

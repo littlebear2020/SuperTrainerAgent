@@ -378,6 +378,14 @@ Sound: the optional post-motion pass is [`animations.md`](../references/animatio
 
 **Success criterion**: the command exits 0 and produces `exports/<project_name>_<timestamp>.pptx`, `validation/<project_name>_<timestamp>.report.json` with `passed` or `passed-with-warnings`, and `validation/<project_name>_<timestamp>.trace.json` when `--conversion-trace` was enabled. The exporter itself requires the current matching `final` quality report and exits nonzero on a missing, unreadable, unsupported, non-final, blocking, stale, or unverifiable one. Read the compact `[POSTFLIGHT]` receipt (`status`, `quality_gate`, slide count, warning counts, paths), disclose material warnings, and never `cat` the full report on success. Retain the report path for a later `deck_motion` handoff; postflight proves the package, not a later MP4 audio track.
 
+#### Step 7.4 — Prescreen Exported Text-Line Overlap (Default / Beautify)
+
+```bash
+python3 ${SKILL_DIR}/scripts/pptx_text_overlap_prescreen.py <printed_output.pptx> > <validation/text-overlap.json>
+```
+
+The prescreen uses `soffice` + `pdftotext -bbox-layout` to compare every pair of rendered text-line bounds, including pairs in the same block（同一 block）. A blocking overlap returns exit 1 and `block_delivery`: return to the source SVG, repair the layout, re-export, and rerun this gate. Only an overlapping line whose complete trimmed text matches `[0-9]{1,2}` is a decorative-number exception; it returns `manual_page_review` instead of a hard delivery failure. Record a textual visual-review conclusion for each such page, inspecting at most 8 pages per round and never substituting images or an Agent claim for the mechanical report. Conversion or parsing failures return exit 2 and also stop delivery. Quick and Edit Native are independent export routes and are not covered by this batch.
+
 ## ✅ Generate PPTX Complete
 
 - [x] Image readiness gate passed
@@ -386,4 +394,5 @@ Sound: the optional post-motion pass is [`animations.md`](../references/animatio
 - [x] Notes split when enabled; disabled exports used `--no-notes`
 - [x] `svg_final/` preview built
 - [x] Native PPTX published and postflight report written
+- [x] Default/Beautify exported text-line overlap prescreen passed; decorative-number page reviews (if any) recorded
 - [ ] **Next**: report the exported PPTX path; when the effective Narration Audio outcome in `design_spec.md §I` is enabled, run [`generate-audio`](stages/generate-audio.md); otherwise run a supporting post-export stage only on its explicit trigger
