@@ -7,6 +7,7 @@
 
 - 在 `core/messages/usage.ts` 新增 `summarizeTurnUsage(groups)`：以可见 human 组划轮，支持列表首部隐式首轮；每轮按 `Set<Message>` 的对象引用去重，使用原有 `getUsageMetadata` 累加输入、输出和总 Token；同 id 的不同对象仍分别计入。
 - 汇总 Map 以轮内最后一个可渲染组的原始索引为锚点。`isEmptyClarificationGroup` 精确定义为 `assistant:clarification` 且首条消息不存在或不满足既有 `hasContent`；渲染分支与汇总锚点共用该谓词。
+- 独立评审发现上传中的乐观 task 占位 AI 在旧 UI 提前返回、没有 Token 行；汇总现精确排除 `assistant` 组内 `additional_kwargs.element === "task"` 的占位，避免上传期间新增虚假“未返回用量”，其他组口径不变。
 - `MessageList` 只在 `tokenUsageEnabled && !thread.isLoading` 时汇总，否则复用同一个冻结的 `EMPTY_TURN_USAGE: ReadonlyMap`；通过既有 `VirtualMessageList.renderAfterGroup` 在每轮只渲染一行，终稿组使用顶部让位，使顺序为回复、工具栏、Token 行。
 - 删除 processing、present-files、subagent、storyboard、clarification 和普通回复内的旧逐条出口。展示复用既有文案：全缺仅显示 `unavailableShort`，部分缺在已返回数值之和后显示 `unavailableShort ×N`。
 - 新增 node、DOM 与 Playwright 覆盖：17 行离线夹具守恒、引用去重、同 id 异对象、缺失/零值、多轮、空 clarification、流式零计算、工具栏位置、96 组虚拟窗口、错误/停止、多个产物组及真实 run-history prepend 后的索引与分轮数值。
@@ -35,9 +36,10 @@
 - GREEN：标准 Playwright token 命令，无构建绕过 → `8 passed`。
 - 变异①撤掉 `mt-9` 让位 → 工具栏位置断言如预期失败：`Expected >= 498 / Received 470`；随后恢复。
 - 变异②移除 `!thread.isLoading` → 加载中门控用例如预期失败：`1 failed / 4 passed`；随后恢复。
-- `pnpm test` → `284 test files passed`、`1845 tests passed`。
-- `pnpm test:e2e` → `128 passed, 3 skipped`。
-- `pnpm check` → ESLint `0 errors`（既有 `120 warnings`）、TypeScript 与 Prettier 通过。首次与 E2E 并行时因共享 `test-results/` 被清理而出现 ESLint `ENOENT`，已在 E2E 结束后串行重跑通过，不作为代码失败。
+- 独立全分支评审 → 1 项 Important：上传 task 占位被误计缺 usage；新增回归 RED `Expected missingCount 0 / Received 1`，最小修复后 node 定向 `49/49 passed`；无 Critical。
+- `pnpm test` → 评审修复后最终重跑 `284 test files / 1846 tests passed`。
+- `pnpm test:e2e` → 评审修复后最终重跑 `128 passed, 3 skipped`。
+- `pnpm check` → 评审修复后串行重跑，ESLint `0 errors`（既有 `120 warnings`）、TypeScript 与 Prettier 通过。首次与 E2E 并行时因共享 `test-results/` 被清理而出现 ESLint `ENOENT`，随后均串行重跑通过，不作为代码失败。
 - `make check` → backend/frontend 静态检查、`knip`、i18n `660` 个叶子存活检测与 docs convention 全部通过；既有 frontend `120 warnings`，无 error。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - PR CI/OCR → 待实际完成后补录，不预先声称通过。

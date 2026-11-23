@@ -138,6 +138,12 @@ function legacyTurnRows(groups: ThreadMessageGroup[]): Message[][] {
       if (message.type !== "ai") {
         return false;
       }
+      if (
+        current.type === "assistant" &&
+        message.additional_kwargs?.element === "task"
+      ) {
+        return false;
+      }
       if (current.type === "assistant:processing") {
         return hasToolCalls(message) ? true : !hasContent(message);
       }
@@ -296,6 +302,37 @@ describe("summarizeTurnUsage", () => {
       new Map([
         [
           1,
+          {
+            usage: { inputTokens: 4, outputTokens: 5, totalTokens: 9 },
+            missingCount: 0,
+          },
+        ],
+      ]),
+    );
+    expectConservation(groups, summary);
+  });
+
+  it("excludes optimistic upload placeholders that legacy assistant rows never rendered", () => {
+    const uploading = ai("uploading", "Uploading files");
+    uploading.additional_kwargs = { element: "task" };
+    const answer = ai("answer", "answer", {
+      input_tokens: 4,
+      output_tokens: 5,
+      total_tokens: 9,
+    });
+    const groups = getMessageGroups([human("h-1"), uploading, answer]);
+
+    expect(groups.map((current) => current.type)).toEqual([
+      "human",
+      "assistant",
+      "assistant",
+    ]);
+    expect(legacyTurnRows(groups)[0]).toEqual([answer]);
+    const summary = summarizeTurnUsage(groups);
+    expect(summary).toEqual(
+      new Map([
+        [
+          2,
           {
             usage: { inputTokens: 4, outputTokens: 5, totalTokens: 9 },
             missingCount: 0,
