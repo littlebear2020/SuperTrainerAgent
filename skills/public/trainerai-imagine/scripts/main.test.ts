@@ -1441,3 +1441,136 @@ test("path normalization, worker count, and retry classification follow expected
   );
   assert.equal(isRetryableGenerationError(new Error("socket hang up")), true);
 });
+
+// ── 媒体计量账本（2026-11-23 首页六卡媒体计量计划 PR 3）─────────────────────
+// qihu360 在 360 返回含图之后、CDN 下载之前向线程工作区账本追加一行 image 事件；
+// 发射永不抛错（同步 fs 调用包在 try/catch 内，不留未 await 的 Promise）。
+
+const IMAGE_EVENT_KEYS = ["elapsed_ms", "event_id", "height", "kind", "model", "width"];
+
+function useLedgerDir(t: TestContext, dir: string): string {
+  useEnv(t, { DEER_FLOW_MEDIA_LEDGER_DIR: dir });
+  return path.join(dir, "media-usage.jsonl");
+}
+
+async function readLedger(file: string): Promise<Array<Record<string, unknown>>> {
+  try {
+    await fs.access(file);
+  } catch {
+    return [];
+  }
+  const text = await fs.readFile(file, "utf8");
+  return text.split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>);
+}
+
+function stubQihuFetch(
+  t: TestContext,
+  body: unknown,
+  options: { downloads?: "fail" | "png" } = {},
+): void {
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = (async () => {
+    call += 1;
+    if (call === 1) {
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (options.downloads === "fail") throw new Error("cdn unreachable");
+    return new Response(PNG_BYTES, { status: 200, headers: { "Content-Type": "image/png" } });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+}
+
+test("qihu360 records one image ledger event with only contract fields after a 200 with image", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const ledger = useLedgerDir(t, await makeTempDir("ledger-ok-"));
+  stubQihuFetch(t, { data: [{ b64_json: PNG_BASE64 }] });
+
+  const bytes = await generateImage("prompt", getDefaultModel(), makeArgs({ aspectRatio: "16:9" }));
+
+  assert.deepEqual([...bytes], [...PNG_BYTES]);
+  const events = await readLedger(ledger);
+  assert.equal(events.length, 1);
+  const event = events[0]!;
+  assert.equal(event.kind, "image");
+  assert.equal(event.model, getDefaultModel());
+  assert.deepEqual([event.width, event.height], [2048, 1152]);
+  assert.match(String(event.event_id), /^[0-9a-f]{32}$/);
+  assert.equal(typeof event.elapsed_ms, "number");
+  assert.deepEqual(Object.keys(event).sort(), IMAGE_EVENT_KEYS);
+});
+
+test("qihu360 records the model actually sent when another Seedream model is requested", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const ledger = useLedgerDir(t, await makeTempDir("ledger-model-"));
+  let sentModel: string | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+    sentModel = (JSON.parse(String(init?.body)) as { model: string }).model;
+    return new Response(JSON.stringify({ data: [{ b64_json: PNG_BASE64 }] }), { status: 200 });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  const model = "doubao-seedream-5-0-pro-260628"; // 非默认 Seedream
+
+  await generateImage("prompt", model, makeArgs());
+
+  assert.equal(sentModel, model);
+  const events = await readLedger(ledger);
+  assert.equal(events.length, 1);
+  assert.equal(events[0]!.model, model, "事件 model 与实际下发一致，不改写为默认模型");
+});
+
+test("qihu360 writes no ledger event for a 200 without an image", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const ledger = useLedgerDir(t, await makeTempDir("ledger-empty-"));
+  stubQihuFetch(t, { data: [] });
+
+  await assert.rejects(generateImage("prompt", getDefaultModel(), makeArgs()));
+  assert.deepEqual(await readLedger(ledger), []);
+});
+
+test("qihu360 keeps the ledger event when the CDN download fails", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const ledger = useLedgerDir(t, await makeTempDir("ledger-cdn-"));
+  stubQihuFetch(t, { data: [{ url: "https://cdn.example/x.png" }] }, { downloads: "fail" });
+
+  await assert.rejects(generateImage("prompt", getDefaultModel(), makeArgs()));
+  const events = await readLedger(ledger);
+  assert.equal(events.length, 1, "供应商已返回含图的 200，消耗已发生");
+  assert.equal(events[0]!.kind, "image");
+});
+
+test("qihu360 still returns the image when the ledger directory is unwritable", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const dir = await makeTempDir("ledger-sealed-");
+  const blocker = path.join(dir, "blocker.txt");
+  await fs.writeFile(blocker, "regular file, not a dir");
+  useEnv(t, { DEER_FLOW_MEDIA_LEDGER_DIR: path.join(blocker, ".usage") });
+  stubQihuFetch(t, { data: [{ b64_json: PNG_BASE64 }] });
+
+  const bytes = await generateImage("prompt", getDefaultModel(), makeArgs());
+
+  assert.deepEqual([...bytes], [...PNG_BYTES]);
+});
+
+test("qihu360 ledger file is 0644 in a 0755 directory even under umask 077", async (t) => {
+  useProviderEnv(t, { QIHU_API_KEY: "qihu-key" });
+  const ledger = useLedgerDir(t, await makeTempDir("ledger-umask-"));
+  stubQihuFetch(t, { data: [{ b64_json: PNG_BASE64 }] });
+  const previous = process.umask(0o077);
+  try {
+    await generateImage("prompt", getDefaultModel(), makeArgs());
+  } finally {
+    process.umask(previous);
+  }
+
+  assert.equal((await fs.stat(ledger)).mode & 0o777, 0o644);
+  assert.equal((await fs.stat(path.dirname(ledger))).mode & 0o777, 0o755);
+});

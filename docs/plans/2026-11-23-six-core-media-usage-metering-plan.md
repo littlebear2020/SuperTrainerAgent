@@ -1,6 +1,6 @@
 # 首页六卡媒体计量与计价接入实施计划
 
-> **状态**：未执行（执行中：账本基座）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅修订计划，未修改产品代码、未部署。执行前先从最新 `origin/main` 评估漂移，再移回 `docs/plans/`。
+> **状态**：未执行（执行中：技能接入）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅修订计划，未修改产品代码、未部署。执行前先从最新 `origin/main` 评估漂移，再移回 `docs/plans/`。
 > **TL;DR**：只覆盖首页六张卡片的新任务，按“直接计价修复 → 休眠账本基座 → 技能发射接入”三个串行 PR 实施。Agent 媒体事件追加到线程工作区 `.usage/media-usage.jsonl`（生产仅支持本地 Aio 容器沙箱），worker 在 run 结束后读取并按当前线程/用户落库；不扫 bash 回显、不依赖 RunJournal；复用现有表和价目，不改 schema、不回填历史账。防护只做保证功能可用的最小底线，不新增 CI 工作流；Writer/ViMax/语音克隆等非首页能力不要求统计。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准后使用 `executing-plans` 单执行者按 Task 0→5 串行执行并逐项勾选；实现先写真实失败测试，再写最小实现。三个 PR 严格按 PR 1→2→3 合入，禁止并行派发。状态只修改顶部原行，依次使用 `未执行（执行中：直接计价）`、`未执行（执行中：账本基座）`、`未执行（执行中：技能接入）`，三条 PR 都合入后才改为 `已执行`，不得另起状态头。
 
@@ -98,7 +98,7 @@ AI 生图/生视频任务的旁白经 `orchestration.tts.synthesize` 默认走�
 - [x] **Step 3：实现账本读取与 worker 钩子。** `runtime/media_usage.py` 只负责路径、受限读取、解析与上界，不 import `app.*`。worker 顶部用 `getattr(ctx, "media_usage_sink", None)` 解包并保留原 finally 的 `ctx` 解绑防护；在 `await bridge.publish_end(run_id)` 之后用 `asyncio.wait_for(..., 10)` 调用 sink，异常或超时只记 WARNING，不改变 run 状态。
 - [x] **Step 4：实现落库 sink。** `agent_media_usage.py`：先对有效 Agent 名调用 `canonical_agent_capability`，限定在 course-video/creative-studio/ppt-master/podcast-studio，否则直接返回；读取账本后分批（≤500）查已存在 `call_id`，按文件顺序对新事件直接构造 `ExternalApiCallRow`（`task_id=thread_id`，metadata 含映射后的 model、`char_count`/`width`/`height`、`metering_source=sandbox_reported`），每条用独立 session 提交（同 `record_external_api_call`），失败先 rollback 再继续下一条：`IntegrityError` 记 duplicate，其他异常记 error；`truncated` 且窗口最早一条有效事件不在已存在集合中时打 overflow WARNING；结束输出一行汇总。`deps.get_run_context` 仅在 `DEER_FLOW_MEDIA_USAGE_LEDGER=1` 时注入 sink。不改 `llm_usage_sink.py`。
 - [x] **Step 5：补部分计价响应。** `_aggregate_media_rows` 额外返回已知 `source=unpriced` 行数，`UsageTask`/HTTP 响应增加必填 `unpriced_media_calls: int`，更新 `agent.py`、`video.py` 两处构造器和现有测试（不要给 dataclass 基类加默认字段，以免 `UsageTaskEntry` 继承顺序出错）。语义写进 `routers/personal_usage.py` 中该字段的 `Field(description=...)`：该字段不含未埋点通道，`media_cost` 是已知下界；API 不新增调用数，调用数只在 DB 与供应商账单侧核对。
-- [ ] **Step 6：按统一门禁交付休眠基座。** 默认 `DEER_FLOW_MEDIA_USAGE_LEDGER=0` 时不新增采集和落库；`/api/usage` 响应仍会多出 `unpriced_media_calls` 字段（前端按 TS 类型读取，忽略未知字段）；测试显式开启验证。提交 `feat(usage): 建立线程媒体计量账本`，经 CI/OCR 后 rebase 合入，再把原状态行改为 `未执行（执行中：技能接入）`。
+- [x] **Step 6：按统一门禁交付休眠基座。** 默认 `DEER_FLOW_MEDIA_USAGE_LEDGER=0` 时不新增采集和落库；`/api/usage` 响应仍会多出 `unpriced_media_calls` 字段（前端按 TS 类型读取，忽略未知字段）；测试显式开启验证。提交 `feat(usage): 建立线程媒体计量账本`，经 CI/OCR 后 rebase 合入，再把原状态行改为 `未执行（执行中：技能接入）`。
 
 ### Task 3 / PR 3：在共享 TTS 实现中发射账本事件
 
@@ -107,17 +107,17 @@ AI 生图/生视频任务的旁白经 `orchestration.tts.synthesize` 默认走�
 - Python（五份 `_doubao_tts.py`、PPT 共用 helper）：`os.makedirs(dir, exist_ok=True)` 后 `os.chmod(dir, 0o755)`；`os.open(path, O_APPEND|O_CREAT|O_WRONLY, 0o644)` 后 `os.fchmod(fd, 0o644)`，单次 `os.write` 一行；只用 Python 3.10 可用的 stdlib API（不用 `datetime.UTC` 等 3.11+ 接口）。
 - Node（`qihu360.ts`）：同步 `mkdirSync({recursive: true})` + `chmodSync` + `openSync(path, "a", 0o644)` + `fchmodSync` + 单次 `writeSync` + `closeSync`，不留未 await 的 Promise，避免未处理的 rejection 让生图进程退出。
 
-- [ ] **Step 1：写五镜像发射失败测试。** `test_sandbox_media_usage_scripts.py` 以环境变量把账本指向 `tmp_path`，用假 `urlopen` 驱动 `_doubao_tts.synthesize()` / `synthesize_with_timestamps()`：成功各写一行（`kind=tts`、`with_timestamps` 正确、`char_count=len(text)`）；重试只写最终成功一次；失败不写；供应商成功但调用方写盘失败仍有账本行；账本目录不可写/不存在时仍返回音频；umask 077 下 `.usage` 目录为 `0o755`、账本文件为 `0o644`。五份副本沿用现有 md5 一致守护。
-- [ ] **Step 2：在五份 `_doubao_tts.py` 同步实现。** 在 `synthesize()`/`synthesize_with_timestamps()` 成功返回点按发射规则写一行；不改模板、不依赖脚本名；corporate-video/tech-explainer-video 因 md5 守护同步修改，非核心 Agent 由 sink 排除；顺带把头部 MIRROR 注释的 “currently 4 copies” 改为 5 份并补上 podcast-studio。
-- [ ] **Step 3：接入 PPT TTS 分片。** 新增 `ppt-master/scripts/media_usage_ledger.py`（遵守发射规则的共用 helper，两个 backend 共用）；`backend_trainerai.py` 在每个真实成功分片写一条事件，多分片不合并、重试不重复；`TRAINERAI_PATCHES.md` 追加 P35 行登记新 helper 与两处补丁，不改 frontmatter、SOUL、SEED_VERSION 或其他 provider。
-- [ ] **Step 4：验证后台与并发。** 子进程调用 `synthesize()`（stdout/stderr 重定向到日志文件，模拟 nohup），断言账本有行且日志无任何计量标记；子进程里用 `sitecustomize` 替换 `urllib.request.urlopen`（`_ENDPOINT` 是写死常量，无环境覆盖）；两个进程并发各写 N 行，行数齐全且逐行可解析。运行 `test_sandbox_media_usage_scripts.py`、`test_skill_script_copies.py`、`test_ppt_master_tts_trainerai.py` 与 podcast 相关回归。
+- [x] **Step 1：写五镜像发射失败测试。** `test_sandbox_media_usage_scripts.py` 以环境变量把账本指向 `tmp_path`，用假 `urlopen` 驱动 `_doubao_tts.synthesize()` / `synthesize_with_timestamps()`：成功各写一行（`kind=tts`、`with_timestamps` 正确、`char_count=len(text)`）；重试只写最终成功一次；失败不写；供应商成功但调用方写盘失败仍有账本行；账本目录不可写/不存在时仍返回音频；umask 077 下 `.usage` 目录为 `0o755`、账本文件为 `0o644`。五份副本沿用现有 md5 一致守护。
+- [x] **Step 2：在五份 `_doubao_tts.py` 同步实现。** 在 `synthesize()`/`synthesize_with_timestamps()` 成功返回点按发射规则写一行；不改模板、不依赖脚本名；corporate-video/tech-explainer-video 因 md5 守护同步修改，非核心 Agent 由 sink 排除；顺带把头部 MIRROR 注释的 “currently 4 copies” 改为 5 份并补上 podcast-studio。
+- [x] **Step 3：接入 PPT TTS 分片。** 新增 `ppt-master/scripts/media_usage_ledger.py`（遵守发射规则的共用 helper，两个 backend 共用）；`backend_trainerai.py` 在每个真实成功分片写一条事件，多分片不合并、重试不重复；`TRAINERAI_PATCHES.md` 追加 P35 行登记新 helper 与两处补丁，不改 frontmatter、SOUL、SEED_VERSION 或其他 provider。
+- [x] **Step 4：验证后台与并发。** 子进程调用 `synthesize()`（stdout/stderr 重定向到日志文件，模拟 nohup），断言账本有行且日志无任何计量标记；子进程里用 `sitecustomize` 替换 `urllib.request.urlopen`（`_ENDPOINT` 是写死常量，无环境覆盖）；两个进程并发各写 N 行，行数齐全且逐行可解析。运行 `test_sandbox_media_usage_scripts.py`、`test_skill_script_copies.py`、`test_ppt_master_tts_trainerai.py` 与 podcast 相关回归。
 
 ### Task 4 / PR 3：接入生图并完成离线贯通测试
 
-- [ ] **Step 1：接入 creative-studio 与 PPT 生图。** `trainerai-imagine/providers/qihu360.ts` 在 360 响应含 `data[0].url|b64_json` 之后、CDN 下载之前写一条 image 事件（`event_id/kind/model/width/height/elapsed_ms`，`model` 为 `generateImage()` 本次实际下发的模型）；`image_backends/backend_qihu360.py` 在同一位置经 `media_usage_ledger.py` 写入（该 backend 只支持默认模型）。200 但无图、HTTP 错误不写；CDN 下载失败仍保留已写事件；其他 provider 不伪造 360 事件。
-- [ ] **Step 2：写 TS 本地行为测试。** `main.test.ts` 增加 qihu360 用例：成功写一行且字段集仅含契约字段、`kind === "image"`；`--model` 指定非默认 Seedream 时事件 `model` 与之相同；200 无图不写；下载失败仍保留；账本目录不可写时生图照常返回；umask 077 下文件为 `0o644`。按现有本地方式运行，不新增 CI 步骤。
-- [ ] **Step 3：运行 PR 3 回归。** `test_sandbox_media_usage_scripts.py`、`test_ppt_master_tts_trainerai.py`、`test_ppt_master_image_trainerai.py`、`test_skill_script_copies.py`、PPT vendored 回归；在 `skills/public/trainerai-imagine` 运行 `npx --no-install tsx --test scripts/main.test.ts scripts/build-batch.test.ts`。P35 补丁表保持既有格式缺陷，不顺手整理。
-- [ ] **Step 4：新增显式离线贯通测试。** 新建 `backend/tests/test_core_media_usage_e2e.py` 并标 `@pytest.mark.e2e`：podcast/course-video 经 `_doubao_tts.py`、PPT 经 `backend_trainerai.py`/`backend_qihu360.py`（假供应商）写账本，再经 `drain_agent_media_usage` → SQLite → `GET /api/usage`；直接两卡经 provider 夹具到同一接口。creative-studio 只用 TS 同形账本行做契约贯通，不单独证明其端到端（真实 TS 由 `main.test.ts` 与 Task 5 验证）。断言归属、DB 调用数、费用公式、`unpriced_media_calls`、`cost_source`；非核心 Agent 的账本不入库；重复读取不重复计费。
+- [x] **Step 1：接入 creative-studio 与 PPT 生图。** `trainerai-imagine/providers/qihu360.ts` 在 360 响应含 `data[0].url|b64_json` 之后、CDN 下载之前写一条 image 事件（`event_id/kind/model/width/height/elapsed_ms`，`model` 为 `generateImage()` 本次实际下发的模型）；`image_backends/backend_qihu360.py` 在同一位置经 `media_usage_ledger.py` 写入（该 backend 只支持默认模型）。200 但无图、HTTP 错误不写；CDN 下载失败仍保留已写事件；其他 provider 不伪造 360 事件。
+- [x] **Step 2：写 TS 本地行为测试。** `main.test.ts` 增加 qihu360 用例：成功写一行且字段集仅含契约字段、`kind === "image"`；`--model` 指定非默认 Seedream 时事件 `model` 与之相同；200 无图不写；下载失败仍保留；账本目录不可写时生图照常返回；umask 077 下文件为 `0o644`。按现有本地方式运行，不新增 CI 步骤。
+- [x] **Step 3：运行 PR 3 回归。** `test_sandbox_media_usage_scripts.py`、`test_ppt_master_tts_trainerai.py`、`test_ppt_master_image_trainerai.py`、`test_skill_script_copies.py`、PPT vendored 回归；在 `skills/public/trainerai-imagine` 运行 `npx --no-install tsx --test scripts/main.test.ts scripts/build-batch.test.ts`。P35 补丁表保持既有格式缺陷，不顺手整理。
+- [x] **Step 4：新增显式离线贯通测试。** 新建 `backend/tests/test_core_media_usage_e2e.py` 并标 `@pytest.mark.e2e`：podcast/course-video 经 `_doubao_tts.py`、PPT 经 `backend_trainerai.py`/`backend_qihu360.py`（假供应商）写账本，再经 `drain_agent_media_usage` → SQLite → `GET /api/usage`；直接两卡经 provider 夹具到同一接口。creative-studio 只用 TS 同形账本行做契约贯通，不单独证明其端到端（真实 TS 由 `main.test.ts` 与 Task 5 验证）。断言归属、DB 调用数、费用公式、`unpriced_media_calls`、`cost_source`；非核心 Agent 的账本不入库；重复读取不重复计费。
 - [ ] **Step 5：按统一门禁合入 PR 3。** 提交 `feat(usage): 接入核心技能媒体计量`，CI/OCR 无 Critical/Important 后 rebase 合入。开启开关仅在部署阶段执行，三条 PR 合入本身不宣称测试服已验收。
 
 ### Task 5：真实验收、回滚与收尾
