@@ -14,6 +14,7 @@ from app.gateway._shared.task_framework.models import TaskRow
 from app.gateway.auth.models import User
 from app.gateway.routers import personal_usage
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
+from deerflow.persistence.external_api_calls.model import ExternalApiCallRow
 from deerflow.persistence.run.model import RunRow
 from deerflow.persistence.thread_meta.model import ThreadMetaRow
 
@@ -253,3 +254,41 @@ async def test_usage_rejects_missing_resolved_user_context(monkeypatch):
             limit=20,
         )
     assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_usage_response_exposes_unpriced_media_calls(db):
+    """ "unpriced_media_calls" 为必填响应字段：已知未计价行数，media_cost 是已知下界。"""
+    async with db() as session:
+        session.add_all(
+            [
+                ExternalApiCallRow(
+                    call_id="unpriced-a",
+                    user_id=USER_A,
+                    task_id="thread-a",
+                    provider="doubao_tts",
+                    method="synthesize_sse_with_timestamps",
+                    status="success",
+                    metadata_json={"model": "seed-tts-2.0", "char_count": 10, "metering_source": "sandbox_reported"},
+                    created_at=CREATED,
+                ),
+                ExternalApiCallRow(call_id="unpriced-b", user_id=USER_A, task_id="thread-a", provider="doubao_tts", method="synthesize_sse", status="error", metadata_json={"model": "seed-tts-2.0", "char_count": 10}, created_at=CREATED),
+            ]
+        )
+        await session.commit()
+    from app.gateway.routers.console import invalidate_media_pricing_cache
+
+    invalidate_media_pricing_cache()
+    payload = client_for().get("/api/usage").json()
+    by_id = {item["source_id"]: item for item in payload["tasks"]}
+    assert all("unpriced_media_calls" in item for item in payload["tasks"]), "字段必填，每个任务都带"
+    assert by_id["thread-a"]["unpriced_media_calls"] == 1, "无价目（media_pricing 空）→ 成功行 unpriced；失败行不计"
+    assert by_id["thread-a"]["media_cost"] is None
+    assert by_id["thread-a"]["cost"] == pytest.approx(1.5, abs=1e-9), "LLM 真账不受媒体未计价影响"
+    assert by_id["image-a"]["unpriced_media_calls"] == 0
+
+
+def test_unpriced_media_calls_field_documents_its_semantics():
+    description = personal_usage.UsageTaskResponse.model_fields["unpriced_media_calls"].description or ""
+    assert "未埋点" in description, "必须说明该字段不含未埋点通道"
+    assert "下界" in description, "必须说明 media_cost 是已知下界"

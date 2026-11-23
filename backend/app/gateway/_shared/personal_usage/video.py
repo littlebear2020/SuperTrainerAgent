@@ -80,7 +80,7 @@ async def aggregate_video_usage(session, *, user_id: str, window: UsageWindow, c
     result: list[UsageTaskEntry] = []
     for task in selected:
         llm = _aggregate_llm_rows(llm_by_task[task.id], pricing)
-        media_cost, media_currency, media_source, media_mixed = _aggregate_media_rows(media_by_task[task.id])
+        media_cost, media_currency, media_source, media_mixed, unpriced_media = _aggregate_media_rows(media_by_task[task.id])
         cost, currency = _combine_costs(llm.cost, llm.currency, media_cost, media_currency, media_mixed)
         activity_candidates = [task.created_at]
         activity_candidates.extend(row.created_at for row in llm_by_task[task.id])
@@ -96,6 +96,7 @@ async def aggregate_video_usage(session, *, user_id: str, window: UsageWindow, c
                 cost=cost,
                 llm_cost=llm.cost,
                 media_cost=media_cost,
+                unpriced_media_calls=unpriced_media,
                 currency=currency,
                 cost_source=merge_cost_source(llm.cost_source, media_source),
                 total_tokens=llm.total_tokens,
