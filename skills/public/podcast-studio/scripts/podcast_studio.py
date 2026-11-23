@@ -155,9 +155,15 @@ def convert_html_bytes(raw: bytes, requested_url: str, final_url: str, headers: 
     content_type = headers.get("Content-Type", "") if headers else ""
     html, _ = _decode_bytes(raw, content_type)
     sanitized, _ = _sanitize_html(html)
-    from bs4 import BeautifulSoup
+    from bs4 import BeautifulSoup, Comment, Doctype
 
     soup = BeautifulSoup(sanitized, "html.parser")
+    for node in soup.find_all(string=lambda value: isinstance(value, (Comment, Doctype))):
+        node.extract()
+    for tag in list(soup.find_all(["head", "frameset"])):
+        tag.decompose()
+    for tag in list(soup.find_all(["html", "body"])):
+        tag.unwrap()
     converter = _load_web_to_md()
     return converter.simple_html_to_markdown_traversal(soup, page_url=final_url or requested_url).strip()
 

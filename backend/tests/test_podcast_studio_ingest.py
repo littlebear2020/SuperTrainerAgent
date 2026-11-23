@@ -166,6 +166,57 @@ def test_convert_html_bytes_is_pure_and_sanitized():
     assert "bad()" not in text and "x.png" not in text
 
 
+def test_convert_html_bytes_excludes_document_structure():
+    text = ps.convert_html_bytes(
+        b"""<!doctype html><html><head><title>Example Domain</title><meta charset='utf-8'></head>
+        <body><h1>Example Domain</h1><p>This domain is for use in documentation examples.</p>
+        <p>More information is available.</p></body></html>""",
+        "https://example.com/",
+        "https://example.com/",
+        {"Content-Type": "text/html; charset=utf-8"},
+    )
+
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    assert first_line != "html" and not first_line.startswith(("html ", "# html"))
+    assert text.count("Example Domain") == 1
+    assert text.count("This domain is for use in documentation examples.") == 1
+
+
+def test_convert_html_bytes_preserves_after_body_and_literal_html():
+    text = ps.convert_html_bytes(
+        """<!doctype html><html><head><title>Metadata only</title></head><body>
+        <h1>Visible heading</h1><p>html 是标记语言。</p><pre><code>&lt;html&gt;</code></pre>
+        <ul><li><a href="https://example.com/related">链接正文</a></li><li>列表项</li></ul>
+        </body></html><p>After body paragraph remains spoken.</p>
+        """.encode(),
+        "https://example.com/",
+        "https://example.com/",
+        {"Content-Type": "text/html; charset=utf-8"},
+    )
+
+    assert "After body paragraph remains spoken." in text
+    assert "html 是标记语言。" in text
+    assert "<html>" in text
+    assert "链接正文" in text and "列表项" in text
+    assert "Metadata only" not in text
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"<!doctype html><html><head><title>Metadata only</title></head><frameset><frame src='one.html'><frame src='two.html'></frameset></html>",
+        b"<!doctype html><html><head><title>Metadata only</title></head><body> \n </body></html>",
+    ],
+    ids=["frameset", "empty-body"],
+)
+def test_convert_html_bytes_frameset_or_empty_body_fails_text_check(raw):
+    text = ps.convert_html_bytes(raw, "https://example.com/", "https://example.com/", {"Content-Type": "text/html; charset=utf-8"})
+
+    assert text == ""
+    with pytest.raises(ps.PodcastError, match="empty|空"):
+        ps._check_text(text)
+
+
 def make_docx(path, text="DOCX 可见正文。"):
     document = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
     <w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'><w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"""
