@@ -42,6 +42,14 @@
 - 开关关闭时发射照写、无人读取；开启开关仅在部署阶段执行，本 PR 合入本身不宣称测试服已验收。
 - 测试：`backend/tests/test_sandbox_media_usage_scripts.py`（五镜像成功/重试/失败/写盘失败仍记账/目录不可写/umask 077 权限/永不抛错/3.10 兼容；子进程重定向 stdio 模拟 nohup + `sitecustomize` 替换 `urlopen`；双进程并发各 25 行无撕裂；PPT TTS 单/多分片/重试/失败、共用 helper、P35 登记；PPT 生图成功/HTTP 错误/200 无图/下载失败保留）、`backend/tests/test_core_media_usage_e2e.py`（`@pytest.mark.e2e`，见验收记录）、`main.test.ts` 新增 6 例 qihu360 账本用例。
 
+### 终审修复（`fix(usage): 媒体计量 drain 不再拖住 run、PPT 生图写盘前记账`）
+
+合入后对 `7ab10e2c..bbb20855 -- backend skills` 做了一次独立只读终审（新上下文子代理，按计划 §五 Review Focus 逐条核）：**无 Critical、1 项 Important、7 项 Minor**。Important 与一条属于计划规则偏离的 Minor 进修复通道，其余登记 findings-backlog。
+
+- **I-1（Important）**：worker 在 run 任务里 `await` drain 时，若 SQLite 写锁被占，`wait_for` 的取消会展开进 `_commit_row` 的 `finally: await session.close()`，rollback/close 排在被阻塞的 INSERT 之后——实测 `TimeoutError` 要 **31.1s**（= busy_timeout 30s）才浮出，期间 `record.task` 存活并拖住 `/runs/wait`；探针还显示驱动会吸收第一次取消、把后续取消转成普通异常被计为 `error` 后循环继续写下一行。修复：① worker 改为在 `publish_end` 之后**调度** drain（`asyncio.create_task` + 模块级强引用集合），run 任务不再被 drain 拖住，drain 自身仍以 `MEDIA_USAGE_DRAIN_TIMEOUT`（10s）限时并 WARNING；② sink 循环每行前检查 `asyncio.current_task().cancelling()`，被吸收的取消不得让循环继续；③ `_commit_row` / `_existing_call_ids` 的 rollback/close 各自有界（1s），`except BaseException` 后原样抛出；④ 循环显式 `except asyncio.CancelledError: raise`。
+- **M-3（Minor，计划规则偏离）**：PPT `backend_qihu360.py` 的 image 事件在 `resolve_output_path`（本地 `os.makedirs`）之后才发射，`output_dir` 不可写时一次已付费的生图永远不记账，违背计划「本地下载/写盘失败不抹去消耗」——发射点提到 `resolve_output_path` 之前。
+- 其余 Minor（延后，登记 findings-backlog）：M-1 throttle `_build_extra_from_ref` 对 provider 给的非整数 token 做 `int()` 会把付费成功变成 error 并计入断路器（`total_tokens` 既有同型）；M-2 `_estimate_call_cost` 对 `inf`/`OverflowError` 无防护；M-4 读取器接受超出 DB 范围的 `elapsed_ms`/负尺寸/代理对字符，导致每次 drain 重复 `error` + 全栈 traceback；M-5 读取器只在 `open` 处捕获 `OSError`，`fstat`/`lseek`/`read` 的 `OSError` 会抛出（worker 仍兜住）；M-6 发射器的事件字典在 `try` 之外构造（`len(text)`/`int()`）；M-7 测试缺口（无 session factory / 查重失败路径、3.10 静态检查未覆盖 PPT helper、`track_token_usage=False` + journal + sink 组合）。
+
 ## 测试服部署与真实验收（Task 5）
 
 部署对象 = 三条 PR 合入后的 main `bbb20855`；镜像 tag `v3-20261124`。只换 gateway 镜像（backend 改动），frontend / worker / remotion / ppt / sandbox 镜像未动；skills 热更新 16 文件；`.env` 只追加 `DEER_FLOW_MEDIA_USAGE_LEDGER=1` 一个变量。主机、账号、路径等真实信息只写入仓库外 ops 记录，本文只记命令与关键输出。
@@ -68,6 +76,9 @@
 - 供应商账单：无 360 / 火山控制台访问权限 → `SUPPLIER_RECONCILIATION_NOT_VERIFIED`（调用数以 `external_api_calls` 与网关日志互证，未与供应商账单对账）。
 
 ## 验收记录
+
+- 终审修复 RED：`pytest tests/test_media_usage_worker.py -k bounded_while -q` → `1 failed`（`取消后仍阻塞 31.1s（busy_timeout 泄漏到调用方）`）；`-k converts_the_cancel`（守卫变异体 `cancelling()` 禁用）→ `FAILED`。
+- 终审修复 GREEN：`pytest tests/test_media_usage_worker.py tests/test_agent_media_usage.py -q` → `54 passed`；`pytest tests/test_sandbox_media_usage_scripts.py tests/test_ppt_master_image_trainerai.py tests/test_ppt_master_tts_trainerai.py tests/test_skill_script_copies.py tests/test_skillscan_native.py -q` → `272 passed`（含 M-3 用例 `test_ppt_image_local_path_failure_keeps_the_event`、I-1 用例 `test_run_task_is_not_held_by_a_slow_drain` / `test_drain_stops_after_a_cancelled_row_even_if_the_driver_absorbs_the_cancel` / `test_drain_stops_when_a_driver_converts_the_cancel_into_an_error`）。全量 `cd backend && CI=true PYTHONPATH=. uv run --no-sync pytest tests/ -q -n auto --dist loadfile` → `10342 passed, 91 skipped, 431 warnings in 68.05s`，exit=0；根 `make check` → `OK 仓库治理约定全过`，exit=0；pre-commit 全 Passed（hook 未改动文件）。
 
 - `git diff --stat 52c316763dc15e60649f1dc6eb0faf52b50013d4..origin/main` → `14 files changed, 2030 insertions(+), 121 deletions(-)`，全部为 chat-token-usage 的 frontend/docs 改动，不触及 sink / worker / provider / 五份 `_doubao_tts.py` / 补丁序号，计划无需修订。
 - `find skills -name '_doubao_tts.py' -exec md5 -r {} \;` → 5 份，md5 全部 `ebc2cc025ba7238d1d5a27c997b54e53`；`grep -nE '^\| *P3[0-9]' skills/public/ppt-master/TRAINERAI_PATCHES.md` → 最新 P34，下一编号 P35。

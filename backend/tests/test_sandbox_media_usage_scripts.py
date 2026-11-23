@@ -550,3 +550,15 @@ def test_ppt_image_cdn_download_failure_keeps_the_event(ppt_image_mod, ledger, m
         mod.generate("下载会失败", output_dir=str(tmp_path), filename="x.png", max_retries=0)
     events = _events(ledger)
     assert len(events) == 1 and events[0]["kind"] == "image"
+
+
+def test_ppt_image_local_path_failure_keeps_the_event(ppt_image_mod, ledger, monkeypatch, tmp_path):
+    """终审 M-3：供应商已返回含图的 200，本地 output_dir 不可写不得抹去账本行（计划：本地下载/写盘失败不抹去消耗）。"""
+    mod = ppt_image_mod
+    blocker = tmp_path / "not-a-dir.txt"
+    blocker.write_text("regular file", encoding="utf-8")
+    _install_ppt_image_fake(mod, monkeypatch, response=_Resp({"data": [{"b64_json": _png_b64()}]}))
+    with pytest.raises(Exception):
+        mod.generate("输出目录不可写", output_dir=str(blocker), filename="x.png", max_retries=0)
+    events = _events(ledger)
+    assert len(events) == 1 and events[0]["kind"] == "image"

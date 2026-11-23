@@ -115,6 +115,14 @@ def _fast_run_cleanup(monkeypatch):
     monkeypatch.setattr(RunManager, "cleanup", lambda self, run_id, *, delay=300: asyncio.sleep(0))
 
 
+async def _drains_done() -> None:
+    """drain 在 run 任务之外调度（终审 I-1）：断言 sink 副作用前先等它落地。"""
+    from deerflow.runtime.runs import worker as worker_mod
+
+    while worker_mod._media_drain_tasks:
+        await asyncio.gather(*list(worker_mod._media_drain_tasks), return_exceptions=True)
+
+
 def _recording_sink(order: list[str] | None = None):
     calls: list[dict] = []
 
@@ -138,6 +146,7 @@ async def test_worker_calls_sink_after_publish_end_with_ui_shaped_identity(_fast
     bridge = _Bridge(order)
 
     await run_agent(bridge, mgr, record, ctx=_ctx(media_usage_sink=sink), agent_factory=_successful_agent_factory, graph_input={}, config={"context": {"agent_name": "course-video"}})
+    await _drains_done()
 
     assert record.status == RunStatus.success
     assert order == ["publish_end", "sink"], "drain 必须在 publish_end 之后"
@@ -162,6 +171,7 @@ async def test_worker_agent_name_resolution_order(_fast_run_cleanup, monkeypatch
     record = await mgr.create(THREAD, assistant_id=assistant_id)
 
     await run_agent(_Bridge(), mgr, record, ctx=_ctx(media_usage_sink=sink), agent_factory=_successful_agent_factory, graph_input={}, config=config)
+    await _drains_done()
 
     assert sink.calls[0]["agent_name"] == expected
 
@@ -187,6 +197,7 @@ async def test_worker_sink_exception_does_not_change_run_result(_fast_run_cleanu
     record = await mgr.create(THREAD, assistant_id="course-video")
     bridge = _Bridge()
     await run_agent(bridge, mgr, record, ctx=_ctx(event_store=_EventStore(), app_config=_APP_CONFIG, media_usage_sink=boom), agent_factory=_successful_agent_factory, graph_input={}, config={})
+    await _drains_done()
     assert record.status == RunStatus.success
     assert record.error is None
     assert not any(event == "error" for (_rid, event, _data) in bridge.published)
@@ -194,8 +205,11 @@ async def test_worker_sink_exception_does_not_change_run_result(_fast_run_cleanu
 
 
 @pytest.mark.asyncio
-async def test_worker_sink_timeout_is_bounded_and_does_not_change_run_result(_fast_run_cleanup, monkeypatch, caplog):
-    monkeypatch.setattr("deerflow.runtime.runs.worker.MEDIA_USAGE_DRAIN_TIMEOUT", 0.05)
+async def test_run_task_is_not_held_by_a_slow_drain(_fast_run_cleanup, monkeypatch, caplog):
+    """终审 I-1：drain 在 run 任务之外调度——sink 卡 30s 也不拖住 run；drain 自身仍按 MEDIA_USAGE_DRAIN_TIMEOUT 限时并 WARNING。"""
+    from deerflow.runtime.runs import worker as worker_mod
+
+    monkeypatch.setattr(worker_mod, "MEDIA_USAGE_DRAIN_TIMEOUT", 0.05)
 
     async def hang(*, thread_id, user_id, agent_name):
         await asyncio.sleep(30)
@@ -203,9 +217,11 @@ async def test_worker_sink_timeout_is_bounded_and_does_not_change_run_result(_fa
     mgr = RunManager(store=None)
     record = await mgr.create(THREAD, assistant_id="course-video")
     with caplog.at_level(logging.WARNING):
-        await asyncio.wait_for(run_agent(_Bridge(), mgr, record, ctx=_ctx(media_usage_sink=hang), agent_factory=_successful_agent_factory, graph_input={}, config={}), timeout=5)
-    assert record.status == RunStatus.success
+        await asyncio.wait_for(run_agent(_Bridge(), mgr, record, ctx=_ctx(media_usage_sink=hang), agent_factory=_successful_agent_factory, graph_input={}, config={}), timeout=3)
+        assert record.status == RunStatus.success, "run 任务在 drain 之前就应返回"
+        await _drains_done()
     assert any("media usage" in rec.message.lower() for rec in caplog.records), "超时必须 WARNING"
+    assert not worker_mod._media_drain_tasks
 
 
 @pytest.mark.asyncio
@@ -379,4 +395,72 @@ async def test_drain_integrity_error_on_race_counts_duplicate(db, monkeypatch):
 async def test_drain_without_ledger_is_a_noop(db):
     stats = await amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video")
     assert (stats.written, stats.duplicate, stats.error) == (0, 0, 0)
+    assert await _rows(db) == []
+
+
+# ---------------------------------------------------------------------------
+# 终审 I-1：写锁被占时 drain 的时限必须真的生效
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_drain_stops_after_a_cancelled_row_even_if_the_driver_absorbs_the_cancel(db, tmp_path):
+    """SQLite 写锁被占时取消 drain：被阻塞的那一行可能仍会落库，但释放锁后 drain 必须迅速结束，
+    且不得继续写余下的行（修前循环会继续，每行再等一次 busy_timeout≈30s）。"""
+    import sqlite3
+    import time
+
+    _write_ledger(*[_line(f"e{i}") for i in range(5)])
+    blocker = sqlite3.connect(tmp_path / "media_usage.db", isolation_level=None, timeout=1)
+    blocker.execute("BEGIN IMMEDIATE")
+    task = asyncio.create_task(amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video"))
+    await asyncio.sleep(0.5)
+    task.cancel()
+    await asyncio.sleep(0.2)
+    released = time.monotonic()
+    blocker.execute("ROLLBACK")
+    blocker.close()
+    with pytest.raises((asyncio.CancelledError, asyncio.TimeoutError)):
+        await asyncio.wait_for(task, timeout=5)
+    assert time.monotonic() - released < 4.5, "释放锁后 drain 应在数秒内结束，而不是逐行再等 busy_timeout"
+    rows = await _rows(db)
+    assert len(rows) <= 1, "只有被阻塞的那一行可能落库；余下不得继续写入"
+
+
+@pytest.mark.asyncio
+async def test_drain_does_not_swallow_cancellation_when_cleanup_raises(db, monkeypatch):
+    """清理路径抛普通异常时，CancelledError 仍须原样向上传播（不得被 except Exception 当作 error 吞掉继续循环）。"""
+    _write_ledger(*[_line(f"e{i}") for i in range(3)])
+
+    async def cancel_then_break(session_factory, row):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(amu, "_commit_row", cancel_then_break)
+    with pytest.raises(asyncio.CancelledError):
+        await amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video")
+    assert await _rows(db) == []
+
+
+@pytest.mark.asyncio
+async def test_drain_stops_when_a_driver_converts_the_cancel_into_an_error(db, monkeypatch):
+    """终审 I-1 合成场景：被阻塞的 DBAPI 调用吸收取消后以普通异常浮出（被计为 error）。
+    此时 `except CancelledError` 拦不到——循环必须在下一行前因 `cancelling()` 停下。"""
+    import time
+
+    _write_ledger(*[_line(f"e{i}") for i in range(4)])
+
+    async def absorb_cancel(session_factory, row):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            raise RuntimeError("driver absorbed the cancel") from None
+
+    monkeypatch.setattr(amu, "_commit_row", absorb_cancel)
+    task = asyncio.create_task(amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video"))
+    await asyncio.sleep(0.2)
+    task.cancel()
+    started = time.monotonic()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=5)
+    assert time.monotonic() - started < 3, "取消后不得继续逐行等待（修前每行再等 10s）"
     assert await _rows(db) == []
