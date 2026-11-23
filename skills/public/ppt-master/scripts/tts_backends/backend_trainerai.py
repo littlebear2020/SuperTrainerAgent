@@ -43,6 +43,7 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+from media_usage_ledger import emit_tts_usage  # P35：线程媒体计量账本（与 image_backends/backend_qihu360.py 共用）
 from tts_backends.backend_common import publish_audio_bytes
 
 ENDPOINT = "https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse"
@@ -174,6 +175,18 @@ def _request_with_retry(request_factory: Callable[[], Request]) -> bytes:
     raise RuntimeError("doubao TTS connection error: unreachable state")
 
 
+def _synthesize_chunk(text: str, speaker: str, api_key: str) -> bytes:
+    """One narration chunk: synthesize (retry inside), then meter the successful call.
+
+    P35：每个真实成功的分片各记一条 tts 事件（``char_count`` = 分片字数）；
+    重试由 ``_request_with_retry`` 内部吸收，所以不会重复计数，失败不发射。
+    """
+    started = time.monotonic()
+    audio = _request_with_retry(lambda: _build_request(text, speaker, api_key))
+    emit_tts_usage(text, with_timestamps=False, started=started)
+    return audio
+
+
 def _synthesize_once(request: Request) -> bytes:
     finished = False
     with urlopen(request, timeout=_TIMEOUT) as response:
@@ -295,9 +308,7 @@ def generate(text: str, output_path: Path, *, api_key: str, voice_id: str) -> No
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if len(text_chunks) == 1:
-        audio = _request_with_retry(
-            lambda: _build_request(text_chunks[0], speaker, key)
-        )
+        audio = _synthesize_chunk(text_chunks[0], speaker, key)
         publish_audio_bytes(audio, output_path)
         return
 
@@ -308,9 +319,7 @@ def generate(text: str, output_path: Path, *, api_key: str, voice_id: str) -> No
         work_dir = Path(temporary_dir)
         chunk_paths: list[Path] = []
         for index, text_chunk in enumerate(text_chunks):
-            audio = _request_with_retry(
-                lambda: _build_request(text_chunk, speaker, key)
-            )
+            audio = _synthesize_chunk(text_chunk, speaker, key)
             chunk_path = work_dir / f"chunk-{index:04d}.mp3"
             chunk_path.write_bytes(audio)
             chunk_paths.append(chunk_path)

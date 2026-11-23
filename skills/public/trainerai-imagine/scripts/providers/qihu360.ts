@@ -1,5 +1,7 @@
-import path from "node:path";
+import { randomBytes } from "node:crypto";
+import { chmodSync, closeSync, fchmodSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import type { CliArgs, OpenAIImageApiDialect } from "../types";
 
 // 2026-11-16: TrainerAI 默认生图通道 = 360 Seedream 5.0 Pro。
@@ -140,6 +142,50 @@ function guessMimeType(filePath: string): string {
 const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_TOTAL_REFERENCE_IMAGE_BYTES = 20 * 1024 * 1024;
 
+// ── 媒体计量账本（2026-11-23 首页六卡媒体计量计划 PR 3）────────────────────
+// 供应商明确成功后向线程工作区账本追加一行 JSON；gateway 在 run 结束后读取并落
+// external_api_calls（生产仅本地 Aio 容器：/mnt/user-data/workspace 即宿主
+// sandbox_work_dir）。全部用同步 fs 调用并包在 try/catch 内——不留未 await 的
+// Promise，避免未处理的 rejection 让生图进程退出；显式 chmod 保证跨 uid 可读。
+// 与 ppt-master/scripts/media_usage_ledger.py 保持同一发射规则。
+const LEDGER_DIR_ENV = "DEER_FLOW_MEDIA_LEDGER_DIR"; // 仅测试用覆盖；生产走缺省
+const LEDGER_DIR_DEFAULT = "/mnt/user-data/workspace/.usage";
+const LEDGER_FILE = "media-usage.jsonl";
+
+type ImageLedgerEvent = {
+  event_id: string;
+  kind: "image";
+  model: string;
+  width?: number;
+  height?: number;
+  elapsed_ms: number;
+};
+
+function recordImageUsage(event: ImageLedgerEvent): void {
+  try {
+    const dir = process.env[LEDGER_DIR_ENV] || LEDGER_DIR_DEFAULT;
+    mkdirSync(dir, { recursive: true });
+    try {
+      chmodSync(dir, 0o755);
+    } catch {
+      // best effort
+    }
+    const fd = openSync(path.join(dir, LEDGER_FILE), "a", 0o644);
+    try {
+      try {
+        fchmodSync(fd, 0o644);
+      } catch {
+        // best effort
+      }
+      writeSync(fd, `${JSON.stringify(event)}\n`);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    // metering must never break generation
+  }
+}
+
 async function referenceToDataUri(reference: string): Promise<string> {
   if (/^(https?:|data:)/i.test(reference)) return reference;
   const fullPath = path.resolve(reference);
@@ -194,6 +240,7 @@ export async function generateImage(
     endpoint = `${baseUrl}/v1/images/edits`;
   }
 
+  const startedAt = Date.now();
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -209,6 +256,19 @@ export async function generateImage(
   }
 
   const result = (await response.json()) as Qihu360ImageResponse;
+  const first = result.data?.[0];
+  if (first?.url || first?.b64_json) {
+    // 供应商已明确成功（200 且含图）——在 CDN 下载之前记账，下载失败不抹去已发生
+    // 的消耗；200 无图 / HTTP 错误不会走到这里。model = 本次实际下发的模型，原样。
+    const dimensions = parseDimensions(String(extraBody.size));
+    recordImageUsage({
+      event_id: randomBytes(16).toString("hex"),
+      kind: "image",
+      model,
+      ...(dimensions ? { width: dimensions[0], height: dimensions[1] } : {}),
+      elapsed_ms: Date.now() - startedAt,
+    });
+  }
   const imageData = await extractImageFromResponse(result);
   assertPngImage(imageData);
   return imageData;

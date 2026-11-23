@@ -55,6 +55,7 @@
 
 | P33 | scripts/tts_backends/subtitle_timing.py（新增）+ backend_cosyvoice.py / backend_elevenlabs.py / backend_minimax.py + notes_to_audio.py + requirements.txt + workflows/stages/generate-audio.md + 现行音频文档；backend_edge.py 删除 | 共用字/字符时间轴与 SRT 重排算法迁至中性模块；Edge 合成、音色列表、CLI 参数、依赖和分发全部移除，TrainerAI 与其他既有后端保留 | 2026-11-22：在线 TTS 收敛为字节直连与既有克隆；禁止其他后端随 Edge 文件误删 |
 | P34 | scripts/svg_quality/checker.py + scripts/pptx_text_overlap_prescreen.py（新增）+ workflows/generate-pptx.md + SKILL.md | SVG 同模块独立 text 以 ink 估算框检查 sibling overlap（模板基线有原生图表 fallback 命中，定 warning）；Default/Beautify 导出后以 soffice + pdftotext -bbox-layout 比较任意行框（含同一 block），仅整行 `[0-9]{1,2}` 数字命中转该页目检，其余重叠阻止交付 | 2026-11-23：咖啡样本第 2 页「再分段注水」/「偏差信号」同 block 真实重叠；机械预筛优先于 Agent 自述与目检，Quick/Edit Native 未覆盖另行登记 |
+| P35 | scripts/media_usage_ledger.py（新增：共用账本发射 helper）+ tts_backends/backend_trainerai.py（新增 `_synthesize_chunk`，单/多分片两处调用点改为经它合成）+ image_backends/backend_qihu360.py（`_generate_image` 在 360 返回含图之后、CDN 下载之前发射） | 每个**真实成功**的 TTS 分片 / 生图调用向线程工作区账本 `/mnt/user-data/workspace/.usage/media-usage.jsonl` 追加一行 JSON（tts: char_count/with_timestamps；image: 实际下发 model/width/height），供 gateway 在 run 结束后读取并落 external_api_calls；发射永不抛错、不写 stdout/stderr，显式 chmod 0755/0644 保证跨 uid 可读 | 2026-11-23 首页六卡媒体计量：ppt-master 在沙箱内直连字节 TTS 与 360 Seedream，gateway 的 record_external_api_call 看不到这些付费调用，个人用量页 media_cost 恒空。不改 SKILL.md/SOUL/SEED_VERSION/frontmatter/其他 provider；不回填历史账 |
 
 **硬钉测试**：`backend/tests/test_ppt_master_skill_vendored.py`——attribution_guard 冒烟
 （vendored 补丁后必须 exit 0）+ P1 覆盖段 P11/P12/P13 marker 断言。P12/P13 为文档级

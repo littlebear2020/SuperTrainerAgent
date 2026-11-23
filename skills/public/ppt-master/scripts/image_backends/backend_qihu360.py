@@ -56,6 +56,7 @@ from image_backends.backend_common import (
     retry_delay,
     save_image_bytes,
 )
+from media_usage_ledger import emit_image_usage  # P35：线程媒体计量账本（与 tts_backends/backend_trainerai.py 共用）
 
 DEFAULT_BASE_URL = "https://api.360.cn"
 DEFAULT_MODEL = "bytedance/doubao-seedream-5.0-pro"
@@ -184,6 +185,7 @@ def _generate_image(
     print()
     print("  [..] Generating...", end="", flush=True)
     start = time.time()
+    started_monotonic = time.monotonic()
     response = requests.post(url, headers=headers, json=body, timeout=300)
     elapsed = time.time() - start
     print(f"\n  [DONE] Response received ({elapsed:.1f}s)")
@@ -199,6 +201,11 @@ def _generate_image(
     path = resolve_output_path(prompt, output_dir, filename, ".png")
     image_url = item.get("url")
     encoded_image = item.get("b64_json")
+    if image_url or encoded_image:
+        # P35：供应商已明确成功（200 且含图）——在 CDN 下载之前记账，本地下载
+        # 失败不抹去已发生的消耗；200 无图 / HTTP 错误不会走到这里。
+        width, height = (int(value) for value in size.split("x"))
+        emit_image_usage(model=model, width=width, height=height, started=started_monotonic)
     url_error: Exception | None = None
     if image_url:
         try:

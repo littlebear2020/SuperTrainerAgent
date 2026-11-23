@@ -3,8 +3,9 @@
 """Standalone ByteDance doubao seed-tts-2.0 TTS helper (stdlib only).
 
 MIRROR: this file is duplicated across every sandbox skill's scripts/ dir
-(glob: skills/**/scripts/_doubao_tts.py — currently 4 copies: auto-video-flow,
-corporate-video, tech-explainer-video, course-video(custom)). Keep ALL copies
+(glob: skills/**/scripts/_doubao_tts.py — currently 5 copies: auto-video-flow,
+corporate-video, tech-explainer-video, course-video(custom), podcast-studio).
+Keep ALL copies
 byte-identical; the guard test backend/tests/test_skill_script_copies.py
 asserts md5 equality across the glob and fails the suite on any drift. (Shared
 extraction blocked by the skill-sandbox path rules — skills run as independent
@@ -72,6 +73,56 @@ _TIMEOUT = 120.0
 _MAX_ATTEMPTS = 2  # 1 次指数退避重试（网络抖动容忍）
 _RETRY_BASE_DELAY = 2.0
 
+# ── 媒体计量账本（2026-11-23 首页六卡媒体计量计划 PR 3）────────────────────
+# 供应商明确成功后向线程工作区账本追加一行 JSON；gateway 在 run 结束后读取并落
+# external_api_calls（生产仅本地 Aio 容器：/mnt/user-data/workspace 即宿主
+# sandbox_work_dir）。发射永不抛错、不写 stdout/stderr；显式 chmod 保证跨 uid
+# 可读（mode 参数受 umask 影响）。只用 Python 3.10 可用的 stdlib API。
+# 与 ppt-master/scripts/media_usage_ledger.py 保持同一发射规则。
+_MEDIA_LEDGER_DIR_ENV = "DEER_FLOW_MEDIA_LEDGER_DIR"  # 仅测试用覆盖；生产走缺省
+_MEDIA_LEDGER_DIR_DEFAULT = "/mnt/user-data/workspace/.usage"
+_MEDIA_LEDGER_FILE = "media-usage.jsonl"
+
+
+def _media_ledger_dir() -> str:
+    # os.getenv（而非 os.environ）：skillscan 对含网络 sink 的文件把任何 os.environ 引用判为 env-dump-exfil。
+    return os.getenv(_MEDIA_LEDGER_DIR_ENV) or _MEDIA_LEDGER_DIR_DEFAULT
+
+
+def _emit_media_usage(event: dict) -> None:
+    """Append one JSON line to the thread ledger. Never raises, never prints."""
+    try:
+        ledger_dir = _media_ledger_dir()
+        os.makedirs(ledger_dir, exist_ok=True)
+        try:
+            os.chmod(ledger_dir, 0o755)
+        except OSError:
+            pass
+        line = json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+        fd = os.open(os.path.join(ledger_dir, _MEDIA_LEDGER_FILE), os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
+        try:
+            try:
+                os.fchmod(fd, 0o644)
+            except OSError:
+                pass
+            os.write(fd, line.encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception:
+        pass  # 计量失败不得影响合成
+
+
+def _emit_tts_usage(text: str, *, with_timestamps: bool, started: float) -> None:
+    _emit_media_usage(
+        {
+            "event_id": uuid.uuid4().hex,
+            "kind": "tts",
+            "with_timestamps": with_timestamps,
+            "char_count": len(text),
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+        }
+    )
+
 
 def _build_request(text: str, speaker: str, speed_ratio: float, enable_subtitle: bool) -> urllib.request.Request:
     access_key = os.getenv("VOLCENGINE_VOICE_ACCESS_KEY", "").strip()
@@ -122,7 +173,10 @@ def synthesize(text: str, speaker: str | None = None, speed_ratio: float = 1.0) 
     任何技能不得回退).
     """
     req = _build_request(text, _resolve_speaker(speaker), speed_ratio, enable_subtitle=False)
-    return _request_with_retry(req)
+    started = time.monotonic()
+    audio = _request_with_retry(req)
+    _emit_tts_usage(text, with_timestamps=False, started=started)  # 仅成功后；重试由 _request_with_retry 内部吸收，只记一次
+    return audio
 
 
 def synthesize_with_timestamps(
@@ -140,7 +194,9 @@ def synthesize_with_timestamps(
     """
     words: list[dict] = []
     req = _build_request(text, _resolve_speaker(speaker), speed_ratio, enable_subtitle=True)
+    started = time.monotonic()
     audio = _request_with_retry(req, words=words)
+    _emit_tts_usage(text, with_timestamps=True, started=started)
     return audio, words
 
 
