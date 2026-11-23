@@ -104,9 +104,29 @@ def test_overlay_pins_document_patches():
     assert "大小 >0" in overlay
     assert "0 字节" in overlay
     assert "每 5 页" in overlay
+    # P34：Default/Beautify 导出后任意文字行框机械预筛
+    assert "P34" in overlay
+    assert "pptx_text_overlap_prescreen.py" in overlay
+    assert "soffice" in overlay
+    assert "pdftotext -bbox-layout" in overlay
+    assert "同一 block" in overlay
+    assert "[0-9]{1,2}" in overlay
+    assert "目检" in overlay
     # P1 基本面：D3 铁律指向 SOUL.md
     assert "D3 执行铁律" in overlay
     assert "backend/seed/agents/ppt-master/SOUL.md" in overlay
+
+
+def test_default_beautify_workflow_requires_pdf_text_overlap_prescreen():
+    workflow = (SKILL_DIR / "workflows" / "generate-pptx.md").read_text(encoding="utf-8")
+    export_step = workflow.split("#### Step 7.3", 1)[1]
+    assert "pptx_text_overlap_prescreen.py <printed_output.pptx> > <validation/text-overlap.json>" in export_step
+    assert "soffice" in export_step
+    assert "pdftotext -bbox-layout" in export_step
+    assert "同一 block" in export_step
+    assert "pptx_delivery_check.py" not in export_step
+    patches = (SKILL_DIR / "TRAINERAI_PATCHES.md").read_text(encoding="utf-8")
+    assert "| P34 |" in patches
 
 
 def _trainerai_overlay() -> str:

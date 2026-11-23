@@ -30,3 +30,9 @@
 - [ ] 2026-11-22 Writer 分享页英文文案不属于本批六卡核心范围，未修改；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
 - [ ] 2026-11-22 P14 Writer 模块入口保留或下线仍属产品决策，本批不增加入口或删除模块；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
 - [ ] 2026-11-22 P15 普通用户“我的渠道/凭据”入口按既定决策不开放，本批不实现；指针：`docs/plans/2026-11-22-live-test-remediation-plan.md`。
+- [ ] 2026-11-23 `display_name=null` 仍为未处理候选，本批未改用户/模型命名逻辑；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「只观察、不在本批修实现」。
+- [ ] 2026-11-23 用量标题国际化仍为未处理候选，本批未改前端或 i18n；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「只观察、不在本批修实现」。
+- [ ] 2026-11-23 ppt-master audio-only 规则仍为未处理候选，本批未改音频工作流；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「只观察、不在本批修实现」。
+- [ ] 2026-11-23 `clone:` 空后缀仍为未处理候选，本批未改音色解析或克隆入口；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「只观察、不在本批修实现」。
+- [ ] 2026-11-23 PPT 导出后文字行预筛仅接入 Default/Beautify，`quick-generate.md` 与 `edit-native-pptx.md` 独立导出路径未覆盖，不得宣称全路径已上门；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md` Task 3。
+- [ ] 2026-11-23 `TRAINERAI_PATCHES.md` 补丁表仍有空行拆表、P32 在 P31 前、缺 P30 行的格式问题，本批只追加 P34、未整理；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「明确不做」。
