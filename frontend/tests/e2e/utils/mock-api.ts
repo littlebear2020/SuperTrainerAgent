@@ -47,6 +47,7 @@ export type MockAPIOptions = {
   threads?: MockThread[];
   agents?: MockAgent[];
   skills?: MockSkill[];
+  tokenUsageEnabled?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
   const threads = options?.threads ?? [];
   const agents = options?.agents ?? [];
   const skills = options?.skills ?? [];
+  const tokenUsageEnabled = options?.tokenUsageEnabled ?? false;
 
   // Thread search — sidebar thread list & chats list page
   void page.route("**/api/langgraph/threads/search", (route) => {
@@ -240,7 +242,23 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
         contentType: "application/json",
         body: JSON.stringify({
           models: [],
-          token_usage: { enabled: false },
+          token_usage: { enabled: tokenUsageEnabled },
+        }),
+      });
+    }
+    return route.fallback();
+  });
+
+  void page.route("**/api/threads/*/token-usage", (route) => {
+    if (route.request().method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          thread_id: MOCK_THREAD_ID,
+          total_input_tokens: 600_000,
+          total_output_tokens: 387_654,
+          total_tokens: 987_654,
         }),
       });
     }
@@ -338,4 +356,44 @@ export function handleRunStream(route: Route) {
     },
     body,
   });
+}
+
+export function createTokenUsageRunStreamHandler(
+  turns: readonly (readonly Record<string, unknown>[])[],
+  options?: { terminalEvent?: "end" | "error" },
+) {
+  let requestCount = 0;
+
+  return (route: Route) => {
+    requestCount += 1;
+    const runId = `token-usage-run-${requestCount}`;
+    const events = [
+      {
+        event: "metadata",
+        data: { run_id: runId, thread_id: MOCK_THREAD_ID },
+      },
+      {
+        event: "values",
+        data: { messages: turns.slice(0, requestCount).flat() },
+      },
+      options?.terminalEvent === "error"
+        ? { event: "error", data: { error: "Token usage test stream error" } }
+        : { event: "end", data: {} },
+    ];
+    const body = events
+      .map(
+        (event) =>
+          `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+      )
+      .join("");
+
+    return route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      headers: {
+        "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/${runId}`,
+      },
+      body,
+    });
+  };
 }

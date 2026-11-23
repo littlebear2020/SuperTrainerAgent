@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   extractStoryboardTaskId,
   getMessageGroups,
+  isEmptyClarificationGroup,
   stripInjectedReminderTags,
   stripInternalMarkers,
+  type ThreadMessageGroup,
 } from "@/core/messages/utils";
 
 const human = (id: string, content: string): Message =>
@@ -23,14 +25,64 @@ const aiWithToolCall = (
     tool_calls: [{ id: toolCallId, name, args: {} }],
   }) as unknown as Message;
 
-const toolResult = (id: string, toolCallId: string, name: string): Message =>
+const toolResult = (
+  id: string,
+  toolCallId: string,
+  name: string,
+  content = '{"status":"done"}',
+): Message =>
   ({
     id,
     type: "tool",
     name,
     tool_call_id: toolCallId,
-    content: '{"status":"done"}',
+    content,
   }) as unknown as Message;
+
+describe("isEmptyClarificationGroup", () => {
+  const makeGroup = (
+    type: ThreadMessageGroup["type"],
+    messages: Message[],
+  ): ThreadMessageGroup =>
+    ({ id: "group", type, messages }) as ThreadMessageGroup;
+
+  it.each([
+    { label: "there is no first message", messages: [] },
+    {
+      label: "the first message has empty content",
+      messages: [toolResult("t-1", "call-1", "ask_clarification", "")],
+    },
+    {
+      label: "the first message has only whitespace",
+      messages: [toolResult("t-2", "call-2", "ask_clarification", " \n ")],
+    },
+  ])("returns true when $label", ({ messages }) => {
+    expect(
+      isEmptyClarificationGroup(makeGroup("assistant:clarification", messages)),
+    ).toBe(true);
+  });
+
+  it("returns false for a clarification with renderable content", () => {
+    const message = toolResult(
+      "t-3",
+      "call-3",
+      "ask_clarification",
+      "Choose an option",
+    );
+    expect(
+      isEmptyClarificationGroup(
+        makeGroup("assistant:clarification", [message]),
+      ),
+    ).toBe(false);
+  });
+
+  it.each(["human", "assistant", "assistant:processing"] as const)(
+    "returns false for an empty %s group",
+    (type) => {
+      expect(isEmptyClarificationGroup(makeGroup(type, []))).toBe(false);
+    },
+  );
+});
 
 describe("getMessageGroups", () => {
   it("appends a tool result to the preceding processing group (normal flow)", () => {

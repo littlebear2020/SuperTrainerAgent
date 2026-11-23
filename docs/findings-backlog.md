@@ -36,3 +36,6 @@
 - [ ] 2026-11-23 `clone:` 空后缀仍为未处理候选，本批未改音色解析或克隆入口；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「只观察、不在本批修实现」。
 - [ ] 2026-11-23 PPT 导出后文字行预筛仅接入 Default/Beautify，`quick-generate.md` 与 `edit-native-pptx.md` 独立导出路径未覆盖，不得宣称全路径已上门；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md` Task 3。
 - [ ] 2026-11-23 `TRAINERAI_PATCHES.md` 补丁表仍有空行拆表、P32 在 P31 前、缺 P30 行的格式问题，本批只追加 P34、未整理；指针：`docs/plans/2026-11-23-six-core-live-defects-remediation-plan.md`「明确不做」。
+- [ ] 2026-11-23 单轮 Token 汇总只含主线程可见 AI 消息，不含子代理与 middleware；若产品需要“总花费”口径，需另做按 `run_id` 关联权威 run 汇总的设计；指针：`docs/plans/2026-11-23-chat-token-usage-turn-summary-plan.md` D2、`docs/changelog/changelog-2026-11-23-chat-token-usage-turn-summary.md`。
+- [ ] 2026-11-23 离线同 id 异对象夹具证明 `accumulateUsage` 按 id 去重会少于旧逐行之和，本批按要求不改顶部徽章回落口径，后续需单独确认；指针：`frontend/src/core/messages/usage.ts`、`frontend/tests/unit/core/messages/usage.test.ts`。
+- [ ] 2026-11-23 新 prepend Playwright 场景暴露虚拟列表对未实测新组按 176px 估算补偿、实测锚点偏移 190.5px 的既有问题；本批禁改 `VirtualMessageList`，仅保留汇总索引与数值的正确性断言，像素级滚动锚定需另批修复；指针：`frontend/src/components/workspace/messages/virtual-message-list.tsx:258-310`、`frontend/tests/e2e/chat.spec.ts` prepend 用例。
