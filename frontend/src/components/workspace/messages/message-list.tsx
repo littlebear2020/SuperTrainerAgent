@@ -8,6 +8,7 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/core/i18n/hooks";
+import { EMPTY_TURN_USAGE, summarizeTurnUsage } from "@/core/messages/usage";
 import {
   extractContentFromMessage,
   extractPresentFilesFromMessage,
@@ -16,7 +17,7 @@ import {
   hasContent,
   hasPresentFiles,
   hasReasoning,
-  hasToolCalls,
+  isEmptyClarificationGroup,
   reuseMessageGroups,
   type ThreadMessageGroup,
 } from "@/core/messages/utils";
@@ -30,7 +31,7 @@ import { StreamingIndicator } from "../streaming-indicator";
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
 import { MessageListItem } from "./message-list-item";
-import { MessageTokenUsageList } from "./message-token-usage";
+import { TurnTokenUsage } from "./message-token-usage";
 import { MessageListSkeleton } from "./skeleton";
 import { StoryboardConfirmCard } from "./storyboard-confirm-card";
 import { SubtaskCard } from "./subtask-card";
@@ -191,6 +192,14 @@ export function MessageList({
     return reused;
   }, [messages, thread.isLoading]);
 
+  const turnUsage = useMemo(
+    () =>
+      tokenUsageEnabled && !thread.isLoading
+        ? summarizeTurnUsage(groups)
+        : EMPTY_TURN_USAGE,
+    [groups, thread.isLoading, tokenUsageEnabled],
+  );
+
   // PR-2 4.3：groups.map 整段收敛为 renderGroup 回调，接入 VirtualMessageList
   // （阈值 ≥60 组自动虚拟化，短会话走静态分支——渲染面与修前等价）。
   const renderGroup = useCallback(
@@ -203,28 +212,22 @@ export function MessageList({
               threadId={threadId}
               message={msg}
               isLoading={thread.isLoading}
-              tokenUsageEnabled={tokenUsageEnabled}
             />
           );
         });
       } else if (group.type === "assistant:clarification") {
-        const message = group.messages[0];
-        if (message && hasContent(message)) {
-          return (
-            <div key={group.id} className="w-full">
-              <MarkdownContent
-                content={extractContentFromMessage(message)}
-                isLoading={thread.isLoading}
-              />
-              <MessageTokenUsageList
-                enabled={tokenUsageEnabled}
-                isLoading={thread.isLoading}
-                messages={group.messages}
-              />
-            </div>
-          );
+        if (isEmptyClarificationGroup(group)) {
+          return null;
         }
-        return null;
+        const message = group.messages[0]!;
+        return (
+          <div key={group.id} className="w-full">
+            <MarkdownContent
+              content={extractContentFromMessage(message)}
+              isLoading={thread.isLoading}
+            />
+          </div>
+        );
       } else if (group.type === "assistant:present-files") {
         const files: string[] = [];
         for (const message of group.messages) {
@@ -243,11 +246,6 @@ export function MessageList({
               />
             )}
             <ArtifactFileList files={files} threadId={threadId} />
-            <MessageTokenUsageList
-              enabled={tokenUsageEnabled}
-              isLoading={thread.isLoading}
-              messages={group.messages}
-            />
           </div>
         );
       } else if (group.type === "assistant:subagent") {
@@ -304,11 +302,6 @@ export function MessageList({
             className="relative z-1 flex flex-col gap-2"
           >
             {results}
-            <MessageTokenUsageList
-              enabled={tokenUsageEnabled}
-              isLoading={thread.isLoading}
-              messages={group.messages}
-            />
           </div>
         );
       } else if (group.type === "assistant:storyboard") {
@@ -326,34 +319,36 @@ export function MessageList({
               />
             )}
             {taskId && <StoryboardConfirmCard taskId={taskId} />}
-            <MessageTokenUsageList
-              enabled={tokenUsageEnabled}
-              isLoading={thread.isLoading}
-              messages={group.messages}
-            />
           </div>
         );
       }
-      const tokenUsageMessages = group.messages.filter(
-        (message) =>
-          message.type === "ai" &&
-          (hasToolCalls(message) ? true : !hasContent(message)),
-      );
       return (
         <div key={"group-" + group.id} className="w-full">
           <MessageGroup
             messages={group.messages}
             isLoading={thread.isLoading}
           />
-          <MessageTokenUsageList
-            enabled={tokenUsageEnabled}
-            isLoading={thread.isLoading}
-            messages={tokenUsageMessages}
-          />
         </div>
       );
     },
-    [t, thread.isLoading, threadId, tokenUsageEnabled],
+    [t, thread.isLoading, threadId],
+  );
+
+  const renderAfterGroup = useCallback(
+    (index: number) => {
+      const turn = turnUsage.get(index);
+      if (!turn) {
+        return null;
+      }
+      return (
+        <TurnTokenUsage
+          className={groups[index]?.type === "assistant" ? "mt-9" : undefined}
+          usage={turn.usage}
+          missingCount={turn.missingCount}
+        />
+      );
+    },
+    [groups, turnUsage],
   );
 
   if (thread.isThreadLoading && messages.length === 0) {
@@ -373,6 +368,7 @@ export function MessageList({
           groups={groups}
           isLoading={thread.isLoading}
           renderGroup={renderGroup}
+          renderAfterGroup={renderAfterGroup}
         />
         {thread.isLoading && <StreamingIndicator className="my-4" />}
         <div style={{ height: `${paddingBottom}px` }} />

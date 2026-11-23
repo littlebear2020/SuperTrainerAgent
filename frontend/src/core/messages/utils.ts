@@ -442,6 +442,14 @@ export function extractStoryboardTaskId(messages: Message[]): string | null {
   return null;
 }
 
+export function isEmptyClarificationGroup(group: MessageGroup) {
+  const firstMessage = group.messages[0];
+  return (
+    group.type === "assistant:clarification" &&
+    (!firstMessage || !hasContent(firstMessage))
+  );
+}
+
 export function isClarificationToolMessage(message: Message) {
   return message.type === "tool" && message.name === "ask_clarification";
 }

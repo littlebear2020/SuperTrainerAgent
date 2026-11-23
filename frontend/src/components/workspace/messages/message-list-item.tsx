@@ -52,7 +52,6 @@ import { cn } from "@/lib/utils";
 import { CopyButton } from "../copy-button";
 
 import { MarkdownContent } from "./markdown-content";
-import { MessageTokenUsage } from "./message-token-usage";
 
 function FeedbackButtons({
   threadId,
@@ -126,7 +125,6 @@ function MessageListItemInner({
   threadId,
   message,
   isLoading,
-  tokenUsageEnabled = false,
   feedback,
   runId,
 }: {
@@ -134,7 +132,6 @@ function MessageListItemInner({
   message: Message;
   isLoading?: boolean;
   threadId: string;
-  tokenUsageEnabled?: boolean;
   feedback?: FeedbackData | null;
   runId?: string;
 }) {
@@ -149,7 +146,6 @@ function MessageListItemInner({
         message={message}
         isLoading={isLoading}
         threadId={threadId}
-        tokenUsageEnabled={tokenUsageEnabled}
       />
       {!isLoading && (
         <MessageToolbar
@@ -229,13 +225,11 @@ function MessageContent_({
   message,
   isLoading = false,
   threadId,
-  tokenUsageEnabled = false,
 }: {
   className?: string;
   message: Message;
   isLoading?: boolean;
   threadId: string;
-  tokenUsageEnabled?: boolean;
 }) {
   const isHuman = message.type === "human";
   const { t } = useI18n();
@@ -325,11 +319,6 @@ function MessageContent_({
           <ReasoningTrigger />
           <ReasoningContent>{reasoningContent}</ReasoningContent>
         </Reasoning>
-        <MessageTokenUsage
-          enabled={tokenUsageEnabled}
-          isLoading={isLoading}
-          message={message}
-        />
       </AIElementMessageContent>
     );
   }
@@ -358,11 +347,6 @@ function MessageContent_({
             {t.errorFallback.retry}
           </Button>
         </div>
-        <MessageTokenUsage
-          enabled={tokenUsageEnabled}
-          isLoading={isLoading}
-          message={message}
-        />
       </AIElementMessageContent>
     );
   }
@@ -401,11 +385,6 @@ function MessageContent_({
         isLoading={isLoading}
         className="my-3"
         components={components}
-      />
-      <MessageTokenUsage
-        enabled={tokenUsageEnabled}
-        isLoading={isLoading}
-        message={message}
       />
     </AIElementMessageContent>
   );

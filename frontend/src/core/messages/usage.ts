@@ -1,5 +1,10 @@
 import type { Message } from "@langchain/langgraph-sdk";
 
+import {
+  isEmptyClarificationGroup,
+  type ThreadMessageGroup,
+} from "@/core/messages/utils";
+
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
@@ -25,6 +30,75 @@ export function getUsageMetadata(message: Message): TokenUsage | null {
     outputTokens: usage.output_tokens ?? 0,
     totalTokens: usage.total_tokens ?? 0,
   };
+}
+
+export interface TurnUsage {
+  usage: TokenUsage | null;
+  missingCount: number;
+}
+
+export const EMPTY_TURN_USAGE: ReadonlyMap<number, TurnUsage> = Object.freeze(
+  new Map<number, TurnUsage>(),
+);
+
+export function summarizeTurnUsage(
+  groups: readonly ThreadMessageGroup[],
+): Map<number, TurnUsage> {
+  const summaries = new Map<number, TurnUsage>();
+  let turnMessages = new Set<Message>();
+  let anchorIndex: number | undefined;
+
+  const finishTurn = () => {
+    if (anchorIndex === undefined || turnMessages.size === 0) {
+      return;
+    }
+
+    const usage: TokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+    let hasUsage = false;
+    let missingCount = 0;
+
+    for (const message of turnMessages) {
+      const messageUsage = getUsageMetadata(message);
+      if (!messageUsage) {
+        missingCount++;
+        continue;
+      }
+      hasUsage = true;
+      usage.inputTokens += messageUsage.inputTokens;
+      usage.outputTokens += messageUsage.outputTokens;
+      usage.totalTokens += messageUsage.totalTokens;
+    }
+
+    summaries.set(anchorIndex, {
+      usage: hasUsage ? usage : null,
+      missingCount,
+    });
+  };
+
+  for (const [index, group] of groups.entries()) {
+    if (group.type === "human") {
+      finishTurn();
+      turnMessages = new Set<Message>();
+      anchorIndex = undefined;
+      continue;
+    }
+
+    if (!isEmptyClarificationGroup(group)) {
+      anchorIndex = index;
+    }
+    for (const message of group.messages) {
+      if (message.type === "ai") {
+        turnMessages.add(message);
+      }
+    }
+  }
+
+  finishTurn();
+  return summaries;
 }
 
 /**
