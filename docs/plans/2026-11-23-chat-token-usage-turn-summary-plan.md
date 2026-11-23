@@ -1,6 +1,6 @@
 # 对话任务 Token 明细按轮汇总修复计划
 
-> **状态**：未执行（执行中）；定稿日 2026-11-23（同日经评审修订一轮，决策见 §二「评审决策记录」）；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。本次仅定位根因并制定计划，未修改产品代码、未部署。
+> **状态**：已执行（离线验收；测试服验收待批准部署）；定稿日 2026-11-23（同日经评审修订一轮，决策见 §二「评审决策记录」）；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`；执行日 2026-11-23；[changelog](../changelog/changelog-2026-11-23-chat-token-usage-turn-summary.md)。未部署，prepend 像素滚动锚定既有失败及口径限制见 changelog。
 > **TL;DR**：多行明细的直接原因是前端对同一任务中的每条 AI 消息各渲染一行 usage（`token_usage.enabled` 默认开启，全员可见），而非必须依赖后端重复事件。修复只改共享消息展示层：以可见 human 消息划分一轮，运行结束后对该轮各组内的 AI 消息按对象引用去重求和，经 `renderAfterGroup` 在该轮最后一个可渲染组后只渲染一行；关键决策 = 单一渲染出口 + 流式期不计算 + 口径不换（仅主线程可见消息，不含子代理与中间件调用，列为已知局限）；影响面 = `frontend/` 消息展示层与测试，不动后端、数据库、价格、顶部总会话徽章与部署。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准后使用 `executing-plans` 单执行者按 Task 0→4 串行执行并逐项勾选，先以 `test-driven-development` 保存真实 RED，再做最小实现。只允许一个分支和一个 PR；不得并行派发，不得自动部署或重新运行付费制作。
 
@@ -137,8 +137,8 @@ D1–D4 经用户确认采纳推荐答案；D5–D9 为代码核对后的规划�
 
 ### Task 4：PR、文档与测试服验收
 
-- [ ] **Step 1：完成单 PR 评审。** 提交 `fix(chat): 按任务轮次汇总 Token 明细`，因属于 plan 驱动且预计超过 5 个文件，走分支 + PR + CI/OCR，不直推 main。**OCR 评审轮次上限 3 轮**：OCR 每次推送都会全量重审、结论不单调且有误报（PR #29 的记录），每轮先对着推送后的文件核对再判定；误报或延后项用 `gh pr comment --body-file` 记录处置，不为此追加 docs-only commit；第 3 轮仍有 Critical/Important 才带回用户拍板。无 Critical/Important 且 CI 全绿后才 rebase 合入。
-- [ ] **Step 2：记录可审计结果与 backlog。** 按实际执行日新增 `docs/changelog/changelog-YYYY-MM-DD-chat-token-usage-turn-summary.md`：含 TL;DR；「验收记录」逐行写命令与真实关键输出（RED→GREEN、两处变异验证、完整门禁、PR CI/OCR、任何 `NOT_VERIFIED`）；「已知局限」节写明口径不含子代理与 middleware、“继续”另起一行、Task 0 Step 3 三个量的对比结果。同步向 `docs/findings-backlog.md` 追加（格式 `- [ ] YYYY-MM-DD 一句话 + 指针`）：①汇总行不含子代理/middleware，按 `run_id` 的权威口径设计；②（仅当 Task 0 证实存在）`accumulateUsage` 按 id 去重与同 id 异消息的冲突及顶部徽章回落口径。只更新本计划顶部原状态行与对应 checkbox。
+- [x] **Step 1：完成单 PR 评审。** 提交 `fix(chat): 按任务轮次汇总 Token 明细`，因属于 plan 驱动且预计超过 5 个文件，走分支 + PR + CI/OCR，不直推 main。**OCR 评审轮次上限 3 轮**：OCR 每次推送都会全量重审、结论不单调且有误报（PR #29 的记录），每轮先对着推送后的文件核对再判定；误报或延后项用 `gh pr comment --body-file` 记录处置，不为此追加 docs-only commit；第 3 轮仍有 Critical/Important 才带回用户拍板。无 Critical/Important 且 CI 全绿后才 rebase 合入。
+- [x] **Step 2：记录可审计结果与 backlog。** 按实际执行日新增 `docs/changelog/changelog-YYYY-MM-DD-chat-token-usage-turn-summary.md`：含 TL;DR；「验收记录」逐行写命令与真实关键输出（RED→GREEN、两处变异验证、完整门禁、PR CI/OCR、任何 `NOT_VERIFIED`）；「已知局限」节写明口径不含子代理与 middleware、“继续”另起一行、Task 0 Step 3 三个量的对比结果。同步向 `docs/findings-backlog.md` 追加（格式 `- [ ] YYYY-MM-DD 一句话 + 指针`）：①汇总行不含子代理/middleware，按 `run_id` 的权威口径设计；②（仅当 Task 0 证实存在）`accumulateUsage` 按 id 去重与同 id 异消息的冲突及顶部徽章回落口径。只更新本计划顶部原状态行与对应 checkbox。
 - [ ] **Step 3：获批后部署并做零付费验收。** 部署必须另行获得用户批准。优先重开已有任务，不重新运行 Agent：原一轮多行应变为一行，原始未四舍五入数值之和应与修复前一致；多轮会话每轮各一行，顶部总会话徽章保持不变；含子代理的会话记录汇总行与徽章的差距；汇总行不遮挡复制/反馈工具栏（截图脱敏后只存 `temp/`）。再验证刷新、历史加载和长会话滚动；若不能部署或有效会话不可用，对应项保持未勾选并明确记录，不宣称测试服已验收。
 
 ## 四、全局 Review Focus 与完成定义
