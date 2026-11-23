@@ -644,7 +644,23 @@ test.describe("Chat token usage by turn", () => {
         timeout: 15_000,
       },
     );
+    const olderMessagesResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "GET" &&
+        url.pathname ===
+          `/api/threads/${MOCK_THREAD_ID}/runs/token-history-older-run/messages`
+      );
+    });
     await page.getByRole("button", { name: "Load more" }).click();
+    expect((await olderMessagesResponse).status()).toBe(200);
+    await page
+      .getByRole("log")
+      .locator(":scope > div")
+      .first()
+      .evaluate((element) => {
+        element.scrollTo({ top: 0, behavior: "instant" });
+      });
     await expect(page.getByText("Older answer", { exact: true })).toBeVisible();
 
     const latestFirstTurn = page.locator(
