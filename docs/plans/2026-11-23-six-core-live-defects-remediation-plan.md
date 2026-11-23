@@ -1,6 +1,6 @@
 # 六项核心能力实测缺陷修复实施计划
 
-> **状态**：未执行（执行中：播客）；定稿日 2026-11-23；执行日 2026-11-23；基准 commit `a2f6059dddbe6362c312d833519bd20f5322b9b9`；执行基线 `origin/main` 与基准一致；changelog：[六项核心能力实测缺陷修复](../changelog/changelog-2026-11-23-six-core-live-defects-remediation.md)。
+> **状态**：未执行（执行中：PPT）；定稿日 2026-11-23；执行日 2026-11-23；基准 commit `a2f6059dddbe6362c312d833519bd20f5322b9b9`；PR 1 已合入为 `9a010c827c9ef8e07819dae34d0e1c00453d448d`；changelog：[六项核心能力实测缺陷修复](../changelog/changelog-2026-11-23-six-core-live-defects-remediation.md)。
 > **TL;DR**：只按 PR 1（播客 HTML 结构标签不得进入朗读正文）→ PR 2（PPT 咖啡样本第 2 页文字重叠）串行修复，禁止并行派发。播客保留安全抓取与现有转换器，PPT 以 ink 估算框检查和导出后 `soffice`/`pdftotext -bbox-layout` 机械预筛双层验收；不新增依赖、不默认跑付费制作。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准本计划后，使用 `executing-plans` 单执行者按 Task 0→4 串行执行并逐项勾选；每个实现任务先写失败测试、保存真实 RED，再写最小实现。两个 PR 严格按 PR 1→PR 2 合入，禁止并行派发；状态只修改文件顶部原状态行，依次使用 `未执行（执行中：播客）`、`未执行（执行中：PPT）`，两条 PR 都合入后才改为 `已执行`，不得另起状态头。
 
@@ -88,7 +88,7 @@
   - 不改 vendored `web_to_md.py`，不写 `replace("html", "")`，不改其他转换逻辑。
 - [x] **Step 5：运行定向与完整安全回归。** 上述测试转绿后运行 `cd backend && uv run pytest tests/test_podcast_studio_ingest.py -q`，覆盖非公网 IP、混合 DNS、逐跳重定向、HTTPS 降级、Host、SNI、TLS、大小/超时、HTML 消毒、script/source hash 与 approval/integrity；空文本仍由 `_check_text()` 响亮失败，不能变成空音频。实际定向 4 passed，完整回归 51 passed。
 - [x] **Step 6：做无 TTS 行为探针。** 用真实 `convert_html_bytes()`/`intake()` 对受控 Example Domain 夹具（网络可用时可取公开 `https://example.com`）保存脱敏 `sources.json` 文本，确认无结构词、越界段落保留且原文朗读 turn 一致；不调用 TTS、不产生音频费用。实际使用本地脱敏重建夹具，输出 `PODCAST_PROBE_OK`，1 个原文 turn 与 source text 完全一致，`tts_called=false`。
-- [ ] **Step 7：完成 PR 1 门禁并串行交接。** `cd backend && uv run pytest tests/ -q` 全绿，根 `make check` 与文档检查通过；提交 `fix(podcast): 排除网页结构标签进入朗读`，经 CI/OCR 无 Critical/Important 后 rebase 合入。合入后只把原状态行改为 `未执行（执行中：PPT）`，再开始 PR 2。
+- [x] **Step 7：完成 PR 1 门禁并串行交接。** `cd backend && uv run pytest tests/ -q` 全绿，根 `make check` 与文档检查通过；提交 `fix(podcast): 排除网页结构标签进入朗读`，经 CI/OCR 无 Critical/Important 后 rebase 合入。合入后只把原状态行改为 `未执行（执行中：PPT）`，再开始 PR 2。实际以仓库标准 `make test` 运行同一完整后端套件（10186 passed / 91 skipped）；PR [#47](https://github.com/littlebear2020/SuperTrainerAgent/pull/47) 的 backend-unit-tests、quick-checks、AI Code Review 全绿，OCR 0 findings，merge commit `9a010c827c9ef8e07819dae34d0e1c00453d448d`。
 
 ### Task 2 / PR 2：让 SVG 检查器识别同模块文字碰撞
 
@@ -96,11 +96,11 @@
 
 **Interfaces：** 在 `SVGQualityChecker` 增加同模块独立 `<text>` 的 sibling 检查，复用现有 `_estimated_text_bounds(..., include_headroom=False)`、`_bounds_overlap_dimensions()` 和现有容差常量（含 `_BOUNDS_OVERFLOW_TOLERANCE`）；同一 `<text>` 内的 tspans 不互比，不重写字体测量或其他检查阶段。最终 error/warning 级别由模板基线决定，不预先假定 1px 容差安全。
 
-- [ ] **Step 1：写咖啡派生的真实失败测试。** 新 backend 测试按现有 `importlib.util.spec_from_file_location`/`sys.path` 方式加载技能 `checker.py`，构造同一卡片模块内两个独立 `<text>`：多行「再分段注水」的 ink 下缘越过「偏差信号」上缘，声明矩形保持不相交。调用真实检查器，当前实现必须因没有 sibling overlap 报告而 RED。
-- [ ] **Step 2：加入误报对照并确认收集。** 覆盖同一 `<text>` 内 tspans 不互比、边缘相接或现有容差内不报错、隐藏/非视觉/既有 off-canvas morph 排除、正常卡片相邻行不误报；`skills/public/ppt-master/scripts/tests/` 不在 CI、Makefile、pre-commit 中执行，新增检查只放 backend 测试。运行 `cd backend && uv run pytest tests/test_ppt_master_svg_quality.py --collect-only -q`，确认新测试由 backend pytest 收集，不把技能目录里的 `python3 -m pytest` 当作主命令。
-- [ ] **Step 3：实现候选碰撞检查。** 在现有文本几何检查之后，对同一模块的独立 `<text>` 两两比较 `include_headroom=False` 的 ink 估算框，复用现有容差和重叠尺寸 helper；保留既有可见性、非视觉和 off-canvas morph 排除，不以声明框替代 ink，也不改 `_estimated_text_bounds()` 的测量算法。先保留候选报告以便基线统计，不提前锁定最终级别。
-- [ ] **Step 4：先跑现有模板 SVG 基线再定级。** 用执行基线中仓库已有的模板 SVG（另以现有正常卡片夹具作对照，不用新造的“正常”样本替代模板）运行候选检查，记录模板清单、正常相邻行的小间隙、所有新增命中及若定为 error 的新增 error 数。基线出现新增 error 时，本批把检查定为 **warning**，并把误报样本、坐标和理由写回本计划；只有零新增 error 才定为 **error**。将最终级别、基线命令和结果写入 changelog，不能预先宣称 1px 容差安全。
-- [ ] **Step 5：运行检查器定向与相关回归。** `cd backend && uv run pytest tests/test_ppt_master_svg_quality.py tests/test_ppt_master_skill_vendored.py -q` 全绿；咖啡夹具命中、修复布局后的同夹具无同类命中，普通中文/英文/数字混排、同段 tspans、合法换行和既有 module overlap 行为不回归。保留 RED→GREEN 与基线证据。
+- [x] **Step 1：写咖啡派生的真实失败测试。** 新 backend 测试按现有 `importlib.util.spec_from_file_location`/`sys.path` 方式加载技能 `checker.py`，构造同一卡片模块内两个独立 `<text>`：多行「再分段注水」的 ink 下缘越过「偏差信号」上缘，声明矩形保持不相交。调用真实检查器，当前实现必须因没有 sibling overlap 报告而 RED。实际旧实现 1 failed / 8 passed，咖啡 ink 纵向相交 9.4px，声明框不相交。
+- [x] **Step 2：加入误报对照并确认收集。** 覆盖同一 `<text>` 内 tspans 不互比、边缘相接或现有容差内不报错、隐藏/非视觉/既有 off-canvas morph 排除、正常卡片相邻行不误报；`skills/public/ppt-master/scripts/tests/` 不在 CI、Makefile、pre-commit 中执行，新增检查只放 backend 测试。运行 `cd backend && uv run pytest tests/test_ppt_master_svg_quality.py --collect-only -q`，确认新测试由 backend pytest 收集，不把技能目录里的 `python3 -m pytest` 当作主命令。实际收集 9 tests。
+- [x] **Step 3：实现候选碰撞检查。** 在现有文本几何检查之后，对同一模块的独立 `<text>` 两两比较 `include_headroom=False` 的 ink 估算框，复用现有容差和重叠尺寸 helper；保留既有可见性、非视觉和 off-canvas morph 排除，不以声明框替代 ink，也不改 `_estimated_text_bounds()` 的测量算法。先保留候选报告以便基线统计，不提前锁定最终级别。
+- [x] **Step 4：先跑现有模板 SVG 基线再定级。** 用执行基线中仓库已有的模板 SVG（另以现有正常卡片夹具作对照，不用新造的“正常”样本替代模板）运行候选检查，记录模板清单、正常相邻行的小间隙、所有新增命中及若定为 error 的新增 error 数。基线出现新增 error 时，本批把检查定为 **warning**，并把误报样本、坐标和理由写回本计划；只有零新增 error 才定为 **error**。将最终级别、基线命令和结果写入 changelog，不能预先宣称 1px 容差安全。实际扫描 `scripts/confirm_ui/static/style_previews/*.svg` 与 `scripts/tests/fixtures/native_projection/*.svg` 共 26 份，若定为 error 会新增 1 个 error：`15_signing_target.svg` 的图例「战兴业务」(x=682,y=274) 与原生图表 fallback 数值「223」(x=743,y=287) 命中 31.0×13.7px；该组属于 `data-pptx-replace-with="chart"` 的 native projection fallback，不作为本批硬失败，故最终级别为 **warning**。现有模板正常相邻行最小非负纵向间隙为 0.4px；基线明细保存在 gitignored `temp/2026-11-23-six-core-live-defects-derived/ppt-svg-baseline.json`。
+- [x] **Step 5：运行检查器定向与相关回归。** `cd backend && uv run pytest tests/test_ppt_master_svg_quality.py tests/test_ppt_master_skill_vendored.py -q` 全绿；咖啡夹具命中、修复布局后的同夹具无同类命中，普通中文/英文/数字混排、同段 tspans、合法换行和既有 module overlap 行为不回归。保留 RED→GREEN 与基线证据。实际 16 passed。
 - [ ] **Step 6：保存检查器实现提交。** 在同一 PR 2 内提交 `fix(ppt-master): 检出同模块文字碰撞`，不夹带 SOUL、seed 或无关模板变化，便于审阅实际算法 diff。
 
 ### Task 3 / PR 2：新增导出后的机械文字行预筛与交付约束

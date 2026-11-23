@@ -4,7 +4,7 @@
 
 ## 执行范围
 
-- PR 1（播客）执行中；PR 2（PPT）尚未开始，严格等待 PR 1 合入。
+- PR 1（播客）已通过 [#47](https://github.com/littlebear2020/SuperTrainerAgent/pull/47) rebase 合入，merge commit `9a010c827c9ef8e07819dae34d0e1c00453d448d`；PR 2（PPT）现从该新 main 串行开始。
 - 原始实测证据已复制到主 clone 的 gitignored `temp/2026-11-23-six-core-live-test/`；只使用脱敏重建夹具作为测试输入，不提交真实任务数据。
 
 ## 验收记录
@@ -17,4 +17,7 @@
 - PR 1 无 TTS 行为探针：真实 `intake()` + `prepare_verbatim()` 处理脱敏重建 HTML → `PODCAST_PROBE_OK`，`turn_count=1`、`verbatim_matches_source=true`、`tts_called=false`；脱敏 `sources.json` 与探针结果保存在 gitignored temp。
 - PR 1 全量：串行 `uv run pytest tests/ -q` 约 5 分钟仅到 10%，主动中止且不计为通过；仓库标准 `cd backend && make test`（同一完整套件，`CI=true ... -n auto --dist loadfile`）→ **10186 passed, 91 skipped**。
 - PR 1 根 `make check` → backend ruff/format、frontend eslint/tsc/prettier/knip/i18n 与 docs convention 全过；既有前端 120 条 warnings、0 errors。工作区首次运行缺 `node_modules`，按锁文件 `pnpm install --frozen-lockfile --prefer-offline` 后复跑通过。
-- PR 2 的 RED→GREEN、行为验收、两条 PR 的 CI/OCR 与最终门禁将在实际执行后回填；未执行项不记为通过。
+- PR #47 `gh pr checks 47 --watch` → backend-unit-tests pass (3m15s)、quick-checks pass、AI Code Review pass；OCR 摘要 1 selected item / **0 findings**；已 rebase 合入为 `9a010c827c9ef8e07819dae34d0e1c00453d448d`。
+- PR 2 SVG RED：`uv run pytest tests/test_ppt_master_svg_quality.py -q` → 1 failed / 8 passed，旧实现没有 sibling overlap 报告；GREEN → 9 passed；与 `test_ppt_master_skill_vendored.py` 相关回归 → 16 passed。
+- PR 2 SVG 基线：真实 `_check_text_bounds()` 扫描 `style_previews/*.svg` + `native_projection/*.svg` → 26 份、1 个候选命中；`15_signing_target.svg` 的「战兴业务」/「223」为 31.0×13.7px，属原生图表 fallback，故最终定为 **warning**；正常相邻行最小非负间隙 0.4px。完整清单与坐标在 gitignored `ppt-svg-baseline.json`。
+- PR 2 PDF 预筛、离线导出行为验收、PR # 待定的 CI/OCR 与最终门禁将在实际执行后回填；未执行项不记为通过。
