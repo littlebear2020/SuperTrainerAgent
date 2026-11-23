@@ -4390,6 +4390,10 @@ class SVGQualityChecker:
             int,
             Tuple[float, float, float, float],
         ] = {}
+        ink_estimated_by_id: Dict[
+            int,
+            Tuple[float, float, float, float],
+        ] = {}
         page_overflow_text_ids: set[int] = set()
         unverified: List[str] = []
         for text_element in root.iter(f'{{{SVG_NS}}}text'):
@@ -4444,6 +4448,7 @@ class SVGQualityChecker:
             if page_estimated is None:
                 unverified.append(self._text_diagnostic_label(text_element))
                 continue
+            ink_estimated_by_id[id(text_element)] = page_estimated
             direct_child = text_element
             parent = parent_by_id.get(id(direct_child))
             while parent is not None and parent is not root:
@@ -4529,6 +4534,45 @@ class SVGQualityChecker:
                         include_headroom=True,
                     ),
                 )
+            if canvas is not None and self._is_off_canvas_morph_group(module, canvas):
+                continue
+            module_text_elements = [
+                text_element
+                for text_element in module.iter(f'{{{SVG_NS}}}text')
+                if id(text_element) in ink_estimated_by_id
+            ]
+            for index, first_text in enumerate(module_text_elements):
+                first_bounds = ink_estimated_by_id[id(first_text)]
+                for second_text in module_text_elements[index + 1:]:
+                    second_bounds = ink_estimated_by_id[id(second_text)]
+                    overlap_width, overlap_height = self._bounds_overlap_dimensions(
+                        first_bounds,
+                        second_bounds,
+                    )
+                    if (
+                        overlap_width <= _BOUNDS_OVERFLOW_TOLERANCE
+                        or math.isclose(
+                            overlap_width,
+                            _BOUNDS_OVERFLOW_TOLERANCE,
+                            rel_tol=0.0,
+                            abs_tol=1e-9,
+                        )
+                        or overlap_height <= _BOUNDS_OVERFLOW_TOLERANCE
+                        or math.isclose(
+                            overlap_height,
+                            _BOUNDS_OVERFLOW_TOLERANCE,
+                            rel_tol=0.0,
+                            abs_tol=1e-9,
+                        )
+                    ):
+                        continue
+                    result['warnings'].append(
+                        f'{self._text_diagnostic_label(first_text)} sibling text overlap with '
+                        f'{self._text_diagnostic_label(second_text)} in {_element_label(module)} '
+                        f'by {overlap_width:.1f}px x {overlap_height:.1f}px; move the independent '
+                        'text elements until their estimated ink bounds are disjoint beyond the '
+                        f'{_BOUNDS_OVERFLOW_TOLERANCE:.0f}px tolerance'
+                    )
 
     def _check_unmergeable_leading_text(self, root: ET.Element, result: Dict) -> None:
         """Warn when leading text cannot be normalized into one PPT text frame."""
