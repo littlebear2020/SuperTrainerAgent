@@ -193,9 +193,13 @@ def _estimate_call_cost(metadata: dict | None, method: str, pricing_entry: dict 
             if raw is None:
                 continue
             try:
-                return (float(raw) / 1000.0) * price
+                value = float(raw)
             except (TypeError, ValueError):
                 continue
+            if value > 0:
+                return (value / 1000.0) * price
+            # 0（或负数）视为缺失：provider 失败/空响应常回报
+            # completion_tokens=0 并带有效 total_tokens，按 0 计价会漏账。
         return None  # can't estimate without token count
     if unit == "per_second":
         duration = md.get("duration")

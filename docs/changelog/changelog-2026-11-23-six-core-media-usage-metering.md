@@ -38,3 +38,4 @@
 - `pre-commit run --files <10 个改动文件>` → ruff lint Passed / ruff format 首轮 Failed（hook 原地格式化 `test_doubao_tts_client.py`，重跑 Passed）/ gitleaks Passed / docs convention Passed；`make -C backend lint` → `All checks passed!` + `1329 files already formatted`。
 - `cd backend && CI=true PYTHONPATH=. uv run --no-sync pytest tests/ -q -n auto --dist loadfile`（= `make test`，干净 worktree 独立 venv）→ `10231 passed, 91 skipped, 435 warnings in 125.19s`，exit=0。
 - 根 `make check` → backend ruff `All checks passed!` / `1329 files already formatted`；frontend knip 仅 configuration hint；`i18n key 存活检测通过：660 个叶子全活`；`OK 仓库治理约定全过`，exit=0。
+- PR 1 评审轮次 1（OCR run 45216169382-1，PR #50）：1 项 `bug · medium`——`completion_tokens=0` 时 `float(0)` 成功即按 0 计价、不回退 `total_tokens`。处置：**采纳**。RED `pytest tests/test_media_pricing.py -q` → `4 failed, 22 passed`（zero / zero-str / negative / zero-without-total）；GREEN：0 与负数按缺失处理、回退 `total_tokens`，两者皆非正数则 unpriced → 四个定向文件 `63 passed`。
