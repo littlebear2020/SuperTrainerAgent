@@ -555,17 +555,37 @@ async def run_agent(
         # back to the SQL run_store after eviction, so /runs/{rid} still works.
         asyncio.create_task(run_manager.cleanup(run_id, delay=60))
 
-        # 媒体计量账本 drain（媒体计量计划 PR 2）：publish_end 之后、限时
-        # MEDIA_USAGE_DRAIN_TIMEOUT；失败/超时只 WARNING，不改变 run 状态。
-        # sink 由 deps 按 DEER_FLOW_MEDIA_USAGE_LEDGER=1 注入，默认 None（休眠）。
+        # 媒体计量账本 drain（媒体计量计划 PR 2）：publish_end 之后 *调度*（不在 run 任务里
+        # await）——DB 写锁被占时，取消要等到 busy_timeout 才真正结束；若在此 await，
+        # record.task 会随之存活并拖住 /runs/wait。drain 自身仍以 MEDIA_USAGE_DRAIN_TIMEOUT
+        # 限时，失败/超时只 WARNING、不改变 run 状态。sink 由 deps 按
+        # DEER_FLOW_MEDIA_USAGE_LEDGER=1 注入，默认 None（休眠）。
         if media_usage_sink is not None:
-            try:
-                await asyncio.wait_for(
-                    media_usage_sink(thread_id=thread_id, user_id=media_usage_user_id, agent_name=_resolve_agent_name(config, record)),
-                    timeout=MEDIA_USAGE_DRAIN_TIMEOUT,
-                )
-            except Exception:
-                logger.warning("Media usage drain failed or timed out for run %s (non-fatal)", run_id, exc_info=True)
+            _schedule_media_usage_drain(
+                media_usage_sink,
+                thread_id=thread_id,
+                user_id=media_usage_user_id,
+                agent_name=_resolve_agent_name(config, record),
+                run_id=run_id,
+            )
+
+
+#: Strong references to in-flight media drains so the loop never GCs a pending task.
+_media_drain_tasks: set[asyncio.Task[None]] = set()
+
+
+def _schedule_media_usage_drain(sink: Callable[..., Awaitable[Any]], *, thread_id: str, user_id: str, agent_name: str | None, run_id: str) -> None:
+    """Run the ledger drain off the run task, bounded by :data:`MEDIA_USAGE_DRAIN_TIMEOUT`."""
+
+    async def _drain() -> None:
+        try:
+            await asyncio.wait_for(sink(thread_id=thread_id, user_id=user_id, agent_name=agent_name), timeout=MEDIA_USAGE_DRAIN_TIMEOUT)
+        except Exception:
+            logger.warning("Media usage drain failed or timed out for run %s (non-fatal)", run_id, exc_info=True)
+
+    task = asyncio.create_task(_drain())
+    _media_drain_tasks.add(task)
+    task.add_done_callback(_media_drain_tasks.discard)
 
 
 def _resolve_agent_name(config: dict, record: RunRecord) -> str | None:

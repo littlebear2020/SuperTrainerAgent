@@ -50,25 +50,48 @@ class MediaDrainStats:
     error: int = 0
 
 
+#: Upper bound on rollback/close once a statement is already blocked (e.g. SQLite
+#: busy lock): without it the cleanup queues behind the blocked statement and
+#: ``wait_for``'s cancellation takes ``busy_timeout`` (30 s) instead of ~2 s.
+_CLEANUP_TIMEOUT = 1.0
+
+
+async def _close_quietly(session, *, timeout: float = _CLEANUP_TIMEOUT) -> None:
+    """Roll back + close, each bounded; a lock-blocked connection must not stall the caller."""
+    for operation in (session.rollback, session.close):
+        try:
+            await asyncio.wait_for(operation(), timeout=timeout)
+        except Exception:
+            pass
+
+
 async def _commit_row(session_factory, row: ExternalApiCallRow) -> None:
-    """Insert one row in its own session; roll back before the exception escapes."""
+    """Insert one row in its own session; roll back before the exception escapes.
+
+    ``except BaseException`` on purpose: a cancellation (``asyncio.wait_for`` in the
+    worker) must run the *bounded* cleanup and then propagate unchanged — never sit
+    in an unbounded ``session.close()`` behind a blocked INSERT, and never be logged
+    as a metering ``error``.
+    """
     session = session_factory()
     try:
         session.add(row)
         await session.commit()
-    except Exception:
-        await session.rollback()
+    except BaseException:
+        await _close_quietly(session)
         raise
-    finally:
-        await session.close()
+    await _close_quietly(session)
 
 
 async def _existing_call_ids(session_factory, call_ids: list[str]) -> set[str]:
     existing: set[str] = set()
-    for start in range(0, len(call_ids), _EXISTING_LOOKUP_BATCH):
-        async with session_factory() as session:
+    session = session_factory()
+    try:
+        for start in range(0, len(call_ids), _EXISTING_LOOKUP_BATCH):
             rows = await session.execute(select(ExternalApiCallRow.call_id).where(ExternalApiCallRow.call_id.in_(call_ids[start : start + _EXISTING_LOOKUP_BATCH])))
             existing.update(r[0] for r in rows)
+    finally:
+        await _close_quietly(session)
     return existing
 
 
@@ -105,6 +128,12 @@ async def drain_agent_media_usage(*, thread_id: str, user_id: str, agent_name: s
     for event, call_id in zip(read.events, call_ids, strict=True):
         if written >= MAX_EVENTS_PER_DRAIN:
             break  # the rest stay in the window for the next drain
+        if asyncio.current_task().cancelling():
+            # The worker's time bound fired. A CancelledError raised inside a blocked
+            # DBAPI call can be absorbed by the driver/ORM and resurface as another
+            # exception (counted above as ``error``); never let the loop move on to
+            # the next row afterwards.
+            raise asyncio.CancelledError
         if call_id in existing:
             duplicate += 1
             continue
@@ -124,6 +153,8 @@ async def drain_agent_media_usage(*, thread_id: str, user_id: str, agent_name: s
             written += 1
         except IntegrityError:
             duplicate += 1
+        except asyncio.CancelledError:
+            raise  # the worker's time bound: not a metering error, never swallowed
         except Exception:
             error += 1
             logger.warning("media usage ledger: write failed for one event in thread %s (agent=%s)", thread_id, agent_name, exc_info=True)
