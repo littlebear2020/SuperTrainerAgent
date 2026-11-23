@@ -29,4 +29,8 @@
 - 实际 CLI 双向结果：重叠版 `pptx_text_overlap_prescreen.py` → exit 1，`CLI_PRESCREEN_BLOCKED status=failed blocking=2`；修复版 → exit 0，`CLI_PRESCREEN_OK status=passed blocking=0`。
 - PR 2 新脚本与 backend 测试定向 `ruff check` → All checks passed；`ruff format --check` → 4 files already formatted。直接以 backend 配置扫描 vendored `checker.py` 会报 400 个存量风格问题（该树本属豁免区），本批未清理或扩大范围。
 - PR 2 全量 `cd backend && make test` → **10204 passed, 91 skipped**；根 `make check` → backend ruff/format、frontend eslint/tsc/prettier/knip/i18n 与 docs convention 全过（既有前端 120 warnings / 0 errors）。
-- PR 2 的 CI/OCR 与合入结果将在实际执行后回填；未执行项不记为通过。
+- PR #48 `gh pr checks 48 --watch` → [backend-unit-tests](https://github.com/littlebear2020/SuperTrainerAgent/actions/runs/45142514529) pass (3m40s)、[quick-checks](https://github.com/littlebear2020/SuperTrainerAgent/actions/runs/45142514617) pass、[AI Code Review](https://github.com/littlebear2020/SuperTrainerAgent/actions/runs/45142515489) pass；OCR 2 条 low 维护建议（容差表达式简化、告警采样），无 Critical/Important，均 deferred；独立整分支评审 0 findings。已 rebase 合入为 `cd94151e` + `0c7b6a4a45d73d091219963d01c7bf560f7a7d6a`。
+- 最新 main 受影响回归：`test_podcast_studio_ingest.py` + 两个 PPT 新测试 + vendored → **76 passed**；根 `make check` 全过。
+- 主 clone 直接全量首次为 33 failed / 10232 passed / 30 skipped，均源于本地 gitignored `config.yaml` v32 与未注入 `$QIHU_API_KEY`；未读取或修改真实配置。直接改指 `config.example.yaml` 不适用（两条测试仍硬读真实文件且示例缺 models），最终改用与 CI 一致的干净 `origin/main` worktree 跑同一完整 `make test` → **10204 passed, 91 skipped**。
+- 最终清理：执行 worktree、RED/评审日志与 `six-core-live-defects-pr1/pr2` 远程分支已删除；gitignored temp 证据与脱敏派生物未进入 git。主 clone 非本批未跟踪 `six-core-media-usage-metering-plan.md` 原样保留。
+- 未自动部署、未执行付费 Agent 制作或 TTS；无 `NOT_VERIFIED` 项。Quick/Edit Native 覆盖与其余候选保持 backlog 未勾选。
