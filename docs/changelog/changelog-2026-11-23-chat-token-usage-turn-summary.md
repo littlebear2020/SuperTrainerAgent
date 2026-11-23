@@ -1,6 +1,6 @@
 # 对话任务 Token 明细按轮汇总
 
-> **状态**：离线验收完成；PR #49 首轮 CI/OCR 全部通过；未部署，测试服验收待另行批准。
+> **状态**：离线验收完成；PR #49 的逐轮 CI/OCR 记录如下；未部署，测试服验收待另行批准。
 > **TL;DR**：将同一可见用户轮次内分散在 processing、产物和普通回复后的逐条 Token 行合并为一行；按消息对象引用去重并保留旧行求和口径，缺 usage 显示次数，流式期间不计算；仅改前端消息展示、测试与文档，不改后端、顶部徽章、`accumulateUsage` 或部署。
 
 ## 改动
@@ -38,9 +38,12 @@
 - 变异②移除 `!thread.isLoading` → 加载中门控用例如预期失败：`1 failed / 4 passed`；随后恢复。
 - 独立全分支评审 → 1 项 Important：上传 task 占位被误计缺 usage；新增回归 RED `Expected missingCount 0 / Received 1`，最小修复后 node 定向 `49/49 passed`；无 Critical。
 - `pnpm test` → 评审修复后最终重跑 `284 test files / 1846 tests passed`。
-- `pnpm test:e2e` → 评审修复后最终重跑 `128 passed, 3 skipped`。
+- `pnpm test:e2e` → 评审修复及 prepend CI 夹具修复后最终重跑 `128 passed, 3 skipped`。
 - `pnpm check` → 评审修复后串行重跑，ESLint `0 errors`（既有 `120 warnings`）、TypeScript 与 Prettier 通过。首次与 E2E 并行时因共享 `test-results/` 被清理而出现 ESLint `ENOENT`，随后均串行重跑通过，不作为代码失败。
 - `make check` → backend/frontend 静态检查、`knip`、i18n `660` 个叶子存活检测与 docs convention 全部通过；既有 frontend `120 warnings`，无 error。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - PR #49 `gh pr checks 49 --watch` → 首轮 `6/6` 通过：AI Code Review `1m55s`、E2E `9m7s`、frontend unit `2m32s`、frontend lint `2m0s`、quick-checks `18s`、perf-budgets `1m21s`；工作流 run `45193695304` / `45193695535` 等详见 PR checks。
 - PR #49 OCR 第一轮 → `0 high`、`2 medium`、`5 low`；medium 空 clarification 项经实际分组代码核定为非法手工组形状误报，task 共享谓词项因超出本批允许导出边界而记录延后；五条 low 均为维护性建议。处置见 PR comment `7104075948`，无未解决 Critical/Important，不为误报追加产品代码。
+- PR #49 第二轮 CI（文档收尾后）→ OCR、unit、lint、quick-checks、perf-budgets 通过；E2E run `45195812275` 的 prepend 用例三次等待屏幕外虚拟行 `Older answer` 超时，结果为 `1 failed / 1 flaky / 126 passed / 3 skipped`，未合入。无关的 agent-new-chat-guide 用例重试后自愈。
+- prepend CI 夹具修复 → 精确等待旧 run messages `200` 响应并滚动到顶部挂载虚拟行，原有索引与数值断言不删弱；`CI=1 ... -g "real run-history" --repeat-each=3 --workers=1` → `3 passed`，标准 token 定向 → `8 passed`。
+- PR #49 OCR 第二轮 run `45195812440` → action `pass`，仅 `1 low`（汇总注释/共享常量维护建议），无 Critical/Important；不扩大本批产品接口。
