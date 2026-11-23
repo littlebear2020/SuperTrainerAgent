@@ -1,6 +1,6 @@
 # 首页六卡媒体计量与计价接入实施计划
 
-> **状态**：已执行（2026-11-24；Task 0–5 全部勾选；PR 1 #50 → PR 2 #51 → PR 3 #52 串行合入 main `bbb20855`；测试服 gateway `v3-20261124` 已部署、`DEER_FLOW_MEDIA_USAGE_LEDGER=1`、六卡真实调用与回滚演练通过；changelog：`docs/changelog/changelog-2026-11-23-six-core-media-usage-metering.md`；未决：供应商账单未对账（`SUPPLIER_RECONCILIATION_NOT_VERIFIED`），见 findings-backlog）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。
+> **状态**：已执行（2026-11-24；Task 0–5 全部勾选；PR 1 #50 → PR 2 #51 → PR 3 #52 串行合入 main `bbb20855`，合入后独立终审（无 Critical）的修复 PR #53 合入 `1571a05c`；测试服 gateway `v3-20261124b` 已部署、`DEER_FLOW_MEDIA_USAGE_LEDGER=1`、六卡真实调用与回滚演练通过、修复后复测通过；changelog：`docs/changelog/changelog-2026-11-23-six-core-media-usage-metering.md`；未决：供应商账单未对账（`SUPPLIER_RECONCILIATION_NOT_VERIFIED`），见 findings-backlog）；定稿日 2026-11-23；基准 commit `52c316763dc15e60649f1dc6eb0faf52b50013d4`。
 > **TL;DR**：只覆盖首页六张卡片的新任务，按“直接计价修复 → 休眠账本基座 → 技能发射接入”三个串行 PR 实施。Agent 媒体事件追加到线程工作区 `.usage/media-usage.jsonl`（生产仅支持本地 Aio 容器沙箱），worker 在 run 结束后读取并按当前线程/用户落库；不扫 bash 回显、不依赖 RunJournal；复用现有表和价目，不改 schema、不回填历史账。防护只做保证功能可用的最小底线，不新增 CI 工作流；Writer/ViMax/语音克隆等非首页能力不要求统计。
 > **For agentic workers：** REQUIRED SUB-SKILL：用户批准后使用 `executing-plans` 单执行者按 Task 0→5 串行执行并逐项勾选；实现先写真实失败测试，再写最小实现。三个 PR 严格按 PR 1→2→3 合入，禁止并行派发。状态只修改顶部原行，依次使用 `未执行（执行中：直接计价）`、`未执行（执行中：账本基座）`、`未执行（执行中：技能接入）`，三条 PR 都合入后才改为 `已执行`，不得另起状态头。
 
