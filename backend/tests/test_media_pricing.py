@@ -33,6 +33,60 @@ class TestEstimateCallCost:
         cost = _estimate_call_cost({}, "generate_video", pricing)
         assert cost is None  # can't estimate without token count
 
+    def test_per_kilo_token_completion_only(self) -> None:
+        """仅回传 completion_tokens 的成功视频（修前只认 total_tokens → 漏价）。"""
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        cost = _estimate_call_cost({"completion_tokens": 460}, "generate_video", pricing)
+        assert cost == pytest.approx(0.01058)  # 0.46 * 0.023
+
+    def test_per_kilo_token_prefers_completion_and_never_sums(self) -> None:
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        cost = _estimate_call_cost({"completion_tokens": 300, "total_tokens": 1000}, "generate_video", pricing)
+        assert cost == pytest.approx(0.0069)  # 300 only; 1300 would be 0.0299
+
+    @pytest.mark.parametrize("completion", [None, "n/a"], ids=["none", "garbage"])
+    def test_per_kilo_token_falls_back_to_total_when_completion_unusable(self, completion) -> None:
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        cost = _estimate_call_cost({"completion_tokens": completion, "total_tokens": 5000}, "generate_video", pricing)
+        assert cost == pytest.approx(0.115)  # 5 * 0.023 via total
+
+    def test_per_kilo_token_no_usable_tokens_is_unpriced(self) -> None:
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        cost = _estimate_call_cost({"completion_tokens": "n/a", "duration": 5.0}, "generate_video", pricing)
+        assert cost is None  # duration is never used to guess tokens
+
+
+class TestEvaluateMediaCallAmount:
+    """真账 amount 优先于任何 token 估算（共享计价器契约，媒体计量计划 PR 1 钉死）。"""
+
+    def test_real_amount_wins_over_completion_token_estimate(self) -> None:
+        from app.gateway._shared.task_cost import evaluate_media_call
+
+        priced = evaluate_media_call("seedance", "generate_video", "ok", {"amount": 0.5, "completion_tokens": 1000})
+        assert priced.cost == pytest.approx(0.5)
+        assert priced.source == "real"
+
+    def test_completion_only_success_row_is_estimated(self, monkeypatch) -> None:
+        from app.gateway._shared import media_pricing_resolver as resolver
+        from app.gateway._shared.task_cost import evaluate_media_call
+
+        monkeypatch.setattr(resolver, "_media_pricing_cache", {("seedance", "video"): {"unit": "per_kilo_token", "unit_price": 0.046, "currency": "CNY"}})
+        monkeypatch.setattr(resolver, "_media_pricing_model_cache", {})
+        priced = evaluate_media_call("seedance", "generate_video", "ok", {"model": "seedance", "completion_tokens": 460})
+        assert priced.cost == pytest.approx(0.02116)  # 0.46 * 0.046
+        assert priced.source == "estimated"
+
+    def test_success_row_without_tokens_is_unpriced_not_zero(self, monkeypatch) -> None:
+        """有价目、无 token → unpriced（不是 0，也不用 duration 猜）。"""
+        from app.gateway._shared import media_pricing_resolver as resolver
+        from app.gateway._shared.task_cost import evaluate_media_call
+
+        monkeypatch.setattr(resolver, "_media_pricing_cache", {("seedance", "video"): {"unit": "per_kilo_token", "unit_price": 0.046, "currency": "CNY"}})
+        monkeypatch.setattr(resolver, "_media_pricing_model_cache", {})
+        priced = evaluate_media_call("seedance", "generate_video", "ok", {"model": "seedance", "duration": 5.0})
+        assert priced.cost is None
+        assert priced.source == "unpriced"
+
     def test_per_second(self) -> None:
         pricing = {"unit": "per_second", "unit_price": 0.5, "currency": "CNY"}
         metadata = {"duration": 10.0}

@@ -185,9 +185,17 @@ def _estimate_call_cost(metadata: dict | None, method: str, pricing_entry: dict 
         # One call = one image; no metadata field needed
         return price
     if unit == "per_kilo_token":
-        tokens = md.get("total_tokens")
-        if tokens is not None:
-            return (float(tokens) / 1000.0) * price
+        # completion → total，依次取第一个可用值，不相加、不用 duration 猜：
+        # 成功视频可能只回传 completion_tokens（媒体计量计划 PR 1），修前只认
+        # total_tokens 会把这类行整体漏成 unpriced。坏值（非数字）按缺失处理。
+        for key in ("completion_tokens", "total_tokens"):
+            raw = md.get(key)
+            if raw is None:
+                continue
+            try:
+                return (float(raw) / 1000.0) * price
+            except (TypeError, ValueError):
+                continue
         return None  # can't estimate without token count
     if unit == "per_second":
         duration = md.get("duration")

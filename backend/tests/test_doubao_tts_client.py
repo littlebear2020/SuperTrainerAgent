@@ -14,7 +14,8 @@ import json
 
 import pytest
 
-from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSClient
+from app.gateway._shared.task_cost import evaluate_media_call
+from app.gateway.voice_twin.doubao_tts_client import DoubaoTTSClient, DoubaoTTSHTTPError
 
 
 class TestHeaders:
@@ -93,3 +94,118 @@ class TestHandleSseEvent:
 
         with pytest.raises(RuntimeError, match="55000000"):
             self.client._handle_sse_event("352", {"code": 55000000, "message": "mismatched"}, self.chunks)
+
+
+class TestUsageRecording:
+    """两个合成入口的 external_api_calls 记录（媒体计量计划 PR 1）。
+
+    字幕版 ``synthesize_sse_with_timestamps`` 修前只记 ``status``，不带
+    ``model`` / ``char_count``（线上行 metadata_json=None），千字价目永远估不出。
+    两个入口必须带同一份 extra；失败调用同样带字段，但估算器只估 ok/success。
+    """
+
+    AUDIO = b"\x00\x01\x02\x03"
+    SPEAKER = "zh_male_anqi_moon_bigtts"
+
+    @pytest.fixture
+    def captured_sink(self, monkeypatch):  # noqa: ANN201
+        calls: list[dict] = []
+
+        async def fake_record(**kwargs):  # noqa: ANN003, ANN202
+            calls.append(kwargs)
+
+        monkeypatch.setattr("app.gateway._shared.llm_usage_sink.record_external_api_call", fake_record)
+        return calls
+
+    @staticmethod
+    def _install_stream(monkeypatch, *, lines: list[str], is_error: bool = False) -> None:  # noqa: ANN001
+        class _FakeResponse:
+            def __init__(self) -> None:
+                self.is_error = is_error
+                self.status_code = 500
+
+            async def aiter_lines(self):  # noqa: ANN201
+                for line in lines:
+                    yield line
+
+            async def aread(self) -> bytes:  # noqa: ANN201
+                return b"upstream boom"
+
+            async def __aenter__(self):  # noqa: ANN201
+                return self
+
+            async def __aexit__(self, *exc) -> bool:  # noqa: ANN001, ANN202
+                return False
+
+        class _FakeClient:
+            def __init__(self, *args, **kwargs) -> None:  # noqa: ANN001, ANN002
+                pass
+
+            async def __aenter__(self):  # noqa: ANN201
+                return self
+
+            async def __aexit__(self, *exc) -> bool:  # noqa: ANN001, ANN202
+                return False
+
+            def stream(self, method, url, **kwargs):  # noqa: ANN001, ANN002, ANN201
+                return _FakeResponse()
+
+        monkeypatch.setattr("app.gateway.voice_twin.doubao_tts_client.httpx.AsyncClient", _FakeClient)
+
+    def _success_lines(self, *, with_subtitle: bool) -> list[str]:
+        audio_b64 = base64.b64encode(self.AUDIO).decode()
+        lines = ["event: 352", f"data: {json.dumps({'code': 0, 'data': audio_b64})}", ""]
+        if with_subtitle:
+            words = [{"word": "你", "startTime": 0.0, "endTime": 0.2, "confidence": 1.0}]
+            lines += ["event: 364", f"data: {json.dumps({'sentence': {'words': words}})}", ""]
+        lines += ["event: 152", 'data: {"code": 20000000}', ""]
+        return lines
+
+    @pytest.mark.asyncio
+    async def test_with_timestamps_success_records_model_and_char_count(self, captured_sink, monkeypatch):  # noqa: ANN001
+        self._install_stream(monkeypatch, lines=self._success_lines(with_subtitle=True))
+        text = "你好，世界！"
+        audio, words = await DoubaoTTSClient(access_key="k").synthesize_sse_with_timestamps(self.SPEAKER, text)
+        assert audio == self.AUDIO
+        assert [w["word"] for w in words] == ["你"]
+        assert len(captured_sink) == 1
+        call = captured_sink[0]
+        assert call["provider"] == "doubao_tts"
+        assert call["method"] == "synthesize_sse_with_timestamps"
+        assert call["status"] == "success"
+        assert call["extra"] == {"model": "seed-tts-2.0", "char_count": len(text)}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("lines", "is_error", "exc_type", "match"),
+        [
+            (["event: 153", 'data: {"code": 1, "message": "boom"}', ""], False, RuntimeError, "session failed"),
+            ([], True, DoubaoTTSHTTPError, "HTTP 500"),
+        ],
+        ids=["sse-session-failed", "http-500"],
+    )
+    async def test_with_timestamps_failure_records_fields_but_is_never_estimated(self, captured_sink, monkeypatch, lines, is_error, exc_type, match):  # noqa: ANN001
+        self._install_stream(monkeypatch, lines=lines, is_error=is_error)
+        text = "失败样本"
+        with pytest.raises(exc_type, match=match):
+            await DoubaoTTSClient(access_key="k").synthesize_sse_with_timestamps(self.SPEAKER, text)
+        assert len(captured_sink) == 1
+        call = captured_sink[0]
+        assert call["status"] == "error"
+        assert call["extra"] == {"model": "seed-tts-2.0", "char_count": len(text)}
+        priced = evaluate_media_call(call["provider"], call["method"], call["status"], call["extra"])
+        assert priced.cost is None
+        assert priced.source is None
+
+    @pytest.mark.asyncio
+    async def test_plain_synthesize_sse_still_records_model_and_char_count(self, captured_sink, monkeypatch):  # noqa: ANN001
+        """普通版行为不变（回归守护）。"""
+        self._install_stream(monkeypatch, lines=self._success_lines(with_subtitle=False))
+        text = "普通版"
+        audio = await DoubaoTTSClient(access_key="k").synthesize_sse(self.SPEAKER, text)
+        assert audio == self.AUDIO
+        assert len(captured_sink) == 1
+        call = captured_sink[0]
+        assert call["method"] == "synthesize_sse"
+        assert call["status"] == "success"
+        assert call["extra"] == {"model": "seed-tts-2.0", "char_count": len(text)}

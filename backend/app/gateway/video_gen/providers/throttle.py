@@ -60,9 +60,14 @@ def _build_extra_from_ref(ref: Any, sink_label: str | None = None) -> dict:
     duration = getattr(ref, "duration", None)
     if duration is not None:
         extra["duration"] = duration
-    # total_tokens from raw_usage (seedance-ark returns this)
+    # completion_tokens / total_tokens from raw_usage (seedance-ark returns
+    # total; providers that only report completion must still be priceable —
+    # the estimator reads completion first, then total, never summed).
     raw_usage = getattr(ref, "raw_usage", None)
     if isinstance(raw_usage, dict):
+        completion_tokens = raw_usage.get("completion_tokens")
+        if completion_tokens is not None:
+            extra["completion_tokens"] = int(completion_tokens)
         total_tokens = raw_usage.get("total_tokens")
         if total_tokens is not None:
             extra["total_tokens"] = int(total_tokens)
