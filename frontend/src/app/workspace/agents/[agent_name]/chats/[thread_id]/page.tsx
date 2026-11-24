@@ -86,12 +86,35 @@ export default function AgentChatPage() {
   const {
     thread,
     sendMessage,
+    stop,
+    isUploading,
+    uploadProgress,
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: { ...settings.context, agent_name: agent_name },
+    // PR2：上传完成、提交 run 前只把预生成 UUID 写进地址栏；controlled threadId /
+    // isNewThread 等 onCreated（onStart）再翻。
+    onSend: (requestedThreadId) => {
+      history.replaceState(
+        null,
+        "",
+        `/workspace/agents/${agent_name}/chats/${requestedThreadId}`,
+      );
+    },
+    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 chats/new
+    onSendError: (requestedThreadId, { wasNewThread }) => {
+      const sentPath = `/workspace/agents/${agent_name}/chats/${requestedThreadId}`;
+      if (wasNewThread && window.location.pathname === sentPath) {
+        history.replaceState(
+          null,
+          "",
+          `/workspace/agents/${agent_name}/chats/new`,
+        );
+      }
+    },
     onStart: (createdThreadId) => {
       setThreadId(createdThreadId);
       setIsNewThread(false);
@@ -148,16 +171,17 @@ export default function AgentChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillSearchParams, handoffKey]);
 
+  // 把 accepted Promise 原样交给 InputBox：受理前失败 / 停止 / busy 保留输入，
+  // 错误提示由 hook 统一负责（每次失败只提示一次）
   const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      void sendMessage(threadId, message, { agent_name });
-    },
+    (message: PromptInputMessage) =>
+      sendMessage(threadId, message, { agent_name }),
     [sendMessage, threadId, agent_name],
   );
 
   const handleStop = useCallback(async () => {
-    await thread.stop();
-  }, [thread]);
+    await stop();
+  }, [stop]);
 
   const demoMode = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
   const guideDisplayName = guideAgentName
@@ -174,6 +198,8 @@ export default function AgentChatPage() {
       autoFocus={showGuidedNewChat ? false : isNewThread}
       status={thread.error ? "error" : thread.isLoading ? "streaming" : "ready"}
       context={settings.context}
+      isUploading={isUploading}
+      uploadProgress={uploadProgress}
       extraHeader={
         !showGuidedNewChat &&
         isNewThread && <AgentWelcome agent={agent} agentName={agent_name} />

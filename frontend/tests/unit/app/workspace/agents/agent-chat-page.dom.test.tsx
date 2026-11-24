@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   guideHistory: [] as Record<string, unknown>[],
   inputMounts: 0,
   inputUnmounts: 0,
+  streamOptions: null as Record<string, unknown> | null,
+  setThreadId: vi.fn(),
+  setIsNewThread: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -44,18 +47,24 @@ vi.mock("@/core/agents", async () => {
 });
 
 vi.mock("@/core/threads/hooks", () => ({
-  useThreadStream: () => ({
-    thread: {
-      messages: [],
-      values: {},
-      error: null,
-      isLoading: false,
-    },
-    sendMessage: h.sendMessage,
-    isHistoryLoading: false,
-    hasMoreHistory: false,
-    loadMoreHistory: vi.fn(),
-  }),
+  useThreadStream: (options: Record<string, unknown>) => {
+    h.streamOptions = options;
+    return {
+      thread: {
+        messages: [],
+        values: {},
+        error: null,
+        isLoading: false,
+      },
+      sendMessage: h.sendMessage,
+      stop: vi.fn(),
+      isUploading: false,
+      uploadProgress: 0,
+      isHistoryLoading: false,
+      hasMoreHistory: false,
+      loadMoreHistory: vi.fn(),
+    };
+  },
 }));
 
 vi.mock("@/core/settings", () => ({
@@ -86,9 +95,9 @@ vi.mock("@/components/workspace/chats", () => ({
   ChatBox: ({ children }: { children: React.ReactNode }) => children,
   useThreadChat: () => ({
     threadId: h.threadId,
-    setThreadId: vi.fn(),
+    setThreadId: h.setThreadId,
     isNewThread: h.isNew,
-    setIsNewThread: vi.fn(),
+    setIsNewThread: h.setIsNewThread,
   }),
 }));
 
@@ -186,6 +195,11 @@ describe("AgentChatPage guide wiring", () => {
     h.guideHistory = [];
     h.inputMounts = 0;
     h.inputUnmounts = 0;
+    h.streamOptions = null;
+    h.setThreadId.mockClear();
+    h.setIsNewThread.mockClear();
+    h.sendMessage.mockReset();
+    history.replaceState(null, "", "/");
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -318,6 +332,83 @@ describe("AgentChatPage guide wiring", () => {
     await renderPage("en-US");
     expect(h.inputProps?.placeholder).toBe(
       showcaseFor("course-video")!.inputPlaceholder.en,
+    );
+  });
+
+  it("hands sendMessage's accepted promise to InputBox unchanged", async () => {
+    h.isNew = true;
+    h.threadId = "thread-uuid";
+    const sent = Promise.resolve();
+    h.sendMessage.mockReturnValueOnce(sent);
+
+    await renderPage();
+    const onSubmit = h.inputProps?.onSubmit as (message: {
+      text: string;
+      files: [];
+    }) => unknown;
+
+    expect(onSubmit({ text: "hi", files: [] })).toBe(sent);
+    expect(h.sendMessage).toHaveBeenCalledWith(
+      "thread-uuid",
+      { text: "hi", files: [] },
+      { agent_name: "course-video" },
+    );
+  });
+
+  it("onSend only rewrites the address bar with the pre-generated id; pre-creation failure rolls a new thread back", async () => {
+    h.isNew = true;
+    h.threadId = "thread-uuid";
+    await renderPage();
+    const onSend = h.streamOptions?.onSend as (id: string) => void;
+    const onSendError = h.streamOptions?.onSendError as (
+      id: string,
+      opts: { wasNewThread: boolean },
+    ) => void;
+
+    act(() => {
+      onSend("thread-uuid");
+    });
+    expect(window.location.pathname).toBe(
+      "/workspace/agents/course-video/chats/thread-uuid",
+    );
+    // 受理前不提前翻 controlled threadId / isNewThread（那是 onStart 的事）
+    expect(h.setThreadId).not.toHaveBeenCalled();
+    expect(h.setIsNewThread).not.toHaveBeenCalled();
+
+    act(() => {
+      onSendError("thread-uuid", { wasNewThread: true });
+    });
+    expect(window.location.pathname).toBe(
+      "/workspace/agents/course-video/chats/new",
+    );
+  });
+
+  it("an existing thread keeps its URL on pre-creation failure; a moved-away address bar is not rolled back", async () => {
+    h.isNew = false;
+    h.threadId = "thread-1";
+    await renderPage();
+    history.replaceState(
+      null,
+      "",
+      "/workspace/agents/course-video/chats/thread-1",
+    );
+    const onSendError = h.streamOptions?.onSendError as (
+      id: string,
+      opts: { wasNewThread: boolean },
+    ) => void;
+
+    act(() => {
+      onSendError("thread-1", { wasNewThread: false });
+    });
+    expect(window.location.pathname).toBe(
+      "/workspace/agents/course-video/chats/thread-1",
+    );
+
+    act(() => {
+      onSendError("thread-uuid", { wasNewThread: true });
+    });
+    expect(window.location.pathname).toBe(
+      "/workspace/agents/course-video/chats/thread-1",
     );
   });
 });

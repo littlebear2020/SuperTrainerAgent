@@ -21,7 +21,18 @@ import { mapTaskEvent } from "../tasks/task-event";
 import type { UploadedFileInfo } from "../uploads";
 import { promptInputFilePartToFile, uploadFilesWithProgress } from "../uploads";
 
-import { friendlySendErrorMessage } from "./errors";
+import {
+  friendlySendErrorMessage,
+  SEND_BUSY_MESSAGE,
+  SEND_STOPPED_MESSAGE,
+} from "./errors";
+import {
+  createSubmission,
+  SendRejectedError,
+  type SendRejectionKind,
+  type Submission,
+  type SubmissionOutcome,
+} from "./submission";
 import type { AgentThread, AgentThreadState, RunMessage } from "./types";
 import { THREAD_PINNED_METADATA_KEY } from "./utils";
 
@@ -59,8 +70,12 @@ export function toastableCustomEventMessage(event: unknown): string | null {
 export type ThreadStreamOptions = {
   threadId?: string | null | undefined;
   context: LocalSettings["context"];
+  /** 上传完成、提交 run 前：页面只用预生成 UUID 更新地址栏，不提前翻 controlled threadId。 */
   onSend?: (threadId: string) => void;
+  /** SDK onCreated：线程与 run 已创建，可以翻 controlled threadId / isNewThread。 */
   onStart?: (threadId: string, runId: string) => void;
+  /** 本次 onSend 已触发、onCreated 前失败或停止（PR2）：URL 回退由页面决定。 */
+  onSendError?: (threadId: string, opts: { wasNewThread: boolean }) => void;
   onFinish?: (state: AgentThreadState) => void;
   onToolEnd?: (event: ToolEndEvent) => void;
 };
@@ -145,11 +160,40 @@ function getStreamErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
+function abortError(): Error {
+  const error = new Error("The operation was aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+/**
+ * PR2：让「附件转换 / 上传」在取消信号触发时立即拒绝——即使底层实现没有兑现
+ * signal，sendMessage 也能按 submission 及时收尾，不会悬挂到实现自己结束。
+ */
+function withAbort<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 export function useThreadStream({
   threadId,
   context,
   onSend,
   onStart,
+  onSendError,
   onFinish,
   onToolEnd,
 }: ThreadStreamOptions) {
@@ -164,9 +208,26 @@ export function useThreadStream({
   const listeners = useRef({
     onSend,
     onStart,
+    onSendError,
     onFinish,
     onToolEnd,
   });
+
+  // ── PR2（2026-11-24 前端可靠性批）：提交受理 / 完成双生命周期 ──
+  // 纯逻辑在 ./submission.ts，这里只做 SDK 接线与共享副作用的归属门控。
+  const submissionSeqRef = useRef(0);
+  /** 受理前阶段的 submission，或最近一个尚未完成的；无 meta 的回调归它。 */
+  const currentSubmissionRef = useRef<Submission | null>(null);
+  /** onCreated 之后带 meta（run_id）的回调按此归属。 */
+  const runSubmissionsRef = useRef(new Map<string, Submission>());
+  /** 上传所有者：递增 id + AbortController（切线程 / 卸载 / 受理前停止时取消）。 */
+  const uploadOpSeqRef = useRef(0);
+  const uploadOpRef = useRef<{
+    id: number;
+    controller: AbortController;
+  } | null>(null);
+  /** 用户按了停止：SDK 的流收尾时据此把 completion 记为 stopped。 */
+  const stopRequestedRef = useRef(false);
 
   const {
     messages: history,
@@ -177,8 +238,8 @@ export function useThreadStream({
 
   // Keep listeners ref updated with latest callbacks
   useEffect(() => {
-    listeners.current = { onSend, onStart, onFinish, onToolEnd };
-  }, [onSend, onStart, onFinish, onToolEnd]);
+    listeners.current = { onSend, onStart, onSendError, onFinish, onToolEnd };
+  }, [onSend, onStart, onSendError, onFinish, onToolEnd]);
 
   useEffect(() => {
     const normalizedThreadId = threadId ?? null;
@@ -204,6 +265,62 @@ export function useThreadStream({
   const queryClient = useQueryClient();
   const updateSubtask = useUpdateSubtask();
 
+  // Optimistic messages shown before the server stream responds
+  const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const sendInFlightRef = useRef(false);
+
+  /** 受理前失败 / 停止：只对本 submission 生效一次；共享副作用按归属门控。 */
+  const rejectSubmission = useCallback(
+    (
+      submission: Submission,
+      kind: SendRejectionKind,
+      message: string,
+      cause?: unknown,
+    ) => {
+      if (submission.state !== "pending") return;
+      if (currentSubmissionRef.current === submission) {
+        uploadOpRef.current?.controller.abort();
+        uploadOpRef.current = null;
+        setOptimisticMessages([]);
+        setIsUploading(false);
+        setUploadProgress(0);
+        sendInFlightRef.current = false;
+      }
+      submission.reject(kind, message, cause);
+      if (submission.onSendFired) {
+        listeners.current.onSendError?.(submission.requestedThreadId, {
+          wasNewThread: submission.wasNewThread,
+        });
+      }
+    },
+    [],
+  );
+
+  /** SDK 回调归属：有 meta 按 run_id，无 meta 归当前尚未受理的 submission。 */
+  const attributeCallback = useCallback(
+    (meta: { run_id?: string } | undefined): Submission | undefined => {
+      if (meta?.run_id) return runSubmissionsRef.current.get(meta.run_id);
+      const current = currentSubmissionRef.current;
+      return current?.state === "pending" ? current : undefined;
+    },
+    [],
+  );
+
+  /** 受理后的终态：completion 只收尾一次，之后同一 run 的迟到回调走既有路径。 */
+  const completeSubmission = useCallback(
+    (submission: Submission, outcome: SubmissionOutcome) => {
+      if (submission.state !== "accepted") return;
+      submission.complete(outcome);
+      if (submission.runId) runSubmissionsRef.current.delete(submission.runId);
+      if (currentSubmissionRef.current === submission) {
+        sendInFlightRef.current = false;
+      }
+    },
+    [],
+  );
+
   const thread = useStream<AgentThreadState>({
     client: getAPIClient(),
     assistantId: "lead_agent",
@@ -216,6 +333,14 @@ export function useThreadStream({
     // 运行时实为 throttle ?? false。（对标上游 DeerFlow hooks.ts:2136-2140）
     throttle: true,
     onCreated(meta) {
+      // PR2：只有当前尚未受理的 submission 认领这次创建；受理 = accepted resolve
+      const pending = currentSubmissionRef.current;
+      if (pending?.state === "pending") {
+        pending.runId = meta.run_id;
+        pending.threadId = meta.thread_id;
+        runSubmissionsRef.current.set(meta.run_id, pending);
+        pending.accept();
+      }
       handleStreamStart(meta.thread_id, meta.run_id);
       if (context.agent_name || context.project_type) {
         void getAPIClient()
@@ -279,8 +404,23 @@ export function useThreadStream({
         toast(toastMessage);
       }
     },
-    onError(error) {
-      setOptimisticMessages([]);
+    onError(error, meta) {
+      // PR2 归属：受理前的失败 reject accepted；受理后的失败收尾 completion；
+      // 不属于任何在途 submission（如 mount rejoin 的历史 run）走既有路径。
+      const submission = attributeCallback(meta);
+      if (submission?.state === "pending") {
+        rejectSubmission(
+          submission,
+          "failed",
+          getStreamErrorMessage(error),
+          error,
+        );
+      } else if (submission?.state === "accepted") {
+        completeSubmission(submission, { status: "failed", error });
+      }
+      if (!submission || currentSubmissionRef.current === submission) {
+        setOptimisticMessages([]);
+      }
       const errorMsg = getStreamErrorMessage(error);
       // Stale run reconnection: the run no longer exists on the server
       // (restart / multi-worker / cleanup).  Clean up the stored run-id so
@@ -301,7 +441,21 @@ export function useThreadStream({
       }
       toast.error(errorMsg);
     },
-    onFinish(state) {
+    onStop() {
+      // SDK thread.stop() 内同步回调：受理前停止 → accepted 以 stopped reject；
+      // 此时服务端尚无 runId，SDK 也不会发 cancel。
+      stopRequestedRef.current = true;
+      const pending = currentSubmissionRef.current;
+      if (pending?.state === "pending") {
+        rejectSubmission(pending, "stopped", SEND_STOPPED_MESSAGE);
+      }
+    },
+    onFinish(state, meta) {
+      // PR2：按 meta.run_id 定位要收尾的 submission（mount 自动 rejoin 不经过 onCreated）
+      const submission = attributeCallback(meta);
+      if (submission?.state === "accepted") {
+        completeSubmission(submission, { status: "finished" });
+      }
       listeners.current.onFinish?.(state.values);
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
       // P2-15：run 结束后刷新当前挂载的 artifact。artifact 可能在本次 run 里被改写，
@@ -314,22 +468,64 @@ export function useThreadStream({
     },
   });
 
-  // Optimistic messages shown before the server stream responds
-  const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const sendInFlightRef = useRef(false);
   // Track the last server message id so we know when the server tail has
   // advanced (robust to context compression keeping the count unchanged).
   const prevTailIdRef = useRef<string | undefined>(thread.messages.at(-1)?.id);
+
+  // busy 判定读最新一次提交的 thread.isLoading：effect 里更新，不在渲染期写 ref
+  const threadRef = useRef(thread);
+  useEffect(() => {
+    threadRef.current = thread;
+  });
+
+  /** busy：上一次发送仍在途，或 SDK 的流（含停止后的收尾）还没结束。 */
+  const isBusy = useCallback(
+    () =>
+      sendInFlightRef.current ||
+      currentSubmissionRef.current?.state === "pending" ||
+      threadRef.current?.isLoading === true,
+    [],
+  );
+
+  // SDK 流收尾（isLoading 回落）时，受理后的 submission 若还没被 onFinish/onError
+  // 收尾（如停止导致的 AbortError 不回调），按是否请求过停止来结案。
+  useEffect(() => {
+    if (thread.isLoading) return;
+    const current = currentSubmissionRef.current;
+    if (current?.state === "accepted") {
+      completeSubmission(current, {
+        status: stopRequestedRef.current ? "stopped" : "finished",
+      });
+    }
+    stopRequestedRef.current = false;
+  }, [thread.isLoading, completeSubmission]);
 
   // Reset thread-local pending UI state when switching between threads so
   // optimistic messages and in-flight guards do not leak across chat views.
   useEffect(() => {
     startedRef.current = false;
-    sendInFlightRef.current = false;
     prevTailIdRef.current = undefined;
-  }, [threadId]);
+    const pending = currentSubmissionRef.current;
+    if (pending?.state !== "pending") {
+      sendInFlightRef.current = false;
+      return;
+    }
+    // `undefined → 本次提交的预生成 UUID` 是身份认领（页面翻 isNewThread），不算切线程
+    if (threadId != null && threadId === pending.requestedThreadId) return;
+    sendInFlightRef.current = false;
+    setOptimisticMessages([]);
+    setIsUploading(false);
+    setUploadProgress(0);
+    rejectSubmission(pending, "stopped", SEND_STOPPED_MESSAGE);
+  }, [threadId, rejectSubmission]);
+
+  // 卸载时取消在途上传（受理前阶段没有别的收尾时机）
+  useEffect(
+    () => () => {
+      uploadOpRef.current?.controller.abort();
+    },
+    [],
+  );
 
   // Clear optimistic when the server tail advances (robust to context
   // compression that keeps message count unchanged — formerly length-only
@@ -354,12 +550,29 @@ export function useThreadStream({
       extraContext?: Record<string, unknown>,
       options?: SendMessageOptions,
     ) => {
-      if (sendInFlightRef.current) {
-        return;
+      if (isBusy()) {
+        // 不提示：输入保留，用户等上一条收尾后再发
+        throw new SendRejectedError("busy", SEND_BUSY_MESSAGE);
       }
+      const submission = createSubmission(
+        ++submissionSeqRef.current,
+        threadId,
+        threadIdRef.current == null,
+      );
+      currentSubmissionRef.current = submission;
       sendInFlightRef.current = true;
+      stopRequestedRef.current = false;
+      const uploadOp = {
+        id: ++uploadOpSeqRef.current,
+        controller: new AbortController(),
+      };
+      uploadOpRef.current = uploadOp;
+      // 归属检查：切线程 / 受理前停止后，本 submission 不再拥有任何后续步骤
+      const stillOwner = () =>
+        currentSubmissionRef.current === submission &&
+        submission.state === "pending";
 
-      const text = message.text.trim();
+      const text = message.text?.trim() ?? "";
 
       // Build optimistic files list with uploading status
       const optimisticFiles: FileInMessage[] = (message.files ?? []).map(
@@ -397,8 +610,6 @@ export function useThreadStream({
       }
       setOptimisticMessages(newOptimistic);
 
-      listeners.current.onSend?.(threadId);
-
       let uploadedFileInfo: UploadedFileInfo[] = [];
 
       try {
@@ -408,10 +619,19 @@ export function useThreadStream({
           setUploadProgress(0);
           try {
             const filePromises = message.files.map((fileUIPart) =>
-              promptInputFilePartToFile(fileUIPart),
+              promptInputFilePartToFile(fileUIPart, {
+                signal: uploadOp.controller.signal,
+              }),
             );
 
-            const conversionResults = await Promise.all(filePromises);
+            const conversionResults = await withAbort(
+              uploadOp.controller.signal,
+              Promise.all(filePromises),
+            );
+            // 附件 URL fallback 转换期间被取消：不进入上传
+            if (!stillOwner() || uploadOp.controller.signal.aborted) {
+              throw new SendRejectedError("stopped", SEND_STOPPED_MESSAGE);
+            }
             const files = conversionResults.filter(
               (file): file is File => file !== null,
             );
@@ -428,15 +648,23 @@ export function useThreadStream({
             }
 
             if (files.length > 0) {
-              const uploadResponse = await uploadFilesWithProgress(
-                threadId,
-                files,
-                (loaded, total) => {
-                  setUploadProgress(
-                    total > 0 ? Math.round((loaded / total) * 100) : 0,
-                  );
-                },
+              const uploadResponse = await withAbort(
+                uploadOp.controller.signal,
+                uploadFilesWithProgress(
+                  threadId,
+                  files,
+                  (loaded, total) => {
+                    setUploadProgress(
+                      total > 0 ? Math.round((loaded / total) * 100) : 0,
+                    );
+                  },
+                  { signal: uploadOp.controller.signal },
+                ),
               );
+              // 上传期间切线程 / 停止：结果不属于当前操作
+              if (!stillOwner() || uploadOp.controller.signal.aborted) {
+                throw new SendRejectedError("stopped", SEND_STOPPED_MESSAGE);
+              }
               uploadedFileInfo = uploadResponse.files;
 
               // Update optimistic human message with uploaded status + paths
@@ -463,18 +691,23 @@ export function useThreadStream({
               });
             }
           } catch (error) {
-            const errorMessage =
-              error instanceof Error
-                ? error.message
-                : "Failed to upload files.";
-            toast.error(errorMessage);
-            setOptimisticMessages([]);
-            throw error;
+            if (!stillOwner() || uploadOp.controller.signal.aborted) {
+              // 切线程 / 受理前停止：静默收尾，不提示
+              rejectSubmission(submission, "stopped", SEND_STOPPED_MESSAGE);
+            } else {
+              const errorMessage =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to upload files.";
+              toast.error(errorMessage);
+              rejectSubmission(submission, "failed", errorMessage, error);
+            }
           } finally {
             setIsUploading(false);
             setUploadProgress(0);
           }
         }
+        if (!stillOwner()) return submission.accepted;
 
         // Build files metadata for submission (included in additional_kwargs)
         const filesForSubmit: FileInMessage[] = uploadedFileInfo.map(
@@ -491,57 +724,85 @@ export function useThreadStream({
           (model) => model.name === context.model_name,
         );
 
-        await thread.submit(
-          {
-            messages: [
-              {
-                type: "human",
-                content: [
-                  {
-                    type: "text",
-                    text,
+        // onSend：附件转换与上传完成、提交 run 前——页面只用预生成 UUID 更新地址栏
+        submission.onSendFired = true;
+        listeners.current.onSend?.(threadId);
+        if (!stillOwner()) return submission.accepted;
+
+        try {
+          await thread.submit(
+            {
+              messages: [
+                {
+                  type: "human",
+                  content: [
+                    {
+                      type: "text",
+                      text,
+                    },
+                  ],
+                  additional_kwargs: {
+                    ...options?.additionalKwargs,
+                    ...(filesForSubmit.length > 0
+                      ? { files: filesForSubmit }
+                      : {}),
                   },
-                ],
-                additional_kwargs: {
-                  ...options?.additionalKwargs,
-                  ...(filesForSubmit.length > 0
-                    ? { files: filesForSubmit }
-                    : {}),
                 },
+              ],
+            },
+            {
+              threadId: threadId,
+              streamSubgraphs: true,
+              streamResumable: true,
+              config: {
+                recursion_limit: 2500,
               },
-            ],
-          },
-          {
-            threadId: threadId,
-            streamSubgraphs: true,
-            streamResumable: true,
-            config: {
-              recursion_limit: 2500,
+              context: {
+                ...extraContext,
+                ...context,
+                mode,
+                thinking_enabled:
+                  mode !== "flash" && selectedModel?.supports_thinking === true,
+                is_plan_mode: mode !== "flash",
+                subagent_enabled: mode === "ultra",
+                reasoning_effort: mode === "flash" ? "minimal" : "high",
+                thread_id: threadId,
+              },
             },
-            context: {
-              ...extraContext,
-              ...context,
-              mode,
-              thinking_enabled:
-                mode !== "flash" && selectedModel?.supports_thinking === true,
-              is_plan_mode: mode !== "flash",
-              subagent_enabled: mode === "ultra",
-              reasoning_effort: mode === "flash" ? "minimal" : "high",
-              thread_id: threadId,
-            },
-          },
-        );
+          );
+        } catch (error) {
+          // SDK 入队前就拒绝（同步校验）：受理前失败，提示一次
+          const errorMessage = getStreamErrorMessage(error);
+          toast.error(friendlySendErrorMessage(error) ?? errorMessage);
+          rejectSubmission(submission, "failed", errorMessage, error);
+          return submission.accepted;
+        }
         void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
-      } catch (error) {
-        setOptimisticMessages([]);
-        setIsUploading(false);
-        throw error;
+        // 受理与否由 SDK 回调决定：onCreated → resolve；创建前 onError / 停止 → reject
+        return submission.accepted;
       } finally {
-        sendInFlightRef.current = false;
+        if (uploadOpRef.current?.id === uploadOp.id) uploadOpRef.current = null;
       }
     },
-    [thread, t.uploads.uploadingFiles, context, models, queryClient],
+    [
+      thread,
+      t.uploads.uploadingFiles,
+      context,
+      models,
+      queryClient,
+      isBusy,
+      rejectSubmission,
+    ],
   );
+
+  /**
+   * 停止当前 run（PR2）：先中断 SDK 的本地流——受理前的 submission 以 stopped reject
+   * （此时服务端尚无 runId，不发 cancel）；已受理的收尾见下方取消同步。
+   */
+  const stop = useCallback(async () => {
+    stopRequestedRef.current = true;
+    await thread.stop();
+  }, [thread]);
 
   // Memoized so the merged array keeps a stable identity between renders that
   // don't actually change messages. Consumers put this array in effect deps
@@ -566,6 +827,7 @@ export function useThreadStream({
   return {
     thread: mergedThread,
     sendMessage,
+    stop,
     isUploading,
     uploadProgress,
     isHistoryLoading,

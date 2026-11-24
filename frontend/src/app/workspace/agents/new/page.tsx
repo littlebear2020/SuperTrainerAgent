@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import {
   PromptInput,
   PromptInputFooter,
+  PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
@@ -189,10 +190,11 @@ export default function NewAgentPage() {
 
     setAgentName(trimmed);
     setStep("chat");
+    // bootstrap 的 rejection（受理前失败 / busy）由 hook 统一提示；这里只观察，页面已进入 chat 步
     await sendMessage(threadId, {
       text: t.agents.nameStepBootstrapMessage.replace("{name}", trimmed),
       files: [],
-    });
+    }).catch(() => undefined);
   }, [
     nameInput,
     sendMessage,
@@ -211,17 +213,19 @@ export default function NewAgentPage() {
     }
   };
 
+  // 普通聊天：accepted Promise 交给 registry PromptInput——受理后才清空正文，
+  // busy 由 sendMessage 拒绝（不在这里提前 return，否则会被当成同步成功而清空）
   const handleChatSubmit = useCallback(
-    async (text: string) => {
+    (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || thread.isLoading) return;
-      await sendMessage(
+      if (!trimmed) return Promise.resolve();
+      return sendMessage(
         threadId,
         { text: trimmed, files: [] },
         { agent_name: agentName },
       );
     },
-    [agentName, sendMessage, thread.isLoading, threadId],
+    [agentName, sendMessage, threadId],
   );
 
   const handleSaveAgent = useCallback(async () => {
@@ -244,9 +248,9 @@ export default function NewAgentPage() {
         { additionalKwargs: { hide_from_ui: true } },
       );
       toast.success(t.agents.saveRequested);
-    } catch (error) {
+    } catch {
+      // 失败提示由 hook 统一负责（每次失败只提示一次）；这里只恢复本地状态
       setSetupAgentStatus("idle");
-      toast.error(error instanceof Error ? error.message : String(error));
     }
   }, [
     agent,
@@ -351,74 +355,77 @@ export default function NewAgentPage() {
   }
 
   return (
-    <ThreadContext.Provider value={{ thread }}>
-      <ArtifactsProvider>
-        <div className="flex size-full flex-col">
-          {header}
+    <PromptInputProvider>
+      <ThreadContext.Provider value={{ thread }}>
+        <ArtifactsProvider>
+          <div className="flex size-full flex-col">
+            {header}
 
-          <main className="flex min-h-0 flex-1 flex-col">
-            {showSaveHint ? (
-              <div className="px-4 pt-4">
-                <div className="mx-auto w-full max-w-(--container-width-md)">
-                  <Alert>
-                    <InfoIcon className="h-4 w-4" />
-                    <AlertDescription>{t.agents.saveHint}</AlertDescription>
-                  </Alert>
+            <main className="flex min-h-0 flex-1 flex-col">
+              {showSaveHint ? (
+                <div className="px-4 pt-4">
+                  <div className="mx-auto w-full max-w-(--container-width-md)">
+                    <Alert>
+                      <InfoIcon className="h-4 w-4" />
+                      <AlertDescription>{t.agents.saveHint}</AlertDescription>
+                    </Alert>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex min-h-0 flex-1 justify-center">
+                <MessageList
+                  className={cn("size-full", showSaveHint ? "pt-4" : "pt-10")}
+                  threadId={threadId}
+                  thread={thread}
+                />
+              </div>
+
+              <div className="bg-background flex shrink-0 justify-center border-t px-4 py-4">
+                <div className="w-full max-w-(--container-width-md)">
+                  {agent ? (
+                    <div className="flex flex-col items-center gap-4 rounded-2xl border py-8 text-center">
+                      <CheckCircleIcon className="text-primary h-10 w-10" />
+                      <p className="font-semibold">{t.agents.agentCreated}</p>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() =>
+                            router.push(
+                              `/workspace/agents/${agentName}/chats/new`,
+                            )
+                          }
+                        >
+                          {t.agents.startChatting}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => router.push("/workspace/agents")}
+                        >
+                          {t.agents.backToGallery}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <PromptInput
+                      // 把 accepted Promise 原样交回 registry：受理后才清空正文
+                      onSubmit={({ text }) => handleChatSubmit(text)}
+                    >
+                      <PromptInputTextarea
+                        autoFocus
+                        placeholder={t.agents.createPageSubtitle}
+                        disabled={thread.isLoading}
+                      />
+                      <PromptInputFooter className="justify-end">
+                        <PromptInputSubmit disabled={thread.isLoading} />
+                      </PromptInputFooter>
+                    </PromptInput>
+                  )}
                 </div>
               </div>
-            ) : null}
-
-            <div className="flex min-h-0 flex-1 justify-center">
-              <MessageList
-                className={cn("size-full", showSaveHint ? "pt-4" : "pt-10")}
-                threadId={threadId}
-                thread={thread}
-              />
-            </div>
-
-            <div className="bg-background flex shrink-0 justify-center border-t px-4 py-4">
-              <div className="w-full max-w-(--container-width-md)">
-                {agent ? (
-                  <div className="flex flex-col items-center gap-4 rounded-2xl border py-8 text-center">
-                    <CheckCircleIcon className="text-primary h-10 w-10" />
-                    <p className="font-semibold">{t.agents.agentCreated}</p>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() =>
-                          router.push(
-                            `/workspace/agents/${agentName}/chats/new`,
-                          )
-                        }
-                      >
-                        {t.agents.startChatting}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push("/workspace/agents")}
-                      >
-                        {t.agents.backToGallery}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <PromptInput
-                    onSubmit={({ text }) => void handleChatSubmit(text)}
-                  >
-                    <PromptInputTextarea
-                      autoFocus
-                      placeholder={t.agents.createPageSubtitle}
-                      disabled={thread.isLoading}
-                    />
-                    <PromptInputFooter className="justify-end">
-                      <PromptInputSubmit disabled={thread.isLoading} />
-                    </PromptInputFooter>
-                  </PromptInput>
-                )}
-              </div>
-            </div>
-          </main>
-        </div>
-      </ArtifactsProvider>
-    </ThreadContext.Provider>
+            </main>
+          </div>
+        </ArtifactsProvider>
+      </ThreadContext.Provider>
+    </PromptInputProvider>
   );
 }

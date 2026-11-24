@@ -428,7 +428,10 @@ export function InputBox({
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
-      if (!message.text) {
+      // 纯附件可发；空白正文且无附件不发送（同步返回 = registry 立即清空，本就为空）
+      const hasText = !!message.text?.trim();
+      const hasFiles = (message.files?.length ?? 0) > 0;
+      if (!hasText && !hasFiles) {
         return;
       }
       // Guard against submitting before the initial model auto-selection
@@ -443,11 +446,14 @@ export function InputBox({
           model_name: resolvedModelName,
           mode: currentMode,
         });
-        setTimeout(() => onSubmit?.(message), 0);
-        return;
+        // setTimeout 只负责延迟一拍；返回的仍是内层 accepted Promise（PR2）：
+        // 输入框只在 run 受理后才清空，受理前失败 / 停止 / busy 则保留。
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 0);
+        });
       }
 
-      onSubmit?.(message);
+      await Promise.resolve(onSubmit?.(message));
     },
     [context, onContextChange, onSubmit, resolvedModelName, currentMode],
   );

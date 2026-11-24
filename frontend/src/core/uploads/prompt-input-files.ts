@@ -7,6 +7,7 @@ export type PromptInputFilePart = FileUIPart & {
 
 export async function promptInputFilePartToFile(
   filePart: PromptInputFilePart,
+  options?: { signal?: AbortSignal },
 ): Promise<File | null> {
   if (filePart.file instanceof File) {
     const filename =
@@ -30,7 +31,8 @@ export async function promptInputFilePartToFile(
   }
 
   try {
-    const response = await fetch(filePart.url);
+    // PR2：附件 URL fallback 的 fetch 也接收取消信号（切线程 / 受理前停止）
+    const response = await fetch(filePart.url, { signal: options?.signal });
     if (!response.ok) {
       throw new Error(
         `HTTP ${response.status} while fetching fallback file URL`,
