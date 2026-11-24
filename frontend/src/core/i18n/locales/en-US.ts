@@ -505,6 +505,8 @@ export const enUS: Translations = {
       filterDiagram: "Diagrams",
       svgEditable: "Editable SVG",
       stylePrefix: "Style: ",
+      caseRecording: "Case recording",
+      caseSourcePrefix: "Source when recorded: ",
     },
     newChatGuides: {
       "course-video": {

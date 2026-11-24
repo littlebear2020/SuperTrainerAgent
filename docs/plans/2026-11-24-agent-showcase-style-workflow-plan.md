@@ -197,9 +197,9 @@ Demo 模板到本计划的修正：
 
 ### 4. 切片 D：语音播客
 
-- [ ] D1 四篇模板（附录 A.4，首行逐字保留）；`actionLabel`：套用原文朗读 / 套用单人播报 / 套用双人访谈 / 套用双人辩论（英文 Read as written / Solo briefing / Two-host interview / Two-side debate）。
-- [ ] D2 `PodcastDialog` 底部 CTA；播客卡 tag 追加「案例实录」，来源行加「案例制作时来源：」前缀。
-- [ ] D3 测试：首行四模式断言保持绿；模板不含 MP3 路径、旧 URL、旧数字与旧对白；共享 audio、互斥播放、文稿、下载行为不变。提交。
+- [x] D1 四篇模板（附录 A.4，首行逐字保留）；`actionLabel`：套用原文朗读 / 套用单人播报 / 套用双人访谈 / 套用双人辩论（英文 Read as written / Solo briefing / Two-host interview / Two-side debate）。
+- [x] D2 `PodcastDialog` 底部 CTA；播客卡 tag 追加「案例实录」，来源行加「案例制作时来源：」前缀。
+- [x] D3 测试：首行四模式断言保持绿；模板不含 MP3 路径、旧 URL、旧数字与旧对白；共享 audio、互斥播放、文稿、下载行为不变。提交。
 
 ### 5. 收尾
 

@@ -441,6 +441,8 @@ export interface Translations {
       filterDiagram: string;
       svgEditable: string;
       stylePrefix: string;
+      caseRecording: string;
+      caseSourcePrefix: string;
     };
     newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };

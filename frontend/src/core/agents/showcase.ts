@@ -259,6 +259,62 @@ const deckRecipeFooter = "案例成品不会自动作为你的模板。";
 const deckRecipeFooterEn =
   "The finished case deck is never used as your template.";
 
+// Podcast templates (plan appendix A.4). The first line is the skill's routing
+// line and stays verbatim; voices are fixed per mode by the skill.
+const readOriginalTemplate = `[模式: read_original]
+请将我提供的文档或安全公开链接中的原文朗读为播客，不增写、不改写、不总结。
+
+【原文来源】
+文档或安全公开链接：【请上传文档或粘贴安全公开链接】
+
+【固定音色】
+云舟2.0（男声）
+
+仅朗读我有权使用的原文；如未提供文档或链接，请先向我索取。输出 MP3。`;
+
+const newsSingleTemplate = `[模式: news_single]
+请围绕我提供的主题或资料制作一期单人播报，先展示完整口播稿、来源和固定音色，确认后再合成 MP3。
+
+【我的内容】
+主题：【请填写】
+资料或安全公开链接：【请填写，可留空】
+
+【固定音色】
+云舟2.0（男声）
+
+请根据我的内容重新撰写，仅使用我提供或经核验的公开资料，不借用案例文稿。`;
+
+const interviewTemplate = `[模式: interview_two]
+请基于我提供的主题或资料制作一期双人访谈，围绕主题展开多轮问答，先确认完整口播稿、来源和固定音色，再合成 MP3。
+
+【我的内容】
+主题：【请填写】
+资料或安全公开链接：【请填写，可留空】
+
+【固定音色】
+云舟2.0（男声，主持）
+Vivi2.0（女声，嘉宾）
+
+请根据我的内容重新撰写，不借用案例文稿。`;
+
+const debateTemplate = `[模式: debate_two]
+请围绕我提供的辩题或资料制作一期双人辩论，双方分别陈述立场、回应和总结，先确认完整口播稿、来源和固定音色，再合成 MP3。
+
+【我的内容】
+辩题：【请填写】
+双方立场：【请填写，可留空】
+资料或安全公开链接：【请填写，可留空】
+
+【固定音色】
+云舟2.0（男声，一方）
+Vivi2.0（女声，另一方）
+
+请根据我的内容重新撰写，不借用案例文稿。`;
+
+const podcastRecipeFooter = "案例文稿与来源不会带入新任务。";
+const podcastRecipeFooterEn =
+  "The case transcript and sources never enter a new task.";
+
 const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
     id: "course-video",
@@ -527,8 +583,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         ),
         actionLabel: text("按此方式改造我的 PPT", "Edit my PPT this way"),
         recipeNote: text(
-          "保留：Edit Native 的页面计划、源对象保留与原生改造方式。填写：上传你有权编辑的 .pptx、新内容资料，以及保留 / 删除 / 改造范围。案例基于授权的 360 模板制作，该" +
-            deckRecipeFooter,
+          "保留：Edit Native 的页面计划、源对象保留与原生改造方式。填写：上传你有权编辑的 .pptx、新内容资料，以及保留 / 删除 / 改造范围。案例基于授权的 360 模板制作，这份成品不会自动作为你的模板。",
           "Kept: the Edit Native page plan, source-object preservation and native editing. Fill in: upload a .pptx you may edit, the new source material, and what to keep, remove or rewrite. The case was built on an authorized 360 template; that deck is never used as your template.",
         ),
         prompt: editNativeDeckTemplate,
@@ -611,8 +666,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "按原文朗读，不增写、不改写、不总结；适合把已有笔记直接变成可听内容。",
           "A verbatim reading without additions, rewrites, or summaries, turning existing notes into audio.",
         ),
-        prompt:
-          "[模式: read_original]\n请将我上传的《上下文工程》笔记按原文朗读，不增写、不改写、不总结；使用男声，输出 MP3。",
+        actionLabel: text("套用原文朗读", "Read as written"),
+        recipeNote: text(
+          "保留：原文朗读形式，不增写、不改写、不总结；云舟单音色。填写：上传你有权使用的文档，或粘贴安全公开链接；未提供时 agent 会先向你索取。" +
+            podcastRecipeFooter,
+          "Kept: the read-original format with no additions, rewrites or summaries, and the single Yunzhou voice. Fill in: upload a document you may use or paste a safe public link; the agent asks first when none is provided. " +
+            podcastRecipeFooterEn,
+        ),
+        prompt: readOriginalTemplate,
         audio: asset("podcast/ep1.mp3"),
         durationSeconds: 48.816,
         voices: [yunzhou],
@@ -657,8 +718,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "先读 InfoQ、经济参考报和 KubeCon 观察，再写单人播报稿；事实都能追溯到来源。",
           "A researched solo briefing based on InfoQ, Economic Information Daily, and KubeCon observations.",
         ),
-        prompt:
-          "[模式: news_single]\n请围绕「AI Agent 的 2026：从演示到数字员工」调研公开来源，制作一期单人播报；先展示完整口播稿、来源和音色，确认后生成 MP3。",
+        actionLabel: text("套用单人播报", "Solo briefing"),
+        recipeNote: text(
+          "保留：单人播报形式与云舟单音色。填写：新主题或资料，受众与关注角度可选；agent 先展示完整口播稿、来源和固定音色，确认后再合成。" +
+            podcastRecipeFooter,
+          "Kept: the solo briefing format and the single Yunzhou voice. Fill in: a new topic or source material; audience and focus are optional. The agent shows the full script, sources and fixed voices before synthesizing. " +
+            podcastRecipeFooterEn,
+        ),
+        prompt: newsSingleTemplate,
         audio: asset("podcast/ep2.mp3"),
         durationSeconds: 87.792,
         voices: [yunzhou],
@@ -717,8 +784,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "从南昌平板工厂和浙江服装工厂的真实案例，聊到泛化、节拍和成本。",
           "A two-person interview about real factory deployments, generalization, production pace, and cost.",
         ),
-        prompt:
-          "[模式: interview_two]\n请基于新华社等公开报道，制作一期双人访谈「人形机器人进厂：还差哪几步？」；男主持、女嘉宾，围绕真实案例和落地门槛展开多轮问答，先确认完整口播稿再合成。",
+        actionLabel: text("套用双人访谈", "Two-host interview"),
+        recipeNote: text(
+          "保留：双人访谈形式，云舟主持、Vivi 嘉宾，音色按模式固定。填写：新主题或资料，嘉宾背景与重点问题可选；agent 先确认完整口播稿、来源和固定音色，再合成。" +
+            podcastRecipeFooter,
+          "Kept: the two-host interview with Yunzhou as host and Vivi as guest; voices are fixed per mode. Fill in: a new topic or source material; guest background and key questions are optional. The agent confirms the full script, sources and fixed voices before synthesizing. " +
+            podcastRecipeFooterEn,
+        ),
+        prompt: interviewTemplate,
         audio: asset("podcast/ep3.mp3"),
         durationSeconds: 86.304,
         voices: [yunzhou, vivi],
@@ -784,8 +857,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "引用 Mozilla 报告和公开榜单，讨论“够用且便宜”与“最前沿且高保障”的两条曲线。",
           "A debate grounded in Mozilla research and public benchmarks about affordability versus frontier capability.",
         ),
-        prompt:
-          "[模式: debate_two]\n请围绕「开源大模型会超过闭源大模型吗？」制作一期双人辩论；男女双方分别陈述立场、回应和总结，引用 Mozilla 报告和公开榜单，先确认完整口播稿再合成。",
+        actionLabel: text("套用双人辩论", "Two-side debate"),
+        recipeNote: text(
+          "保留：双人辩论形式（陈述、回应、总结），云舟与 Vivi 各执一方，音色按模式固定。填写：新辩题或资料，双方立场与评判维度可选；agent 先确认完整口播稿、来源和固定音色，再合成。" +
+            podcastRecipeFooter,
+          "Kept: the two-side debate with statements, responses and a wrap-up, Yunzhou and Vivi on opposite sides; voices are fixed per mode. Fill in: a new motion or source material; both positions and judging criteria are optional. The agent confirms the full script, sources and fixed voices before synthesizing. " +
+            podcastRecipeFooterEn,
+        ),
+        prompt: debateTemplate,
         audio: asset("podcast/ep4.mp3"),
         durationSeconds: 114.24,
         voices: [yunzhou, vivi],

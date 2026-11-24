@@ -480,6 +480,8 @@ export const zhCN: Translations = {
       filterDiagram: "结构图",
       svgEditable: "SVG 可编辑",
       stylePrefix: "视觉：",
+      caseRecording: "案例实录",
+      caseSourcePrefix: "案例制作时来源：",
     },
     newChatGuides: {
       "course-video": {
