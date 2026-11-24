@@ -1,7 +1,7 @@
 # Agent 新会话案例改为“用我的内容复用此创作方式”的通用模板
 
-> **状态**：离线验收完成（单测、全量 e2e、视口前后对比、`pnpm check`、`perf:check`、文档门禁全过）；最小 live 冒烟未跑——本机没有模型凭据，原因与补跑办法见「未执行项」。未部署、未产生付费调用。
-> **TL;DR**：课程海报、文字动效、PPT 课件、语音播客的 20 篇案例提示词从“重做原案例”改成“用我的内容复用此创作方式”的通用模板；卡片与预览弹窗共用一个只填不发的 CTA，弹窗底部多一行“保留 / 填写”说明；课程海报把知识卡片与信息图合并为「知识图解」。关键决策 = 执行中两处按视口实测修正了计划指定的 CTA 文案长度（视频卡 5 字、PPT 卡 4 字），否则 1280 下会出现新的截断或换行。影响面 = 仅 `frontend/` 的 showcase 数据、卡片、弹窗、i18n 与测试；不动 backend、技能、部署。
+> **状态**：离线验收完成（单测、全量 e2e、视口前后对比、`pnpm check`、`perf:check`、文档门禁全过）；最小 live 冒烟已于同日补跑——5 条 run 中 4 条按预期停在确认门 / 出 1 张图，Edit Native 一条因模型供应商读超时未验证，见「最小 live 冒烟补跑」。共 5 条 run、1 张图、0 次 TTS / 渲染；未部署。
+> **TL;DR**：课程海报、文字动效、PPT 课件、语音播客的 20 篇案例提示词从“重做原案例”改成“用我的内容复用此创作方式”的通用模板；卡片与预览弹窗共用一个只填不发的 CTA，弹窗底部多一行“保留 / 填写”说明；课程海报把知识卡片与信息图合并为「知识图解」。关键决策 = 执行中两处按视口实测修正了计划指定的 CTA 文案长度（视频卡 5 字、PPT 卡 4 字），否则 1280 下会出现新的截断或换行；补跑的 live 冒烟 4/5 通过，并据此把课程海报弹窗说明里“先确认方案再出图”改成如实的“内容齐全时直接出图”。影响面 = 仅 `frontend/` 的 showcase 数据、卡片、弹窗、i18n 与测试；不动 backend、技能、部署。
 
 计划：[`docs/plans/2026-11-24-agent-showcase-style-workflow-plan.md`](../plans/2026-11-24-agent-showcase-style-workflow-plan.md)
 
@@ -36,11 +36,27 @@
 - 英文 locale 在 1280 下补测：PPT、视频、播客的 CTA 均不宽于原 `Use this prompt`，按钮行换行状态与改动前一致。
 - 截图与指标落在主 clone 的 `temp/2026-11-24-agent-showcase-evidence/{before,after}/`（已 gitignore，不入库），对比输出见同目录 `layout-compare.log`。
 
-## 未执行项
+## 最小 live 冒烟补跑（2026-11-24，PR #55 合入后）
 
-- **最小 live 冒烟（5 条 run）未跑。** 计划要求本机 `make dev` 跑 5 条真实 run；实测本机没有可用的模型凭据：gateway 启动即报 `Environment variable QIHU_API_KEY not found for config value $QIHU_API_KEY`，主 clone 没有 `.env`，shell 环境与 shell 配置里也没有这些变量。没有去系统里翻找密钥，也没有改用测试服（计划边界是本机、不部署）。因此“模板能否让真实 agent 停在确认门”这一条**行为级验收未验证**；模板与运行时的一致性目前只有代码核对（技能 SOUL / SKILL.md、上传白名单、marker 用例）支撑。
-- 补跑办法（二选一，均需用户提供条件）：① 在本机提供模型凭据（如按 `.env.example` 建根目录 `.env`），用计划的 5 条输入按原边界跑；② 把本分支部署到测试服后，在测试服上按原边界跑。冒烟输入（自有短讲稿、脚本生成的 3 页 `.pptx`）与驱动脚本已留存于主 clone `temp/2026-11-24-agent-showcase-evidence/smoke-kit/`（不入库），驱动脚本会轮询线程历史，一旦出现 TTS / 渲染类命令立即取消 run。
-- 未做部署、未产生任何付费调用。
+首次交付时这一项未跑：主 clone 没有 `.env`，shell 里也没有 `config.yaml` 引用的 `$QIHU_API_KEY` 等变量，gateway 启动即报 `Environment variable QIHU_API_KEY not found`。用户随后指明凭据在仓库外的备份快照 `~/Documents/备份快照/trainer ai/.env`（29 个变量，覆盖 `config.yaml` 引用的全部键）。补跑环境与计划的边界一致：
+
+- 后端取合入后的 main（隔离 worktree，全新 `backend/.deer-flow/`，不碰本地开发库），`config.yaml` 用主 clone 的，凭据在同一启动命令里 `source` 进进程，不打印、不入库；前端 `pnpm run dev`（:3000）+ nginx（:2026），与 `make dev` 的服务组合相同。关闭 LangFuse 上报，worker 探测地址指向本机空端口。
+- 驱动走真实界面：点卡片上的 CTA → 覆盖填写占位符 → 经 composer 附文件 → 回车发送；每 4 秒轮询线程历史，出现真正执行 TTS / 渲染的命令或超过 1 张图就取消 run。输入为自有短讲稿与脚本生成的 3 页 `.pptx`。
+- 用量：5 条 run、1 张图、0 次 TTS / 渲染，每条只跑 1 次。
+
+| # | Agent · 模板 | thread | 结果 |
+|---|---|---|---|
+| 1 | course-video · 固定讲稿 | `7d3eb849-fa4d-48d5-864f-554709aee310` | **通过。** 读了上传讲稿与技能文档、做了最小侦察（字数统计），按模板给出方案（云舟2.0 男声、词级字幕、不加 BGM、16:9、深色科技网格与概率条），`ask_clarification`「请确认以上制作方案」→ 停在确认门①。 |
+| 2 | ppt-master · Default | `4dae2099-ebd1-4ec3-8216-abb4c43c0c0f` | **通过。** 走默认生成流程，用填入的主题建项目并写需求简报，`ask_clarification`「【Stage 1 · 沟通契约 + 模板选择】…受众：刚入职的新员工…页数：你指定 8 页…自由设计…深色杂志风 / 琥珀与青」→ 停在 Stage 1，未生成 PPTX。 |
+| 3 | ppt-master · Edit Native | `5ed3e6bf-54ca-4781-8888-75c4f2bdc086` | **未验证。** 该 run 的第一个模型请求就触发供应商读超时（gateway 日志：`LLM call failed after 1 attempt(s) (model=anthropic/claude-sonnet-5-5): ReadTimeout`），线程只有 3 条消息，模板没有被 agent 处理。已用掉这一条唯一的一次 run，未重发。 |
+| 4 | podcast-studio · interview_two | `8e492c27-84de-4c76-977f-71c58ffb05d4` | **通过。** 围绕填入的主题联网调研（17 次 search / fetch，来源为 GitLab handbook、Atlassian、ADR、Diátaxis 等新来源），跑完素材 intake，写出 34 轮访谈稿，`ask_clarification`「请确认以上完整口播稿(34 轮)、来源…音色(男声主持=云舟2.0,女声嘉宾=Vivi2.0)。确认后…生成 MP3」→ 停在稿件确认，0 次 TTS。 |
+| 5 | creative-studio · 课程海报 | `b3c63619-9027-4ac2-b878-972af3fa808a` | **通过。** 恰好 1 次生图（agent 自述「用 trainerai-imagine 生图，模型是 360 API 的 Seedream 5.0 Pro，没有用 course-poster 模板」），产物 `python-course-poster.png` 1152×2048（9:16），画面文字全部来自填入内容，主视觉为「Python 入门」原创，无案例内容。 |
+
+**由冒烟发现并修正的一处不实文案**：计划 4.1 写“发送后 agent 会先确认方案再出图”，并据此在 10 条课程海报的 `recipeNote` 结尾写了「发送后 agent 先确认方案再出图。」。实测第 5 条在内容齐全时，agent 把「需求确认」作为自查步骤报告后直接进入生图，没有等待确认（SOUL 的流程是“关键节点用 `ask_clarification` 确认”，是否需要由 agent 判断）。这句会让用户以为出图前还有一次把关，已改为「内容齐全时 agent 会直接出图；缺内容会先向你索取。」，DOM 测试先红后绿。模板正文本身不需要改：它写的是“如果我的内容仍为空，请先向我索取”，与实测一致。
+
+**仍未验证**：Edit Native 模板能否让真实 agent 停在逐页编辑计划确认。补跑只需 1 条 run（同一输入与驱动，见 `smoke-kit/`），超出已授权的“5 条、每条 1 次”边界，需用户点头。
+
+结果明细（每条 run 的完整消息与工具调用）与成图留在主 clone `temp/2026-11-24-agent-showcase-evidence/smoke-results/`（不入库）。
 
 ## 范围外发现
 
@@ -58,5 +74,7 @@
 - `pnpm exec playwright test tests/e2e/agent-new-chat-guide.spec.ts tests/e2e/agent-showcase-style-workflow.spec.ts`（CTA 文案定稿后）→ `55 passed`。
 - `pnpm perf:check` → `exit=0`，五路由 JS/CSS 在预算内（`/workspace/chats` JS 3264306 B 等）。
 - 视口前后对比脚本 → `LAYOUT BASELINE`：16 格网格 class、卡片 x/w、标签高度不变；视频元信息截断逐像素相同；差异仅 390 下 PPT 卡高度 521 → 477。
-- live 冒烟 → `RuntimeError: Failed to load configuration during gateway startup: Environment variable QIHU_API_KEY not found`，5 条 run 均未执行。
+- live 冒烟（首次）→ `RuntimeError: Failed to load configuration during gateway startup: Environment variable QIHU_API_KEY not found`，5 条 run 均未执行。
+- live 冒烟（补跑）→ 5 条 run：#1 `ask_clarification`「请确认以上制作方案」（0 次 TTS / 渲染）；#2 `ask_clarification`「【Stage 1 · 沟通契约 + 模板选择】…」；#3 `LLM call failed after 1 attempt(s) (model=anthropic/claude-sonnet-5-5): ReadTimeout`，未验证；#4 `ask_clarification`「请确认以上完整口播稿(34 轮)…」（0 次 TTS）；#5 生图命令 1 次、`present_files` 1 个文件、`sips` → `1152 × 2048`。
+- 文案修正 RED → DOM `shows the recipe note above the visual dialog CTA`：`expected … to contain '内容齐全时 agent 会直接出图'`；GREEN → 三个 showcase 测试文件 `3 passed (3)` / `65 passed (65)`，`tsc --noEmit` 退出 0。
 - `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
