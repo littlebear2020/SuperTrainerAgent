@@ -106,6 +106,8 @@ const h = vi.hoisted(() => {
     },
   );
   const cancel = vi.fn(async () => ({}));
+  /** hook 调用的可等待取消（真实实现在 core/api/api-client，另有单测） */
+  const cancelRun = vi.fn();
   const client = {
     threads: {
       create: vi.fn(),
@@ -139,12 +141,17 @@ const h = vi.hoisted(() => {
     convert,
     stream,
     cancel,
+    cancelRun,
     client,
     history,
   };
 });
 
 vi.mock("@/core/api", () => ({ getAPIClient: () => h.client }));
+vi.mock("@/core/api/api-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  cancelRun: h.cancelRun,
+}));
 vi.mock("@/core/config", () => ({
   getBackendBaseURL: () => "",
   getLangGraphBaseURL: () => "",
@@ -315,6 +322,8 @@ beforeEach(() => {
   h.stream.mockClear();
   h.cancel.mockClear();
   h.cancel.mockResolvedValue({});
+  h.cancelRun.mockReset();
+  h.cancelRun.mockResolvedValue({ status: "cancelled" });
   h.client.threads.create.mockReset();
   h.client.threads.create.mockImplementation(async (input) => ({
     thread_id: input?.threadId ?? "t-created",
@@ -611,5 +620,55 @@ describe("上传会话与 onSend 时机", () => {
     expect(h.upload).not.toHaveBeenCalled();
     expect(h.stream).not.toHaveBeenCalled();
     expect(cb.onSend).not.toHaveBeenCalled();
+  });
+});
+
+describe("可等待的取消（纵切 C）", () => {
+  /** 受理后的 submission（run-1）。 */
+  async function acceptedRun() {
+    const cb = await mount("t-1");
+    const sent = api().sendMessage("t-1", { text: "A", files: [] });
+    await flush();
+    fireCreated(0, "run-1");
+    await act(async () => {
+      await sent;
+    });
+    return cb;
+  }
+
+  test("受理后停止且 cancel 受理：对 (thread, run) 发 cancel，不提示", async () => {
+    await acceptedRun();
+    await act(async () => {
+      await api().stop();
+    });
+    expect(h.cancelRun).toHaveBeenCalledWith("t-1", "run-1");
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  test("cancel 失败：toast 恰好一次并带真实错误，不伪造流错误", async () => {
+    await acceptedRun();
+    h.cancelRun.mockResolvedValueOnce({
+      status: "failed",
+      error: new Error("HTTP 500: cancel boom"),
+    });
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(toastError).toHaveBeenCalledTimes(1);
+    const first = toastError.mock.calls[0]?.[0];
+    expect(typeof first === "string" ? first : "").toMatch(/cancel boom/);
+    expect(api().thread.error ?? null).toBeNull();
+  });
+
+  test("终态 409（not_cancellable）：维持兼容语义——视为已停止，不提示", async () => {
+    await acceptedRun();
+    h.cancelRun.mockResolvedValueOnce({ status: "not_cancellable" });
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(h.cancelRun).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

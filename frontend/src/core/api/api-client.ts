@@ -143,19 +143,81 @@ function createCompatibleClient(): LangGraphClient {
   // `await thread.stop()` in component code — it lands as an unhandled
   // rejection. Containing it has to happen here, at the client boundary.
   const originalCancel = client.runs.cancel.bind(client.runs);
-  client.runs.cancel = (async (threadId, runId, wait, action) => {
-    try {
-      return await originalCancel(threadId, runId, wait, action);
-    } catch (error) {
-      if (isRunNotCancellableError(error)) {
-        clearReconnectRun(threadId, runId);
-        return;
-      }
-      throw error;
-    }
-  }) as typeof client.runs.cancel;
+  client.runs.cancel = (async (threadId, runId, wait, action) =>
+    dedupeCancel(threadId, runId, () =>
+      originalCancel(threadId, runId, wait, action),
+    )) as unknown as typeof client.runs.cancel;
 
   return client;
+}
+
+// ── PR2（2026-11-24 前端可靠性批）：可等待的取消 ────────────────────────────
+
+/** 取消请求的结果：永不 reject，由调用方决定 completion 与提示。 */
+export type CancelOutcome =
+  | { status: "cancelled" }
+  | { status: "not_cancellable" }
+  | { status: "failed"; error: unknown };
+
+/** 同一 runId 的并发取消合并为一次请求（服务端对重复取消幂等）。 */
+const inFlightCancels = new Map<string, Promise<CancelOutcome>>();
+
+function isCancelOutcome(value: unknown): value is CancelOutcome {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof Reflect.get(value, "status") === "string"
+  );
+}
+
+/**
+ * 把一次 cancel 请求映射为 CancelOutcome：成功 → cancelled；终态 409 →
+ * not_cancellable（清 reconnect key、视为已停止）；其余失败 → failed（保留错误）。
+ * 已经是 outcome 的结果（SDK 浮动调用与显式 cancelRun 命中同一请求时）原样透传。
+ */
+async function cancelWithOutcome(
+  threadId: string,
+  runId: string,
+  request: Promise<unknown>,
+): Promise<CancelOutcome> {
+  try {
+    const result = await request;
+    return isCancelOutcome(result) ? result : { status: "cancelled" };
+  } catch (error) {
+    if (isRunNotCancellableError(error)) {
+      clearReconnectRun(threadId, runId);
+      return { status: "not_cancellable" };
+    }
+    return { status: "failed", error };
+  }
+}
+
+function dedupeCancel(
+  threadId: string,
+  runId: string,
+  start: () => Promise<unknown>,
+): Promise<CancelOutcome> {
+  const key = `${threadId}:${runId}`;
+  const existing = inFlightCancels.get(key);
+  if (existing) return existing;
+  const request = cancelWithOutcome(threadId, runId, start()).finally(() => {
+    inFlightCancels.delete(key);
+  });
+  inFlightCancels.set(key, request);
+  return request;
+}
+
+/**
+ * 可等待的取消（hook 的停止路径用）：`thread.stop()` 里 SDK 发出的 cancel 是浮动
+ * Promise、接不到结果；这里显式等同一个请求的结果。永不 reject。
+ */
+export function cancelRun(
+  threadId: string,
+  runId: string,
+): Promise<CancelOutcome> {
+  return dedupeCancel(threadId, runId, () =>
+    getAPIClient().runs.cancel(threadId, runId, true, "interrupt"),
+  );
 }
 
 const _clients = new Map<string, LangGraphClient>();
