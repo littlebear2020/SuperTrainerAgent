@@ -500,10 +500,10 @@ export const enUS: Translations = {
       playbackError: "This audio cannot play right now. Please try again.",
       filterAll: "All",
       filterPoster: "Course posters",
-      filterCard: "Knowledge cards",
+      filterCard: "Knowledge graphics",
       filterComic: "Knowledge comics",
-      filterInfographic: "Infographics",
       filterDiagram: "Diagrams",
+      svgEditable: "Editable SVG",
     },
     newChatGuides: {
       "course-video": {

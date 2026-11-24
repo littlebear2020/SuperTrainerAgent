@@ -438,8 +438,8 @@ export interface Translations {
       filterPoster: string;
       filterCard: string;
       filterComic: string;
-      filterInfographic: string;
       filterDiagram: string;
+      svgEditable: string;
     };
     newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };

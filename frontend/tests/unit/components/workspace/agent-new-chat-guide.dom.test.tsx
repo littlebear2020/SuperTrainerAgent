@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PromptInputProvider,
+  usePromptInputAttachments,
   usePromptInputController,
 } from "@/components/ai-elements/prompt-input";
 import { AgentNewChatGuide } from "@/components/workspace/agent-new-chat-guide";
@@ -23,6 +24,24 @@ function TestComposer() {
       value={textInput.value}
       readOnly
     />
+  );
+}
+
+function TestAttachments() {
+  const { files, add } = usePromptInputAttachments();
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="add-attachment"
+        onClick={() =>
+          add([new File(["my notes"], "notes.txt", { type: "text/plain" })])
+        }
+      >
+        add attachment
+      </button>
+      <span data-testid="attachment-count">{files.length}</span>
+    </>
   );
 }
 
@@ -65,6 +84,7 @@ describe("AgentNewChatGuide", () => {
     onRetry,
     onSubmit = vi.fn(),
     showLocaleSwitch = false,
+    showAttachments = false,
   }: {
     agentName?: AgentNewChatGuideId;
     handoffReady?: boolean;
@@ -75,12 +95,14 @@ describe("AgentNewChatGuide", () => {
     onRetry?: () => void;
     onSubmit?: () => void;
     showLocaleSwitch?: boolean;
+    showAttachments?: boolean;
   } = {}) {
     await act(async () => {
       root.render(
         <I18nProvider initialLocale="zh-CN">
           <PromptInputProvider initialInput={initialInput}>
             {showLocaleSwitch && <LocaleSwitch />}
+            {showAttachments && <TestAttachments />}
             <AgentNewChatGuide
               agentName={agentName}
               handoffReady={handoffReady}
@@ -112,8 +134,11 @@ describe("AgentNewChatGuide", () => {
     );
   }
 
-  function showcasePrompt(index: number): string {
-    const prompt = showcaseFor("course-video")?.cases[index]?.prompt;
+  function showcasePrompt(
+    index: number,
+    agentName: AgentNewChatGuideId = "course-video",
+  ): string {
+    const prompt = showcaseFor(agentName)?.cases[index]?.prompt;
     if (!prompt) throw new Error(`showcase prompt ${index} not found`);
     return prompt;
   }
@@ -237,17 +262,137 @@ describe("AgentNewChatGuide", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  // The first fill-in placeholder of the inserted segment, never a section
+  // header such as 【我的内容】.
+  const placeholder = /【(?:请[^【】]*|可选填写[^【】]*)】/;
+
+  function expectSelection(expected: string) {
+    const input = composer();
+    expect(input.value.slice(input.selectionStart, input.selectionEnd)).toBe(
+      expected,
+    );
+    expect(input.selectionEnd - input.selectionStart).toBe(expected.length);
+  }
+
   it("prefills and focuses an empty draft without submitting", async () => {
     const onSubmit = vi.fn();
-    await renderGuide({ onSubmit });
-    const prompt = showcasePrompt(0);
+    await renderGuide({ agentName: "creative-studio", onSubmit });
+    const prompt = showcasePrompt(0, "creative-studio");
+
+    await click(caseButtons()[0]!);
+
+    expect(composer().value).toBe(prompt);
+    expect(document.activeElement).toBe(composer());
+    // The section header 【我的内容】 comes first; the first fill-in wins.
+    expectSelection("【请填写】");
+    expect(composer().selectionStart).toBe(prompt.indexOf("课程主题：") + 5);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("selects the first fill-in placeholder inside the inserted segment only", async () => {
+    await renderGuide({
+      agentName: "creative-studio",
+      initialInput: "草稿里的【请填写】不是目标",
+    });
+    const prompt = showcasePrompt(1, "creative-studio");
+
+    await click(caseButtons()[1]!);
+    await click(button("追加"));
+
+    expect(composer().value).toBe(`草稿里的【请填写】不是目标\n${prompt}`);
+    expectSelection("【请填写】");
+    expect(composer().selectionStart).toBeGreaterThan(
+      "草稿里的【请填写】不是目标\n".length,
+    );
+  });
+
+  it("leaves the caret at the end when the filled prompt has no placeholder", async () => {
+    await renderGuide({ agentName: "co-writer" });
+    const prompt = zhCN.agents.newChatGuides["co-writer"].cases[0].prompt;
+    expect(prompt).not.toMatch(/【/);
 
     await click(caseButtons()[0]!);
 
     expect(composer().value).toBe(prompt);
     expect(document.activeElement).toBe(composer());
     expect(composer().selectionStart).toBe(prompt.length);
-    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  // One row per agent; each slice appends its dialog as it gains the CTA.
+  const dialogCases = [
+    {
+      agentName: "creative-studio",
+      open: "showcase-open-visual-card-rag",
+      promptId: "visual-card-rag",
+    },
+  ] as const;
+
+  it.each(dialogCases)(
+    "fills from the $agentName dialog CTA without sending or touching attachments",
+    async ({ agentName, open, promptId }) => {
+      const onSubmit = vi.fn();
+      await renderGuide({ agentName, onSubmit, showAttachments: true });
+      await click(button("add attachment"));
+      const item = showcaseFor(agentName)!.cases.find(
+        (entry) => entry.id === promptId,
+      )!;
+
+      await click(
+        container.querySelector<HTMLElement>(`[data-testid='${open}']`)!,
+      );
+      await click(
+        document.querySelector<HTMLElement>(
+          "[data-testid='showcase-use-style']",
+        )!,
+      );
+
+      // Preview closed, template filled, attachments untouched, nothing sent.
+      expect(document.querySelector("[role='dialog']")).toBeNull();
+      expect(composer().value).toBe(item.prompt);
+      expect(
+        container.querySelector("[data-testid='attachment-count']")
+          ?.textContent,
+      ).toBe("1");
+      expect(document.activeElement).toBe(composer());
+      expectSelection(placeholder.exec(item.prompt)![0]);
+      expect(onSubmit).not.toHaveBeenCalled();
+    },
+  );
+
+  it("routes the dialog CTA through the draft confirmation when the draft is not empty", async () => {
+    await renderGuide({
+      agentName: "creative-studio",
+      initialInput: "我的草稿",
+      showAttachments: true,
+    });
+    await click(button("add attachment"));
+    const item = showcaseFor("creative-studio")!.cases.find(
+      (entry) => entry.id === "visual-card-prompt",
+    )!;
+
+    await click(
+      container.querySelector<HTMLElement>(
+        "[data-testid='showcase-open-visual-card-prompt']",
+      )!,
+    );
+    await click(
+      document.querySelector<HTMLElement>(
+        "[data-testid='showcase-use-style']",
+      )!,
+    );
+
+    // Only the confirmation dialog is open and it holds the focus.
+    const dialogs = document.querySelectorAll("[role='dialog']");
+    expect(dialogs).toHaveLength(1);
+    expect(document.body.textContent).toContain("输入框已有内容");
+    expect(dialogs[0]!.contains(document.activeElement)).toBe(true);
+    expect(composer().value).toBe("我的草稿");
+    await click(button("替换"));
+
+    expect(composer().value).toBe(item.prompt);
+    expect(
+      container.querySelector("[data-testid='attachment-count']")?.textContent,
+    ).toBe("1");
   });
 
   it("cancels a case selection without changing a non-empty draft", async () => {

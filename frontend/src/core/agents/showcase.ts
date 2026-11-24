@@ -13,6 +13,11 @@ type ShowcaseCaseBase = {
   title: LocalizedText;
   tag: LocalizedText;
   description: LocalizedText;
+  /** Fill-only CTA label shared by the card and the preview dialog. */
+  actionLabel?: LocalizedText;
+  /** One-line "kept / fill in" note shown above the dialog CTA. */
+  recipeNote?: LocalizedText;
+  /** Reusable template; never the case's own brief. */
   prompt: string;
 };
 
@@ -102,6 +107,59 @@ const kubeCon: ShowcaseSource = {
 };
 const yunzhou = text("云舟2.0（男声）", "Yunzhou 2.0 (male)");
 const vivi = text("Vivi2.0（女声）", "Vivi 2.0 (female)");
+const createInThisStyle = text("按此风格创作", "Create in this style");
+
+// Visual templates (style-workflow plan appendix A.1): the user's content is
+// left as placeholders, only the style, layout and output format are kept.
+const visualFields = {
+  poster: [
+    "课程主题：【请填写】",
+    "主标题：【请填写】",
+    "副标题与关键信息：【请填写】",
+  ],
+  knowledge: [
+    "主题：【请填写】",
+    "核心知识点：【请填写】",
+    "必须准确呈现的文字：【请填写】",
+  ],
+  comic: [
+    "主题：【请填写】",
+    "角色与四格情节：【请填写】",
+    "必须保留的对白：【请填写】",
+  ],
+  diagram: [
+    "主题：【请填写】",
+    "节点与层级：【请填写】",
+    "连接关系：【请填写】",
+  ],
+} as const;
+
+const visualTemplate = ({
+  type,
+  fields,
+  style,
+  diagram = false,
+}: {
+  type: string;
+  fields: readonly string[];
+  style: string;
+  diagram?: boolean;
+}) =>
+  [
+    `[模式: ${diagram ? "结构图" : "视觉创作"}]`,
+    `请按参考风格制作一张${type}。`,
+    "",
+    "【我的内容】",
+    ...fields,
+    "",
+    "【风格与版式】",
+    style,
+    "",
+    "仅参考视觉风格，不复制案例标题、知识点和文案。如果我的内容仍为空，请先向我索取，不要使用案例内容补齐。",
+  ].join("\n");
+
+const recipeFooter = "发送后 agent 先确认方案再出图。";
+const recipeFooterEn = "The agent confirms the plan before generating.";
 
 const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
@@ -678,8 +736,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
     ),
     badge: text("产物已核验", "Verified output"),
     note: text(
-      "10 个案例覆盖 5 类作品，每类 2 种风格；海报、知识卡、信息图与结构图按真实成品类型分别排版，全部使用冷色系（深蓝/石墨/靛蓝/青绿/珊瑚），不用奶油纸感；漫画为生图产物。",
-      "Ten designs across five categories and two styles each, laid out by their real artifact type (poster, card, infographic, diagram) in a cool palette of deep blue, graphite, indigo, teal, and coral—no cream grounds; the comics are generated art.",
+      "10 个案例覆盖 4 类作品：课程海报与知识漫画各 2 种风格，知识图解 4 种，结构图 2 种；海报、知识图解与结构图按真实成品类型分别排版，全部使用冷色系（深蓝/石墨/靛蓝/青绿/珊瑚），不用奶油纸感；漫画为生图产物。",
+      "Ten designs across four categories: two poster and two comic styles, four knowledge graphics and two diagrams, laid out by their real artifact type (poster, graphic, diagram) in a cool palette of deep blue, graphite, indigo, teal, and coral—no cream grounds; the comics are generated art.",
     ),
     steps: [
       {
@@ -715,9 +773,20 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "神经网络球体作为主视觉，适合课程封面和社群传播。",
           "A luminous neural-network sphere for course covers and community promotion.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：深空科技风、9:16 竖版与细线框排版。填写：课程主题、主标题、副标题与关键信息；主视觉按你的主题重新设计。" +
+            recipeFooter,
+          "Kept: the deep-space tech look, 9:16 portrait and thin-frame layout. Fill in: course topic, headline, subtitle and key details; the key visual is redesigned for your topic. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("深空科技风", "Deep-space tech"),
-        prompt:
-          "[模式: 视觉创作]\n请为「AI Agent 实战训练营」设计一张竖版课程海报。深空科技风，画面主体是发光的神经网络球体，标题、副标题和底部信息要清晰可读；输出 9:16 图片。",
+        prompt: visualTemplate({
+          type: "课程海报",
+          fields: visualFields.poster,
+          style:
+            "深空科技风，深蓝黑背景、青蓝光线、中文大标题与细线框，9:16 竖版；用 trainerai-imagine 生图，不走 course-poster 固定模板；主视觉根据课程主题重新设计",
+        }),
         preview: asset("visual/previews/poster-agent-dark.webp"),
         original: asset("visual/originals/poster-agent-dark-v2.jpg"),
         downloadName: "visual-poster-agent.jpg",
@@ -734,9 +803,20 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "深蓝底、荧光绿与朱红的几何色块，以及克制的瑞士网格排版。",
           "Deep-blue ground, lime and vermilion blocks, and a restrained Swiss grid.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：深蓝底、瑞士网格与荧光绿 / 朱红色块，9:16 竖版。填写：课程主题、主标题、副标题与关键信息；主视觉和文案按你的内容重新设计。" +
+            recipeFooter,
+          "Kept: deep-blue ground, Swiss grid and lime / vermilion blocks in 9:16. Fill in: course topic, headline, subtitle and key details; the key visual and copy are redesigned for your content. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("深蓝瑞士风", "Deep-blue Swiss"),
-        prompt:
-          "[模式: 视觉创作]\n请为「大模型应用开发」设计一张竖版课程海报。深蓝底、瑞士网格、荧光绿与朱红的几何色块，标题排版要克制；输出 9:16 图片。",
+        prompt: visualTemplate({
+          type: "课程海报",
+          fields: visualFields.poster,
+          style:
+            "深蓝底、瑞士网格、荧光绿与朱红几何色块，9:16 竖版；用 trainerai-imagine 生图，不走 course-poster 固定模板；主视觉和文案根据课程内容重新设计",
+        }),
         preview: asset("visual/previews/poster-llm-deep-blue.webp"),
         original: asset("visual/originals/poster-llm-deep-blue.jpg"),
         downloadName: "visual-poster-llm.jpg",
@@ -749,16 +829,27 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         category: "card",
         title: text("RAG：让模型先查再答", "RAG: retrieve before answering"),
         tag: text(
-          "知识卡片 · 3D 玻璃三幕",
-          "Knowledge card · 3D glass triptych",
+          "知识图解 · 3D 玻璃三幕",
+          "Knowledge graphics · 3D glass triptych",
         ),
         description: text(
           "三块半透明玻璃模块由数据流连接，把检索、增强、生成讲成一条链路。",
           "Three translucent glass modules linked by a data stream, tracing retrieval, augmentation, and generation.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：深靛紫底、半透明 3D 玻璃与青绿高光，16:9 三幕横向构图。填写：主题、核心知识点与必须准确呈现的文字；信息结构按你的内容重新组织。" +
+            recipeFooter,
+          "Kept: deep indigo, translucent 3D glass and teal highlights in a 16:9 three-act layout. Fill in: topic, key points and text that must be exact; the information structure is reorganized for your content. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("3D 玻璃叙事", "3D glass story"),
-        prompt:
-          "[模式: 视觉创作]\n请把「RAG：让模型先查再答」做成一张 16:9 知识卡片，三步：检索、增强、生成；三块半透明玻璃模块横向排列，由数据流连接，深靛紫底、荧光绿与青色高光，中文要准确。",
+        prompt: visualTemplate({
+          type: "知识图解",
+          fields: visualFields.knowledge,
+          style:
+            "深靛紫底、半透明 3D 玻璃、青绿高光、三幕横向构图与 16:9 画幅；信息结构按用户内容重新组织",
+        }),
         preview: asset("visual/previews/card-rag.webp"),
         original: asset("visual/originals/card-rag.jpg"),
         downloadName: "visual-card-rag.jpg",
@@ -771,16 +862,27 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         category: "card",
         title: text("提示词的四个要素", "The four elements of a prompt"),
         tag: text(
-          "知识卡片 · Prompt 手稿",
-          "Knowledge card · Prompt transcript",
+          "知识图解 · Prompt 手稿",
+          "Knowledge graphics · Prompt transcript",
         ),
         description: text(
           "深色 prompt 手稿与四段批注，把角色、任务、上下文、格式写成可执行的占位符。",
           "A dark prompt transcript with four margin notes, turning role, task, context, and format into executable placeholders.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：深色终端手稿、正文加四段批注与四色标注，16:9。填写：主题、核心知识点与必须准确呈现的文字；手稿内容全部换成你的。" +
+            recipeFooter,
+          "Kept: the dark terminal transcript with four margin notes in four colors, 16:9. Fill in: topic, key points and text that must be exact; the transcript content is entirely yours. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("Prompt 手稿", "Prompt transcript"),
-        prompt:
-          "[模式: 视觉创作]\n请把「提示词的四个要素：角色、任务、上下文、格式」做成一张 16:9 Prompt 手稿知识卡片，深色终端底、完整 prompt 文本与四段批注，蓝、珊瑚、绿、紫四色标注。",
+        prompt: visualTemplate({
+          type: "知识图解",
+          fields: visualFields.knowledge,
+          style:
+            "深色终端手稿、正文与四段批注、蓝 / 珊瑚 / 绿 / 紫标注，16:9 画幅；手稿内容全部由用户替换",
+        }),
         preview: asset("visual/previews/card-prompt.webp"),
         original: asset("visual/originals/card-prompt.jpg"),
         downloadName: "visual-card-prompt.jpg",
@@ -797,9 +899,20 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "四格漫画，用学生和机器人解释定目标、调用工具和检查结果。",
           "A student and robot explain goals, tool use, and checking results in four panels.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：16:9 四格日系漫画与清晰的阅读顺序。填写：主题、角色与四格情节、必须保留的对白；角色、情节与对白按你的主题重新创作。" +
+            recipeFooter,
+          "Kept: a 16:9 four-panel manga with a clear reading order. Fill in: topic, characters and four-panel plot, and lines to keep; characters, plot and dialogue are created for your topic. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("日系漫画", "Japanese manga"),
-        prompt:
-          "[模式: 视觉创作]\n请画一页 16:9 的四格知识漫画，主题是「什么是 AI Agent」，用学生和机器人两个角色，解释定目标、调用工具、检查结果。",
+        prompt: visualTemplate({
+          type: "知识漫画",
+          fields: visualFields.comic,
+          style:
+            "16:9 四格日系漫画、清晰阅读顺序和角色一致性；角色、情节与对白均根据用户主题重新创作",
+        }),
         preview: asset("visual/previews/comic-agent.webp"),
         original: asset("visual/originals/comic-agent.jpg"),
         downloadName: "visual-comic-agent.jpg",
@@ -816,9 +929,20 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "用靛蓝水墨的四格画面，解释看方向、走一步、重复。",
           "Four indigo-ink panels explain choosing a direction, taking a step, and repeating.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：16:9 四格靛蓝水墨、克制留白与连续叙事。填写：主题、角色与四格情节、必须保留的对白；角色与比喻按你的主题重新设计。" +
+            recipeFooter,
+          "Kept: a 16:9 four-panel indigo ink comic with restrained whitespace and a continuous story. Fill in: topic, characters and four-panel plot, and lines to keep; characters and metaphors are designed for your topic. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("靛蓝水墨", "Indigo ink"),
-        prompt:
-          "[模式: 视觉创作]\n请画一页 16:9 的四格靛蓝水墨知识漫画，用登山者下山解释「梯度下降」：从山顶出发、看哪边更低、向低处走一步、重复到谷底。",
+        prompt: visualTemplate({
+          type: "知识漫画",
+          fields: visualFields.comic,
+          style:
+            "16:9 四格靛蓝水墨、克制留白和连续叙事；角色与比喻根据用户主题重新设计",
+        }),
         preview: asset("visual/previews/comic-gradient.webp"),
         original: asset("visual/originals/comic-gradient.jpg"),
         downloadName: "visual-comic-gradient.jpg",
@@ -830,14 +954,25 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         kind: "visual",
         category: "infographic",
         title: text("大模型训练全流程", "The complete LLM training pipeline"),
-        tag: text("信息图 · 数据管线", "Infographic · Data pipeline"),
+        tag: text("知识图解 · 数据管线", "Knowledge graphics · Data pipeline"),
         description: text(
           "五个阶段排成一条横向管线，标注 INPUT / OUTPUT 与连续箭头；从数据清洗到推理部署一张图看完。",
           "Five stages on one horizontal pipeline with INPUT / OUTPUT labels and continuous arrows, from data cleaning to deployment.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：冷白数据管线、横向节点与连续箭头，16:9。填写：主题、核心知识点与必须准确呈现的文字；阶段数量与内容由你决定。" +
+            recipeFooter,
+          "Kept: the cool-white data pipeline with horizontal nodes and continuous arrows, 16:9. Fill in: topic, key points and text that must be exact; you decide the stages and content. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("数据管线", "Data pipeline"),
-        prompt:
-          "[模式: 视觉创作]\n请把「大模型训练全流程」做成一张 16:9 信息图，五个阶段：数据清洗、预训练、监督微调、对齐、推理部署；冷白数据管线风，五个节点横向排列，标注输入/输出与箭头，不要编造数字指标。",
+        prompt: visualTemplate({
+          type: "知识图解",
+          fields: visualFields.knowledge,
+          style:
+            "冷白数据管线、横向节点、连续箭头和输入 / 输出标注，16:9 画幅；阶段数量与内容由用户决定",
+        }),
         preview: asset("visual/previews/infographic-training.webp"),
         original: asset("visual/originals/infographic-training.jpg"),
         downloadName: "visual-infographic-training.jpg",
@@ -852,14 +987,28 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "企业 AI Agent 落地路线图",
           "Enterprise AI agent adoption roadmap",
         ),
-        tag: text("信息图 · 深绿路线图", "Infographic · Emerald roadmap"),
+        tag: text(
+          "知识图解 · 深绿路线图",
+          "Knowledge graphics · Emerald roadmap",
+        ),
         description: text(
           "深绿时间线上，一条 S 形路径串起评估、试点、扩展、治理四个阶段与停止条件。",
           "An S-curve on a deep-green timeline links assessment, pilot, scale, and governance, with stop conditions.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：深绿时间线、S 形路径与阶段节点，16:9。填写：主题、核心知识点与必须准确呈现的文字；阶段与说明由你重新填写。" +
+            recipeFooter,
+          "Kept: the deep-green timeline with an S-curve and stage nodes, 16:9. Fill in: topic, key points and text that must be exact; you rewrite the stages and captions. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("深绿路线图", "Emerald roadmap"),
-        prompt:
-          "[模式: 视觉创作]\n请把「企业 AI Agent 落地路线图」做成一张 16:9 信息图，四个阶段：评估、试点、扩展、治理；深绿时间线，一条 S 形路径串起四个阶段与停止条件，不要编造数字指标。",
+        prompt: visualTemplate({
+          type: "知识图解",
+          fields: visualFields.knowledge,
+          style:
+            "深绿时间线、S 形路径、阶段节点与停止条件，16:9 画幅；阶段与说明由用户重新填写",
+        }),
         preview: asset("visual/previews/infographic-roadmap.webp"),
         original: asset("visual/originals/infographic-roadmap.jpg"),
         downloadName: "visual-infographic-roadmap.jpg",
@@ -879,9 +1028,21 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "按应用层、编排层、模型层、基础设施四层组织，适合课程导论和方案讲解。",
           "Four layers from applications to infrastructure for introductions and solution reviews.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：石墨黑底、分层组织与蓝 / 青 / 琥珀 / 黄绿配色，输出可编辑 SVG。填写：主题、节点与层级、连接关系；层级与拓扑由你的内容决定。" +
+            recipeFooter,
+          "Kept: graphite black, layered groups and the blue / teal / amber / lime palette, delivered as an editable SVG. Fill in: topic, nodes and layers, and connections; the layers and topology follow your content. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("石墨结构图", "Graphite diagram"),
-        prompt:
-          "[模式: 结构图]\n请生成一张「AI Agent 技术栈」知识结构图，石墨黑底，按应用层、编排层、模型层、基础设施四层组织，用蓝/青/琥珀/黄绿区分，标注每层的关键能力，输出 SVG。",
+        prompt: visualTemplate({
+          type: "结构图",
+          fields: visualFields.diagram,
+          diagram: true,
+          style:
+            "石墨黑底、分层组织、蓝 / 青 / 琥珀 / 黄绿配色，输出可编辑 SVG；层级、节点与关系由用户内容决定",
+        }),
         preview: asset("visual/previews/diagram-agent-stack.webp"),
         original: asset("visual/diagrams/diagram-agent-stack.svg"),
         vector: asset("visual/diagrams/diagram-agent-stack.svg"),
@@ -902,9 +1063,21 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "文档源、解析切分、向量库、检索器、生成模型与评估层，一张图理清链路。",
           "Sources, parsing, vector store, retrieval, generation, and evaluation in one diagram.",
         ),
+        actionLabel: createInThisStyle,
+        recipeNote: text(
+          "保留：靛蓝 / 珊瑚 / 青绿分组与清晰的连接关系，底色沿用技能默认暗色主题，输出可编辑 SVG。填写：主题、节点与层级、连接关系；节点和拓扑由你的内容决定。" +
+            recipeFooter,
+          "Kept: indigo / coral / teal groups with clear connections on the skill's default dark theme, delivered as an editable SVG. Fill in: topic, nodes and layers, and connections; the nodes and topology follow your content. " +
+            recipeFooterEn,
+        ),
         styleLabel: text("冷白蓝图", "Cool blueprint"),
-        prompt:
-          "[模式: 结构图]\n请生成一张「RAG 系统架构」知识结构图，冷白蓝图底色，用靛蓝/珊瑚/青绿区分离线索引、在线检索与生成，包含文档源、解析与切分、向量库、检索器、生成模型、答案与引用及评估层；输出 SVG。",
+        prompt: visualTemplate({
+          type: "结构图",
+          fields: visualFields.diagram,
+          diagram: true,
+          style:
+            "靛蓝 / 珊瑚 / 青绿分组和清晰连接关系，底色沿用技能默认暗色主题，输出可编辑 SVG；节点和拓扑由用户内容决定",
+        }),
         preview: asset("visual/previews/diagram-rag-architecture.webp"),
         original: asset("visual/diagrams/diagram-rag-architecture.svg"),
         vector: asset("visual/diagrams/diagram-rag-architecture.svg"),
