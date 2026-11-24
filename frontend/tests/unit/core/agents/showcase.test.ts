@@ -244,7 +244,11 @@ describe("Agent showcase data and assets", () => {
 
   // Agents whose case prompts are reusable templates; each slice appends its
   // agents as they are converted.
-  const templatedAgents = ["course-video", "creative-studio"] as const;
+  const templatedAgents = [
+    "course-video",
+    "ppt-master",
+    "creative-studio",
+  ] as const;
 
   it("turns every case prompt into a reusable template without case facts", () => {
     const sourceLabels = agentIds.flatMap((id) =>

@@ -1485,9 +1485,24 @@ test.describe("Agent new-chat task guides", () => {
     );
     const guide = page.getByTestId("agent-new-chat-guide");
     expect(await guide.innerText()).not.toMatch(/[一-鿿]/);
+    // Each deck names its own fill-only action; the generic label is gone.
+    await expect(
+      page.getByRole("button", {
+        name: /^(?:Quick-draft this way|Plan and build this way|Edit my PPT this way): /,
+      }),
+    ).toHaveCount(3);
     await expect(
       page.getByRole("button", { name: /^Use this prompt:/ }),
-    ).toHaveCount(3);
+    ).toHaveCount(0);
+    // The dialog note and CTA are UI copy, so they stay English too.
+    await page.getByTestId("showcase-open-ppt-template").click();
+    const recipe = page.getByTestId("showcase-recipe");
+    await expect(recipe).toBeVisible();
+    expect(await recipe.innerText()).not.toMatch(/[一-鿿]/);
+    await expect(page.getByTestId("showcase-use-style")).toHaveAccessibleName(
+      /^Edit my PPT this way: /,
+    );
+    await page.getByTestId("showcase-dialog-close").click();
     await page.getByTestId("showcase-prompt-ppt-standard").click();
     const prompt = showcase.cases[1]!.prompt;
     await expect(page.locator("textarea[name='message']")).toHaveValue(prompt);

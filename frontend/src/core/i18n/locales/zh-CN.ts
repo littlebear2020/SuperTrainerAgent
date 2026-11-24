@@ -479,6 +479,7 @@ export const zhCN: Translations = {
       filterComic: "知识漫画",
       filterDiagram: "结构图",
       svgEditable: "SVG 可编辑",
+      stylePrefix: "视觉：",
     },
     newChatGuides: {
       "course-video": {

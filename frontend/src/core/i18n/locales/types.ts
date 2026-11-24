@@ -440,6 +440,7 @@ export interface Translations {
       filterComic: string;
       filterDiagram: string;
       svgEditable: string;
+      stylePrefix: string;
     };
     newChatGuides: Record<AgentNewChatGuideId, AgentNewChatGuideCopy>;
   };
