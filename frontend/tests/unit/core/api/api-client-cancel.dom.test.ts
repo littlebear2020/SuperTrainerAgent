@@ -22,6 +22,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 const cancelMock = vi.fn();
 const streamMock = vi.fn();
 const joinStreamMock = vi.fn();
+const clientConfigs: Array<{
+  callerOptions?: { fetch?: typeof fetch };
+}> = [];
 
 vi.mock("@langchain/langgraph-sdk/client", () => ({
   Client: class {
@@ -32,6 +35,9 @@ vi.mock("@langchain/langgraph-sdk/client", () => ({
       updateState: async () => ({}),
       update: async () => ({}),
     };
+    constructor(config: { callerOptions?: { fetch?: typeof fetch } }) {
+      clientConfigs.push(config);
+    }
     runs = {
       cancel: cancelMock,
       stream: streamMock,
@@ -288,5 +294,44 @@ describe("cancelRun：可等待的取消结果", () => {
     expect(unhandled).toEqual([]);
     await act(async () => root.unmount());
     container.remove();
+  });
+});
+
+describe("compat 层把中止 rejection 归一成 SDK 认得的形态", () => {
+  test("client 的 fetch 把 Chromium 的 abort 消息改写成 AbortError 前缀，AsyncCaller 才不会重试已中止的请求", async () => {
+    vi.resetModules();
+    await import("@/core/api/api-client");
+    const customFetch = clientConfigs.at(-1)?.callerOptions?.fetch;
+    expect(customFetch, "client 未注入 callerOptions.fetch").toBeTypeOf(
+      "function",
+    );
+
+    // Chromium 对 AbortController.abort() 的拒绝形态：name 是 AbortError，但 message 不带前缀
+    const chromiumAbort = Object.assign(
+      new Error("signal is aborted without reason"),
+      { name: "AbortError" },
+    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(chromiumAbort);
+
+    const normalized = await customFetch!("http://localhost:2024/threads", {
+      method: "POST",
+      signal: new AbortController().signal,
+    }).then(
+      () => "resolved",
+      (error: Error) => error,
+    );
+    expect(normalized).toBeInstanceOf(Error);
+    expect((normalized as Error).name).toBe("AbortError");
+    expect((normalized as Error).message).toMatch(/^AbortError/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 非中止错误原样透传
+    fetchMock.mockRejectedValueOnce(new Error("Failed to fetch"));
+    await expect(
+      customFetch!("http://localhost:2024/threads", {}),
+    ).rejects.toThrow("Failed to fetch");
+    fetchMock.mockRestore();
   });
 });
