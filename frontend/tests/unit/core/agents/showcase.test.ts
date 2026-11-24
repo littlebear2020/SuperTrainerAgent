@@ -242,14 +242,6 @@ describe("Agent showcase data and assets", () => {
     }
   });
 
-  // Agents whose case prompts are reusable templates; each slice appends its
-  // agents as they are converted.
-  const templatedAgents = [
-    "course-video",
-    "ppt-master",
-    "creative-studio",
-  ] as const;
-
   it("turns every case prompt into a reusable template without case facts", () => {
     const sourceLabels = agentIds.flatMap((id) =>
       agent(id).cases.flatMap((item) =>
@@ -263,7 +255,7 @@ describe("Agent showcase data and assets", () => {
     );
     const sourceNames = ["InfoQ", "经济参考报", "KubeCon", "新华社", "Mozilla"];
 
-    for (const id of templatedAgents) {
+    for (const id of agentIds) {
       for (const item of agent(id).cases) {
         const where = `${id}/${item.id}`;
         for (const title of [item.title.zh, item.title.en]) {
@@ -295,12 +287,25 @@ describe("Agent showcase data and assets", () => {
             /\b(?:32|29|39)\b/,
           );
         }
+        if (item.kind === "podcast") {
+          // The display transcript stays a case fact: none of its lines and
+          // none of its figures or years reach the new task.
+          expect(item.prompt, `${where} leaks the case year`).not.toContain(
+            "2026",
+          );
+          for (const turn of item.transcript) {
+            expect(
+              item.prompt,
+              `${where} leaks a transcript line`,
+            ).not.toContain(turn.text.slice(0, 8));
+          }
+        }
       }
     }
   });
 
   it("gives every case a fill-only action label within the card budget", () => {
-    for (const id of templatedAgents) {
+    for (const id of agentIds) {
       for (const item of agent(id).cases) {
         expect(item.actionLabel, `${id}/${item.id}`).toBeDefined();
         expect(item.actionLabel?.zh.trim(), `${id}/${item.id}`).not.toBe("");
@@ -331,7 +336,7 @@ describe("Agent showcase data and assets", () => {
     ];
     const placeholder = /^【(?:请[^【】]*|可选填写[^【】]*)】$/;
 
-    for (const id of templatedAgents) {
+    for (const id of agentIds) {
       for (const item of agent(id).cases) {
         const where = `${id}/${item.id}`;
         // A fixed-script video takes an uploaded script, so it may have no

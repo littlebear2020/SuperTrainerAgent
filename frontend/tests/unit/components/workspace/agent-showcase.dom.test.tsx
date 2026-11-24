@@ -143,6 +143,13 @@ describe("AgentShowcase", () => {
       hasVideo: false,
       label: "按此方式快速出稿",
     },
+    {
+      agent: "podcast-studio",
+      open: "showcase-transcript-podcast-context",
+      promptId: "podcast-context",
+      hasVideo: false,
+      label: "套用原文朗读",
+    },
   ] as const;
 
   it.each(dialogCases)(
@@ -520,6 +527,23 @@ describe("AgentShowcase", () => {
     expect(element("showcase-case-podcast-agent2026").textContent).toContain(
       "InfoQ · 经济参考报 · KubeCon 2026",
     );
+  });
+
+  it("labels podcast cards as case recordings with their recording-time sources", async () => {
+    await renderShowcase("podcast-studio");
+    // The tag and the source row are facts about the case, not the new task.
+    expect(
+      element("showcase-case-podcast-embodied").querySelector(".showcase-tag")
+        ?.textContent,
+    ).toBe("双人访谈 · 工厂案例 · 案例实录");
+    expect(element("showcase-case-podcast-context").textContent).toContain(
+      "案例制作时来源：原创技术笔记（未改写原文）",
+    );
+    // The waveform, the shared audio element and the transcript entry stay.
+    expect(document.querySelectorAll("audio")).toHaveLength(1);
+    expect(
+      element("showcase-transcript-podcast-embodied").textContent,
+    ).toContain("查看文稿");
   });
 
   it("plays podcasts through one shared audio element with progress and exclusive switching", async () => {

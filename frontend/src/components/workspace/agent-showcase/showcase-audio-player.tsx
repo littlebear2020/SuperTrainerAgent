@@ -154,7 +154,8 @@ export function ShowcaseAudioPlayer({
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="showcase-tag rounded px-2 py-1 text-[11px] font-medium">
-                  {localized(item.tag, locale)}
+                  {localized(item.tag, locale)} ·{" "}
+                  {t.agents.showcase.caseRecording}
                 </span>
                 <span className="text-muted-foreground text-[11px] tabular-nums">
                   {formatDuration(item.durationSeconds)}
@@ -265,6 +266,7 @@ export function ShowcaseAudioPlayer({
                   className="showcase-accent-text mt-0.5 h-3 w-3 shrink-0"
                   aria-hidden="true"
                 />
+                {t.agents.showcase.caseSourcePrefix}
                 {localized(item.source, locale)}
               </p>
             </article>

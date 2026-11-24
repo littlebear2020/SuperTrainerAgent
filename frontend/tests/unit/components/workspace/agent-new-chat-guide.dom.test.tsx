@@ -347,6 +347,11 @@ describe("AgentNewChatGuide", () => {
       open: "showcase-open-ppt-standard",
       promptId: "ppt-standard",
     },
+    {
+      agentName: "podcast-studio",
+      open: "showcase-transcript-podcast-embodied",
+      promptId: "podcast-embodied",
+    },
   ] as const;
 
   it.each(dialogCases)(

@@ -451,12 +451,13 @@ export function VisualDialog({
 export function PodcastDialog({
   item,
   locale,
+  disabled = false,
+  onUsePrompt,
   onClose,
 }: {
   item: PodcastCase;
   locale: ShowcaseLocale;
-  onClose: () => void;
-}) {
+} & UsePromptProps) {
   const { t } = useI18n();
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -510,6 +511,15 @@ export function PodcastDialog({
             {t.agents.showcase.downloadMp3}
           </a>
         </div>
+        <DialogRecipeAction
+          item={item}
+          title={item.title}
+          locale={locale}
+          disabled={disabled}
+          accent="bg-cyan-600 hover:bg-cyan-500 focus-visible:ring-cyan-500"
+          close={() => onClose({ returnFocus: false })}
+          onUsePrompt={onUsePrompt}
+        />
       </DialogContent>
     </Dialog>
   );

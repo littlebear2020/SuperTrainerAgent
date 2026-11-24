@@ -308,6 +308,8 @@ export function AgentShowcase({
         <PodcastDialog
           item={activePodcast}
           locale={language}
+          disabled={disabled}
+          onUsePrompt={onUsePrompt}
           onClose={closeDialog}
         />
       ) : null}
