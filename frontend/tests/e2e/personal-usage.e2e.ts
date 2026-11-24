@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Route,
+} from "@playwright/test";
 
 import type {
   PersonalUsageResponse,
@@ -291,7 +297,7 @@ async function rowGeometry(page: Page) {
     const title = cell(`task-title-${id}`);
     const tokens = cell(`task-tokens-${id}`);
     const cost = cell(`task-cost-${id}`);
-    const chevron = row.querySelector("svg")?.closest("[aria-hidden='true']");
+    const chevron = cell(`task-chevron-${id}`);
     return {
       rowHeight: row.getBoundingClientRect().height,
       titleWhiteSpace: getComputedStyle(title).whiteSpace,
@@ -307,7 +313,7 @@ async function rowGeometry(page: Page) {
           `status of ${rowTestId}`,
         ),
       ),
-      chevron: box(required(chevron, `chevron of ${rowTestId}`)),
+      chevron: box(chevron),
     };
   });
 }
@@ -367,17 +373,14 @@ async function expectCardLayout(page: Page) {
   await expectContained(page);
 }
 
-async function expectFilterScrollsInItsOwnContainer(page: Page) {
-  const scroller = page.getByTestId("usage-filter-scroll");
+/** The element is a real horizontal scroller: content wider than its box, and it moves. */
+async function expectScrollsInOwnContainer(scroller: Locator) {
   await expect(async () => {
     const dimensions = await scroller.evaluate((element) => ({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
-      toolbarOverflows:
-        element.parentElement!.scrollWidth > element.parentElement!.clientWidth,
     }));
     expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
-    expect(dimensions.toolbarOverflows).toBe(false);
   }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
   await scroller.evaluate((element) => {
     element.scrollLeft = 80;
@@ -385,6 +388,18 @@ async function expectFilterScrollsInItsOwnContainer(page: Page) {
   expect(
     await scroller.evaluate((element) => element.scrollLeft),
   ).toBeGreaterThan(0);
+}
+
+async function expectFilterScrollsInItsOwnContainer(page: Page) {
+  const scroller = page.getByTestId("usage-filter-scroll");
+  await expect(async () => {
+    const toolbarOverflows = await scroller.evaluate(
+      (element) =>
+        element.parentElement!.scrollWidth > element.parentElement!.clientWidth,
+    );
+    expect(toolbarOverflows).toBe(false);
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
+  await expectScrollsInOwnContainer(scroller);
 }
 
 async function expectAllTaskFieldsInsideViewport(page: Page) {
@@ -742,18 +757,7 @@ test("pagination, statuses, keyboard, unknown media, and narrow-screen containme
     ]) {
       await expect(page.getByTestId(testId).first()).toBeVisible();
     }
-    const scroller = page.getByTestId("model-table-scroll");
-    const dimensions = await scroller.evaluate((element) => ({
-      scrollWidth: element.scrollWidth,
-      clientWidth: element.clientWidth,
-    }));
-    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
-    await scroller.evaluate((element) => {
-      element.scrollLeft = 80;
-    });
-    expect(
-      await scroller.evaluate((element) => element.scrollLeft),
-    ).toBeGreaterThan(0);
+    await expectScrollsInOwnContainer(page.getByTestId("model-table-scroll"));
     expect(
       await page.evaluate(
         () =>
@@ -821,10 +825,11 @@ test("keeps numeric columns contained with the sidebar expanded", async ({
     { width: 820, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
-    const pageRoot = (await page
-      .getByTestId("personal-usage-page")
-      .boundingBox())!;
-    expect(pageRoot.x).toBeGreaterThanOrEqual(250);
+    // Precondition: the expanded sidebar really pushes the page 256px in.
+    await expect(async () => {
+      const pageRoot = await boxOf(page, "personal-usage-page");
+      expect(pageRoot.x).toBeGreaterThanOrEqual(250);
+    }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
     await expectTableLayout(page);
   }
 });
