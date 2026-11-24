@@ -77,16 +77,18 @@ async function openFramePanel(page: Page, taskId: string) {
   await frameOne.click({ force: true });
   const regenVisual = page.getByTestId("frame-regen-visual");
   await expect(regenVisual).toBeVisible();
-  // 面板右栏（提示句的父节点）内：[0] 旁白、[1] 画面提示词；切换器也在这一栏
-  const rightColumn = page
-    .getByText("切换视觉来源后需点「重生画面」出新画面")
-    .locator("xpath=..");
+  // 帧操作面板根节点（最近的 rounded-lg 容器）：面板内恰有一个切换器与两个 textarea
+  const panel = regenVisual.locator(
+    "xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' rounded-lg ')][1]",
+  );
+  await expect(panel.getByRole("textbox")).toHaveCount(2);
   return {
     regenVisual,
+    hint: page.getByTestId("frame-regen-visual-hint"),
     regenAudio: page.getByRole("button", { name: "重生配音" }),
-    narration: rightColumn.getByRole("textbox").nth(0),
-    prompt: rightColumn.getByRole("textbox").nth(1),
-    sourceSwitcher: rightColumn.getByRole("combobox"),
+    narration: panel.getByRole("textbox").nth(0),
+    prompt: panel.getByRole("textbox").nth(1),
+    sourceSwitcher: panel.getByRole("combobox"),
   };
 }
 
@@ -112,10 +114,12 @@ for (const taskType of GUARDED_TYPES) {
     const panel = await openFramePanel(page, taskId);
     await expect(panel.regenVisual).toBeEnabled();
 
-    // 画面提示词未保存 → 禁用 + 提示先保存
+    // 画面提示词未保存 → 禁用 + 提示先保存（title + 可见文字）
     await panel.prompt.fill("改了还没保存的提示词");
     await expect(panel.regenVisual).toBeDisabled();
     await expect(panel.regenVisual).toHaveAttribute("title", /请先保存/);
+    await expect(panel.hint).toBeVisible();
+    await expect(panel.hint).toContainText("请先保存");
 
     // 视觉来源也未保存 → 仍禁用
     await pickOption(page, panel.sourceSwitcher, "AI 生视频");
@@ -145,6 +149,7 @@ for (const taskType of GUARDED_TYPES) {
     // 对照：全部恢复后点击才发付费请求
     await panel.prompt.fill(SAVED_PROMPT);
     await expect(panel.regenVisual).toBeEnabled();
+    await expect(panel.hint).toHaveCount(0);
     await panel.regenVisual.click();
     await expect
       .poll(() => api.regenerateRequests.length, { timeout: 5_000 })

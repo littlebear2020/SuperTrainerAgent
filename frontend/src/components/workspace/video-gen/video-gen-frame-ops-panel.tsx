@@ -71,6 +71,17 @@ export function refAssetsLabel(
   return [...counts.entries()].map(([n, c]) => `${n} ×${c}`).join(" / ");
 }
 
+/** E5：被守卫挡住时的说明——按钮 title 与可见提示共用同一句（触屏收不到 title）。 */
+const VISUAL_REGEN_BLOCKED_HINT =
+  "请先保存画面提示词或视觉来源的修改，再重新生成画面";
+
+/** E5：「重生画面」的 title（纯函数，dom 测试直接断言文案）。 */
+export function visualRegenTitle(blocked: boolean, canRegen: boolean): string {
+  if (blocked) return VISUAL_REGEN_BLOCKED_HINT;
+  if (canRegen) return "只重新生成画面（配音/字幕不动）";
+  return "仅 ready/failed 可重生";
+}
+
 /** 选中帧操作面板：大图预览 + prompt/旁白编辑（ready 已放开，Task 4 后端）+ 重生/上传。 */
 export function FrameOpsPanel({
   taskId,
@@ -107,10 +118,6 @@ export function FrameOpsPanel({
   const src = frame.local_visual_path
     ? getFrameVisualUrl(taskId, frame.index, thumbVersion)
     : frame.visual_url;
-  const dirty =
-    narration !== (frame.narration ?? "") ||
-    prompt !== (frame.image_prompt ?? "") ||
-    source !== (frame.visual_source ?? "");
   // F6（2026-09-28 edits 修复批）：单拆 narration 维度——旁白未保存时「重生配音」
   // 会拿旧旁白配音，用户误以为修改已生效。
   const narrationDirty = narration !== (frame.narration ?? "");
@@ -120,6 +127,8 @@ export function FrameOpsPanel({
   const visualDirty =
     prompt !== (frame.image_prompt ?? "") ||
     source !== (frame.visual_source ?? "");
+  // 三个 dirty 标志只有这一套比较来源
+  const dirty = narrationDirty || visualDirty;
   const blockRegenVisual = visualDirty && supportsVisualDirtyGuard(videoType);
   const warning = (updateMut.data as { warning?: string } | undefined)?.warning;
 
@@ -228,13 +237,7 @@ export function FrameOpsPanel({
                   },
                 )
               }
-              title={
-                blockRegenVisual
-                  ? "请先保存画面提示词或视觉来源的修改，再重新生成画面"
-                  : canRegen
-                    ? "只重新生成画面（配音/字幕不动）"
-                    : "仅 ready/failed 可重生"
-              }
+              title={visualRegenTitle(blockRegenVisual, canRegen)}
               data-testid="frame-regen-visual"
             >
               {regenPending ? (
@@ -294,6 +297,14 @@ export function FrameOpsPanel({
               </Button>
             </span>
           </div>
+          {blockRegenVisual && (
+            <p
+              data-testid="frame-regen-visual-hint"
+              className="mt-2 text-xs text-amber-600 dark:text-amber-400"
+            >
+              {VISUAL_REGEN_BLOCKED_HINT}
+            </p>
+          )}
           <input
             ref={uploadRef}
             type="file"
@@ -324,7 +335,7 @@ export function FrameOpsPanel({
             disabled={!editable}
           />
           <p className="text-muted-foreground text-[10px]">
-            切换视觉来源后需点「重生画面」出新画面，「重新合成」本身不拾取新来源
+            切换视觉来源或改画面词后需先「保存修改」再点「重生画面」出新画面，「重新合成」本身不拾取新来源
           </p>
           <label className="text-muted-foreground block text-xs">
             旁白（解说词）
