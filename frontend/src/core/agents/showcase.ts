@@ -159,8 +159,12 @@ const visualTemplate = ({
     "仅参考视觉风格，不复制案例标题、知识点和文案。如果我的内容仍为空，请先向我索取，不要使用案例内容补齐。",
   ].join("\n");
 
-const recipeFooter = "发送后 agent 先确认方案再出图。";
-const recipeFooterEn = "The agent confirms the plan before generating.";
+// Live smoke (2026-11-24): the creative-studio agent treats "需求确认" as its
+// own check — a complete brief goes straight to the image, an incomplete one is
+// asked about first. Say so instead of promising a confirmation that may not come.
+const recipeFooter = "内容齐全时 agent 会直接出图；缺内容会先向你索取。";
+const recipeFooterEn =
+  "With complete content the agent generates directly; it asks first when something is missing.";
 
 // Video templates (plan appendix A.2): the user's own script or topic; the case
 // lends only its visual style and default voice.

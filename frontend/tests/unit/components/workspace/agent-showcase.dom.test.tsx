@@ -228,7 +228,11 @@ describe("AgentShowcase", () => {
     await click(element("showcase-open-visual-poster-agent"));
     const dialog = document.querySelector("[role='dialog']");
     expect(dialog?.textContent).toContain("9:16");
-    expect(dialog?.textContent).toContain("先确认方案再出图");
+    // Live smoke (2026-11-24): with a complete brief the agent generates
+    // directly and only asks when content is missing — never promise a
+    // confirmation step that does not happen.
+    expect(dialog?.textContent).toContain("内容齐全时 agent 会直接出图");
+    expect(dialog?.textContent).not.toContain("先确认方案再出图");
     // The case's own title stays a fact on the card, not a template variable.
     expect(element("showcase-recipe").textContent).not.toContain(
       "AI Agent 实战训练营",
