@@ -332,6 +332,8 @@ export interface Translations {
     filterLabel: string;
     windowLabel: string;
     taskListLabel: string;
+    taskColumn: string;
+    statusColumn: string;
     loading: string;
     error: string;
     retry: string;

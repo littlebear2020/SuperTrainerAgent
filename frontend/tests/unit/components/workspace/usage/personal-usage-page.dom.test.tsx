@@ -3,6 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonalUsagePage } from "@/components/workspace/usage/personal-usage-page";
+import type { Locale } from "@/core/i18n";
 import { I18nProvider } from "@/core/i18n/context";
 import type { FetchPersonalUsageOptions } from "@/core/usage/api";
 import type { PersonalUsageResponse, UsageTask } from "@/core/usage/types";
@@ -97,10 +98,10 @@ describe("PersonalUsagePage", () => {
     container.remove();
   });
 
-  async function renderPage() {
+  async function renderPage(initialLocale: Locale = "zh-CN") {
     await act(async () => {
       root.render(
-        <I18nProvider initialLocale="zh-CN">
+        <I18nProvider initialLocale={initialLocale}>
           <PersonalUsagePage />
         </I18nProvider>,
       );
@@ -375,16 +376,17 @@ describe("PersonalUsagePage", () => {
       expect(icon).not.toBeNull();
       expect(icon!.closest("[aria-hidden='true']")).not.toBeNull();
     }
-    expect(items[0].textContent).toContain("已核算费用");
-    expect(items[0].textContent).toContain("¥1.50");
-    expect(items[0].textContent).toContain("含估算；未知不记为 0");
+    const [costItem, tokensItem] = items as [HTMLElement, HTMLElement];
+    expect(costItem.textContent).toContain("已核算费用");
+    expect(costItem.textContent).toContain("¥1.50");
+    expect(costItem.textContent).toContain("含估算；未知不记为 0");
     expect(
-      items[0].querySelector("[data-testid='usage-summary-cost-source']")
+      costItem.querySelector("[data-testid='usage-summary-cost-source']")
         ?.textContent,
     ).toBe("供应商回传");
-    expect(items[1].textContent).toContain("总 Token");
-    expect(items[1].textContent).toContain("100");
-    expect(items[1].textContent).toContain("输入 + 输出，缓存读取不重复累加");
+    expect(tokensItem.textContent).toContain("总 Token");
+    expect(tokensItem.textContent).toContain("100");
+    expect(tokensItem.textContent).toContain("输入 + 输出，缓存读取不重复累加");
 
     h.result = success(
       response([], {
@@ -428,5 +430,62 @@ describe("PersonalUsagePage", () => {
       container.querySelector("[data-testid='usage-summary-tokens']")
         ?.textContent,
     ).toContain("0");
+  });
+
+  it("contains the list and pagination in one task panel", async () => {
+    h.result = success(
+      response([task("completed")], { total_tasks: 21, has_more: true }),
+    );
+    await renderPage();
+
+    const panel = container.querySelector("[data-testid='usage-task-panel']");
+    expect(panel).not.toBeNull();
+    const heading = Array.from(panel!.querySelectorAll("h2")).find(
+      (node) => node.textContent === "用量任务",
+    );
+    expect(heading).toBeDefined();
+    expect(
+      container.querySelectorAll("[data-testid='usage-page-info']"),
+    ).toHaveLength(1);
+    expect(
+      panel!.querySelector("[data-testid='usage-page-info']")?.textContent,
+    ).toContain("1–1 / 21");
+    const list = panel!.querySelector("[role='list'][aria-label='用量任务']");
+    expect(list).not.toBeNull();
+    expect(list!.querySelector("[role='listitem']")).not.toBeNull();
+    const pagination = panel!.querySelector("nav");
+    expect(pagination).not.toBeNull();
+    expect(
+      pagination!.querySelector("[data-testid='usage-previous-page']"),
+    ).not.toBeNull();
+    expect(
+      pagination!.querySelector("[data-testid='usage-next-page']"),
+    ).not.toBeNull();
+    const columns = panel!.querySelector("[data-testid='usage-task-columns']");
+    expect(columns).not.toBeNull();
+    expect(Array.from(columns!.children, (cell) => cell.textContent)).toEqual([
+      "任务",
+      "状态",
+      "总 Token",
+      "已核算费用",
+      "",
+    ]);
+
+    // I18nProvider reads initialLocale on mount only and useI18n re-seeds from
+    // the locale cookie, so re-mount under an English cookie.
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    document.cookie = "locale=en-US; path=/";
+    await renderPage("en-US");
+    const englishColumns = container.querySelector(
+      "[data-testid='usage-task-columns']",
+    );
+    expect(
+      Array.from(englishColumns!.children, (cell) => cell.textContent),
+    ).toEqual(["Task", "Status", "Total tokens", "Accounted spend", ""]);
+    expect(
+      container.querySelector("[role='list'][aria-label='Usage tasks']"),
+    ).not.toBeNull();
+    document.cookie = "locale=zh-CN; path=/";
   });
 });

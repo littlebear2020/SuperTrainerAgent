@@ -165,7 +165,25 @@ export function PersonalUsagePage() {
             <div className="mt-5 min-w-0">
               <UsageSummary summary={query.data.summary} />
             </div>
-            <section className="mt-6 min-w-0">
+            <section
+              data-testid="usage-task-panel"
+              className="bg-card mt-6 min-w-0 rounded-2xl border shadow-sm"
+            >
+              <div className="flex min-h-[60px] min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 min-[820px]:px-[22px]">
+                <h2 className="text-base font-semibold">{c.taskListLabel}</h2>
+                {query.data.total_tasks > 0 ? (
+                  <span
+                    data-testid="usage-page-info"
+                    className="text-muted-foreground text-xs"
+                  >
+                    {c.pageInfo(
+                      offset + 1,
+                      offset + query.data.tasks.length,
+                      query.data.total_tasks,
+                    )}
+                  </span>
+                ) : null}
+              </div>
               {query.data.tasks.length > 0 ? (
                 <UsageTaskList
                   tasks={query.data.tasks}
@@ -173,32 +191,21 @@ export function PersonalUsagePage() {
                   onToggle={toggleTask}
                 />
               ) : (
-                <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
+                <div className="text-muted-foreground m-4 rounded-xl border border-dashed p-8 text-center text-sm min-[820px]:m-[22px]">
                   {c.empty}
                 </div>
               )}
-            </section>
-            {query.data.total_tasks > 0 ? (
-              <nav
-                className="mt-5 flex flex-wrap items-center justify-between gap-3"
-                aria-label={c.taskListLabel}
-              >
-                <span
-                  data-testid="usage-page-info"
-                  className="text-muted-foreground text-xs"
+              {query.data.total_tasks > 0 ? (
+                <nav
+                  className="grid grid-cols-2 gap-2 border-t px-4 py-3 min-[820px]:flex min-[820px]:justify-end min-[820px]:px-[22px]"
+                  aria-label={c.taskListLabel}
                 >
-                  {c.pageInfo(
-                    offset + 1,
-                    offset + query.data.tasks.length,
-                    query.data.total_tasks,
-                  )}
-                </span>
-                <div className="flex gap-2">
                   <Button
                     data-testid="usage-previous-page"
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="focus-visible:ring-indigo-500"
                     disabled={offset === 0}
                     onClick={() =>
                       changeOffset(Math.max(0, offset - PAGE_SIZE))
@@ -211,14 +218,15 @@ export function PersonalUsagePage() {
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="focus-visible:ring-indigo-500"
                     disabled={!query.data.has_more}
                     onClick={() => changeOffset(offset + PAGE_SIZE)}
                   >
                     {c.next}
                   </Button>
-                </div>
-              </nav>
-            ) : null}
+                </nav>
+              ) : null}
+            </section>
             <p className="text-muted-foreground mt-3.5 text-xs">
               {c.footerNote}
             </p>

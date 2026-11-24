@@ -380,6 +380,8 @@ export const enUS: Translations = {
     filterLabel: "Filter by capability",
     windowLabel: "Usage window",
     taskListLabel: "Usage tasks",
+    taskColumn: "Task",
+    statusColumn: "Status",
     loading: "Loading usage…",
     error: "Could not load usage. Check your connection and try again.",
     retry: "Retry",

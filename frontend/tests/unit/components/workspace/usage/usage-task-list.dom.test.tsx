@@ -247,4 +247,74 @@ describe("UsageTaskList", () => {
     expect(normalRow.textContent).toContain("正常课程");
     expect(normalRow.textContent).not.toContain("标题生成中");
   });
+
+  it("keeps titles, numbers and status pills readable in the responsive row", async () => {
+    const longTitle = `超长任务标题${"很长的标题片段".repeat(12)}结束`;
+    await render([
+      task("long", { title: longTitle }),
+      task("missing", { title: null }),
+      task("running-row", { status: "running" }),
+      task("incomplete-row", { status: "incomplete" }),
+    ]);
+
+    const longTitleNode = container.querySelector(
+      "[data-testid='task-title-long']",
+    );
+    expect(longTitleNode?.textContent).toBe(longTitle);
+    expect(longTitleNode?.className).toContain("truncate");
+    expect(longTitleNode?.className).toContain("line-clamp-2");
+    expect(longTitleNode?.getAttribute("title")).toBe(longTitle);
+    const missingTitleNode = container.querySelector(
+      "[data-testid='task-title-missing']",
+    );
+    expect(missingTitleNode?.textContent).toBe("标题生成中");
+    expect(missingTitleNode?.getAttribute("title")).toBe("标题生成中");
+
+    for (const selector of [
+      "[data-testid='task-cost-long']",
+      "[data-testid='task-tokens-long']",
+    ]) {
+      const node = container.querySelector(selector)!;
+      expect(node.className).toContain("tabular-nums");
+      expect(node.className).toContain("break-all");
+      expect(node.className).not.toContain("whitespace-nowrap");
+    }
+
+    for (const [status, label] of [
+      ["completed", "已完成"],
+      ["running", "进行中"],
+      ["incomplete", "未完成"],
+    ] as const) {
+      const statusNode = container.querySelector(
+        `[data-testid='task-status-${status}']`,
+      )!;
+      expect(statusNode.textContent).toBe(label);
+      const dot = statusNode.querySelector("[aria-hidden='true']");
+      expect(dot).not.toBeNull();
+      expect(dot!.textContent).toBe("");
+    }
+
+    const columns = container.querySelector(
+      "[data-testid='usage-task-columns']",
+    );
+    expect(columns?.getAttribute("aria-hidden")).toBe("true");
+
+    for (const article of Array.from(container.querySelectorAll("article"))) {
+      expect(article.getAttribute("role")).toBe("listitem");
+      const row = article.querySelector<HTMLElement>("[role='button']")!;
+      expect(row.getAttribute("tabindex")).toBe("0");
+      expect(row.getAttribute("aria-expanded")).toBe("false");
+      expect(
+        article.querySelector("[data-testid^='task-details-']"),
+      ).toBeNull();
+      expect(row.className).toContain("focus-visible:ring-indigo-500");
+      const chevron = row.querySelector("svg");
+      expect(chevron).not.toBeNull();
+      expect(chevron!.closest("[aria-hidden='true']")).not.toBeNull();
+    }
+    const longRow = container.querySelector("[data-testid='task-row-long']")!;
+    expect(longRow.getAttribute("aria-label")).toBe(
+      `${longTitle}: 展开模型明细`,
+    );
+  });
 });

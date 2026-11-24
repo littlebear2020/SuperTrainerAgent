@@ -365,6 +365,8 @@ export const zhCN: Translations = {
     filterLabel: "按能力筛选",
     windowLabel: "统计周期",
     taskListLabel: "用量任务",
+    taskColumn: "任务",
+    statusColumn: "状态",
     loading: "正在加载用量…",
     error: "用量加载失败，请检查网络后重试。",
     retry: "重试",
