@@ -6,6 +6,7 @@
  * `handleRunStream` from here.
  */
 
+import type { Message } from "@langchain/langgraph-sdk";
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -43,11 +44,45 @@ export type MockSkill = {
   enabled?: boolean;
 };
 
+/** 一个 run 的最小描述（`runs` 选项按 newest-first 给出，与真实 API 一致）。 */
+export type MockRun = {
+  run_id: string;
+  status?: RunStatus;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RunStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "error"
+  | "timeout"
+  | "interrupted";
+
+function toRunResponse(run: MockRun, threadId: string) {
+  return {
+    run_id: run.run_id,
+    thread_id: threadId,
+    assistant_id: "lead_agent",
+    created_at: run.created_at ?? "2025-01-01T00:00:00Z",
+    updated_at: run.updated_at ?? run.created_at ?? "2025-01-01T00:00:00Z",
+    status: run.status ?? "success",
+    metadata: {},
+    multitask_strategy: "reject",
+    kwargs: {},
+  };
+}
+
 export type MockAPIOptions = {
   threads?: MockThread[];
   agents?: MockAgent[];
   skills?: MockSkill[];
   tokenUsageEnabled?: boolean;
+  /** 线程的 run 列表（newest-first）。缺省返回空列表。 */
+  runs?: MockRun[];
+  /** 按 runId 登记的历史消息（seq 从 1 起），端点据此分页。 */
+  runMessages?: Record<string, Message[]>;
 };
 
 export interface MockLangGraphAPI {
@@ -253,14 +288,55 @@ export function mockLangGraphAPI(
   // followed by `?` or end-of-string.  This must NOT match `/runs/stream`.
   void page.route(/\/api\/langgraph\/threads\/[^/]+\/runs(\?|$)/, (route) => {
     if (route.request().method() === "GET") {
+      const list = options?.runs
+        ? options.runs.map((run) =>
+            toRunResponse(run, threadIdFromUrl(route.request().url())),
+          )
+        : [];
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
+        body: JSON.stringify(list),
       });
     }
     return route.fallback();
   });
+
+  // 单 run 历史消息：按真实端点分页（首页不带游标 = 最新 limit 条、页内 seq 升序；
+  // before_seq 向前取旧页）。只有 `runMessages` 里登记过的 run 才命中，其余交给用例自定的路由。
+  void page.route(
+    /\/api\/threads\/[^/]+\/runs\/[^/?#]+\/messages\?/,
+    (route) => {
+      const url = new URL(route.request().url());
+      const runId = url.pathname.split("/")[5] ?? "";
+      const messages = options?.runMessages?.[runId];
+      if (!messages) return route.fallback();
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const beforeSeq = Number(url.searchParams.get("before_seq"));
+      const ceiling =
+        url.searchParams.has("before_seq") && Number.isFinite(beforeSeq)
+          ? beforeSeq
+          : Number.POSITIVE_INFINITY;
+      const rows = messages.map((content, index) => ({
+        run_id: runId,
+        seq: index + 1,
+        content,
+        metadata: { caller: "user" },
+        created_at: "2025-01-01T00:00:00Z",
+      }));
+      // 页内 seq 升序：从 ceiling 向前取 limit 条
+      const eligible = rows.filter((row) => row.seq < ceiling);
+      const page = eligible.slice(Math.max(0, eligible.length - limit));
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: page,
+          has_more: eligible.length > page.length,
+        }),
+      });
+    },
+  );
 
   // Run stream — returns a minimal SSE response with an AI message
   void page.route("**/api/langgraph/runs/stream", handleRunStream);
