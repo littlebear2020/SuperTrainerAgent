@@ -158,15 +158,36 @@ async function openPersonalUsage(
 // (the shell is h-screen overflow-hidden and the page root clips x), so
 // horizontal containment is asserted on the task rows and numeric cells
 // themselves, never on the document.
+//
+// Breakpoints: the component pairs `min-[820px]:` with `max-[820px]:`. Tailwind 4
+// compiles those to `(width >= 820px)` and `(width < 820px)` respectively
+// (`@media not all and (min-width:820px)`), so exactly 820px is the table and
+// 819px the two-row card — the assertions below probe both sides of that edge.
 
 type Box = { x: number; y: number; width: number; height: number };
+
+// Geometry is read right after a viewport change. The layout itself is pure
+// CSS, but a slow machine may still be mid-frame (font swap, a resize-driven
+// effect), so every read is retried briefly; a real layout fault persists
+// and still fails.
+const LAYOUT_TIMEOUT_MS = 5_000;
 
 function centerY(box: Box) {
   return box.y + box.height / 2;
 }
 
-async function expectContained(page: Page) {
-  const offenders = await page.evaluate(() =>
+function centerX(box: Box) {
+  return box.x + box.width / 2;
+}
+
+async function boxOf(page: Page, testId: string): Promise<Box> {
+  const box = await page.getByTestId(testId).boundingBox();
+  if (!box) throw new Error(`bounding box of ${testId} not found`);
+  return box;
+}
+
+async function containmentOffenders(page: Page) {
+  return page.evaluate(() =>
     Array.from(
       document.querySelectorAll<HTMLElement>(
         "[data-testid^='task-row-'], [data-testid^='task-cost-'], [data-testid^='task-tokens-']",
@@ -178,93 +199,115 @@ async function expectContained(page: Page) {
           `${node.dataset.testid}: ${node.scrollWidth} > ${node.clientWidth}`,
       ),
   );
-  expect(offenders).toEqual([]);
+}
+
+async function expectContained(page: Page) {
+  await expect
+    .poll(() => containmentOffenders(page), { timeout: LAYOUT_TIMEOUT_MS })
+    .toEqual([]);
 }
 
 async function expectContentCentered(page: Page) {
-  const content = (await page
-    .getByTestId("usage-layout-content")
-    .boundingBox())!;
-  const pageRoot = (await page
-    .getByTestId("personal-usage-page")
-    .boundingBox())!;
-  expect(content.width).toBeLessThanOrEqual(1120.5);
-  expect(
-    Math.abs(content.x + content.width / 2 - (pageRoot.x + pageRoot.width / 2)),
-  ).toBeLessThanOrEqual(1);
+  await expect(async () => {
+    const content = await boxOf(page, "usage-layout-content");
+    const pageRoot = await boxOf(page, "personal-usage-page");
+    expect(content.width).toBeLessThanOrEqual(1120.5);
+    expect(Math.abs(centerX(content) - centerX(pageRoot))).toBeLessThanOrEqual(
+      1,
+    );
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
 }
 
 async function expectToolbarOnOneRow(page: Page) {
   const toolbar = page.getByTestId("usage-filter-toolbar");
   await expect(toolbar).toBeVisible();
   await expect(toolbar.getByTestId("usage-filter-scroll")).toHaveCount(1);
+  // Six capabilities plus "全部": a product constant, mirrored by the unit test.
   await expect(toolbar.getByRole("button")).toHaveCount(7);
-  const layout = await toolbar.evaluate((node) => {
-    const box = (element: Element) => {
-      const { x, y, width, height } = element.getBoundingClientRect();
-      return { x, y, width, height };
-    };
-    return {
-      label: box(node.querySelector(":scope > span")!),
-      buttons: Array.from(node.querySelectorAll("button"), box),
-    };
-  });
-  const firstTop = Math.min(...layout.buttons.map((button) => button.y));
-  for (const button of layout.buttons) {
-    expect(Math.abs(button.y - firstTop)).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(centerY(button) - centerY(layout.label)),
-    ).toBeLessThanOrEqual(4);
-  }
+  await expect(async () => {
+    const layout = await toolbar.evaluate((node) => {
+      const box = (element: Element): Box => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      const label = node.querySelector(":scope > span");
+      if (!label) throw new Error("filter toolbar label not found");
+      return {
+        label: box(label),
+        buttons: Array.from(node.querySelectorAll("button"), box),
+      };
+    });
+    const firstTop = Math.min(...layout.buttons.map((button) => button.y));
+    for (const button of layout.buttons) {
+      expect(Math.abs(button.y - firstTop)).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(centerY(button) - centerY(layout.label)),
+      ).toBeLessThanOrEqual(4);
+    }
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
 }
 
 async function expectSummarySideBySide(page: Page) {
-  const cost = (await page.getByTestId("usage-summary-cost").boundingBox())!;
-  const tokens = (await page
-    .getByTestId("usage-summary-tokens")
-    .boundingBox())!;
-  expect(Math.abs(centerY(cost) - centerY(tokens))).toBeLessThanOrEqual(1);
-  expect(cost.x + cost.width).toBeLessThanOrEqual(tokens.x + 0.5);
+  await expect(async () => {
+    const cost = await boxOf(page, "usage-summary-cost");
+    const tokens = await boxOf(page, "usage-summary-tokens");
+    expect(Math.abs(centerY(cost) - centerY(tokens))).toBeLessThanOrEqual(1);
+    expect(cost.x + cost.width).toBeLessThanOrEqual(tokens.x + 0.5);
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
 }
 
 async function expectSummaryStacked(page: Page) {
-  const cost = (await page.getByTestId("usage-summary-cost").boundingBox())!;
-  const tokens = (await page
-    .getByTestId("usage-summary-tokens")
-    .boundingBox())!;
-  expect(cost.y + cost.height).toBeLessThanOrEqual(tokens.y + 0.5);
-  expect(Math.abs(cost.x - tokens.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(cost.width - tokens.width)).toBeLessThanOrEqual(1);
+  await expect(async () => {
+    const cost = await boxOf(page, "usage-summary-cost");
+    const tokens = await boxOf(page, "usage-summary-tokens");
+    expect(cost.y + cost.height).toBeLessThanOrEqual(tokens.y + 0.5);
+    expect(Math.abs(cost.x - tokens.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cost.width - tokens.width)).toBeLessThanOrEqual(1);
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
 }
 
 async function rowGeometry(page: Page) {
   return page.evaluate(() => {
-    const row = document.querySelector<HTMLElement>(
-      "[data-testid^='task-row-']",
-    )!;
-    const id = row.dataset.testid!.slice("task-row-".length);
-    const box = (element: Element | null): Box | null => {
-      if (!element) return null;
+    // Name the missing node instead of failing on a null dereference.
+    const required = <T>(node: T | null | undefined, what: string): T => {
+      if (!node) throw new Error(`${what} not found`);
+      return node;
+    };
+    const row = required(
+      document.querySelector<HTMLElement>("[data-testid^='task-row-']"),
+      "first task row",
+    );
+    const rowTestId = required(row.dataset.testid, "task row testid");
+    const id = rowTestId.slice("task-row-".length);
+    const box = (element: Element): Box => {
       const { x, y, width, height } = element.getBoundingClientRect();
       return { x, y, width, height };
     };
-    const title = row.querySelector<HTMLElement>(
-      `[data-testid='task-title-${id}']`,
-    )!;
-    const numeric = [`task-tokens-${id}`, `task-cost-${id}`].map(
-      (testId) => row.querySelector<HTMLElement>(`[data-testid='${testId}']`)!,
-    );
+    const cell = (testId: string) =>
+      required(
+        row.querySelector<HTMLElement>(`[data-testid='${testId}']`),
+        testId,
+      );
+    const title = cell(`task-title-${id}`);
+    const tokens = cell(`task-tokens-${id}`);
+    const cost = cell(`task-cost-${id}`);
+    const chevron = row.querySelector("svg")?.closest("[aria-hidden='true']");
     return {
       rowHeight: row.getBoundingClientRect().height,
       titleWhiteSpace: getComputedStyle(title).whiteSpace,
-      numericAlign: numeric.map((cell) => getComputedStyle(cell).textAlign),
-      title: box(title),
-      cost: box(row.querySelector(`[data-testid='task-cost-${id}']`)),
-      tokens: box(row.querySelector(`[data-testid='task-tokens-${id}']`)),
-      status: box(row.querySelector("[data-testid^='task-status-']")),
-      chevron: box(
-        row.querySelector("svg")?.closest("[aria-hidden='true']") ?? null,
+      numericAlign: [tokens, cost].map(
+        (node) => getComputedStyle(node).textAlign,
       ),
+      title: box(title),
+      cost: box(cost),
+      tokens: box(tokens),
+      status: box(
+        required(
+          row.querySelector("[data-testid^='task-status-']"),
+          `status of ${rowTestId}`,
+        ),
+      ),
+      chevron: box(required(chevron, `chevron of ${rowTestId}`)),
     };
   });
 }
@@ -272,65 +315,70 @@ async function rowGeometry(page: Page) {
 /** ≥820px: column header visible, all five cells share one ≥70px row. */
 async function expectTableLayout(page: Page) {
   await expect(page.getByTestId("usage-task-columns")).toBeVisible();
-  const geometry = await rowGeometry(page);
-  expect(geometry.rowHeight).toBeGreaterThanOrEqual(70);
-  expect(geometry.titleWhiteSpace).toBe("nowrap");
-  expect(geometry.numericAlign).toEqual(["right", "right"]);
-  const cells = [
-    geometry.title,
-    geometry.status,
-    geometry.tokens,
-    geometry.cost,
-    geometry.chevron,
-  ];
-  for (const cell of cells) {
-    expect(cell).not.toBeNull();
-    expect(
-      Math.abs(centerY(cell!) - centerY(geometry.title!)),
-    ).toBeLessThanOrEqual(4);
-  }
-  const leftEdges = cells.map((cell) => cell!.x);
-  expect(leftEdges).toEqual([...leftEdges].sort((a, b) => a - b));
+  await expect(async () => {
+    const geometry = await rowGeometry(page);
+    expect(geometry.rowHeight).toBeGreaterThanOrEqual(70);
+    expect(geometry.titleWhiteSpace).toBe("nowrap");
+    expect(geometry.numericAlign).toEqual(["right", "right"]);
+    const cells = [
+      geometry.title,
+      geometry.status,
+      geometry.tokens,
+      geometry.cost,
+      geometry.chevron,
+    ];
+    for (const cell of cells) {
+      expect(
+        Math.abs(centerY(cell) - centerY(geometry.title)),
+      ).toBeLessThanOrEqual(4);
+    }
+    const leftEdges = cells.map((node) => node.x);
+    expect(leftEdges).toEqual([...leftEdges].sort((a, b) => a - b));
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
   await expectContained(page);
 }
 
 /** <820px: column header hidden, title/cost on row one, status/tokens on row two. */
 async function expectCardLayout(page: Page) {
   await expect(page.getByTestId("usage-task-columns")).toBeHidden();
-  const geometry = await rowGeometry(page);
-  expect(geometry.titleWhiteSpace).toBe("normal");
-  expect(geometry.numericAlign).toEqual(["right", "right"]);
-  expect(
-    Math.abs(centerY(geometry.title!) - centerY(geometry.cost!)),
-  ).toBeLessThanOrEqual(4);
-  expect(
-    Math.abs(centerY(geometry.status!) - centerY(geometry.tokens!)),
-  ).toBeLessThanOrEqual(4);
-  expect(centerY(geometry.status!)).toBeGreaterThan(
-    centerY(geometry.title!) + 10,
-  );
-  expect(geometry.cost!.x).toBeGreaterThanOrEqual(
-    geometry.title!.x + geometry.title!.width,
-  );
-  expect(centerY(geometry.chevron!)).toBeGreaterThan(
-    centerY(geometry.title!) + 2,
-  );
-  expect(centerY(geometry.chevron!)).toBeLessThan(
-    centerY(geometry.status!) - 2,
-  );
+  await expect(async () => {
+    const geometry = await rowGeometry(page);
+    expect(geometry.titleWhiteSpace).toBe("normal");
+    expect(geometry.numericAlign).toEqual(["right", "right"]);
+    expect(
+      Math.abs(centerY(geometry.title) - centerY(geometry.cost)),
+    ).toBeLessThanOrEqual(4);
+    expect(
+      Math.abs(centerY(geometry.status) - centerY(geometry.tokens)),
+    ).toBeLessThanOrEqual(4);
+    expect(centerY(geometry.status)).toBeGreaterThan(
+      centerY(geometry.title) + 10,
+    );
+    expect(geometry.cost.x).toBeGreaterThanOrEqual(
+      geometry.title.x + geometry.title.width,
+    );
+    expect(centerY(geometry.chevron)).toBeGreaterThan(
+      centerY(geometry.title) + 2,
+    );
+    expect(centerY(geometry.chevron)).toBeLessThan(
+      centerY(geometry.status) - 2,
+    );
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
   await expectContained(page);
 }
 
 async function expectFilterScrollsInItsOwnContainer(page: Page) {
   const scroller = page.getByTestId("usage-filter-scroll");
-  const dimensions = await scroller.evaluate((element) => ({
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-    toolbarOverflows:
-      element.parentElement!.scrollWidth > element.parentElement!.clientWidth,
-  }));
-  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
-  expect(dimensions.toolbarOverflows).toBe(false);
+  await expect(async () => {
+    const dimensions = await scroller.evaluate((element) => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      toolbarOverflows:
+        element.parentElement!.scrollWidth > element.parentElement!.clientWidth,
+    }));
+    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+    expect(dimensions.toolbarOverflows).toBe(false);
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
   await scroller.evaluate((element) => {
     element.scrollLeft = 80;
   });
@@ -340,49 +388,72 @@ async function expectFilterScrollsInItsOwnContainer(page: Page) {
 }
 
 async function expectAllTaskFieldsInsideViewport(page: Page) {
-  const outside = await page.evaluate(() => {
-    const width = window.innerWidth;
-    const fields = document.querySelectorAll<HTMLElement>(
-      "[data-testid^='task-title-'], [data-testid^='task-status-'], [data-testid^='task-tokens-'], [data-testid^='task-cost-']",
-    );
-    return Array.from(fields)
-      .filter((field) => {
-        const rect = field.getBoundingClientRect();
-        return rect.width === 0 || rect.left < -0.5 || rect.right > width + 0.5;
-      })
-      .map((field) => field.dataset.testid ?? field.tagName);
-  });
-  expect(outside).toEqual([]);
+  await expect(async () => {
+    const outside = await page.evaluate(() => {
+      const width = window.innerWidth;
+      const fields = document.querySelectorAll<HTMLElement>(
+        "[data-testid^='task-title-'], [data-testid^='task-status-'], [data-testid^='task-tokens-'], [data-testid^='task-cost-']",
+      );
+      return Array.from(fields)
+        .filter((field) => {
+          const rect = field.getBoundingClientRect();
+          return (
+            rect.width === 0 || rect.left < -0.5 || rect.right > width + 0.5
+          );
+        })
+        .map((field) => field.dataset.testid ?? field.tagName);
+    });
+    expect(outside).toEqual([]);
+  }).toPass({ timeout: LAYOUT_TIMEOUT_MS });
 }
+
+// task-05 carries these so numeric cells are proven to wrap rather than clip
+// or squeeze the title column; every other priced task costs UNIT_COST.
+const HUGE_COST = 1234567.89;
+const HUGE_TOKENS = 9876543210987;
+const UNIT_COST = 1;
+const UNIT_TOKENS = 10;
+const WINDOW_DAYS: UsageDays = 7;
 
 function pagedFixture() {
   const longModel = `vendor/${"very-long-model-segment-".repeat(6)}end`;
   const tasks = Array.from({ length: 21 }, (_, index) => {
     const id = `task-${String(index).padStart(2, "0")}`;
     const empty = index === 20;
-    const big = index === 5;
     let title = `任务 ${index}`;
     if (index === 3) title = "历史媒体任务";
     if (index === 4) title = "未计价媒体任务";
     let status: UsageTask["status"] = "completed";
     if (index === 1 || empty) status = "running";
     else if (index === 2) status = "incomplete";
+    let cost: number | null = index === 5 ? HUGE_COST : UNIT_COST;
+    let totalTokens: number | null = index === 5 ? HUGE_TOKENS : UNIT_TOKENS;
+    if (empty) {
+      cost = null;
+      totalTokens = null;
+    }
     return task(id, index === 0 ? "course-video" : "ai_image", {
       title,
       status,
-      cost: empty ? null : big ? 1234567.89 : 1,
-      llm_cost: empty ? null : big ? 1234567.89 : 1,
+      cost,
+      llm_cost: cost,
       media_cost: null,
       currency: empty ? null : "CNY",
       cost_source: empty ? null : "real",
-      total_tokens: empty ? null : big ? 9876543210987 : 10,
+      total_tokens: totalTokens,
       models: index === 0 ? [model(longModel, 8, 2, 0, 1, "real")] : [],
     });
   });
-  // task-05 carries huge values so numeric cells are proven to wrap rather
-  // than clip or squeeze the title column. Totals reconcile with the page:
-  // 20 × ¥1 plus task-05's extra ¥1,234,566.89; 20 × 10 tokens plus its extra.
-  const fullSummary = summary(1234586.89, 9876543211177, "real");
+  // The summary is a fixed mock, so it is derived from the same values to
+  // keep the page reconciled: ¥1,234,586.89 and 9,876,543,211,177.
+  const totalCost = tasks.reduce((sum, item) => sum + (item.cost ?? 0), 0);
+  const totalTokens = tasks.reduce(
+    (sum, item) => sum + (item.total_tokens ?? 0),
+    0,
+  );
+  expect(totalCost).toBeCloseTo(1234586.89, 2);
+  expect(totalTokens).toBe(9876543211177);
+  const fullSummary = summary(totalCost, totalTokens, "real");
   return { longModel, tasks, fullSummary };
 }
 
@@ -394,11 +465,11 @@ function mockPagedUsage(
   return mockUsageAPI(page, (_days, _capability, offset, limit) => {
     expect(limit).toBe(20);
     return response(
-      7,
+      WINDOW_DAYS,
       tasks.slice(offset, offset + limit),
       fullSummary,
-      21,
-      offset + limit < 21,
+      tasks.length,
+      offset + limit < tasks.length,
     );
   });
 }
