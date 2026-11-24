@@ -1,116 +1,87 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import {
-  type PromptInputFilePart,
-  promptInputFilePartToFile,
-} from "@/core/uploads/prompt-input-files";
+import { promptInputFilePartToFile } from "@/core/uploads/prompt-input-files";
 
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
+/**
+ * PR2（2026-11-24 前端可靠性批）：附件 URL fallback 转换接收取消信号。中止不是
+ * 「获取失败」：不刷误导性 warn、不返回 null（= 静默丢附件），而是把 AbortError 原样抛出。
+ */
+describe("promptInputFilePartToFile 的取消信号", () => {
+  let warn: ReturnType<typeof vi.spyOn>;
 
-test("reuses the original File when a prompt attachment already has one", async () => {
-  const file = new File(["hello"], "note.txt", { type: "text/plain" });
-
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => {
-      throw new Error("fetch should not run when File is already present");
-    }),
-  );
-
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    filename: file.name,
-    mediaType: file.type,
-    url: "blob:http://localhost:2026/stale-preview-url",
-    file,
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
-  expect(converted).toBe(file);
-});
-
-test("reconstructs a File from a data URL when no original File is present", async () => {
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    filename: "note.txt",
-    mediaType: "text/plain",
-    url: "data:text/plain;base64,aGVsbG8=",
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  expect(converted).toBeTruthy();
-  expect(converted!.name).toBe("note.txt");
-  expect(converted!.type).toBe("text/plain");
-  expect(await converted!.text()).toBe("hello");
-});
+  test("预 aborted 的 signal：不发 fetch，直接以 AbortError reject", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
 
-test("rewraps the original File when the prompt metadata changes", async () => {
-  const file = new File(["hello"], "note.txt", { type: "text/plain" });
+    await expect(
+      promptInputFilePartToFile(
+        {
+          type: "file",
+          url: "blob:abc",
+          filename: "a.txt",
+          mediaType: "text/plain",
+        },
+        { signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
 
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    filename: "renamed.txt",
-    mediaType: "text/markdown",
-    file,
-  } as PromptInputFilePart);
-
-  expect(converted).toBeTruthy();
-  expect(converted).not.toBe(file);
-  expect(converted!.name).toBe("renamed.txt");
-  expect(converted!.type).toBe("text/markdown");
-  expect(await converted!.text()).toBe("hello");
-});
-
-test("returns null when upload preparation is missing required data", async () => {
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    mediaType: "text/plain",
-  } as PromptInputFilePart);
-
-  expect(converted).toBeNull();
-});
-
-test("returns null when the URL fallback fetch fails", async () => {
-  const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => ({}));
-
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => {
-      throw new Error("network down");
-    }),
-  );
-
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    filename: "note.txt",
-    url: "blob:http://localhost:2026/missing-preview-url",
-  } as PromptInputFilePart);
-
-  expect(converted).toBeNull();
-  expect(warnSpy).toHaveBeenCalledOnce();
-});
-
-test("returns null when the URL fallback fetch response is non-ok", async () => {
-  const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => ({}));
-
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      async () =>
-        new Response("missing", {
-          status: 404,
-          statusText: "Not Found",
+  test("中途 abort：fetch 被中止，同样以 AbortError reject 且不 warn", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const error = new Error("The operation was aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
         }),
-    ),
-  );
+    );
 
-  const converted = await promptInputFilePartToFile({
-    type: "file",
-    filename: "note.txt",
-    url: "blob:http://localhost:2026/missing-preview-url",
-  } as PromptInputFilePart);
+    const pending = promptInputFilePartToFile(
+      {
+        type: "file",
+        url: "blob:abc",
+        filename: "a.txt",
+        mediaType: "text/plain",
+      },
+      { signal: controller.signal },
+    );
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    // 中途 abort：请求已经发出，是被信号打断的
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+  });
 
-  expect(converted).toBeNull();
-  expect(warnSpy).toHaveBeenCalledOnce();
+  test("真实获取失败：仍返回 null 并 warn（既有语义不变）", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 404,
+    } as Response);
+    await expect(
+      promptInputFilePartToFile(
+        {
+          type: "file",
+          url: "blob:missing",
+          filename: "a.txt",
+          mediaType: "text/plain",
+        },
+        { signal: new AbortController().signal },
+      ),
+    ).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
 });

@@ -29,6 +29,9 @@ export async function promptInputFilePartToFile(
   if (!filePart.url || !filePart.filename) {
     return null;
   }
+  if (options?.signal?.aborted) {
+    throw Object.assign(new Error("Upload aborted"), { name: "AbortError" });
+  }
 
   try {
     // PR2：附件 URL fallback 的 fetch 也接收取消信号（切线程 / 受理前停止）
@@ -44,6 +47,14 @@ export async function promptInputFilePartToFile(
       type: filePart.mediaType || blob.type,
     });
   } catch (error) {
+    // 取消不是「获取失败」：原样抛出（调用方按 signal 判定），不 warn、不返回 null 丢附件
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      Reflect.get(error, "name") === "AbortError"
+    ) {
+      throw error;
+    }
     console.warn("promptInputFilePartToFile: fetch fallback failed", {
       error,
       url: filePart.url,

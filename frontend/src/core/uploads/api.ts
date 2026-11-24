@@ -9,7 +9,10 @@ import { getBackendBaseURL } from "../config";
 /** Maximum file size for uploads (2 GiB, synced with backend default). */
 export const MAX_FILE_SIZE_BYTES = 2 * 1024 ** 3;
 
-/** 网络无进展的上限（毫秒）：上传与等待响应共用同一个空闲计时。 */
+/**
+ * 网络无进展的上限（毫秒）：上传与等待响应共用同一个空闲计时。这是前端自己的兜底，
+ * 必须小于网关 / nginx 的 proxy read/send timeout，否则网关先断连、前端永远等不到它。
+ */
 export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
 
 /** 上传停滞（空闲超时）错误的 name；调用方据此映射成用户可读文案。 */
