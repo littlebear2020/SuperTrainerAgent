@@ -56,6 +56,7 @@ export default function ChatPage() {
   const {
     thread,
     sendMessage,
+    stop,
     isUploading,
     uploadProgress,
     isHistoryLoading,
@@ -64,9 +65,19 @@ export default function ChatPage() {
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: settings.context,
-    onSend: (_threadId) => {
-      setThreadId(_threadId);
-      setIsNewThread(false);
+    // PR2：上传完成、提交 run 前只把预生成 UUID 写进地址栏；controlled threadId /
+    // isNewThread 等 onCreated（onStart）再翻，避免把本次上传当成切线程。
+    onSend: (requestedThreadId) => {
+      history.replaceState(null, "", `/workspace/chats/${requestedThreadId}`);
+    },
+    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 /chats/new
+    onSendError: (requestedThreadId, { wasNewThread }) => {
+      if (
+        wasNewThread &&
+        window.location.pathname === `/workspace/chats/${requestedThreadId}`
+      ) {
+        history.replaceState(null, "", "/workspace/chats/new");
+      }
     },
     onStart: (createdThreadId) => {
       setThreadId(createdThreadId);
@@ -141,7 +152,10 @@ export default function ChatPage() {
       })
     ) {
       autoSendRanRef.current = true;
-      void sendMessage(threadId, { text, files: [] });
+      // 受理前失败 / busy：把提示词放回输入框，不让自动发送的内容丢失
+      void sendMessage(threadId, { text, files: [] }).catch(() => {
+        textInput.setInput(text);
+      });
       return;
     }
     // 预填分支（两步流）：sessionStorage 长 prompt 且不要求 autoSend →
@@ -156,15 +170,15 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNewThread, threadId, sendMessage]);
 
+  // 把 accepted Promise 原样交给 InputBox：受理前失败 / 停止 / busy 保留输入，
+  // 错误提示由 hook 统一负责（每次失败只提示一次）
   const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      void sendMessage(threadId, message);
-    },
+    (message: PromptInputMessage) => sendMessage(threadId, message),
     [sendMessage, threadId],
   );
   const handleStop = useCallback(async () => {
-    await thread.stop();
-  }, [thread]);
+    await stop();
+  }, [stop]);
 
   return (
     <ThreadContext.Provider value={{ thread }}>
