@@ -1,6 +1,6 @@
 # 个人「我的用量」布局优化实施计划
 
-> **状态**：未执行（实施中；执行日 2026-11-24；2026-11-24 评审修订已并入）；定稿日 2026-11-24；基准 commit `f44073a1`（执行日 re-pin：`ab92a527..f44073a1` 对五个 usage 组件、既有测试、`personalUsage` i18n 与三个钉死全局文件零漂移）；执行后须链接实际执行日的 changelog。
+> **状态**：已执行（任务 0→4 全部完成；代码门禁全绿，三处反向验证各有预期失败；经分支 `personal-usage-layout-redesign` 以 PR 交付，PR 号见 changelog）；定稿日 2026-11-24；执行日 2026-11-24；基准 commit `f44073a1`（执行日 re-pin：`ab92a527..f44073a1` 对五个 usage 组件、既有测试、`personalUsage` i18n 与三个钉死全局文件零漂移）；changelog：[个人用量布局优化](../changelog/changelog-2026-11-24-personal-usage-layout-redesign.md)。
 > **TL;DR**：按已确认的静态 Demo 重排普通用户「我的用量」，收拢页宽、筛选、双指标和任务列表；只改前端组件结构、样式与必要列名 i18n，不改 API、数据、计费、状态、分页或管理员后台；以既有行为测试全绿 + 1440/1024/820/819/390/320px 浏览器布局断言验收（溢出断言取任务行/单元格级并经反向验证）。
 > **For agentic workers:** REQUIRED SUB-SKILL: Claude 必须使用 `executing-plans`（单执行者、单工作区）逐任务实施；每项遵循“失败测试 → 确认失败原因 → 最小实现 → 定向回归 → 提交”，执行即勾选对应 checkbox，不得把本计划当成直接改生产的授权。
 
@@ -243,12 +243,12 @@ PersonalUsagePage
 
 **Interfaces**：只消费任务 1–3 的 testid 和既有 mock response；不得修改 Playwright 配置、端口、身份、mock gateway 或生产 API。
 
-- [ ] **Step 1：先补桌面行为级布局断言**。在现有 E2E 正常数据场景中加入 1440×900 与 1024×768 检查：`usage-layout-content` 宽度不超过 1120px 且在 main 可用区域居中；页头与周期同处 header；七个能力按钮在桌面位于同一工具栏（`usage-filter-toolbar`）；两个汇总项左右排列；`usage-task-columns` 可见；任务行高 ≥ 70px，Token/费用右对齐；标题计算样式 `white-space` 为 `nowrap`；包含性断言（见 Step 2）通过。随后点击任务并确认展开区、模型表和原任务链接仍可用。
-- [ ] **Step 2：先补 breakpoint、大数值与手机行为级断言**。先抽 helper `expectContained(page)`：对每个任务行、每个 `task-cost-*` 与 `task-tokens-*` 单元格断言 `scrollWidth <= clientWidth`。不拿 `document.documentElement` 当溢出证据：工作区根是 `h-screen overflow-hidden`、页面根是 `overflow-x-hidden`，文档级断言恒真，列被裁掉也通过（既有那条保留不删，另加本断言）。覆盖 820、819、390、320px：820px 列头可见；819px 起列头隐藏且任务标题/费用在第一行、状态/Token 在第二行，标题计算样式 `white-space` 为 `normal`；390/320px 汇总上下排列、能力筛选只在自身容器横向滚动、所有任务字段可见。在第二个用例的 21 任务夹具里给 `task-05` 追加 `total_tokens: 9876543210987`、`cost: 1234567.89`、`llm_cost: 1234567.89`，断言 `task-tokens-task-05` 含 `9,876,543,210,987`、`task-cost-task-05` 含 `¥1,234,567.89`，且各宽度 `expectContained` 通过。夹具保持对账（汇总是写死的 mock，没有求和断言也会失真）：`fullSummary` 同步为 `summary(1234586.89, 9876543211177, "real")`，第一页与第二页的四处汇总断言改为 `¥1,234,586.89` 与 `9,876,543,211,177`。展开长模型表后，继续断言只有 `model-table-scroll` 可横向滚动；不得用隐藏内容换取通过。另加一个小用例 `keeps numeric columns contained with the sidebar expanded`：给 `openPersonalUsage` 加可选参数 `{ sidebar?: "open" }`（把 `sidebar_state` cookie 写成 `true`），复用第二个用例的夹具与 mock（抽成 helper）；在 1050×900 与 820×844 下各跑一次 `expectContained`，这两个视口是侧栏展开时溢出最严重的位置。
-- [ ] **Step 3：运行专用 E2E 至全绿**。执行 `cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts`。任务 1–3 已实现，此时没有天然的失败阶段：新断言若失败，只允许按 Step 4 的边界修复后重跑，不得先删除或放宽新断言。
-- [ ] **Step 4：反向验证新断言会失败**。全绿后一次性做三处临时改动，重跑 Step 3 命令，逐条核对预期失败：① 列头去掉 <820px 的隐藏类 → 819px「列头隐藏」断言 FAIL；② 任务行网格在所有宽度固定为桌面列 → 819px「标题/费用在第一行、状态/Token 在第二行」断言 FAIL；③ 数值单元格去掉 `break-all` 并加 `whitespace-nowrap` → `expectContained` 对 `task-05` FAIL（只去 `break-all` 不够，长数字可在“ Token”前的空格换行）。记录实际失败项后恢复，用 `git diff --stat` 确认工作区与改动前一致、无残留，再重跑至绿。任何修复只允许落在本计划 allow 的 usage 组件；保留 SSR regular identity、周期/筛选真实数据变化、两模型对账、三态、分页、键盘、无旧 console/定价请求等所有原断言。
-- [ ] **Step 5：保存实际效果证据但不提交像素基线**。在同一专用 E2E 环境以 1440×900 截取默认收起和首条展开两图，以 390×844 截取手机图（三个视图均取第一个用例的正常数据场景，第二个用例的汇总栏是大数值夹具），放 `<主clone>/temp/2026-11-24-personal-usage-layout-evidence/`（worktree 内的忽略文件会随 `git worktree remove` 删除）；人工核对与 §1 的桌面/手机结构一致。截图仅作 changelog 验收证据，不加入 `tests/e2e/**/*.png` 基线，不创建新 docs 子目录。
-- [ ] **Step 6：代码冻结后串行运行代码门禁**。长命令按根约定后台化，禁止两个会共享 `.next` / `test-results` 的命令并行。先对本任务已改未提交的文件跑手动 pre-commit（钩子未安装，且 eslint/prettier 会原地改文件，必须先于后台测试）；`pnpm check` 已含于 `make check`，不重复。文档门禁放到 Step 8、文档写完之后再跑：
+- [x] **Step 1：先补桌面行为级布局断言**。在现有 E2E 正常数据场景中加入 1440×900 与 1024×768 检查：`usage-layout-content` 宽度不超过 1120px 且在 main 可用区域居中；页头与周期同处 header；七个能力按钮在桌面位于同一工具栏（`usage-filter-toolbar`）；两个汇总项左右排列；`usage-task-columns` 可见；任务行高 ≥ 70px，Token/费用右对齐；标题计算样式 `white-space` 为 `nowrap`；包含性断言（见 Step 2）通过。随后点击任务并确认展开区、模型表和原任务链接仍可用。
+- [x] **Step 2：先补 breakpoint、大数值与手机行为级断言**。先抽 helper `expectContained(page)`：对每个任务行、每个 `task-cost-*` 与 `task-tokens-*` 单元格断言 `scrollWidth <= clientWidth`。不拿 `document.documentElement` 当溢出证据：工作区根是 `h-screen overflow-hidden`、页面根是 `overflow-x-hidden`，文档级断言恒真，列被裁掉也通过（既有那条保留不删，另加本断言）。覆盖 820、819、390、320px：820px 列头可见；819px 起列头隐藏且任务标题/费用在第一行、状态/Token 在第二行，标题计算样式 `white-space` 为 `normal`；390/320px 汇总上下排列、能力筛选只在自身容器横向滚动、所有任务字段可见。在第二个用例的 21 任务夹具里给 `task-05` 追加 `total_tokens: 9876543210987`、`cost: 1234567.89`、`llm_cost: 1234567.89`，断言 `task-tokens-task-05` 含 `9,876,543,210,987`、`task-cost-task-05` 含 `¥1,234,567.89`，且各宽度 `expectContained` 通过。夹具保持对账（汇总是写死的 mock，没有求和断言也会失真）：`fullSummary` 同步为 `summary(1234586.89, 9876543211177, "real")`，第一页与第二页的四处汇总断言改为 `¥1,234,586.89` 与 `9,876,543,211,177`。展开长模型表后，继续断言只有 `model-table-scroll` 可横向滚动；不得用隐藏内容换取通过。另加一个小用例 `keeps numeric columns contained with the sidebar expanded`：给 `openPersonalUsage` 加可选参数 `{ sidebar?: "open" }`（把 `sidebar_state` cookie 写成 `true`），复用第二个用例的夹具与 mock（抽成 helper）；在 1050×900 与 820×844 下各跑一次 `expectContained`，这两个视口是侧栏展开时溢出最严重的位置。
+- [x] **Step 3：运行专用 E2E 至全绿**。执行 `cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts`。任务 1–3 已实现，此时没有天然的失败阶段：新断言若失败，只允许按 Step 4 的边界修复后重跑，不得先删除或放宽新断言。
+- [x] **Step 4：反向验证新断言会失败**。全绿后一次性做三处临时改动，重跑 Step 3 命令，逐条核对预期失败：① 列头去掉 <820px 的隐藏类 → 819px「列头隐藏」断言 FAIL；② 任务行网格在所有宽度固定为桌面列 → 819px「标题/费用在第一行、状态/Token 在第二行」断言 FAIL；③ 数值单元格去掉 `break-all` 并加 `whitespace-nowrap` → `expectContained` 对 `task-05` FAIL（只去 `break-all` 不够，长数字可在“ Token”前的空格换行）。记录实际失败项后恢复，用 `git diff --stat` 确认工作区与改动前一致、无残留，再重跑至绿。任何修复只允许落在本计划 allow 的 usage 组件；保留 SSR regular identity、周期/筛选真实数据变化、两模型对账、三态、分页、键盘、无旧 console/定价请求等所有原断言。
+- [x] **Step 5：保存实际效果证据但不提交像素基线**。在同一专用 E2E 环境以 1440×900 截取默认收起和首条展开两图，以 390×844 截取手机图（三个视图均取第一个用例的正常数据场景，第二个用例的汇总栏是大数值夹具），放 `<主clone>/temp/2026-11-24-personal-usage-layout-evidence/`（worktree 内的忽略文件会随 `git worktree remove` 删除）；人工核对与 §1 的桌面/手机结构一致。截图仅作 changelog 验收证据，不加入 `tests/e2e/**/*.png` 基线，不创建新 docs 子目录。
+- [x] **Step 6：代码冻结后串行运行代码门禁**。长命令按根约定后台化，禁止两个会共享 `.next` / `test-results` 的命令并行。先对本任务已改未提交的文件跑手动 pre-commit（钩子未安装，且 eslint/prettier 会原地改文件，必须先于后台测试）；`pnpm check` 已含于 `make check`，不重复。文档门禁放到 Step 8、文档写完之后再跑：
 
 ```bash
 pre-commit run --files frontend/tests/e2e/personal-usage.e2e.ts
@@ -259,8 +259,8 @@ make check
 ```
 
 预期：所有命令 exit 0；本批未改 backend，不以跳过前端测试或缩减既有 E2E 代替门禁。
-- [ ] **Step 7：清理产物并完成文档**。检查 `git status --short` 和测试输出目录，只删除本批运行产生的临时日志/报告，保留陌生文件。更新计划勾选与状态头；changelog 命名对齐本计划，含 ≤5 行 TL;DR、「验收记录」节（每行“命令 → 实际关键输出”）、桌面/手机截图路径、未验证项和“不涉及 config_version / 后端 / 部署”。
-- [ ] **Step 8：文档门禁后按仓库 PR 流程交付**。changelog 与计划写完（Step 7）后才跑文档门禁，文件列表须覆盖分支提交、暂存与未跟踪文件：
+- [x] **Step 7：清理产物并完成文档**。检查 `git status --short` 和测试输出目录，只删除本批运行产生的临时日志/报告，保留陌生文件。更新计划勾选与状态头；changelog 命名对齐本计划，含 ≤5 行 TL;DR、「验收记录」节（每行“命令 → 实际关键输出”）、桌面/手机截图路径、未验证项和“不涉及 config_version / 后端 / 部署”。
+- [x] **Step 8：文档门禁后按仓库 PR 流程交付**。changelog 与计划写完（Step 7）后才跑文档门禁，文件列表须覆盖分支提交、暂存与未跟踪文件：
 
 ```bash
 git add <本批全部文件，含未跟踪的 changelog 与计划>
