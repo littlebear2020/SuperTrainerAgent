@@ -13,13 +13,15 @@ import { cn } from "@/lib/utils";
 // track has no pixel floor (minmax(0,1fr)): when the sidebar is expanded the
 // content area loses 208px and the title yields instead of clipping the
 // status/Token/cost columns. Below 820px the same cells re-flow into a
-// two-row card (title + cost, then status + tokens) through grid areas.
+// two-row card (title + cost, then status + tokens) through grid areas; the
+// shared number column is capped at 45% so a long value wraps instead of
+// squeezing the title.
 const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_auto_28px] min-[820px]:grid-cols-[minmax(0,1fr)_82px_118px_105px_28px] min-[1050px]:grid-cols-[minmax(0,1fr)_92px_142px_126px_28px]";
+  "grid grid-cols-[minmax(0,1fr)_fit-content(45%)_28px] min-[820px]:grid-cols-[minmax(0,1fr)_82px_118px_105px_28px] min-[1050px]:grid-cols-[minmax(0,1fr)_92px_142px_126px_28px]";
 const ROW_PADDING = "px-4 min-[820px]:px-[22px]";
 const ROW_GAP = "gap-x-3 min-[1050px]:gap-x-[18px]";
 const CARD_AREAS =
-  "max-[819px]:[grid-template-areas:'title_cost_chevron'_'status_tokens_chevron']";
+  "max-[820px]:[grid-template-areas:'title_cost_chevron'_'status_tokens_chevron']";
 
 // The theme has no success/warning tokens, so the three states use palette
 // classes local to this page (light + dark pairs).
@@ -94,7 +96,7 @@ export function UsageTaskList({
                   CARD_AREAS,
                   ROW_PADDING,
                   ROW_GAP,
-                  "hover:bg-muted/40 grid min-h-[70px] min-w-0 cursor-pointer items-center gap-y-1 py-2.5 outline-none select-none focus-visible:ring-2 focus-visible:ring-indigo-500 max-[819px]:grid-rows-2",
+                  "hover:bg-muted/40 grid min-h-[70px] min-w-0 cursor-pointer items-center gap-y-1 py-2.5 outline-none select-none focus-visible:ring-2 focus-visible:ring-indigo-500 max-[820px]:grid-rows-2",
                 )}
                 onClick={() => onToggle(task.task_key)}
                 onKeyDown={(event) => {
@@ -107,11 +109,11 @@ export function UsageTaskList({
                 <h2
                   data-testid={`task-title-${id}`}
                   title={title}
-                  className="min-w-0 truncate text-sm font-medium max-[819px]:line-clamp-2 max-[819px]:whitespace-normal max-[819px]:[grid-area:title]"
+                  className="min-w-0 truncate text-sm font-medium max-[820px]:line-clamp-2 max-[820px]:whitespace-normal max-[820px]:[grid-area:title]"
                 >
                   {title}
                 </h2>
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 max-[819px]:[grid-area:status]">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 max-[820px]:[grid-area:status]">
                   <span
                     data-testid={`task-status-${task.status}`}
                     data-task-id={id}
@@ -144,19 +146,19 @@ export function UsageTaskList({
                 </div>
                 <div
                   data-testid={`task-tokens-${id}`}
-                  className="text-muted-foreground min-w-0 text-right text-xs break-all tabular-nums max-[819px]:[grid-area:tokens]"
+                  className="text-muted-foreground min-w-0 text-right text-xs break-all tabular-nums max-[820px]:[grid-area:tokens]"
                 >
                   {formatInteger(task.total_tokens)} Token
                 </div>
                 <div
                   data-testid={`task-cost-${id}`}
-                  className="min-w-0 text-right text-sm font-semibold break-all tabular-nums max-[819px]:[grid-area:cost]"
+                  className="min-w-0 text-right text-sm font-semibold break-all tabular-nums max-[820px]:[grid-area:cost]"
                 >
                   {formatUsageCost(task.cost, task.currency)}
                 </div>
                 <span
                   aria-hidden="true"
-                  className="text-muted-foreground flex items-center justify-center max-[819px]:[grid-area:chevron]"
+                  className="text-muted-foreground flex items-center justify-center max-[820px]:[grid-area:chevron]"
                 >
                   <ChevronDown
                     className={cn(
