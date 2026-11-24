@@ -225,13 +225,13 @@ PersonalUsagePage
 - Consumes: 现有 `UsageTaskList` props（`tasks/expanded/onToggle`）、`UsageModelBreakdown` props、全部任务字段和 `usageTaskHref`；组件公共 props 不变。
 - Produces: `data-testid="usage-task-panel"`、`usage-task-columns` 与逐任务 `task-title-${source_id}`；新增 i18n `taskColumn`（中“任务”/英“Task”）、`statusColumn`（中“状态”/英“Status”）。既有任务、详情、模型、原任务、分页 testid 全部保留，页面中 `usage-page-info` 只出现一次。
 
-- [ ] **Step 1：先写面板与列头失败测试**。在页面测试新增 `contains the list and pagination in one task panel`：面板头含“用量任务”和唯一分页信息，`role=list[name=用量任务]` 与分页 nav 同属 `usage-task-panel`；列头依次为“任务 / 状态 / 总 Token / 已核算费用”，英文 locale 使用新增英文 key，不允许硬编码中文；英文渲染下用 testid 或现有英文 `taskListLabel` 定位列表，不新增第三个 key。
-- [ ] **Step 2：先写任务行可读性与结构失败测试**。在 `usage-task-list.dom.test.tsx` 新增：长标题节点 `task-title-${id}` 含 `truncate`、`line-clamp-2` 与完整 `title` 属性、缺标题仍显示“标题生成中”；费用/Token 节点含 `tabular-nums` 与 `break-all`、不含 `whitespace-nowrap`；状态节点含空圆点节点（`aria-hidden=true`、无文本），其 `textContent` 仍严格等于三态文案；主行含 `focus-visible:ring-indigo-500`；列头为视觉辅助且 `aria-hidden=true`；每个任务仍是 `role=listitem`，主行仍为可聚焦 `role=button`，默认全部收起，箭头装饰不进入无障碍名称。
-- [ ] **Step 3：运行三份 DOM 测试并确认新断言失败**。执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/usage/personal-usage-page.dom.test.tsx tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx tests/unit/components/workspace/usage/usage-model-breakdown.dom.test.tsx`；预期因任务面板、列头和新标题节点尚不存在而 FAIL。
-- [ ] **Step 4：实现任务面板与响应式行**。按 §1.2 实现单一任务面板、列头、桌面/中等/手机网格、状态 pill、箭头、展开费用三栏与分页位置；不新增局部 expanded 状态，不改父组件 `toggleTask`。标题列用 `minmax(0,1fr)`；数值单元格 `min-w-0 break-all`，任务行与数值单元格不加 `overflow-hidden`；标题 <820px 两行截断；状态圆点按 §1.3。模型表只调间距/边框，保持 `min-w-[640px]`。
-- [ ] **Step 5：重跑并复核所有旧行为断言**。重跑 Step 3，必须同时通过新旧断言：Tab/Enter/Space、独立原任务链接、链接点击不冒泡、运行中“截至目前/核算中”、未完成消耗、费用等式成立条件、媒体未核算、无模型明细、缓存 `null/0`、真实费用来源、长模型名和大数自身滚动。不得删除或放宽这些断言。
-- [ ] **Step 6：运行全部 usage DOM 回归与 i18n 类型检查**。执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/usage && pnpm exec tsc --noEmit`，预期全绿；再执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/console/console-role-page.dom.test.tsx`，确认普通/管理员分流未变。
-- [ ] **Step 7：提交本任务**。提交主题：`refactor(usage): 收拢任务列表与展开明细`；三份 i18n 只能有两个 key 的最小增量。
+- [x] **Step 1：先写面板与列头失败测试**。在页面测试新增 `contains the list and pagination in one task panel`：面板头含“用量任务”和唯一分页信息，`role=list[name=用量任务]` 与分页 nav 同属 `usage-task-panel`；列头依次为“任务 / 状态 / 总 Token / 已核算费用”，英文 locale 使用新增英文 key，不允许硬编码中文；英文渲染下用 testid 或现有英文 `taskListLabel` 定位列表，不新增第三个 key。
+- [x] **Step 2：先写任务行可读性与结构失败测试**。在 `usage-task-list.dom.test.tsx` 新增：长标题节点 `task-title-${id}` 含 `truncate`、`line-clamp-2` 与完整 `title` 属性、缺标题仍显示“标题生成中”；费用/Token 节点含 `tabular-nums` 与 `break-all`、不含 `whitespace-nowrap`；状态节点含空圆点节点（`aria-hidden=true`、无文本），其 `textContent` 仍严格等于三态文案；主行含 `focus-visible:ring-indigo-500`；列头为视觉辅助且 `aria-hidden=true`；每个任务仍是 `role=listitem`，主行仍为可聚焦 `role=button`，默认全部收起，箭头装饰不进入无障碍名称。
+- [x] **Step 3：运行三份 DOM 测试并确认新断言失败**。执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/usage/personal-usage-page.dom.test.tsx tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx tests/unit/components/workspace/usage/usage-model-breakdown.dom.test.tsx`；预期因任务面板、列头和新标题节点尚不存在而 FAIL。
+- [x] **Step 4：实现任务面板与响应式行**。按 §1.2 实现单一任务面板、列头、桌面/中等/手机网格、状态 pill、箭头、展开费用三栏与分页位置；不新增局部 expanded 状态，不改父组件 `toggleTask`。标题列用 `minmax(0,1fr)`；数值单元格 `min-w-0 break-all`，任务行与数值单元格不加 `overflow-hidden`；标题 <820px 两行截断；状态圆点按 §1.3。模型表只调间距/边框，保持 `min-w-[640px]`。
+- [x] **Step 5：重跑并复核所有旧行为断言**。重跑 Step 3，必须同时通过新旧断言：Tab/Enter/Space、独立原任务链接、链接点击不冒泡、运行中“截至目前/核算中”、未完成消耗、费用等式成立条件、媒体未核算、无模型明细、缓存 `null/0`、真实费用来源、长模型名和大数自身滚动。不得删除或放宽这些断言。
+- [x] **Step 6：运行全部 usage DOM 回归与 i18n 类型检查**。执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/usage && pnpm exec tsc --noEmit`，预期全绿；再执行 `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/console/console-role-page.dom.test.tsx`，确认普通/管理员分流未变。
+- [x] **Step 7：提交本任务**。提交主题：`refactor(usage): 收拢任务列表与展开明细`；三份 i18n 只能有两个 key 的最小增量。
 
 ### 任务 4：真实浏览器布局验收、全量回归与交付
 

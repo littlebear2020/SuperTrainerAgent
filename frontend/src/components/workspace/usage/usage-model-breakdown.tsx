@@ -22,25 +22,27 @@ export function UsageModelBreakdown({
   return (
     <div
       data-testid="model-table-scroll"
-      className="max-w-full min-w-0 overflow-x-auto rounded-lg border"
+      className="bg-background max-w-full min-w-0 overflow-x-auto rounded-xl border"
     >
       <table className="w-full min-w-[640px] border-collapse text-left text-xs">
-        <thead className="bg-muted/60 text-muted-foreground">
+        <thead className="bg-muted/40 text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">{c.model}</th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3.5 py-2.5 font-medium">{c.model}</th>
+            <th className="px-3.5 py-2.5 text-right font-medium">
               {c.inputTokens}
             </th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3.5 py-2.5 text-right font-medium">
               {c.outputTokens}
             </th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3.5 py-2.5 text-right font-medium">
               {c.cacheReadTokens}
             </th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3.5 py-2.5 text-right font-medium">
               {c.modelTotalTokens}
             </th>
-            <th className="px-3 py-2 text-right font-medium">{c.modelCost}</th>
+            <th className="px-3.5 py-2.5 text-right font-medium">
+              {c.modelCost}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -48,35 +50,35 @@ export function UsageModelBreakdown({
             <tr key={model.name} className="border-t align-top">
               <td
                 data-testid={`model-name-${index}`}
-                className="max-w-[240px] min-w-[180px] px-3 py-2 break-all"
+                className="max-w-[240px] min-w-[180px] px-3.5 py-2.5 break-all"
               >
                 {model.name}
               </td>
               <td
                 data-testid={`model-input-${index}`}
-                className="px-3 py-2 text-right whitespace-nowrap"
+                className="px-3.5 py-2.5 text-right whitespace-nowrap"
               >
                 {formatInteger(model.input_tokens)}
               </td>
               <td
                 data-testid={`model-output-${index}`}
-                className="px-3 py-2 text-right whitespace-nowrap"
+                className="px-3.5 py-2.5 text-right whitespace-nowrap"
               >
                 {formatInteger(model.output_tokens)}
               </td>
               <td
                 data-testid={`model-cache-${index}`}
-                className="px-3 py-2 text-right whitespace-nowrap"
+                className="px-3.5 py-2.5 text-right whitespace-nowrap"
               >
                 {formatInteger(model.cache_read_tokens)}
               </td>
               <td
                 data-testid={`model-total-${index}`}
-                className="px-3 py-2 text-right font-medium whitespace-nowrap"
+                className="px-3.5 py-2.5 text-right font-medium whitespace-nowrap"
               >
                 {formatInteger(model.total_tokens)}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3.5 py-2.5">
                 <div className="flex flex-col items-end gap-1">
                   <span
                     data-testid={`model-cost-${index}`}
