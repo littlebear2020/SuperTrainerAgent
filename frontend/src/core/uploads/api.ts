@@ -9,6 +9,9 @@ import { getBackendBaseURL } from "../config";
 /** Maximum file size for uploads (2 GiB, synced with backend default). */
 export const MAX_FILE_SIZE_BYTES = 2 * 1024 ** 3;
 
+/** 网络无进展的上限（毫秒）：上传与等待响应共用同一个空闲计时。 */
+export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
+
 export interface UploadedFileInfo {
   filename: string;
   size: number;
@@ -32,6 +35,8 @@ export interface UploadResponse {
 export interface UploadOptions {
   /** 外部取消（切线程 / 卸载 / 受理前停止）：已 aborted 时不发 XHR，中途 abort 则中止 XHR。 */
   signal?: AbortSignal;
+  /** 连续无网络进展多久判失败，默认 120 秒；每次网络进展重置。 */
+  idleTimeoutMs?: number;
 }
 
 function uploadAbortedError(): Error {
@@ -47,8 +52,10 @@ function uploadAbortedError(): Error {
  * real upload progress for large files. All other behavior (auth cookies,
  * CSRF headers, error handling) is identical to `uploadFiles`.
  *
- * PR2（2026-11-24 前端可靠性批）：可取消——signal 已 aborted 时不发 XHR，
- * 中途 abort 则中止 XHR 并以 AbortError 拒绝，Promise 只 settle 一次。
+ * 空闲超时与取消（PR2，2026-11-24 前端可靠性批）：此前没有任何超时，网络半开时
+ * 上传会永远挂着、输入框一直处于上传态。现在上传与等待响应共用一个空闲计时，
+ * 每次网络进展（上行或下行的 progress 事件）重置；超时、load、error、abort、
+ * 外部取消都清理监听与计时器，Promise 只 settle 一次。
  */
 export function uploadFilesWithProgress(
   threadId: string,
@@ -69,12 +76,36 @@ export function uploadFilesWithProgress(
     });
 
     const xhr = new XMLHttpRequest();
+    const idleTimeoutMs = options?.idleTimeoutMs ?? UPLOAD_IDLE_TIMEOUT_MS;
     let settled = false;
+    let idleTimer: number | undefined;
+
+    const clearIdleTimer = () => {
+      if (idleTimer !== undefined) {
+        window.clearTimeout(idleTimer);
+        idleTimer = undefined;
+      }
+    };
     const settle = (action: () => void) => {
       if (settled) return;
       settled = true;
+      clearIdleTimer();
       signal?.removeEventListener("abort", onExternalAbort);
       action();
+    };
+    // 每次网络进展（上行 progress 或下行 progress）重置空闲计时
+    const touch = () => {
+      clearIdleTimer();
+      idleTimer = window.setTimeout(() => {
+        settle(() => {
+          xhr.abort();
+          reject(
+            new Error(
+              `Upload stalled: no network progress for ${Math.round(idleTimeoutMs / 1000)}s`,
+            ),
+          );
+        });
+      }, idleTimeoutMs);
     };
     const onExternalAbort = () => {
       settle(() => {
@@ -100,10 +131,13 @@ export function uploadFilesWithProgress(
     }
 
     xhr.upload.addEventListener("progress", (event) => {
+      touch();
       if (event.lengthComputable) {
         onProgress?.(event.loaded, event.total);
       }
     });
+    // 上传完、等响应期间：下行进展同样算网络进展
+    xhr.addEventListener("progress", () => touch());
 
     xhr.addEventListener("load", () => {
       settle(() => {
@@ -141,6 +175,7 @@ export function uploadFilesWithProgress(
       settle(() => reject(uploadAbortedError()));
     });
 
+    touch();
     xhr.send(formData);
   });
 }

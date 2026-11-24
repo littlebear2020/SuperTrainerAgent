@@ -6,13 +6,16 @@ import {
   createTokenUsageRunStreamHandler,
   handleRunStream,
   MOCK_THREAD_ID,
+  type MockLangGraphAPI,
   mockLangGraphAPI,
 } from "./utils/mock-api";
 
 test.describe("Chat workspace", () => {
+  let api: MockLangGraphAPI;
+
   test.beforeEach(async ({ page }) => {
     await pinEnglishLocale(page);
-    mockLangGraphAPI(page);
+    api = mockLangGraphAPI(page);
   });
 
   test("new chat page loads with input box", async ({ page }) => {
@@ -90,7 +93,8 @@ test.describe("Chat workspace", () => {
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page).toHaveURL(new RegExp(`${MOCK_THREAD_ID}$`));
+    // 地址栏以线程创建回显的 thread id 为准（页面预生成的 UUID）
+    await expect(page).toHaveURL(new RegExp(`${api.createdThreadIds[0]}$`));
     await expect(
       page.locator("button[aria-label='Submit'] svg").first(),
     ).toHaveClass(/lucide-arrow-up/, { timeout: 10_000 });
