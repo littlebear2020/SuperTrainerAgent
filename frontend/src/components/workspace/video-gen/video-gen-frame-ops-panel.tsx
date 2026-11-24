@@ -15,6 +15,7 @@ import type {
   RefInjectionRecord,
   StoryboardFrameData,
 } from "@/core/video-gen/types";
+import { supportsVisualDirtyGuard } from "@/core/video-gen/visual-dirty-guard";
 
 import { RemotionCourseFrameOps } from "./remotion-course-frame-ops";
 import { VisualSourceSwitcher } from "./visual-source-switcher";
@@ -113,6 +114,13 @@ export function FrameOpsPanel({
   // F6（2026-09-28 edits 修复批）：单拆 narration 维度——旁白未保存时「重生配音」
   // 会拿旧旁白配音，用户误以为修改已生效。
   const narrationDirty = narration !== (frame.narration ?? "");
+  // E5（2026-11-24 前端可靠性批）：单拆 visual 维度——画面提示词 / 视觉来源未保存时
+  // 「重生画面」会拿旧参数付费重生。只对 ai_image/ai_video/ai_visual 生效，与
+  // narrationDirty 互不误伤（visualDirty 不挡配音）。
+  const visualDirty =
+    prompt !== (frame.image_prompt ?? "") ||
+    source !== (frame.visual_source ?? "");
+  const blockRegenVisual = visualDirty && supportsVisualDirtyGuard(videoType);
   const warning = (updateMut.data as { warning?: string } | undefined)?.warning;
 
   // T13（决策 14）：remotion_course 一期专属形态——版式 + 静帧 + 素材区
@@ -211,7 +219,7 @@ export function FrameOpsPanel({
               size="sm"
               variant="outline"
               className="h-7 w-full min-w-0 text-xs"
-              disabled={!canRegen || regenPending}
+              disabled={!canRegen || !!regenPending || blockRegenVisual}
               onClick={() =>
                 regenMut.mutate(
                   { frameIndex: frame.index, mode: "visual_only" },
@@ -221,10 +229,13 @@ export function FrameOpsPanel({
                 )
               }
               title={
-                canRegen
-                  ? "只重新生成画面（配音/字幕不动）"
-                  : "仅 ready/failed 可重生"
+                blockRegenVisual
+                  ? "请先保存画面提示词或视觉来源的修改，再重新生成画面"
+                  : canRegen
+                    ? "只重新生成画面（配音/字幕不动）"
+                    : "仅 ready/failed 可重生"
               }
+              data-testid="frame-regen-visual"
             >
               {regenPending ? (
                 <Loader2 className="mr-1 h-3 w-3 animate-spin" />
