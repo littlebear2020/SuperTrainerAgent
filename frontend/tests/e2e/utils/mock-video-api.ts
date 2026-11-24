@@ -57,6 +57,7 @@ export interface MockStoryboardFrame {
   visual_source?: string | null;
   preview_state?: "running" | "done" | "error";
   preview_error?: string | null;
+  regen_state?: "running" | "done" | "error";
 }
 
 export interface MockStoryboard {
@@ -76,6 +77,12 @@ export interface RecordedRequest {
   body: unknown;
 }
 
+/** 任务详情 GET 的服务端视角：taskId + 响应时的 status（验证轮询停机用）。 */
+export interface RecordedTaskDetailRequest {
+  taskId: string;
+  status: MockVideoTaskStatus;
+}
+
 export interface MockVideoAPI {
   readonly createRequests: RecordedRequest[];
   readonly frameUpdateRequests: RecordedRequest[];
@@ -85,12 +92,22 @@ export interface MockVideoAPI {
   readonly retryRequests: RecordedRequest[];
   readonly deleteRequests: RecordedRequest[];
   readonly projectRequests: RecordedRequest[];
+  /** POST /tasks/{id}/frames/{i}/regenerate（付费重生——零请求断言用）。 */
+  readonly regenerateRequests: RecordedRequest[];
+  /** POST /tasks/{id}/storyboard/visual-source/bulk（一键关闭图文镜）。 */
+  readonly bulkDisableRequests: RecordedRequest[];
+  /** GET /tasks/{id}（任务详情轮询）。 */
+  readonly taskDetailRequests: RecordedTaskDetailRequest[];
   readonly createdTaskId: string | undefined;
   seedTask(task: Partial<MockVideoTask> & { id: string }): void;
   clearTasks(): void;
   failNextList(status?: number): void;
   clearListFailure(): void;
   failNextRetry(status: 409): void;
+  /** 下一次 PUT /tasks/{id}/storyboard/frames/{i}（保存 / 切来源 / 改版式共用）失败。 */
+  failNextFrameUpdate(status?: number, detail?: unknown): void;
+  /** 下一次 POST /tasks/{id}/storyboard/visual-source/bulk 失败。 */
+  failNextBulkDisableGraphic(status?: number, detail?: unknown): void;
   seedProject(project: MockCourseProject): MockCourseProject;
   project(id: string): MockCourseProject | undefined;
   setTaskStatus(
@@ -221,9 +238,14 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
   const retryRequests: RecordedRequest[] = [];
   const deleteRequests: RecordedRequest[] = [];
   const projectRequests: RecordedRequest[] = [];
+  const regenerateRequests: RecordedRequest[] = [];
+  const bulkDisableRequests: RecordedRequest[] = [];
+  const taskDetailRequests: RecordedTaskDetailRequest[] = [];
   let failCreate: { status: 422 | 503; detail: unknown } | undefined;
   let failListStatus: number | undefined;
   let failRetryStatus: 409 | undefined;
+  let failFrameUpdate: { status: number; detail: unknown } | undefined;
+  let failBulkDisable: { status: number; detail: unknown } | undefined;
   let createdTaskId: string | undefined;
   let projectSequence = 0;
 
@@ -424,7 +446,10 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
 
       if (!task) return json(route, 404, { detail: "Task not found" });
 
-      if (!suffix && method === "GET") return json(route, 200, detail(task));
+      if (!suffix && method === "GET") {
+        taskDetailRequests.push({ taskId, status: task.status });
+        return json(route, 200, detail(task));
+      }
 
       if (!suffix && method === "DELETE") {
         deleteRequests.push({ method, url: path, body: undefined });
@@ -487,13 +512,18 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
       }
 
       if (suffix.startsWith("storyboard/frames/") && method === "PUT") {
+        const updates = parseBody(route) as Record<string, unknown>;
         frameUpdateRequests.push({
           method,
           url: path,
-          body: parseBody(route),
+          body: updates,
         });
+        if (failFrameUpdate) {
+          const failure = failFrameUpdate;
+          failFrameUpdate = undefined;
+          return json(route, failure.status, { detail: failure.detail });
+        }
         const frameIndex = Number(suffix.split("/").pop());
-        const updates = parseBody(route) as Record<string, unknown>;
         const storyboard = storyboards.get(taskId);
         if (storyboard?.frames) {
           storyboard.frames = storyboard.frames.map((frame) =>
@@ -506,6 +536,49 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
             Object.keys(updates).map((key) => [String(frameIndex), key]),
           ),
         });
+      }
+
+      if (suffix === "storyboard/visual-source/bulk" && method === "POST") {
+        bulkDisableRequests.push({ method, url: path, body: parseBody(route) });
+        if (failBulkDisable) {
+          const failure = failBulkDisable;
+          failBulkDisable = undefined;
+          return json(route, failure.status, { detail: failure.detail });
+        }
+        // 与后端一致：graphic → null（=主引擎），graphic_spec 由后端清理
+        let disabled = 0;
+        const storyboard = storyboards.get(taskId);
+        if (storyboard?.frames) {
+          storyboard.frames = storyboard.frames.map((frame) => {
+            if (frame.visual_source !== "graphic") return frame;
+            disabled += 1;
+            return { ...frame, visual_source: null };
+          });
+        }
+        return json(route, 200, { disabled });
+      }
+
+      if (
+        suffix.startsWith("frames/") &&
+        suffix.endsWith("/regenerate") &&
+        method === "POST"
+      ) {
+        regenerateRequests.push({
+          method,
+          url: path,
+          body: parseBody(route),
+        });
+        const frameIndex = Number(suffix.split("/")[1]);
+        const storyboard = storyboards.get(taskId);
+        if (storyboard?.frames) {
+          // 202 受理后帧上 regen_state=running，终态由 storyboard 轮询到达
+          storyboard.frames = storyboard.frames.map((frame) =>
+            frame.index === frameIndex
+              ? { ...frame, regen_state: "running" as const }
+              : frame,
+          );
+        }
+        return json(route, 200, { frame_index: frameIndex, storyboard });
       }
 
       if (suffix === "storyboard/frames" && method === "POST") {
@@ -597,6 +670,9 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     retryRequests,
     deleteRequests,
     projectRequests,
+    regenerateRequests,
+    bulkDisableRequests,
+    taskDetailRequests,
     get createdTaskId() {
       return createdTaskId;
     },
@@ -610,6 +686,15 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
     },
     failNextRetry(status: 409) {
       failRetryStatus = status;
+    },
+    failNextFrameUpdate(status = 500, detail = "Mock frame update failure") {
+      failFrameUpdate = { status, detail };
+    },
+    failNextBulkDisableGraphic(
+      status = 409,
+      detail = "Mock bulk disable failure",
+    ) {
+      failBulkDisable = { status, detail };
     },
     seedProject,
     project(projectId: string) {
