@@ -281,4 +281,39 @@ describe("InputBox 受理前保留输入", () => {
     await settle();
     expect(textarea().value).toBe("");
   });
+
+  test("受理前等待期间用户继续输入的文字，在受理后保留（registry 清空后恢复）", async () => {
+    let accept!: () => void;
+    onSubmit.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          accept = resolve;
+        }),
+    );
+    await renderComposer();
+    await clickSubmit();
+    expect(textarea().value).toBe(draft);
+
+    // 等待受理期间继续输入（例如上传大附件的几秒钟）
+    act(() => {
+      const el = textarea();
+      el.value = "等待期间继续写的新内容";
+      (
+        el as HTMLTextAreaElement & {
+          _valueTracker?: { setValue(v: string): void };
+        }
+      )._valueTracker?.setValue("");
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(textarea().value).toBe("等待期间继续写的新内容");
+
+    await act(async () => {
+      accept();
+    });
+    // registry 在 Promise resolve 后清空；InputBox 随后恢复等待期间的新输入
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(textarea().value).toBe("等待期间继续写的新内容");
+  });
 });

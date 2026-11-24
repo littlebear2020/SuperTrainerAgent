@@ -206,7 +206,8 @@ export function InputBox({
   /** Agent-specific composer prompt. Defaults to the global InputBox copy. */
   placeholder?: string;
   onContextChange?: (context: LocalSettings["context"]) => void;
-  onSubmit?: (message: PromptInputMessage) => void;
+  /** 返回 accepted Promise（sendMessage）时，输入框只在 run 受理后才清空。 */
+  onSubmit?: (message: PromptInputMessage) => void | Promise<void>;
   onStop?: () => void;
 }) {
   const { t } = useI18n();
@@ -426,6 +427,15 @@ export function InputBox({
     [onStop, status],
   );
 
+  // 最新 onSubmit 的引用：模型自动校正分支延迟一拍后要调用校正后的那份——旧闭包里
+  // 的 onSubmit 仍捕获校正前的 context / model_name
+  // textInput.setInput 是稳定的 useState setter（controller 对象每次渲染新建，不进依赖）
+  const setInput = textInput.setInput;
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
+
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
       // 纯附件可发；空白正文且无附件不发送（同步返回 = registry 立即清空，本就为空）
@@ -453,9 +463,18 @@ export function InputBox({
         });
       }
 
-      await Promise.resolve(onSubmit?.(message));
+      const submittedText = message.text ?? "";
+      await onSubmitRef.current?.(message);
+      // 受理后 registry 会无条件清空输入框；等待受理期间（如上传大附件）用户继续
+      // 输入的文字不能跟着丢。registry 的清空发生在本 Promise resolve 之后，所以延后
+      // 一拍把等待期间的新输入放回去。
+      // latestDraftRef 每次渲染都更新，读到的是等待期间的最新输入（闭包里的 textInput.value 是提交那一帧的快照）
+      const currentText = latestDraftRef.current;
+      if (currentText && currentText !== submittedText) {
+        setTimeout(() => setInput(currentText), 0);
+      }
     },
-    [context, onContextChange, onSubmit, resolvedModelName, currentMode],
+    [context, onContextChange, resolvedModelName, currentMode, setInput],
   );
 
   return (

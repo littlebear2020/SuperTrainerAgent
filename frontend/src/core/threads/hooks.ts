@@ -24,6 +24,7 @@ import { promptInputFilePartToFile, uploadFilesWithProgress } from "../uploads";
 
 import {
   friendlySendErrorMessage,
+  friendlyUploadErrorMessage,
   SEND_BUSY_MESSAGE,
   SEND_STOPPED_MESSAGE,
 } from "./errors";
@@ -411,20 +412,18 @@ export function useThreadStream({
       // PR2 归属：受理前的失败 reject accepted；受理后的失败收尾 completion；
       // 不属于任何在途 submission（如 mount rejoin 的历史 run）走既有路径。
       const submission = attributeCallback(meta);
+      const errorMsg = getStreamErrorMessage(error);
+      // 与 thread.submit 同步失败的提示路径一致：409 / busy 优先用友好文案
+      const friendly =
+        friendlySendErrorMessage(error) ?? friendlySendErrorMessage(errorMsg);
       if (submission?.state === "pending") {
-        rejectSubmission(
-          submission,
-          "failed",
-          getStreamErrorMessage(error),
-          error,
-        );
+        rejectSubmission(submission, "failed", friendly ?? errorMsg, error);
       } else if (submission?.state === "accepted") {
         completeSubmission(submission, { status: "failed", error });
       }
       if (!submission || currentSubmissionRef.current === submission) {
         setOptimisticMessages([]);
       }
-      const errorMsg = getStreamErrorMessage(error);
       // Stale run reconnection: the run no longer exists on the server
       // (restart / multi-worker / cleanup).  Clean up the stored run-id so
       // the next mount doesn't retry, and skip the error toast since the
@@ -436,8 +435,6 @@ export function useThreadStream({
         return;
       }
       // 原始 error 带 status；errorMsg 兜住 SDK 嵌套形态（{error: Error}）里的后端 detail 文案。
-      const friendly =
-        friendlySendErrorMessage(error) ?? friendlySendErrorMessage(errorMsg);
       if (friendly) {
         toast.error(friendly);
         return; // 不再走默认错误文案
@@ -457,7 +454,11 @@ export function useThreadStream({
       // PR2：按 meta.run_id 定位要收尾的 submission（mount 自动 rejoin 不经过 onCreated）
       const submission = attributeCallback(meta);
       if (submission?.state === "accepted") {
-        completeSubmission(submission, { status: "finished" });
+        // 用户按了停止但 SDK 以 onFinish（而非 AbortError / onError）收尾：仍记 stopped，
+        // 与流收尾 effect 的判定一致
+        completeSubmission(submission, {
+          status: stopRequestedRef.current ? "stopped" : "finished",
+        });
       }
       listeners.current.onFinish?.(state.values);
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
@@ -516,11 +517,15 @@ export function useThreadStream({
       return;
     }
     // `undefined → 本次提交的预生成 UUID` 是身份认领（页面翻 isNewThread），不算切线程
-    if (threadId != null && threadId === pending.requestedThreadId) return;
+    if (
+      threadId !== null &&
+      threadId !== undefined &&
+      threadId === pending.requestedThreadId
+    ) {
+      return;
+    }
+    // 清理（optimistic / 上传态 / sendInFlight / 中止上传）都在 rejectSubmission 里
     sendInFlightRef.current = false;
-    setOptimisticMessages([]);
-    setIsUploading(false);
-    setUploadProgress(0);
     rejectSubmission(pending, "stopped", SEND_STOPPED_MESSAGE);
   }, [threadId, rejectSubmission]);
 
@@ -562,7 +567,7 @@ export function useThreadStream({
       const submission = createSubmission(
         ++submissionSeqRef.current,
         threadId,
-        threadIdRef.current == null,
+        threadIdRef.current === null,
       );
       currentSubmissionRef.current = submission;
       sendInFlightRef.current = true;
@@ -704,7 +709,8 @@ export function useThreadStream({
                 error instanceof Error
                   ? error.message
                   : "Failed to upload files.";
-              toast.error(errorMessage);
+              // 停滞超时等已知形态映射成用户可读文案；其余沿用后端 detail / 网络错误原串
+              toast.error(friendlyUploadErrorMessage(error) ?? errorMessage);
               rejectSubmission(submission, "failed", errorMessage, error);
             }
           } finally {
@@ -800,36 +806,53 @@ export function useThreadStream({
     ],
   );
 
+  /** 已受理的 run：等可等待的 cancel，结果写入 submission 的 completion。 */
+  const cancelAcceptedRun = useCallback(
+    async (submission: Submission) => {
+      if (!submission.runId) return;
+      cancelPendingRef.current = true;
+      try {
+        const outcome = await cancelRun(
+          submission.threadId ?? submission.requestedThreadId,
+          submission.runId,
+        );
+        if (outcome.status === "failed") {
+          toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
+          completeSubmission(submission, {
+            status: "cancelFailed",
+            error: outcome.error,
+          });
+        } else {
+          completeSubmission(submission, { status: "stopped" });
+        }
+      } finally {
+        cancelPendingRef.current = false;
+      }
+    },
+    [completeSubmission],
+  );
+
   /**
-   * 停止当前 run（PR2）：先中断 SDK 的本地流——受理前的 submission 以 stopped reject
-   * （此时服务端尚无 runId，不发 cancel）；已受理的再 await 可等待的 cancel，
-   * 结果写入 submission 的 completion：受理 → stopped，失败 → cancelFailed 并提示一次
-   * （不伪造 interrupted，重试入口由 PR3 提供）。
+   * 停止当前 run（PR2）：受理前的 submission 由这里直接以 stopped reject（中止上传，
+   * 不依赖 SDK 的 onStop 是否触发；此时服务端尚无 runId，不发 cancel）；再中断 SDK 的
+   * 本地流；已受理的再 await 可等待的 cancel——受理 → stopped，失败 → cancelFailed
+   * 并提示一次（不伪造 interrupted，重试入口由 PR3 提供）。
    */
   const stop = useCallback(async () => {
     stopRequestedRef.current = true;
-    await thread.stop();
-    const submission = currentSubmissionRef.current;
-    if (submission?.state !== "accepted" || !submission.runId) return;
-    cancelPendingRef.current = true;
-    try {
-      const outcome = await cancelRun(
-        submission.threadId ?? submission.requestedThreadId,
-        submission.runId,
-      );
-      if (outcome.status === "failed") {
-        toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
-        completeSubmission(submission, {
-          status: "cancelFailed",
-          error: outcome.error,
-        });
-      } else {
-        completeSubmission(submission, { status: "stopped" });
-      }
-    } finally {
-      cancelPendingRef.current = false;
+    const pending = currentSubmissionRef.current;
+    if (pending?.state === "pending") {
+      rejectSubmission(pending, "stopped", SEND_STOPPED_MESSAGE);
     }
-  }, [thread, completeSubmission]);
+    try {
+      await thread.stop();
+    } finally {
+      const submission = currentSubmissionRef.current;
+      if (submission?.state === "accepted") {
+        await cancelAcceptedRun(submission);
+      }
+    }
+  }, [thread, rejectSubmission, cancelAcceptedRun]);
 
   // Memoized so the merged array keeps a stable identity between renders that
   // don't actually change messages. Consumers put this array in effect deps

@@ -672,3 +672,25 @@ describe("可等待的取消（纵切 C）", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 });
+
+describe("上传错误的提示（OCR 第 1 轮）", () => {
+  test("上传停滞错误映射为用户可读文案，而不是英文原串", async () => {
+    await mount("t-1");
+    const stalled = Object.assign(
+      new Error("Upload stalled: no network progress for 120s"),
+      { name: "UploadStalledError" },
+    );
+    h.upload.mockRejectedValueOnce(stalled);
+
+    await expect(
+      api().sendMessage("t-1", { text: "A", files: [ATTACHMENT] }),
+    ).rejects.toMatchObject({ kind: "failed" });
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    const first = toastError.mock.calls[0]?.[0];
+    expect(typeof first === "string" ? first : "").toContain("没有网络进展");
+    expect(typeof first === "string" ? first : "").not.toMatch(
+      /Upload stalled/,
+    );
+  });
+});
