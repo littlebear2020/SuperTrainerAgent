@@ -185,8 +185,8 @@ Demo 模板到本计划的修正：
 
 ### 2. 切片 B：文字动效
 
-- [ ] B1 三篇模板（附录 A.2）；`actionLabel`：按此风格创作 / 按此风格创作 / 按此调研创作（英文 Use this style / Use this style / Research first）。
-- [ ] B2 `VideoDialog` 底部 CTA；关闭必须暂停视频。
+- [x] B1 三篇模板（附录 A.2）；`actionLabel`：按此风格创作 / 按此风格创作 / 按此调研创作（英文 Use this style / Use this style / Research first）。（执行修正：视频卡 CTA 改为 5 字「按风格创作 / 按风格创作 / 调研后创作」。改动前实测 1440 下卡片宽 260px、元信息列 108px，「云舟2.0（男声）」恰需 108px；6 字 CTA 会让按钮宽约 12px，音色行在 1440 即开始截断，违反 B3。英文不变。）
+- [x] B2 `VideoDialog` 底部 CTA；关闭必须暂停视频。
 - [ ] B3 测试：marker 用例保持绿；模板不含 32 / 29 / 39 秒与 InfoQ / 经济参考报 / KubeCon；DOM 断言弹窗 CTA。提交后用浏览器在 1280 与 1440 视口实测音色行截断不多于现状。
 
 ### 3. 切片 C：PPT 课件

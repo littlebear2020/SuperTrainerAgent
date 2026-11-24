@@ -107,6 +107,7 @@ const kubeCon: ShowcaseSource = {
 };
 const yunzhou = text("云舟2.0（男声）", "Yunzhou 2.0 (male)");
 const vivi = text("Vivi2.0（女声）", "Vivi 2.0 (female)");
+const liufei = text("刘飞2.0（男声）", "Liu Fei 2.0 (male)");
 const createInThisStyle = text("按此风格创作", "Create in this style");
 
 // Visual templates (style-workflow plan appendix A.1): the user's content is
@@ -160,6 +161,55 @@ const visualTemplate = ({
 
 const recipeFooter = "发送后 agent 先确认方案再出图。";
 const recipeFooterEn = "The agent confirms the plan before generating.";
+
+// Video templates (plan appendix A.2): the user's own script or topic; the case
+// lends only its visual style and default voice.
+const videoSkill = "整个制作过程请使用 /skill auto-video-flow。";
+
+const fixedScriptTemplate = (visual: LocalizedText, voice: LocalizedText) =>
+  `请严格依据我上传的完整口播稿制作 16:9 视频课，讲稿按原文使用，不改写、不扩写，也不要联网补充。
+
+【必需材料】
+完整口播稿：请上传 docx、pdf、md 或 txt 文件；未提供完整讲稿前请勿开始制作。
+
+【视觉与配音】
+视觉：${visual.zh}（可修改）
+默认音色：${voice.zh}（可修改）
+字幕：保留
+背景音乐：不添加
+画面：不生成真人角色或剧情镜头，不虚构真实素材。
+
+请先提供完整制作方案，待我确认后再开始执行。${videoSkill}`;
+
+const researchTemplate = (visual: LocalizedText, voice: LocalizedText) =>
+  `请围绕我的主题做一次深度联网调研，先展示调研来源、完整口播稿和分镜，待我确认后再制作 16:9 视频课。
+
+【需填写】
+主题：【请填写】
+受众：【请填写】
+目标时长：【请填写】
+
+【可选】
+来源偏好：【可选填写】
+
+【视觉与配音】
+视觉：${visual.zh}（可修改）
+默认音色：${voice.zh}（可修改）
+字幕：保留
+背景音乐：不添加
+要求：事实必须能对应来源，不补写来源中没有的数据，不虚构真实素材，不生成真人角色或剧情镜头。
+
+${videoSkill}`;
+
+const videoRecipeFooter = "发送后先确认制作方案再执行。";
+const videoRecipeFooterEn =
+  "The agent confirms the production plan before executing.";
+const darkTech = text(
+  "深色科技 · 网格与概率条",
+  "Dark tech · Grids and probability bars",
+);
+const warmPaper = text("暖白纸感 · 杂志排版", "Warm paper · Editorial layout");
+const deepGreen = text("深绿调研 · 来源卡片", "Deep green · Source cards");
 
 const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
@@ -219,16 +269,19 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "从“预测下一个词”讲起，解释幻觉的三个来源，以及检索增强、引用约束和结果核验三种工程手段。",
           "Explain three sources of hallucination and three engineering mitigations, starting from next-token prediction.",
         ),
-        prompt:
-          "请严格依据我上传的《大模型为什么会产生幻觉》讲稿制作视频课程。整体画面采用深色科技风，使用男声配音，正常语速，背景为深蓝黑，不添加背景音乐，但需保留字幕。讲稿中的关键表述要与画面同步呈现，不要生成真人角色或剧情镜头，不要虚构真实素材。请先提供完整制作方案，待我确认后再开始执行。整个制作过程请使用 /skill auto-video-flow。",
+        actionLabel: text("按风格创作", "Use this style"),
+        recipeNote: text(
+          "保留：深色科技画面、网格与概率条，云舟音色、字幕、无背景音乐（均可改）。填写：上传你自己的完整口播稿；讲稿按原文使用，不改写。" +
+            videoRecipeFooter,
+          "Kept: dark tech visuals with grids and probability bars, the Yunzhou voice, captions and no background music (all editable). Fill in: upload your own full script; it is used verbatim without rewriting. " +
+            videoRecipeFooterEn,
+        ),
         poster: asset("videos/poster-v1.webp"),
         video: asset("videos/v1.mp4"),
         durationSeconds: 32.32,
         voice: yunzhou,
-        styleLabel: text(
-          "深色科技 · 网格与概率条",
-          "Dark tech · Grids and probability bars",
-        ),
+        styleLabel: darkTech,
+        prompt: fixedScriptTemplate(darkTech, yunzhou),
       },
       {
         id: "video-feynman",
@@ -245,16 +298,19 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "四个步骤讲清费曼学习法，用暖白纸感、衬线标题和手绘线条呈现。",
           "Four clear steps with warm paper textures, serif headlines, and hand-drawn lines.",
         ),
-        prompt:
-          "请严格依据我上传的《费曼学习法》讲稿制作视频课程。整体画面采用明亮纸感、杂志排版风格，使用女声配音，正常语速，背景为暖白色，不添加背景音乐，但需保留字幕。讲稿中的步骤和关键句要与画面同步呈现，不要生成真人角色或剧情镜头，不要虚构真实素材。请先提供完整制作方案，待我确认后再开始执行。整个制作过程请使用 /skill auto-video-flow。",
+        actionLabel: text("按风格创作", "Use this style"),
+        recipeNote: text(
+          "保留：暖白纸感、杂志排版与手绘线条，Vivi 音色、字幕、无背景音乐（均可改）。填写：上传你自己的完整口播稿；讲稿按原文使用，不改写。" +
+            videoRecipeFooter,
+          "Kept: warm paper textures, editorial layout and hand-drawn lines, the Vivi voice, captions and no music (all editable). Fill in: upload your own full script; it is used verbatim without rewriting. " +
+            videoRecipeFooterEn,
+        ),
         poster: asset("videos/poster-v2.webp"),
         video: asset("videos/v2.mp4"),
         durationSeconds: 29.162667,
         voice: vivi,
-        styleLabel: text(
-          "暖白纸感 · 杂志排版",
-          "Warm paper · Editorial layout",
-        ),
+        styleLabel: warmPaper,
+        prompt: fixedScriptTemplate(warmPaper, vivi),
       },
       {
         id: "video-agent-research",
@@ -268,14 +324,18 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "先读公开来源、整理证据链，再用调研结论组织讲稿和画面；数字都能对应到来源。",
           "Build an evidence chain from public sources, then turn it into narration and visuals with traceable figures.",
         ),
-        prompt:
-          "请围绕「AI Agent 为什么开始接管完整工作流」做一次深度联网调研，优先读取 InfoQ、经济参考报、KubeCon 等公开来源，整理成 40 秒左右的知识科普视频。先展示调研来源、讲稿和分镜供我确认，再用 auto-video-flow 制作：深绿色调研纪实风，男声配音，保留字幕，不配背景音乐，不生成真人角色或剧情镜头。事实必须能对应到来源，不要补写来源里没有的数据或虚构真实素材。",
+        actionLabel: text("调研后创作", "Research first"),
+        recipeNote: text(
+          "保留：深绿调研纪实风、来源卡片与证据链，刘飞音色、字幕、无背景音乐（均可改）。填写：新主题、受众与目标时长；agent 先联网调研并展示来源、完整口播稿和分镜，确认后再配音。InfoQ、经济参考报、KubeCon 仅为本案例来源。",
+          "Kept: the deep-green documentary look, source cards and an evidence chain, the Liu Fei voice, captions and no music (all editable). Fill in: a new topic, audience and target length; the agent researches online and shows sources, the full script and the storyboard before narration. InfoQ, Economic Information Daily and KubeCon were this case's sources only.",
+        ),
         poster: asset("videos/poster-v3.webp"),
         video: asset("videos/v3.mp4"),
         durationSeconds: 39.082667,
-        voice: text("刘飞2.0（男声）", "Liu Fei 2.0 (male)"),
-        styleLabel: text("深绿调研 · 来源卡片", "Deep green · Source cards"),
+        voice: liufei,
+        styleLabel: deepGreen,
         sources: [infoQ, economicReference, kubeCon],
+        prompt: researchTemplate(deepGreen, liufei),
       },
     ],
   },

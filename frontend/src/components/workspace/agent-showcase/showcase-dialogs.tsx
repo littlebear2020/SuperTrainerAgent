@@ -142,12 +142,13 @@ export function SourceLinks({
 export function VideoDialog({
   item,
   locale,
+  disabled = false,
+  onUsePrompt,
   onClose,
 }: {
   item: VideoCase;
   locale: ShowcaseLocale;
-  onClose: () => void;
-}) {
+} & UsePromptProps) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -156,9 +157,10 @@ export function VideoDialog({
     return () => video?.pause();
   }, []);
 
-  const close = () => {
+  // Every close pauses the video, including the fill-only CTA.
+  const close = (options?: { returnFocus?: boolean }) => {
     videoRef.current?.pause();
-    onClose();
+    onClose(options);
   };
 
   return (
@@ -200,6 +202,15 @@ export function VideoDialog({
           <span>{localized(item.styleLabel, locale)}</span>
         </div>
         <SourceLinks sources={item.sources} locale={locale} />
+        <DialogRecipeAction
+          item={item}
+          title={item.title}
+          locale={locale}
+          disabled={disabled}
+          accent="bg-indigo-600 hover:bg-indigo-500 focus-visible:ring-indigo-500"
+          close={() => close({ returnFocus: false })}
+          onUsePrompt={onUsePrompt}
+        />
       </DialogContent>
     </Dialog>
   );

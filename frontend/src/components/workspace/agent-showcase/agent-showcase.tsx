@@ -279,6 +279,8 @@ export function AgentShowcase({
         <VideoDialog
           item={activeVideo}
           locale={language}
+          disabled={disabled}
+          onUsePrompt={onUsePrompt}
           onClose={closeDialog}
         />
       ) : null}

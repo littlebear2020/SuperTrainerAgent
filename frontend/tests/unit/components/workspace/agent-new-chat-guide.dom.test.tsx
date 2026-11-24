@@ -274,6 +274,18 @@ describe("AgentNewChatGuide", () => {
     expect(input.selectionEnd - input.selectionStart).toBe(expected.length);
   }
 
+  // First fill-in placeholder of the filled prompt, or the caret at the end
+  // when the template has none (a fixed-script video takes an upload instead).
+  function expectPlaceholderOrCaret(prompt: string) {
+    const match = placeholder.exec(prompt);
+    if (match) {
+      expectSelection(match[0]);
+      return;
+    }
+    expect(composer().selectionStart).toBe(prompt.length);
+    expect(composer().selectionEnd).toBe(prompt.length);
+  }
+
   it("prefills and focuses an empty draft without submitting", async () => {
     const onSubmit = vi.fn();
     await renderGuide({ agentName: "creative-studio", onSubmit });
@@ -325,6 +337,11 @@ describe("AgentNewChatGuide", () => {
       open: "showcase-open-visual-card-rag",
       promptId: "visual-card-rag",
     },
+    {
+      agentName: "course-video",
+      open: "showcase-open-video-hallucination",
+      promptId: "video-hallucination",
+    },
   ] as const;
 
   it.each(dialogCases)(
@@ -354,7 +371,7 @@ describe("AgentNewChatGuide", () => {
           ?.textContent,
       ).toBe("1");
       expect(document.activeElement).toBe(composer());
-      expectSelection(placeholder.exec(item.prompt)![0]);
+      expectPlaceholderOrCaret(item.prompt);
       expect(onSubmit).not.toHaveBeenCalled();
     },
   );

@@ -129,6 +129,13 @@ describe("AgentShowcase", () => {
       hasVideo: false,
       label: "按此风格创作",
     },
+    {
+      agent: "course-video",
+      open: "showcase-open-video-hallucination",
+      promptId: "video-hallucination",
+      hasVideo: true,
+      label: "按风格创作",
+    },
   ] as const;
 
   it.each(dialogCases)(
@@ -173,6 +180,18 @@ describe("AgentShowcase", () => {
     // Diagrams advertise the editable SVG output on their badge.
     expect(element("showcase-open-visual-diagram-stack").textContent).toContain(
       "SVG 可编辑",
+    );
+  });
+
+  it("keeps the video card CTA short enough for the meta column", async () => {
+    await renderShowcase("course-video");
+    // Same five characters as the generic label: the bottom row of a video
+    // card must not get wider than before (B3: no extra meta truncation).
+    expect(element("showcase-prompt-video-hallucination").textContent).toBe(
+      "按风格创作",
+    );
+    expect(element("showcase-prompt-video-agent-research").textContent).toBe(
+      "调研后创作",
     );
   });
 
