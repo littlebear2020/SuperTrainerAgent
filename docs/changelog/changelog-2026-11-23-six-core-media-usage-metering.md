@@ -50,6 +50,18 @@
 - **M-3（Minor，计划规则偏离）**：PPT `backend_qihu360.py` 的 image 事件在 `resolve_output_path`（本地 `os.makedirs`）之后才发射，`output_dir` 不可写时一次已付费的生图永远不记账，违背计划「本地下载/写盘失败不抹去消耗」——发射点提到 `resolve_output_path` 之前。
 - 其余 Minor（延后，登记 findings-backlog）：M-1 throttle `_build_extra_from_ref` 对 provider 给的非整数 token 做 `int()` 会把付费成功变成 error 并计入断路器（`total_tokens` 既有同型）；M-2 `_estimate_call_cost` 对 `inf`/`OverflowError` 无防护；M-4 读取器接受超出 DB 范围的 `elapsed_ms`/负尺寸/代理对字符，导致每次 drain 重复 `error` + 全栈 traceback；M-5 读取器只在 `open` 处捕获 `OSError`，`fstat`/`lseek`/`read` 的 `OSError` 会抛出（worker 仍兜住）；M-6 发射器的事件字典在 `try` 之外构造（`len(text)`/`int()`）；M-7 测试缺口（无 session factory / 查重失败路径、3.10 静态检查未覆盖 PPT helper、`track_token_usage=False` + journal + sink 组合）。
 
+### 终审延后项修复（`fix(usage): 媒体计量加固：坏值不抛错、读取器上界与读阶段容错`）
+
+用户决定（2026-11-24）把终审延后的 6 条代码 Minor 一次修完；全部在 PR 1–3 的 allow 路径内，各带一条失败测试：
+
+- M-1 `throttle.py`：新增 `_safe_int()`，`_build_extra_from_ref` 对 provider 回传的非整数 token（`"460.0"`/`"n/a"`/嵌套对象）按缺失处理——此前 `int()` 抛错会让一次**已付费的成功**被记成 `error` 并计入共享断路器。
+- M-2 `media_pricing_resolver.py`：新增 `_finite_number()`，per_kilo_token / per_second / per_kilo_char 只接受有限正数；`inf`、`nan`、`10**400`（`OverflowError`）不再产生 `inf` 成本或让 `/api/usage` 500。
+- M-4 `runtime/media_usage.py`：读取器加上界——`elapsed_ms 0..2³¹-1`（INTEGER 列 32 位）、`width/height 0..10⁶`、`model` 须可打印（无控制字符、无孤立代理对）。超界行在读取处计一次 `error`，不再每次 drain 都被 DB 拒绝并打全栈 traceback。
+- M-5 `runtime/media_usage.py`：`fstat` / `lseek` / `read` 阶段的 `OSError`（EIO / ESTALE）计 error 返回，不再抛出，与 docstring「never raises」一致。
+- M-6 发射器：五份 `_doubao_tts.py` 镜像与 PPT helper 把事件字典的构造（`len(text)`、算术、`"WxH"` 解析）收进 try；PPT `emit_image_usage` 改收 `size` 字符串，解析失败仍发射（不带宽高）——付费已发生。
+- M-7 测试缺口：无 session factory / 查重失败两条路径（`error+1` + WARNING，事件留给下次 drain）、`event_store` 在场 + `track_token_usage=False` + sink 的 worker 组合、Python 3.10 语法检查改为对全部 8 个发射文件做 `ast.parse(feature_version=(3, 10))`。
+- 顺带修正一个测试的时间依赖缺陷：`test_core_media_usage_e2e.py` 的用量窗口原先固定在 `2026-11-23 12:00`，而入库行 `created_at` 用真实时钟——跨过窗口结束时刻（11-24 00:00 UTC）后用例会假失败；窗口改为以真实 `now` 为基准。
+
 ## 测试服部署与真实验收（Task 5）
 
 部署对象 = 三条 PR 合入后的 main `bbb20855`；镜像 tag `v3-20261124`。只换 gateway 镜像（backend 改动），frontend / worker / remotion / ppt / sandbox 镜像未动；skills 热更新 16 文件；`.env` 只追加 `DEER_FLOW_MEDIA_USAGE_LEDGER=1` 一个变量。主机、账号、路径等真实信息只写入仓库外 ops 记录，本文只记命令与关键输出。
@@ -79,6 +91,9 @@
 - 供应商账单：无 360 / 火山控制台访问权限 → `SUPPLIER_RECONCILIATION_NOT_VERIFIED`（调用数以 `external_api_calls` 与网关日志互证，未与供应商账单对账）。
 
 ## 验收记录
+
+- 延后项修复 RED：`pytest tests/test_throttle_amount_passthrough.py tests/test_media_pricing.py tests/test_agent_media_usage.py -q` → `17 failed, 62 passed`；`-k "tolerates_bad_arguments"` → `2 failed`（M-7 的三条 worker 用例与 3.10 AST 检查属覆盖补充，本就通过）。
+- 延后项修复 GREEN：上述三文件 → `79 passed`；`pytest tests/test_sandbox_media_usage_scripts.py tests/test_skill_script_copies.py tests/test_ppt_master_{image,tts}_trainerai.py tests/test_skillscan_native.py tests/test_core_media_usage_e2e.py tests/test_media_usage_worker.py -q` → `309 passed`（五份镜像 md5 仍一致）。全量 `make test` → `10365 passed, 94 skipped, 437 warnings in 101.53s`，exit=0；根 `make check` → exit=0；TS → `62 pass`；pre-commit 全 Passed。
 
 - 终审修复 RED：`pytest tests/test_media_usage_worker.py -k bounded_while -q` → `1 failed`（`取消后仍阻塞 31.1s（busy_timeout 泄漏到调用方）`）；`-k converts_the_cancel`（守卫变异体 `cancelling()` 禁用）→ `FAILED`。
 - 终审修复 GREEN：`pytest tests/test_media_usage_worker.py tests/test_agent_media_usage.py -q` → `54 passed`；`pytest tests/test_sandbox_media_usage_scripts.py tests/test_ppt_master_image_trainerai.py tests/test_ppt_master_tts_trainerai.py tests/test_skill_script_copies.py tests/test_skillscan_native.py -q` → `272 passed`（含 M-3 用例 `test_ppt_image_local_path_failure_keeps_the_event`、I-1 用例 `test_run_task_is_not_held_by_a_slow_drain` / `test_drain_stops_after_a_cancelled_row_even_if_the_driver_absorbs_the_cancel` / `test_drain_stops_when_a_driver_converts_the_cancel_into_an_error`）。全量 `cd backend && CI=true PYTHONPATH=. uv run --no-sync pytest tests/ -q -n auto --dist loadfile` → `10342 passed, 91 skipped, 431 warnings in 68.05s`，exit=0；根 `make check` → `OK 仓库治理约定全过`，exit=0；pre-commit 全 Passed（hook 未改动文件）。

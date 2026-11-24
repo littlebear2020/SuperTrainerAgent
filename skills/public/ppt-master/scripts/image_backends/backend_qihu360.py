@@ -205,8 +205,7 @@ def _generate_image(
         # *之前* 记账，二者任一失败都不抹去已发生的消耗；200 无图 / HTTP 错误
         # 不会走到这里。（终审 M-3：此前放在 resolve_output_path 之后，output_dir
         # 不可写会让一次已付费的生成永远不记账。）
-        width, height = (int(value) for value in size.split("x"))
-        emit_image_usage(model=model, width=width, height=height, started=started_monotonic)
+        emit_image_usage(model=model, size=size, started=started_monotonic)
     path = resolve_output_path(prompt, output_dir, filename, ".png")
     url_error: Exception | None = None
     if image_url:

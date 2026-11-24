@@ -464,3 +464,57 @@ async def test_drain_stops_when_a_driver_converts_the_cancel_into_an_error(db, m
         await asyncio.wait_for(task, timeout=5)
     assert time.monotonic() - started < 3, "取消后不得继续逐行等待（修前每行再等 10s）"
     assert await _rows(db) == []
+
+
+# ---------------------------------------------------------------------------
+# 终审 M-7：补齐计划列出但缺测试的路径
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_drain_without_session_factory_counts_one_error_and_warns(db, monkeypatch, caplog):
+    _write_ledger(_line("a"), _line("b"))
+    monkeypatch.setattr(amu, "get_session_factory", lambda: None)
+    with caplog.at_level(logging.WARNING):
+        stats = await amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video")
+    assert (stats.written, stats.duplicate, stats.error) == (0, 0, 1), "drain 级 error+1，不按事件数放大"
+    assert any("session factory" in rec.getMessage() for rec in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_drain_lookup_failure_counts_one_error_and_leaves_events_for_the_next_drain(db, monkeypatch, caplog):
+    _write_ledger(_line("a"), _line("b"))
+
+    async def boom(session_factory, call_ids):
+        raise RuntimeError("db hiccup")
+
+    original = amu._existing_call_ids
+    monkeypatch.setattr(amu, "_existing_call_ids", boom)
+    with caplog.at_level(logging.WARNING):
+        stats = await amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video")
+    assert (stats.written, stats.duplicate, stats.error) == (0, 0, 1)
+    assert any("lookup failed" in rec.getMessage() for rec in caplog.records)
+    monkeypatch.setattr(amu, "_existing_call_ids", original)
+    assert (await amu.drain_agent_media_usage(thread_id=THREAD, user_id=USER, agent_name="course-video")).written == 2, "事件仍留账本，下次 drain 补入"
+
+
+@pytest.mark.asyncio
+async def test_worker_drains_with_journal_present_and_token_tracking_off(_fast_run_cleanup, monkeypatch):
+    """计划 Task 2 Step 2：event_store 在场 + run_events_config.track_token_usage=False + sink 在场仍正常。"""
+    sink = _recording_sink()
+    monkeypatch.setattr("deerflow.runtime.runs.worker.get_effective_user_id", lambda: USER)
+    mgr = RunManager(store=None)
+    record = await mgr.create(THREAD, assistant_id="podcast-studio")
+    bridge = _Bridge()
+    await run_agent(
+        bridge,
+        mgr,
+        record,
+        ctx=_ctx(event_store=_EventStore(), run_events_config=SimpleNamespace(track_token_usage=False), media_usage_sink=sink),
+        agent_factory=_successful_agent_factory,
+        graph_input={},
+        config={},
+    )
+    await _drains_done()
+    assert record.status == RunStatus.success
+    assert sink.calls == [{"thread_id": THREAD, "user_id": USER, "agent_name": "podcast-studio"}]

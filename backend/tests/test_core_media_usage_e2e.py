@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -46,8 +46,10 @@ PPT_SCRIPTS = REPO_ROOT / "skills" / "public" / "ppt-master" / "scripts"
 DOUBAO = REPO_ROOT / "skills" / "public" / "podcast-studio" / "scripts" / "_doubao_tts.py"
 COURSE_DOUBAO = REPO_ROOT / "skills" / "custom" / "course-video" / "scripts" / "_doubao_tts.py"
 USER = "11111111-1111-1111-1111-111111111111"
-NOW = datetime(2026, 11, 23, 12, tzinfo=UTC)
-IN_WINDOW = datetime(2026, 11, 23, 10, tzinfo=UTC)
+#: 入库行的 ``created_at`` 用真实时钟（模型默认值），所以窗口必须以真实 ``now`` 为基准——
+#: 固定日期会让用例在跨过窗口结束时刻后（如 2026-11-24 00:00 UTC）假失败。
+NOW = datetime.now(UTC)
+IN_WINDOW = NOW - timedelta(hours=2)
 
 # 价目（与 DEFAULT_MEDIA_PRICING 对齐；估算只读 DB 行）
 PER_IMAGE = 0.5

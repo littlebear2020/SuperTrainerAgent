@@ -226,3 +226,44 @@ class TestBoundedRead:
         ledger.mkdir()
         read = mu.read_ledger_events(ledger)
         assert (read.events, read.errors) == ([], 1)
+
+
+class TestReaderBounds:
+    """终审 M-4：读取器拒绝 DB 一定会拒绝的值（超范围整数、负尺寸、不可打印 model），不让它每次 drain 重复报错。"""
+
+    @pytest.mark.parametrize(
+        ("event", "why"),
+        [
+            (_image("e", elapsed_ms=2**31), "elapsed_ms above 32-bit INTEGER"),
+            (_image("e", elapsed_ms=-1), "negative elapsed_ms"),
+            (_image("e", width=-1), "negative width"),
+            (_image("e", height=10**6 + 1), "height above 1e6"),
+            (_image("e", model="seedream-\ud800"), "lone surrogate in model"),
+            (_image("e", model="seedream-\x00"), "control char in model"),
+            (_image("e", model="seedream-x\n"), "newline in model"),
+        ],
+        ids=["elapsed-overflow", "elapsed-negative", "width-negative", "height-too-big", "model-surrogate", "model-control", "model-newline"],
+    )
+    def test_out_of_range_values_count_as_errors(self, ledger, event, why):
+        # 默认 ensure_ascii：孤立代理对只能以 \udXXXX 转义形式出现在文件里（发射器无法写出别的形态）
+        _write(ledger, json.dumps(event) + "\n")
+        read = mu.read_ledger_events(ledger)
+        assert (read.events, read.errors) == ([], 1), why
+
+    def test_boundary_values_are_accepted(self, ledger):
+        _write(ledger, _line(**_image("e", elapsed_ms=2**31 - 1, width=10**6, height=0)))
+        read = mu.read_ledger_events(ledger)
+        assert read.errors == 0
+        assert read.events[0].elapsed_ms == 2**31 - 1 and read.events[0].width == 10**6 and read.events[0].height == 0
+
+    @pytest.mark.parametrize("failing", ["fstat", "lseek", "read"], ids=["fstat", "lseek", "read"])
+    def test_oserror_during_read_phase_is_an_error_not_an_exception(self, ledger, monkeypatch, failing):
+        """终审 M-5：EIO/ESTALE 发生在 open 之后也必须计 error，不得抛出。"""
+        _write(ledger, _line(**_tts("ok")))
+
+        def boom(*args, **kwargs):
+            raise OSError(5, "Input/output error")
+
+        monkeypatch.setattr(mu.os, failing, boom)
+        read = mu.read_ledger_events(ledger)
+        assert (read.events, read.errors) == ([], 1)
