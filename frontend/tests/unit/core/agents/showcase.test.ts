@@ -242,6 +242,112 @@ describe("Agent showcase data and assets", () => {
     }
   });
 
+  // Agents whose case prompts are reusable templates; each slice appends its
+  // agents as they are converted.
+  const templatedAgents = ["creative-studio"] as const;
+
+  it("turns every case prompt into a reusable template without case facts", () => {
+    const sourceLabels = agentIds.flatMap((id) =>
+      agent(id).cases.flatMap((item) =>
+        item.kind === "video" || item.kind === "podcast"
+          ? (item.sources ?? []).flatMap((source) => [
+              source.label.zh,
+              source.label.en,
+            ])
+          : [],
+      ),
+    );
+    const sourceNames = ["InfoQ", "经济参考报", "KubeCon", "新华社", "Mozilla"];
+
+    for (const id of templatedAgents) {
+      for (const item of agent(id).cases) {
+        const where = `${id}/${item.id}`;
+        for (const title of [item.title.zh, item.title.en]) {
+          expect(item.prompt, `${where} leaks its own title`).not.toContain(
+            title,
+          );
+        }
+        expect(
+          item.prompt,
+          `${where} keeps sample durations and page counts out`,
+        ).not.toMatch(/\d+(?:\.\d+)?\s*(?:秒|页|seconds?|slides?|pages?)/i);
+        expect(item.prompt, `${where} has no URL`).not.toMatch(/https?:\/\//);
+        expect(item.prompt, `${where} has no case media path`).not.toContain(
+          "/agent-showcase/",
+        );
+        for (const label of [...sourceLabels, ...sourceNames]) {
+          expect(item.prompt, `${where} leaks source ${label}`).not.toContain(
+            label,
+          );
+        }
+        if (item.kind === "deck") {
+          expect(item.prompt, `${where} leaks the case brand`).not.toContain(
+            "360",
+          );
+        }
+      }
+    }
+  });
+
+  it("gives every case a fill-only action label within the card budget", () => {
+    for (const id of templatedAgents) {
+      for (const item of agent(id).cases) {
+        expect(item.actionLabel, `${id}/${item.id}`).toBeDefined();
+        expect(item.actionLabel?.zh.trim(), `${id}/${item.id}`).not.toBe("");
+        expect(item.actionLabel?.en.trim(), `${id}/${item.id}`).not.toBe("");
+        if (item.kind === "video") {
+          // The video card's bottom row shares space with a truncatable meta
+          // column, so its label has a hard length budget.
+          expect(item.actionLabel?.zh.length).toBeLessThanOrEqual(6);
+          expect(item.actionLabel?.en.length).toBeLessThanOrEqual(16);
+        }
+      }
+    }
+  });
+
+  it("uses request placeholders the composer can recognize", () => {
+    // The composer selects the first fill-in placeholder of the inserted
+    // segment: a 【请…】 / 【可选填写…】 token. Section headers share the
+    // brackets, so every token must be either a known header or a placeholder.
+    const headers = [
+      "【我的内容】",
+      "【风格与版式】",
+      "【必需材料】",
+      "【视觉与配音】",
+      "【需填写】",
+      "【可选】",
+      "【原文来源】",
+      "【固定音色】",
+    ];
+    const placeholder = /^【(?:请[^【】]*|可选填写[^【】]*)】$/;
+
+    for (const id of templatedAgents) {
+      for (const item of agent(id).cases) {
+        const where = `${id}/${item.id}`;
+        const tokens = item.prompt.match(/【[^【】\n]*】/g) ?? [];
+        expect(
+          tokens.some((token) => placeholder.test(token)),
+          where,
+        ).toBe(true);
+        for (const token of tokens) {
+          expect(
+            headers.includes(token) || placeholder.test(token),
+            `${where} uses an unknown token ${token}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("keeps mode lines off decks and videos", () => {
+    for (const item of [
+      ...agent("course-video").cases,
+      ...agent("ppt-master").cases,
+    ]) {
+      expect(item.prompt.split("\n")[0]).not.toMatch(/^\[模式/);
+    }
+  });
+
   it("uses HTTPS for every external source", () => {
     const sources = agentIds.flatMap((id) =>
       agent(id).cases.flatMap((item) => {

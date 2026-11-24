@@ -475,10 +475,10 @@ export const zhCN: Translations = {
       playbackError: "音频暂时无法播放，请重试。",
       filterAll: "全部",
       filterPoster: "课程海报",
-      filterCard: "知识卡片",
+      filterCard: "知识图解",
       filterComic: "知识漫画",
-      filterInfographic: "信息图",
       filterDiagram: "结构图",
+      svgEditable: "SVG 可编辑",
     },
     newChatGuides: {
       "course-video": {

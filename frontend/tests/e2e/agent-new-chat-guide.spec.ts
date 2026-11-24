@@ -313,8 +313,9 @@ test.describe("Agent new-chat task guides", () => {
     );
 
     await page.getByTestId("showcase-filter-card").click();
+    // Knowledge cards and infographics share the merged filter.
     await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
-      2,
+      4,
     );
     await expect(page.getByTestId("showcase-filter-card")).toHaveAttribute(
       "aria-pressed",
@@ -1309,16 +1310,23 @@ test.describe("Agent new-chat task guides", () => {
 
     await expect(cards).toHaveCount(10);
     await expect(page.getByText("10 件", { exact: true })).toBeVisible();
+    await expect(page.locator("[data-testid^='showcase-filter-']")).toHaveCount(
+      5,
+    );
+    await expect(page.getByTestId("showcase-filter-infographic")).toHaveCount(
+      0,
+    );
 
-    for (const filter of [
-      "poster",
-      "card",
-      "comic",
-      "infographic",
-      "diagram",
+    // Cards and infographics merge into one four-item "knowledge graphics"
+    // filter, so it fills three columns while the others fill two.
+    for (const [filter, count, columns] of [
+      ["poster", 2, 2],
+      ["card", 4, 3],
+      ["comic", 2, 2],
+      ["diagram", 2, 2],
     ] as const) {
       await page.getByTestId(`showcase-filter-${filter}`).click();
-      await expect(cards, filter).toHaveCount(2);
+      await expect(cards, filter).toHaveCount(count);
       await expect(
         page.getByTestId(`showcase-filter-${filter}`),
       ).toHaveAttribute("aria-pressed", "true");
@@ -1328,8 +1336,10 @@ test.describe("Agent new-chat task guides", () => {
           Math.round(element.getBoundingClientRect().x),
         ),
       );
-      expect(new Set(filteredColumns).size, filter).toBe(2);
-      await expect(page.getByText("2 / 10 件", { exact: true })).toBeVisible();
+      expect(new Set(filteredColumns).size, filter).toBe(columns);
+      await expect(
+        page.getByText(`${count} / 10 件`, { exact: true }),
+      ).toBeVisible();
     }
 
     await expect(

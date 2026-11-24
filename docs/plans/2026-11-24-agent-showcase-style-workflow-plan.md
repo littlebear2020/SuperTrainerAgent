@@ -174,14 +174,14 @@ Demo 模板到本计划的修正：
 
 ### 1. 切片 A：共享底座 + 课程海报
 
-- [ ] A1 布局基线：在 `agent-showcase.dom.test.tsx` 钉住网格容器 class——`columns-1 gap-4 sm:columns-2 xl:columns-3`、`grid gap-4 sm:grid-cols-2 xl:grid-cols-3`（视频与筛选后的视觉共用）、`flex flex-col gap-4`、`grid gap-4 sm:grid-cols-2`，以及 DeckCard 的两档内网格。视频首行三卡、首屏不溢出、字阶沿用既有 e2e（`wide video showcase…`、`showcase viewport…`、`showcase cards keep the P1 type scale`），不重写。此后任何任务不得修改这些断言。
-- [ ] A2 数据模型：`ShowcaseCaseBase` 新增可选 `actionLabel`、`recipeNote`；`PromptButton` 优先用 `actionLabel`，缺省回落到现有 `usePrompt`；`aria-label` 改为 `${actionLabel}: ${标题}`。
-- [ ] A3 分类合并：数据层 `category` 不动；`agent-showcase.tsx` 的筛选把 `card` 与 `infographic` 合并为键 `card`（匹配两者），testid 仍为 `showcase-filter-card`；`filterCard` 改为「知识图解 / Knowledge graphics」，删除 `filterInfographic` 键（三个 locale 文件）；4 个 card / infographic 案例的 `tag` 改「知识图解 · <风格>」；`note` 改为 4 类口径。
-- [ ] A4 预期内的断言更新（不属于布局基线）：DOM `filters visual cases…`（筛选按钮 6 → 5，`card` 下 2 → 4 件，“4 / 10 件”）；e2e `creative-studio showcase filters real designs…`（`card` 下 2 → 4 件）、`visual filters keep counts in sync…`（筛选列表改为 poster / card / comic / diagram，件数 2 / 4 / 2 / 2，`card` 在 1440 下占 3 列、其余 2 列）、`English showcase keeps long hero…`（可访问名前缀由 `Use this prompt:` 改为新的 `actionLabel.en`）。
-- [ ] A5 课程海报 10 篇模板：按附录 A.1 写入 `prompt`；`actionLabel`「按此风格创作 / Create in this style」；`recipeNote` 按第四节表格写“保留 / 填写”。
-- [ ] A6 弹窗 CTA：`VisualDialog` 底部加一行 `recipeNote` 说明与 CTA（testid `showcase-use-style`）；点击先 `onClose` 再 `onUsePrompt(item.prompt)`；`VisualCard` 的 SVG 徽标改「SVG 可编辑」。
-- [ ] A7 焦点：`AgentShowcase.closeDialog` 增加“不回位卡片”的选项，CTA 发起的关闭使用之；`focusComposer` 改为选中刚填入片段的第一个 `【…】` 占位符。
-- [ ] A8 测试：`showcase.test.ts` 新增“模板不含本案例标题、带数字的秒 / 页、来源标签与 URL、`/agent-showcase/` 路径”断言，既有 marker 用例保持绿；DOM 新增“弹窗 CTA 先关预览再填入、附件数不变、不触发 submit、焦点落在输入框或确认弹窗”；`agent-new-chat-guide.dom.test.tsx` 新增“填入后选中首个占位符”。定向测试绿后提交。
+- [x] A1 布局基线：在 `agent-showcase.dom.test.tsx` 钉住网格容器 class——`columns-1 gap-4 sm:columns-2 xl:columns-3`、`grid gap-4 sm:grid-cols-2 xl:grid-cols-3`（视频与筛选后的视觉共用）、`flex flex-col gap-4`、`grid gap-4 sm:grid-cols-2`，以及 DeckCard 的两档内网格。视频首行三卡、首屏不溢出、字阶沿用既有 e2e（`wide video showcase…`、`showcase viewport…`、`showcase cards keep the P1 type scale`），不重写。此后任何任务不得修改这些断言。
+- [x] A2 数据模型：`ShowcaseCaseBase` 新增可选 `actionLabel`、`recipeNote`；`PromptButton` 优先用 `actionLabel`，缺省回落到现有 `usePrompt`；`aria-label` 改为 `${actionLabel}: ${标题}`。
+- [x] A3 分类合并：数据层 `category` 不动；`agent-showcase.tsx` 的筛选把 `card` 与 `infographic` 合并为键 `card`（匹配两者），testid 仍为 `showcase-filter-card`；`filterCard` 改为「知识图解 / Knowledge graphics」，删除 `filterInfographic` 键（三个 locale 文件）；4 个 card / infographic 案例的 `tag` 改「知识图解 · <风格>」；`note` 改为 4 类口径。
+- [x] A4 预期内的断言更新（不属于布局基线）：DOM `filters visual cases…`（筛选按钮 6 → 5，`card` 下 2 → 4 件，“4 / 10 件”）；e2e `creative-studio showcase filters real designs…`（`card` 下 2 → 4 件）、`visual filters keep counts in sync…`（筛选列表改为 poster / card / comic / diagram，件数 2 / 4 / 2 / 2，`card` 在 1440 下占 3 列、其余 2 列）、`English showcase keeps long hero…`（可访问名前缀由 `Use this prompt:` 改为新的 `actionLabel.en`）。（English 一条针对 ppt-master，随切片 C 的 `actionLabel` 一并更新。）
+- [x] A5 课程海报 10 篇模板：按附录 A.1 写入 `prompt`；`actionLabel`「按此风格创作 / Create in this style」；`recipeNote` 按第四节表格写“保留 / 填写”。
+- [x] A6 弹窗 CTA：`VisualDialog` 底部加一行 `recipeNote` 说明与 CTA（testid `showcase-use-style`）；点击先 `onClose` 再 `onUsePrompt(item.prompt)`；`VisualCard` 的 SVG 徽标改「SVG 可编辑」。
+- [x] A7 焦点：`AgentShowcase.closeDialog` 增加“不回位卡片”的选项，CTA 发起的关闭使用之；`focusComposer` 改为选中刚填入片段的第一个 `【…】` 占位符。（执行修正：占位符只认 `【请…】` / `【可选填写…】` 形态，`【我的内容】` 这类小节标题不选中。）
+- [x] A8 测试：`showcase.test.ts` 新增“模板不含本案例标题、带数字的秒 / 页、来源标签与 URL、`/agent-showcase/` 路径”断言，既有 marker 用例保持绿；DOM 新增“弹窗 CTA 先关预览再填入、附件数不变、不触发 submit、焦点落在输入框或确认弹窗”；`agent-new-chat-guide.dom.test.tsx` 新增“填入后选中首个占位符”。定向测试绿后提交。
 
 ### 2. 切片 B：文字动效
 

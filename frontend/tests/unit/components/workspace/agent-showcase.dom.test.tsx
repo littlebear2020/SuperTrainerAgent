@@ -120,6 +120,84 @@ describe("AgentShowcase", () => {
     ).toBe(false);
   });
 
+  // One row per agent; each slice appends its dialog as it gains the CTA.
+  const dialogCases = [
+    {
+      agent: "creative-studio",
+      open: "showcase-open-visual-poster-agent",
+      promptId: "visual-poster-agent",
+      hasVideo: false,
+      label: "按此风格创作",
+    },
+  ] as const;
+
+  it.each(dialogCases)(
+    "fills the composer from the $agent dialog CTA after closing its preview",
+    async ({ agent, open, promptId, hasVideo, label }) => {
+      const pause = mockPause();
+      await renderShowcase(agent);
+      const item = showcaseFor(agent)!.cases.find(
+        (entry) => entry.id === promptId,
+      )!;
+      const trigger = element(open);
+      trigger.focus();
+      const returnFocus = vi.spyOn(trigger, "focus");
+      await click(trigger);
+
+      const cta = element<HTMLButtonElement>("showcase-use-style");
+      expect(cta.textContent).toContain(label);
+      expect(cta.getAttribute("aria-label")).toBe(`${label}: ${item.title.zh}`);
+      await click(cta);
+
+      // The preview closes first: no dialog and no media element remain.
+      expect(document.querySelector("[role='dialog']")).toBeNull();
+      expect(document.querySelector("video")).toBeNull();
+      expect(onUsePrompt).toHaveBeenCalledTimes(1);
+      expect(onUsePrompt).toHaveBeenCalledWith(item.prompt);
+      // Focus moves on to the composer, not back to the card.
+      expect(returnFocus).not.toHaveBeenCalled();
+      if (hasVideo) expect(pause).toHaveBeenCalled();
+    },
+  );
+
+  it("labels card prompt actions with the case action label", async () => {
+    await renderShowcase("creative-studio");
+    const item = showcaseFor("creative-studio")!.cases[0]!;
+    const button = element<HTMLButtonElement>(
+      "showcase-prompt-visual-poster-agent",
+    );
+    expect(button.textContent).toContain("按此风格创作");
+    expect(button.getAttribute("aria-label")).toBe(
+      `按此风格创作: ${item.title.zh}`,
+    );
+    // Diagrams advertise the editable SVG output on their badge.
+    expect(element("showcase-open-visual-diagram-stack").textContent).toContain(
+      "SVG 可编辑",
+    );
+  });
+
+  it("shows the recipe note above the visual dialog CTA", async () => {
+    await renderShowcase("creative-studio");
+    await click(element("showcase-open-visual-poster-agent"));
+    const dialog = document.querySelector("[role='dialog']");
+    expect(dialog?.textContent).toContain("9:16");
+    expect(dialog?.textContent).toContain("先确认方案再出图");
+    // The case's own title stays a fact on the card, not a template variable.
+    expect(element("showcase-recipe").textContent).not.toContain(
+      "AI Agent 实战训练营",
+    );
+  });
+
+  it("disables the dialog CTA together with the other prompt actions", async () => {
+    await renderShowcase("creative-studio", true);
+    await click(element("showcase-open-visual-card-rag"));
+    const cta = element<HTMLButtonElement>("showcase-use-style");
+    expect(cta.disabled).toBe(true);
+    await click(cta);
+    expect(onUsePrompt).not.toHaveBeenCalled();
+    expect(document.querySelector("[role='dialog']")).not.toBeNull();
+  });
+
   it("replaces a broken poster with an honest media fallback", async () => {
     await renderShowcase();
     const image = container.querySelector<HTMLImageElement>(
@@ -296,15 +374,45 @@ describe("AgentShowcase", () => {
     );
   });
 
+  // Layout baseline (style-workflow plan §1 / A1): pin the grid containers.
+  // These assertions are the acceptance baseline and must not be edited.
+  it("pins the grid containers of all four showcases", async () => {
+    const casesClass = () => element("agent-guide-cases").className;
+
+    await renderShowcase("creative-studio");
+    expect(casesClass()).toContain("columns-1 gap-4 sm:columns-2 xl:columns-3");
+    // A filtered subset of the visual showcase switches to the regular grid.
+    await click(element("showcase-filter-poster"));
+    expect(casesClass()).toContain("grid gap-4 sm:grid-cols-2 xl:grid-cols-3");
+    expect(casesClass()).not.toContain("columns-");
+
+    await renderShowcase("course-video");
+    expect(casesClass()).toContain("grid gap-4 sm:grid-cols-2 xl:grid-cols-3");
+
+    await renderShowcase("ppt-master");
+    expect(casesClass()).toContain("flex flex-col gap-4");
+    const deck = element("showcase-case-ppt-quick").className;
+    expect(deck).toContain("md:grid-cols-[250px_minmax(0,1fr)]");
+    expect(deck).toContain("xl:grid-cols-[296px_minmax(0,1fr)]");
+
+    await renderShowcase("podcast-studio");
+    expect(casesClass()).toContain("grid gap-4 sm:grid-cols-2");
+  });
+
   it("filters visual cases with aria state and opens original and SVG downloads", async () => {
     await renderShowcase("creative-studio");
     expect(container.querySelectorAll("article")).toHaveLength(10);
+    // Knowledge cards and infographics share the merged "card" filter.
     expect(
       container.querySelectorAll("[data-testid^='showcase-filter-']"),
-    ).toHaveLength(6);
+    ).toHaveLength(5);
+    expect(
+      container.querySelector("[data-testid='showcase-filter-infographic']"),
+    ).toBeNull();
+    expect(element("showcase-filter-card").textContent).toBe("知识图解");
 
     await click(element("showcase-filter-card"));
-    expect(container.querySelectorAll("article")).toHaveLength(2);
+    expect(container.querySelectorAll("article")).toHaveLength(4);
     expect(element("showcase-filter-card").getAttribute("aria-pressed")).toBe(
       "true",
     );
@@ -312,7 +420,7 @@ describe("AgentShowcase", () => {
       "false",
     );
     // The right-edge count follows the filtered grid.
-    expect(container.textContent).toContain("2 / 10 件");
+    expect(container.textContent).toContain("4 / 10 件");
 
     const trigger = element("showcase-open-visual-card-rag");
     trigger.focus();

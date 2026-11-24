@@ -26,6 +26,27 @@ import {
 } from "./showcase-dialogs";
 import { localized, type ShowcaseLocale } from "./showcase-utils";
 
+// Filter keys of the visual showcase. "card" covers both knowledge cards and
+// infographics: they merge into one "knowledge graphics" filter while the data
+// layer keeps its own `category`.
+type VisualFilter = "all" | "poster" | "card" | "comic" | "diagram";
+
+const VISUAL_FILTERS: readonly VisualFilter[] = [
+  "all",
+  "poster",
+  "card",
+  "comic",
+  "diagram",
+];
+
+function matchesVisualFilter(item: VisualCase, filter: VisualFilter) {
+  return (
+    filter === "all" ||
+    item.category === filter ||
+    (filter === "card" && item.category === "infographic")
+  );
+}
+
 export function AgentShowcase({
   agent,
   disabled,
@@ -44,16 +65,11 @@ export function AgentShowcase({
   } | null>(null);
   const [activeVisual, setActiveVisual] = useState<VisualCase | null>(null);
   const [activePodcast, setActivePodcast] = useState<PodcastCase | null>(null);
-  const [visualFilter, setVisualFilter] = useState<
-    VisualCase["category"] | "all"
-  >("all");
+  const [visualFilter, setVisualFilter] = useState<VisualFilter>("all");
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleCases = agent.cases.filter(
-    (item) =>
-      item.kind !== "visual" ||
-      visualFilter === "all" ||
-      item.category === visualFilter,
+    (item) => item.kind !== "visual" || matchesVisualFilter(item, visualFilter),
   );
   const podcastCases = agent.cases.filter(
     (item): item is PodcastCase => item.kind === "podcast",
@@ -66,24 +82,20 @@ export function AgentShowcase({
     agent.cases.every((item) => item.kind === "visual");
   const hasPodcastCases = podcastCases.length > 0;
   const gridCases = visibleCases.filter((item) => item.kind !== "podcast");
-  const filterLabels: Record<VisualCase["category"] | "all", string> = {
+  const filterLabels: Record<VisualFilter, string> = {
     all: t.agents.showcase.filterAll,
     poster: t.agents.showcase.filterPoster,
     card: t.agents.showcase.filterCard,
     comic: t.agents.showcase.filterComic,
-    infographic: t.agents.showcase.filterInfographic,
     diagram: t.agents.showcase.filterDiagram,
   };
-  const availableCategories = new Set(
-    agent.cases
-      .filter((item): item is VisualCase => item.kind === "visual")
-      .map((item) => item.category),
-  );
-  const visualFilters = (
-    ["all", "poster", "card", "comic", "infographic", "diagram"] as const
-  )
-    .filter((value) => value === "all" || availableCategories.has(value))
-    .map((value) => [value, filterLabels[value]] as const);
+  const visualFilters = VISUAL_FILTERS.filter(
+    (value) =>
+      value === "all" ||
+      agent.cases.some(
+        (item) => item.kind === "visual" && matchesVisualFilter(item, value),
+      ),
+  ).map((value) => [value, filterLabels[value]] as const);
 
   // Filtered results are all visual cases; only then may the masonry be
   // replaced by the regular grid (mixed deck/video cards need their own layout).
@@ -97,7 +109,11 @@ export function AgentShowcase({
     };
   }, []);
 
-  const closeDialog = () => {
+  // `returnFocus: false` is for the fill-only CTA: the focus belongs to the
+  // composer or the draft confirmation that opens next, not to the card.
+  const closeDialog = ({
+    returnFocus = true,
+  }: { returnFocus?: boolean } = {}) => {
     if (focusTimeoutRef.current !== null) {
       clearTimeout(focusTimeoutRef.current);
     }
@@ -106,7 +122,9 @@ export function AgentShowcase({
     setActiveDeck(null);
     setActiveVisual(null);
     setActivePodcast(null);
-    focusTimeoutRef.current = setTimeout(() => trigger?.focus(), 0);
+    if (returnFocus) {
+      focusTimeoutRef.current = setTimeout(() => trigger?.focus(), 0);
+    }
   };
 
   return (
@@ -277,6 +295,8 @@ export function AgentShowcase({
         <VisualDialog
           item={activeVisual}
           locale={language}
+          disabled={disabled}
+          onUsePrompt={onUsePrompt}
           onClose={closeDialog}
         />
       ) : null}

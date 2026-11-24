@@ -58,21 +58,37 @@ export function AgentNewChatGuide({
     status === "ready" &&
     !disabled;
 
-  const focusComposer = () => {
+  // A fill-in placeholder of a template: 【请填写】, 【请填写，可留空】,
+  // 【可选填写】 and their longer variants. Section headers such as 【我的内容】
+  // share the brackets but are not meant to be typed over.
+  const focusComposer = (start: number, end: number) => {
     const composer = document.querySelector<HTMLTextAreaElement>(
       "textarea[name='message']",
     );
     if (!composer) return;
     composer.focus();
+    // Select the first placeholder of the inserted segment only, so an older
+    // placeholder in the kept draft is never picked.
+    const match = /【(?:请[^【】\n]*|可选填写[^【】\n]*)】/.exec(
+      composer.value.slice(start, end),
+    );
+    if (match) {
+      composer.setSelectionRange(
+        start + match.index,
+        start + match.index + match[0].length,
+      );
+      return;
+    }
     composer.setSelectionRange(composer.value.length, composer.value.length);
   };
 
   const applyPrompt = (prompt: string, append: boolean) => {
     const current = textInput.value;
     const separator = append && current && !current.endsWith("\n") ? "\n" : "";
+    const start = append ? current.length + separator.length : 0;
     textInput.setInput(append ? current + separator + prompt : prompt);
     setPendingSelection(null);
-    setTimeout(focusComposer, 0);
+    setTimeout(() => focusComposer(start, start + prompt.length), 0);
   };
 
   const selectCase = (prompt: string) => {

@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   ImageOff,
+  Plus,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -20,19 +21,90 @@ import {
 } from "@/components/ui/dialog";
 import type {
   DeckCase,
+  LocalizedText,
   PodcastCase,
+  ShowcaseCase,
   ShowcaseSource,
   VideoCase,
   VisualCase,
 } from "@/core/agents/showcase";
 import { useI18n } from "@/core/i18n/hooks";
+import { cn } from "@/lib/utils";
 
 import {
   formatBytes,
   formatDuration,
   localized,
+  promptActionLabel,
   type ShowcaseLocale,
 } from "./showcase-utils";
+
+type UsePromptProps = {
+  /** Fill-only: the preview closes first, then the template goes to the composer. */
+  onUsePrompt?: (prompt: string) => void;
+  disabled?: boolean;
+  /** `returnFocus: false` keeps the focus for the composer or the draft confirmation. */
+  onClose: (options?: { returnFocus?: boolean }) => void;
+};
+
+/**
+ * Bottom row of a preview dialog: the case's "kept / fill in" note and the
+ * same fill-only CTA as its card.
+ */
+function DialogRecipeAction({
+  item,
+  title,
+  locale,
+  disabled,
+  accent,
+  close,
+  onUsePrompt,
+}: {
+  item: ShowcaseCase;
+  title: LocalizedText;
+  locale: ShowcaseLocale;
+  disabled: boolean;
+  accent: string;
+  close: () => void;
+  onUsePrompt?: (prompt: string) => void;
+}) {
+  const { t } = useI18n();
+  if (!onUsePrompt) return null;
+  const label = promptActionLabel(item, locale, t.agents.showcase.usePrompt);
+  return (
+    <div
+      data-testid="showcase-recipe"
+      className="border-border/70 flex flex-wrap items-center justify-between gap-3 border-t pt-4 dark:border-white/10"
+    >
+      {item.recipeNote ? (
+        <p className="text-muted-foreground min-w-0 flex-1 basis-64 text-xs leading-5">
+          {localized(item.recipeNote, locale)}
+        </p>
+      ) : (
+        <span className="flex-1" aria-hidden="true" />
+      )}
+      <button
+        type="button"
+        data-testid="showcase-use-style"
+        disabled={disabled}
+        aria-label={`${label}: ${localized(title, locale)}`}
+        onClick={() => {
+          // Close the preview first so it never stacks on the draft
+          // confirmation, and leave the focus to what comes next.
+          close();
+          onUsePrompt(item.prompt);
+        }}
+        className={cn(
+          "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-medium text-white focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45",
+          accent,
+        )}
+      >
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+        {label}
+      </button>
+    </div>
+  );
+}
 
 export function SourceLinks({
   sources,
@@ -269,11 +341,12 @@ export function DeckDialog({
 export function VisualDialog({
   item,
   locale,
+  disabled = false,
+  onUsePrompt,
   onClose,
-}: {
+}: UsePromptProps & {
   item: VisualCase;
   locale: ShowcaseLocale;
-  onClose: () => void;
 }) {
   const { t } = useI18n();
   const [failed, setFailed] = useState(false);
@@ -340,6 +413,15 @@ export function VisualDialog({
               : t.agents.showcase.downloadOriginal}
           </a>
         </div>
+        <DialogRecipeAction
+          item={item}
+          title={item.title}
+          locale={locale}
+          disabled={disabled}
+          accent="bg-fuchsia-600 hover:bg-fuchsia-500 focus-visible:ring-fuchsia-500"
+          close={() => onClose({ returnFocus: false })}
+          onUsePrompt={onUsePrompt}
+        />
       </DialogContent>
     </Dialog>
   );

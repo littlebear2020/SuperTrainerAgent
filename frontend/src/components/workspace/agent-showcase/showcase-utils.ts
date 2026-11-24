@@ -1,4 +1,4 @@
-import type { LocalizedText } from "@/core/agents/showcase";
+import type { LocalizedText, ShowcaseCase } from "@/core/agents/showcase";
 
 export type ShowcaseLocale = "zh" | "en";
 
@@ -7,6 +7,15 @@ export function localized(
   locale: ShowcaseLocale,
 ): string {
   return value[locale];
+}
+
+/** Fill-only CTA label; falls back to the generic "use prompt" copy. */
+export function promptActionLabel(
+  item: ShowcaseCase,
+  locale: ShowcaseLocale,
+  fallback: string,
+): string {
+  return item.actionLabel ? localized(item.actionLabel, locale) : fallback;
 }
 
 export function formatDuration(seconds: number): string {

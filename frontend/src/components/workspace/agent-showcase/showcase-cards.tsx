@@ -26,6 +26,7 @@ import {
   formatBytes,
   formatDuration,
   localized,
+  promptActionLabel,
   type ShowcaseLocale,
 } from "./showcase-utils";
 
@@ -43,18 +44,19 @@ export function PromptButton({
   onUsePrompt: (prompt: string) => void;
 }) {
   const { t } = useI18n();
+  const label = promptActionLabel(item, locale, t.agents.showcase.usePrompt);
   return (
     <button
       type="button"
       data-showcase-prompt
       data-testid={`showcase-prompt-${item.id}`}
-      aria-label={`${t.agents.showcase.usePrompt}: ${localized(title, locale)}`}
+      aria-label={`${label}: ${localized(title, locale)}`}
       disabled={disabled}
       onClick={() => onUsePrompt(item.prompt)}
       className="showcase-prompt border-border bg-card text-muted-foreground inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-medium whitespace-nowrap transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-      {t.agents.showcase.usePrompt}
+      {label}
     </button>
   );
 }
@@ -350,7 +352,7 @@ export function VisualCard({
         </span>
         {item.vector ? (
           <span className="absolute top-3 right-3 rounded-full bg-black/70 px-2 py-1 text-[10px] font-medium text-white">
-            SVG
+            {t.agents.showcase.svgEditable}
           </span>
         ) : null}
       </button>
