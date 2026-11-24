@@ -290,6 +290,8 @@ export function AgentShowcase({
           item={activeDeck.item}
           initialSlide={activeDeck.initialSlide}
           locale={language}
+          disabled={disabled}
+          onUsePrompt={onUsePrompt}
           onClose={closeDialog}
         />
       ) : null}

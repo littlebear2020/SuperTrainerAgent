@@ -220,13 +220,14 @@ export function DeckDialog({
   item,
   initialSlide,
   locale,
+  disabled = false,
+  onUsePrompt,
   onClose,
 }: {
   item: DeckCase;
   initialSlide: number;
   locale: ShowcaseLocale;
-  onClose: () => void;
-}) {
+} & UsePromptProps) {
   const { t } = useI18n();
   const [index, setIndex] = useState(initialSlide);
   const title = localized(item.title, locale);
@@ -344,6 +345,15 @@ export function DeckDialog({
             {t.agents.showcase.downloadPptx}
           </a>
         </div>
+        <DialogRecipeAction
+          item={item}
+          title={item.title}
+          locale={locale}
+          disabled={disabled}
+          accent="bg-amber-700 hover:bg-amber-800 focus-visible:ring-amber-500"
+          close={() => onClose({ returnFocus: false })}
+          onUsePrompt={onUsePrompt}
+        />
       </DialogContent>
     </Dialog>
   );

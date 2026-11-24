@@ -237,6 +237,7 @@ export function DeckCard({
             {localized(item.tag, locale)}
           </span>
           <span className="text-muted-foreground text-[10.5px]">
+            {t.agents.showcase.stylePrefix}
             {localized(item.styleLabel, locale)}
           </span>
         </div>

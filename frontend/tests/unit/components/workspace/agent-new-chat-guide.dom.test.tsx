@@ -342,6 +342,11 @@ describe("AgentNewChatGuide", () => {
       open: "showcase-open-video-hallucination",
       promptId: "video-hallucination",
     },
+    {
+      agentName: "ppt-master",
+      open: "showcase-open-ppt-standard",
+      promptId: "ppt-standard",
+    },
   ] as const;
 
   it.each(dialogCases)(

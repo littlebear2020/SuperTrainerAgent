@@ -211,6 +211,54 @@ const darkTech = text(
 const warmPaper = text("暖白纸感 · 杂志排版", "Warm paper · Editorial layout");
 const deepGreen = text("深绿调研 · 来源卡片", "Deep green · Source cards");
 
+// Deck templates (plan appendix A.3). No leading mode line: ppt-master's mode
+// is a conversation mode, so the trigger sentences come from the real prompts.
+const deckContentFields = [
+  "主题：【请填写】",
+  "资料：【请填写要点，或注明你手动添加的资料文件】",
+  "受众：【请填写，如零基础学员】",
+  "目标：【请填写学完能做到什么】",
+  "页数：【请填写建议页数】",
+];
+
+const quickDeckTemplate = `走 Quick 流程，跳过 Stage 1/2 策略与方案确认，直接出稿并完成质量检查，交付原生可编辑 PPTX。
+
+【我的内容】
+${deckContentFields.join("\n")}
+
+视觉：参考轻量科技、暖纸与钴蓝配色，按我的内容重新设计。
+
+要求：逐页可编辑，不使用整页截图代替原生页面；不要沿用案例主题或文案。`;
+
+const defaultDeckTemplate = `按 Default 标准流程制作一份原生可编辑 PPTX。先与我确认课程结构和设计方案，再逐页生成。
+
+【我的内容】
+${deckContentFields.join("\n")}
+
+视觉：参考深色杂志风、琥珀与青配色，按我的内容重新设计。
+
+要求：图表与流程页使用原生可编辑对象，不使用整页截图代替；不要沿用案例主题或文案。`;
+
+const editNativeDeckTemplate = `请走 Edit Native 原生编辑，改造我上传的现有 PPT：先与我确认逐页编辑计划（输出页 → 源页 → 操作），再执行原生编辑。
+
+【必需材料】
+源 PPTX：请上传你有权编辑的 .pptx
+新内容资料：【请填写要点，或注明你手动添加的资料文件】
+
+【我的内容】
+新主题：【请填写】
+受众：【请填写】
+目标：【请填写】
+页数：按新内容决定，不限定页数
+保留范围：【请填写需保留的封面、页眉页脚、版式或对象】
+改写范围：【请填写需改写或新增的页面与内容】
+
+要求：仅处理我有权编辑的文件；按“保留范围”保留原设计；未编辑对象不重建，未修改的对象保持原样；新增或改写页面沿用源 PPT 的视觉语言，交付可继续改字、换图、调整版式的 PPTX，不用整页截图替代。`;
+
+const deckRecipeFooter = "案例成品不会自动作为你的模板。";
+const deckRecipeFooterEn =
+  "The finished case deck is never used as your template.";
+
 const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
   "course-video": {
     id: "course-video",
@@ -409,8 +457,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，从为什么需要提示词工程到四要素、改写示例、模板和常见误区；跳过策略确认，直接出稿。",
           "Seven slides covering prompt engineering fundamentals, four elements, rewrites, templates, and pitfalls.",
         ),
-        prompt:
-          "快速生成一份 7 页课件《AI 提示词工程入门》，面向零基础学员，轻量科技风。走 Quick 流程，跳过 Stage 1/2 策略与方案确认，直接出稿，保持逐页可编辑并完成质量检查。",
+        actionLabel: text("按此方式快速出稿", "Quick-draft this way"),
+        recipeNote: text(
+          "保留：Quick 流程（跳过 Stage 1/2）与轻量科技、暖纸钴蓝配色。填写：主题或资料；受众、目标、页数可填，也可由 Agent 判断。" +
+            deckRecipeFooter,
+          "Kept: the Quick workflow (skipping Stage 1/2) and the light-tech warm-paper cobalt palette. Fill in: a topic or source material; audience, goal and page count are optional—the agent decides otherwise. " +
+            deckRecipeFooterEn,
+        ),
+        prompt: quickDeckTemplate,
         slides: slides("quick"),
         pptx: asset("ppt/quick-prompt-v3.pptx"),
         pptxBytes: 236985,
@@ -437,8 +491,14 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，包含课程地图、三层架构、RAG 流程、Agent 循环和评估框架；先确认方案再逐页设计。",
           "Seven slides with a course map, three-layer architecture, RAG flow, agent loop, and evaluation framework.",
         ),
-        prompt:
-          "按 Default 标准流程制作一份 7 页课件《大模型应用开发实战》，深色杂志风。先与我确认课程结构和设计方案，再逐页生成；要有课程地图、三层架构、RAG 流程、Agent 循环和评估页，交付原生可编辑 PPTX。",
+        actionLabel: text("按此方式规划制作", "Plan and build this way"),
+        recipeNote: text(
+          "保留：Default 两阶段确认与深色杂志、琥珀青配色。填写：主题或资料、受众基础、学习目标与使用场景；页数可由 Agent 推荐。" +
+            deckRecipeFooter,
+          "Kept: the two Default confirmations and the dark editorial amber-and-teal palette. Fill in: a topic or source material, audience level, learning goals and setting; the agent can recommend the page count. " +
+            deckRecipeFooterEn,
+        ),
+        prompt: defaultDeckTemplate,
         slides: slides("standard"),
         pptx: asset("ppt/standard-llm-app-v3.pptx"),
         pptxBytes: 437726,
@@ -465,8 +525,13 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，保留 360 原封面、页眉标识与绿色视觉语言，把内容重排成通识课；未修改的封面与背景对象保持原样。",
           "Seven slides rebuilt as an introductory course while preserving the 360 cover, header mark, and green visual language.",
         ),
-        prompt:
-          "我会上传 360 模板《模板.pptx》。请走 Edit Native 原生编辑，保留原封面、页眉页脚和整体版式设计，把内容改写成 7 页《生成式 AI 通识课》；未编辑对象不重建，未修改的对象保持原样，新增或改写页面沿用模板视觉语言，交付可编辑 PPTX。",
+        actionLabel: text("按此方式改造我的 PPT", "Edit my PPT this way"),
+        recipeNote: text(
+          "保留：Edit Native 的页面计划、源对象保留与原生改造方式。填写：上传你有权编辑的 .pptx、新内容资料，以及保留 / 删除 / 改造范围。案例基于授权的 360 模板制作，该" +
+            deckRecipeFooter,
+          "Kept: the Edit Native page plan, source-object preservation and native editing. Fill in: upload a .pptx you may edit, the new source material, and what to keep, remove or rewrite. The case was built on an authorized 360 template; that deck is never used as your template.",
+        ),
+        prompt: editNativeDeckTemplate,
         slides: slides("template"),
         pptx: asset("ppt/template-360-ai-v4.pptx"),
         pptxBytes: 467022,

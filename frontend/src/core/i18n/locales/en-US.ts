@@ -504,6 +504,7 @@ export const enUS: Translations = {
       filterComic: "Knowledge comics",
       filterDiagram: "Diagrams",
       svgEditable: "Editable SVG",
+      stylePrefix: "Style: ",
     },
     newChatGuides: {
       "course-video": {

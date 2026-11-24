@@ -136,6 +136,13 @@ describe("AgentShowcase", () => {
       hasVideo: true,
       label: "按风格创作",
     },
+    {
+      agent: "ppt-master",
+      open: "showcase-open-ppt-quick",
+      promptId: "ppt-quick",
+      hasVideo: false,
+      label: "按此方式快速出稿",
+    },
   ] as const;
 
   it.each(dialogCases)(
@@ -181,6 +188,20 @@ describe("AgentShowcase", () => {
     expect(element("showcase-open-visual-diagram-stack").textContent).toContain(
       "SVG 可编辑",
     );
+  });
+
+  it("marks the deck style row and the case-brand note as visual facts", async () => {
+    await renderShowcase("ppt-master");
+    // The style is what the template reuses; say so on the card.
+    expect(element("showcase-case-ppt-quick").textContent).toContain(
+      "视觉：轻量科技 · 暖纸钴蓝",
+    );
+    await click(element("showcase-open-ppt-template"));
+    const note = element("showcase-recipe").textContent ?? "";
+    expect(note).toContain("不会自动作为你的模板");
+    // The 360 deck stays a case fact in the note, never in the prompt.
+    expect(note).toContain("360");
+    expect(showcaseFor("ppt-master")!.cases[2]!.prompt).not.toContain("360");
   });
 
   it("keeps the video card CTA short enough for the meta column", async () => {
