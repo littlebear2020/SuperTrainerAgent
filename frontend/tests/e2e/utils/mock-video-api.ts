@@ -58,6 +58,8 @@ export interface MockStoryboardFrame {
   preview_state?: "running" | "done" | "error";
   preview_error?: string | null;
   regen_state?: "running" | "done" | "error";
+  regen_error?: string | null;
+  regen_state_at?: string;
 }
 
 export interface MockStoryboard {
@@ -246,6 +248,29 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
   let failRetryStatus: 409 | undefined;
   let failFrameUpdate: { status: number; detail: unknown } | undefined;
   let failBulkDisable: { status: number; detail: unknown } | undefined;
+
+  /**
+   * 一次性失败注入：命中则取出（下一次请求恢复正常）并直接下发错误响应，
+   * 未注入返回 undefined，调用方继续正常分支。
+   */
+  function consumeFailure(
+    route: Route,
+    slot: "recompose" | "frameUpdate" | "bulkDisable",
+  ): Promise<void> | undefined {
+    const failure =
+      slot === "recompose"
+        ? failRetryStatus !== undefined
+          ? { status: failRetryStatus, detail: "Storyboard edit required" }
+          : undefined
+        : slot === "frameUpdate"
+          ? failFrameUpdate
+          : failBulkDisable;
+    if (!failure) return undefined;
+    if (slot === "recompose") failRetryStatus = undefined;
+    else if (slot === "frameUpdate") failFrameUpdate = undefined;
+    else failBulkDisable = undefined;
+    return json(route, failure.status, { detail: failure.detail });
+  }
   let createdTaskId: string | undefined;
   let projectSequence = 0;
 
@@ -460,11 +485,8 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
 
       if (suffix === "recompose" && method === "POST") {
         retryRequests.push({ method, url: path, body: parseBody(route) });
-        if (failRetryStatus !== undefined) {
-          const status = failRetryStatus;
-          failRetryStatus = undefined;
-          return json(route, status, { detail: "Storyboard edit required" });
-        }
+        const failure = consumeFailure(route, "recompose");
+        if (failure) return failure;
         setTaskStatus(taskId, "composing", { progress: 35 });
         return json(route, 200, { task_id: taskId, status: "composing" });
       }
@@ -518,11 +540,8 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
           url: path,
           body: updates,
         });
-        if (failFrameUpdate) {
-          const failure = failFrameUpdate;
-          failFrameUpdate = undefined;
-          return json(route, failure.status, { detail: failure.detail });
-        }
+        const frameFailure = consumeFailure(route, "frameUpdate");
+        if (frameFailure) return frameFailure;
         const frameIndex = Number(suffix.split("/").pop());
         const storyboard = storyboards.get(taskId);
         if (storyboard?.frames) {
@@ -539,13 +558,14 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
       }
 
       if (suffix === "storyboard/visual-source/bulk" && method === "POST") {
-        bulkDisableRequests.push({ method, url: path, body: parseBody(route) });
-        if (failBulkDisable) {
-          const failure = failBulkDisable;
-          failBulkDisable = undefined;
-          return json(route, failure.status, { detail: failure.detail });
+        const body = parseBody(route) as { action?: string } | undefined;
+        bulkDisableRequests.push({ method, url: path, body });
+        if (body?.action !== "disable_graphic") {
+          return json(route, 422, { detail: "Unsupported bulk action" });
         }
-        // 与后端一致：graphic → null（=主引擎），graphic_spec 由后端清理
+        const failure = consumeFailure(route, "bulkDisable");
+        if (failure) return failure;
+        // 与后端一致：graphic → null（=主引擎）；graphic_spec 保留（前端 api.ts 同约定）
         let disabled = 0;
         const storyboard = storyboards.get(taskId);
         if (storyboard?.frames) {
@@ -563,13 +583,29 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
         suffix.endsWith("/regenerate") &&
         method === "POST"
       ) {
-        regenerateRequests.push({
-          method,
-          url: path,
-          body: parseBody(route),
-        });
+        const body = parseBody(route) as { mode?: string } | undefined;
+        regenerateRequests.push({ method, url: path, body });
+        // 与后端 frame regenerate 路由同序：状态门 → 帧下标 → 受理
+        if (task.status !== "ready" && task.status !== "failed") {
+          return json(route, 409, {
+            detail: "Task must be ready or failed to regenerate a frame",
+          });
+        }
         const frameIndex = Number(suffix.split("/")[1]);
+        if (!Number.isInteger(frameIndex) || frameIndex < 0) {
+          return json(route, 422, { detail: "Invalid frame index" });
+        }
         const storyboard = storyboards.get(taskId);
+        if (
+          storyboard?.frames &&
+          !storyboard.frames.some((frame) => frame.index === frameIndex)
+        ) {
+          return json(route, 400, {
+            detail: `frame_index ${frameIndex} out of range (0-${
+              storyboard.frames.length - 1
+            })`,
+          });
+        }
         if (storyboard?.frames) {
           // 202 受理后帧上 regen_state=running，终态由 storyboard 轮询到达
           storyboard.frames = storyboard.frames.map((frame) =>
@@ -578,7 +614,10 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
               : frame,
           );
         }
-        return json(route, 200, { frame_index: frameIndex, storyboard });
+        return json(route, 202, {
+          status: "started",
+          mode: body?.mode ?? "all",
+        });
       }
 
       if (suffix === "storyboard/frames" && method === "POST") {

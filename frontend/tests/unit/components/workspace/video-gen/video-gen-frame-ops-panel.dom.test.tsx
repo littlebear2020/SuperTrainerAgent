@@ -222,6 +222,34 @@ describe("E5 帧面板未保存编辑禁止付费重生", () => {
     expect(findButton("重生画面").hasAttribute("disabled")).toBe(true);
   });
 
+  // 触屏收不到 title：被守卫挡住时要有可见文字说明下一步（OCR 第 1 轮）
+  it.each(GUARDED_TYPES)(
+    "%s：被守卫禁用时显示可见的「先保存」提示，恢复后消失",
+    (videoType) => {
+      renderPanel({ videoType });
+      const hint = () =>
+        container!.querySelector('[data-testid="frame-regen-visual-hint"]');
+      expect(hint()).toBeNull();
+
+      typePrompt("改了还没保存的提示词");
+      expect(hint()?.textContent).toContain("请先保存");
+
+      typePrompt(FRAME.image_prompt!);
+      expect(hint()).toBeNull();
+    },
+  );
+
+  it("操作指引写明先保存再重生；vimax 不出现守卫提示", () => {
+    renderPanel({ videoType: "ai_image" });
+    expect(container!.textContent).toContain("先「保存修改」再点「重生画面」");
+
+    renderPanel({ videoType: "vimax" });
+    typePrompt("改了还没保存的提示词");
+    expect(
+      container!.querySelector('[data-testid="frame-regen-visual-hint"]'),
+    ).toBeNull();
+  });
+
   it("vimax：提示词与视觉来源都未保存时「重生画面」保持可点（原按钮规则）", () => {
     renderPanel({ videoType: "vimax" });
     typePrompt("改了还没保存的提示词");
