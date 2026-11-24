@@ -161,31 +161,20 @@ const CANCEL_ACTION: CancelAction = "interrupt";
 /** 同一 (thread, run, wait, action) 的并发取消合并为一次请求（服务端对重复取消幂等）。 */
 const inFlightCancels = new Map<string, Promise<CancelOutcome>>();
 
-const CANCEL_STATUSES = new Set<string>([
-  "cancelled",
-  "not_cancellable",
-  "failed",
-]);
-
-function isCancelOutcome(value: unknown): value is CancelOutcome {
-  if (typeof value !== "object" || value === null) return false;
-  const status = Reflect.get(value, "status");
-  return typeof status === "string" && CANCEL_STATUSES.has(status);
-}
-
 /**
- * 把一次 cancel 请求映射为 CancelOutcome：成功 → cancelled；终态 409 →
- * not_cancellable（清 reconnect key、视为已停止）；其余失败 → failed（保留错误）。
- * 已经是 outcome 的结果（命中同一在途请求时）原样透传。
+ * 把一次 cancel 请求映射为 CancelOutcome：成功 → cancelled（SDK 的 cancel 只以
+ * Promise<void> 结束，没有可判定的响应体）；终态 409 → not_cancellable（清 reconnect
+ * key、视为已停止）；其余失败 → failed（保留错误）。调用方传入的永远是对原始
+ * cancel 的 Promise，命中在途请求时在 dedupeCancel 里就直接返回了，不会到这里。
  */
 async function cancelWithOutcome(
   threadId: string,
   runId: string,
-  request: Promise<unknown>,
+  request: Promise<void>,
 ): Promise<CancelOutcome> {
   try {
-    const result = await request;
-    return isCancelOutcome(result) ? result : { status: "cancelled" };
+    await request;
+    return { status: "cancelled" };
   } catch (error) {
     if (isRunNotCancellableError(error)) {
       clearReconnectRun(threadId, runId);
@@ -200,14 +189,21 @@ function dedupeCancel(
   runId: string,
   wait: boolean,
   action: string,
-  start: () => Promise<unknown>,
+  start: () => Promise<void>,
+  onFailed?: (outcome: Extract<CancelOutcome, { status: "failed" }>) => void,
 ): Promise<CancelOutcome> {
   const key = `${threadId}:${runId}:${wait ? "1" : "0"}:${action}`;
   const existing = inFlightCancels.get(key);
   if (existing) return existing;
-  const request = cancelWithOutcome(threadId, runId, start()).finally(() => {
-    inFlightCancels.delete(key);
-  });
+  const request = cancelWithOutcome(threadId, runId, start())
+    .then((outcome) => {
+      // SDK 浮动路径的失败没人 await，至少留一条可排查的痕迹
+      if (outcome.status === "failed") onFailed?.(outcome);
+      return outcome;
+    })
+    .finally(() => {
+      inFlightCancels.delete(key);
+    });
   inFlightCancels.set(key, request);
   return request;
 }
@@ -275,15 +271,32 @@ function createCompatibleClient(): LangGraphClient {
   // rejection. Containing it has to happen here, at the client boundary.
   // 运行时返回 CancelOutcome（SDK 类型仍声明 Promise<void>，这处断言无法避免）；
   // 需要结果的调用方一律走 cancelRun。
-  rawCancel = client.runs.cancel.bind(client.runs);
+  const boundCancel: RawCancel = client.runs.cancel.bind(client.runs);
+  // 模块级登记只供 cancelRun 使用（getAPIClient 按 key 只建一次 client）
+  rawCancel = boundCancel;
   client.runs.cancel = ((
     threadId: string,
     runId: string,
     wait = false,
     action: CancelAction = "interrupt",
+    options?: { signal?: AbortSignal },
   ) =>
-    dedupeCancel(threadId, runId, wait, action, () =>
-      rawCancel!(threadId, runId, wait, action),
+    // 闭包只引用本 client 的绑定（不读模块级 rawCancel），重建 client 时不会跨实例错配；
+    // 第 5 个参数 options.signal 原样透传
+    dedupeCancel(
+      threadId,
+      runId,
+      wait,
+      action,
+      () => boundCancel(threadId, runId, wait, action, options),
+      (outcome) => {
+        if (!options?.signal?.aborted) {
+          console.warn(
+            "langgraph: background run cancel failed",
+            outcome.error,
+          );
+        }
+      },
     )) as unknown as typeof client.runs.cancel;
 
   return client;
