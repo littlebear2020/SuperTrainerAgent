@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { pinEnglishLocale } from "./utils/locale";
-import { MOCK_THREAD_ID, mockLangGraphAPI } from "./utils/mock-api";
+import { mockLangGraphAPI } from "./utils/mock-api";
 
 const MOCK_AGENTS = [
   {
@@ -52,7 +52,7 @@ test.describe("Agent chat", () => {
   test("agent reply reaches ready without requesting follow-up suggestions", async ({
     page,
   }) => {
-    mockLangGraphAPI(page, { agents: MOCK_AGENTS });
+    const api = mockLangGraphAPI(page, { agents: MOCK_AGENTS });
     const suggestionPosts: string[] = [];
     await page.route("**/api/threads/*/suggestions", (route) => {
       if (route.request().method() === "POST") {
@@ -74,8 +74,11 @@ test.describe("Agent chat", () => {
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
+    // 地址栏以线程创建回显的 thread id 为准（页面预生成的 UUID）
     await expect(page).toHaveURL(
-      new RegExp(`/workspace/agents/test-agent/chats/${MOCK_THREAD_ID}$`),
+      new RegExp(
+        `/workspace/agents/test-agent/chats/${api.createdThreadIds[0]}$`,
+      ),
     );
     await expect(
       page.locator("button[aria-label='Submit'] svg").first(),

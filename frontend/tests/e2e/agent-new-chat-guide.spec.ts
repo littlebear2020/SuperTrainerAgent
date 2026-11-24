@@ -5,7 +5,11 @@ import { showcaseFor } from "../../src/core/agents/showcase";
 import { enUS, zhCN } from "../../src/core/i18n/locales";
 
 import { pinEnglishLocale } from "./utils/locale";
-import { mockLangGraphAPI, MOCK_THREAD_ID } from "./utils/mock-api";
+import {
+  mockLangGraphAPI,
+  MOCK_THREAD_ID,
+  runStreamThreadId,
+} from "./utils/mock-api";
 
 const GUIDE_AGENTS = [
   {
@@ -55,7 +59,7 @@ test.describe("Agent new-chat task guides", () => {
         body: JSON.stringify({ token: "mock-csrf-token" }),
       }),
     );
-    mockLangGraphAPI(page, { agents: GUIDE_AGENTS });
+    return mockLangGraphAPI(page, { agents: GUIDE_AGENTS });
   }
 
   function agentHeader(page: Page) {
@@ -755,40 +759,42 @@ test.describe("Agent new-chat task guides", () => {
   test("shared only explicit submission creates one thread and stage markers stay hidden", async ({
     page,
   }) => {
-    mockGuideAPI(page);
+    const api = mockGuideAPI(page);
     const aiMessage = {
       type: "ai",
       id: "guided-ai",
       content: "[[STAGE:OUTLINE]]\n\n# 课程大纲\n\n第一章",
     };
-    const events = [
-      {
-        event: "metadata",
-        data: { run_id: "guided-run", thread_id: MOCK_THREAD_ID },
-      },
-      { event: "values", data: { messages: [aiMessage] } },
-      { event: "end", data: {} },
-    ];
-    const body = events
-      .map(
-        (event) =>
-          `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
-      )
-      .join("");
+    // metadata 与 Content-Location 回显请求路径里的线程 id（页面预生成、create 回显的 UUID）
     for (const pattern of [
       "**/api/langgraph/runs/stream",
       "**/api/langgraph/threads/*/runs/stream",
     ]) {
-      await page.route(pattern, (route) =>
-        route.fulfill({
+      await page.route(pattern, (route) => {
+        const threadId = runStreamThreadId(route);
+        const events = [
+          {
+            event: "metadata",
+            data: { run_id: "guided-run", thread_id: threadId },
+          },
+          { event: "values", data: { messages: [aiMessage] } },
+          { event: "end", data: {} },
+        ];
+        const body = events
+          .map(
+            (event) =>
+              `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+          )
+          .join("");
+        return route.fulfill({
           status: 200,
           contentType: "text/event-stream",
           headers: {
-            "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/guided-run`,
+            "Content-Location": `/threads/${threadId}/runs/guided-run`,
           },
           body,
-        }),
-      );
+        });
+      });
     }
     const calls = trackSending(page);
     await openGuide(page, "co-writer");
@@ -799,8 +805,9 @@ test.describe("Agent new-chat task guides", () => {
     const textarea = page.locator("textarea[name='message']");
     await textarea.press("Enter");
     await expect.poll(() => calls.runs).toBe(1);
+    // 地址栏以线程创建回显的 thread id 为准
     await expect(page).toHaveURL(
-      `/workspace/agents/co-writer/chats/${MOCK_THREAD_ID}`,
+      `/workspace/agents/co-writer/chats/${api.createdThreadIds[0]}`,
     );
     await expect(
       page.getByRole("heading", { name: "课程大纲", exact: true }),

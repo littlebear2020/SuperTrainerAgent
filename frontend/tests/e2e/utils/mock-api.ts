@@ -50,6 +50,29 @@ export type MockAPIOptions = {
   tokenUsageEnabled?: boolean;
 };
 
+export interface MockLangGraphAPI {
+  /**
+   * `POST /threads` 请求里的 thread_id（页面预生成的 UUID），按创建顺序。
+   * 后端会照单采用客户端给的 thread_id，mock 同样回显——用例以此断言地址栏，
+   * 不再依赖固定的 MOCK_THREAD_ID。
+   */
+  readonly createdThreadIds: string[];
+}
+
+/** run stream 请求对应的线程 id：`/threads/{id}/runs/stream`，取不到时回落固定值。 */
+export function runStreamThreadId(route: Route): string {
+  const match = /\/threads\/([^/?#]+)\/runs\/stream/.exec(
+    route.request().url(),
+  );
+  return match?.[1] ?? MOCK_THREAD_ID;
+}
+
+/** `/…/threads/{id}` 这类以线程 id 结尾的路径取其 id。 */
+function pathThreadId(route: Route): string {
+  const match = /\/threads\/([^/?#]+)/.exec(route.request().url());
+  return match?.[1] ?? MOCK_THREAD_ID;
+}
+
 // ---------------------------------------------------------------------------
 // mockLangGraphAPI
 // ---------------------------------------------------------------------------
@@ -59,11 +82,15 @@ export type MockAPIOptions = {
  * during message sending.  Without these mocks the pages would hang waiting
  * for a real backend.
  */
-export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
+export function mockLangGraphAPI(
+  page: Page,
+  options?: MockAPIOptions,
+): MockLangGraphAPI {
   const threads = options?.threads ?? [];
   const agents = options?.agents ?? [];
   const skills = options?.skills ?? [];
   const tokenUsageEnabled = options?.tokenUsageEnabled ?? false;
+  const createdThreadIds: string[] = [];
 
   // Thread search — sidebar thread list & chats list page
   void page.route("**/api/langgraph/threads/search", (route) => {
@@ -92,14 +119,24 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     });
   });
 
-  // Thread create — called when user sends first message in a new chat
+  // Thread create — called when user sends first message in a new chat.
+  // 回显请求里的 thread_id（页面预生成的 UUID），与后端「Optional thread ID」一致。
   void page.route("**/api/langgraph/threads", (route) => {
     if (route.request().method() === "POST") {
+      const payload = route.request().postData() ?? "";
+      let requested: string | undefined;
+      try {
+        requested = (JSON.parse(payload) as { thread_id?: string }).thread_id;
+      } catch {
+        requested = undefined;
+      }
+      const threadId = requested ?? MOCK_THREAD_ID;
+      createdThreadIds.push(threadId);
       return route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          thread_id: MOCK_THREAD_ID,
+          thread_id: threadId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           metadata: {},
@@ -117,7 +154,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ thread_id: MOCK_THREAD_ID }),
+        body: JSON.stringify({ thread_id: pathThreadId(route) }),
       });
     }
     return route.fallback();
@@ -255,7 +292,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          thread_id: MOCK_THREAD_ID,
+          thread_id: pathThreadId(route),
           total_input_tokens: 600_000,
           total_output_tokens: 387_654,
           total_tokens: 987_654,
@@ -308,6 +345,8 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
       body: JSON.stringify({ detail: "Agent not found" }),
     });
   });
+
+  return { createdThreadIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -317,12 +356,14 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
 /**
  * Build a minimal SSE stream that the LangGraph SDK can parse.
  * The stream returns a single AI message: "Hello from DeerFlow!".
+ * metadata 与 Content-Location 回显请求路径里的线程 id（SDK 的 onCreated 用它）。
  */
 export function handleRunStream(route: Route) {
+  const threadId = runStreamThreadId(route);
   const events = [
     {
       event: "metadata",
-      data: { run_id: MOCK_RUN_ID, thread_id: MOCK_THREAD_ID },
+      data: { run_id: MOCK_RUN_ID, thread_id: threadId },
     },
     {
       event: "values",
@@ -352,7 +393,7 @@ export function handleRunStream(route: Route) {
     status: 200,
     contentType: "text/event-stream",
     headers: {
-      "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/${MOCK_RUN_ID}`,
+      "Content-Location": `/threads/${threadId}/runs/${MOCK_RUN_ID}`,
     },
     body,
   });
@@ -367,10 +408,11 @@ export function createTokenUsageRunStreamHandler(
   return (route: Route) => {
     requestCount += 1;
     const runId = `token-usage-run-${requestCount}`;
+    const threadId = runStreamThreadId(route);
     const events = [
       {
         event: "metadata",
-        data: { run_id: runId, thread_id: MOCK_THREAD_ID },
+        data: { run_id: runId, thread_id: threadId },
       },
       {
         event: "values",
@@ -391,7 +433,7 @@ export function createTokenUsageRunStreamHandler(
       status: 200,
       contentType: "text/event-stream",
       headers: {
-        "Content-Location": `/threads/${MOCK_THREAD_ID}/runs/${runId}`,
+        "Content-Location": `/threads/${threadId}/runs/${runId}`,
       },
       body,
     });
