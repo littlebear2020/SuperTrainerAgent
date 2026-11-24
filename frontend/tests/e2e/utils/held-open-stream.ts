@@ -21,11 +21,20 @@ export async function startHeldOpenStreamServer(options?: {
   const responses = new Set<{ write: (chunk: string) => void }>();
 
   const server = createServer((request, response) => {
-    const runMatch = options?.echoContentLocation
-      ? /\/threads\/(?<thread>[^/?#]+)\/runs\/(?<run>[^/?#]+)/.exec(
-          request.url ?? "",
-        )
-      : null;
+    const runMatch =
+      /\/threads\/(?<thread>[^/?#]+)\/runs\/(?<run>[^/?#]+)/.exec(
+        request.url ?? "",
+      );
+    // 开了回显却没带 `/threads/{id}/runs/{run}`：SDK 永远不会触发 onCreated，
+    // 用例只会以超时失败——在服务端直接暴露误用
+    if (options?.echoContentLocation && !runMatch) {
+      response.destroy(
+        new Error(
+          `held-open stream: echoContentLocation needs a /threads/{id}/runs/{run} path, got ${request.url}`,
+        ),
+      );
+      return;
+    }
     response.writeHead(200, {
       "Cache-Control": "no-cache",
       "Content-Type": "text/event-stream",

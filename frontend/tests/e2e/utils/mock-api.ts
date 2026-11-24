@@ -59,18 +59,30 @@ export interface MockLangGraphAPI {
   readonly createdThreadIds: string[];
 }
 
-/** run stream 请求对应的线程 id：`/threads/{id}/runs/stream`，取不到时回落固定值。 */
-export function runStreamThreadId(route: Route): string {
-  const match = /\/threads\/([^/?#]+)\/runs\/stream/.exec(
-    route.request().url(),
-  );
-  return match?.[1] ?? MOCK_THREAD_ID;
+/** 路径里 `/threads/{id}` 的线程 id，取不到时回落固定值。 */
+function threadIdFromUrl(url: string, fallback = MOCK_THREAD_ID): string {
+  return /\/threads\/([^/?#]+)/.exec(url)?.[1] ?? fallback;
 }
 
-/** `/…/threads/{id}` 这类以线程 id 结尾的路径取其 id。 */
-function pathThreadId(route: Route): string {
-  const match = /\/threads\/([^/?#]+)/.exec(route.request().url());
-  return match?.[1] ?? MOCK_THREAD_ID;
+/** run stream 请求对应的线程 id（`/threads/{id}/runs/stream`），取不到时回落固定值。 */
+export function runStreamThreadId(route: Route): string {
+  const url = route.request().url();
+  return /\/runs\/stream(?:\?|$)/.test(url)
+    ? threadIdFromUrl(url)
+    : MOCK_THREAD_ID;
+}
+
+/** 请求体里非空字符串的 thread_id（页面预生成的 UUID）；缺失或非法返回 undefined。 */
+function requestedThreadId(postData: string | null): string | undefined {
+  if (!postData) return undefined;
+  try {
+    const parsed = JSON.parse(postData) as { thread_id?: unknown };
+    return typeof parsed.thread_id === "string" && parsed.thread_id !== ""
+      ? parsed.thread_id
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,14 +135,9 @@ export function mockLangGraphAPI(
   // 回显请求里的 thread_id（页面预生成的 UUID），与后端「Optional thread ID」一致。
   void page.route("**/api/langgraph/threads", (route) => {
     if (route.request().method() === "POST") {
-      const payload = route.request().postData() ?? "";
-      let requested: string | undefined;
-      try {
-        requested = (JSON.parse(payload) as { thread_id?: string }).thread_id;
-      } catch {
-        requested = undefined;
-      }
-      const threadId = requested ?? MOCK_THREAD_ID;
+      // 只有非空字符串才当作页面预生成的线程 id；缺失或非法时回落固定值
+      const threadId =
+        requestedThreadId(route.request().postData()) ?? MOCK_THREAD_ID;
       createdThreadIds.push(threadId);
       return route.fulfill({
         status: 200,
@@ -154,7 +161,9 @@ export function mockLangGraphAPI(
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ thread_id: pathThreadId(route) }),
+        body: JSON.stringify({
+          thread_id: threadIdFromUrl(route.request().url()),
+        }),
       });
     }
     return route.fallback();
@@ -292,7 +301,7 @@ export function mockLangGraphAPI(
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          thread_id: pathThreadId(route),
+          thread_id: threadIdFromUrl(route.request().url()),
           total_input_tokens: 600_000,
           total_output_tokens: 387_654,
           total_tokens: 987_654,
@@ -346,7 +355,12 @@ export function mockLangGraphAPI(
     });
   });
 
-  return { createdThreadIds };
+  // 对外给只读快照，避免用例误改 mock 内部状态
+  return {
+    get createdThreadIds() {
+      return [...createdThreadIds];
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
