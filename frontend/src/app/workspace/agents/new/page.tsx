@@ -253,8 +253,12 @@ export default function NewAgentPage() {
     } catch (error) {
       // failed / stopped 由 hook 统一提示；busy 是 hook 刻意不提示的（假设正文还留在
       // 输入框）——但这里是隐藏的保存命令，没有可重试的输入，需要自己提示一次
-      if (SendRejectedError.rejectionKind(error) === "busy") {
+      const kind = SendRejectedError.rejectionKind(error);
+      if (kind === "busy") {
         toast.error(error instanceof Error ? error.message : SEND_BUSY_MESSAGE);
+      } else if (kind === null) {
+        // hook 未预期路径直接抛出的普通错误同样不能静默
+        toast.error(error instanceof Error ? error.message : String(error));
       }
       setSetupAgentStatus("idle");
     }

@@ -101,17 +101,21 @@ export default function AgentChatPage() {
       history.replaceState(
         null,
         "",
-        `/workspace/agents/${agent_name}/chats/${requestedThreadId}`,
+        `/workspace/agents/${encodeURIComponent(agent_name)}/chats/${requestedThreadId}`,
       );
     },
-    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 chats/new
+    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 chats/new（回退后重新预生成
+    // UUID，取舍同通用聊天页：重试用新 ID，为新线程选的 context / model 回到默认值）。
+    // useParams 给的是已解码的 agent_name，而浏览器会把地址栏按 percent-encoding
+    // 规范化——两边都先编码再比较。
     onSendError: (requestedThreadId, { wasNewThread }) => {
-      const sentPath = `/workspace/agents/${agent_name}/chats/${requestedThreadId}`;
+      const encodedAgent = encodeURIComponent(agent_name);
+      const sentPath = `/workspace/agents/${encodedAgent}/chats/${requestedThreadId}`;
       if (wasNewThread && window.location.pathname === sentPath) {
         history.replaceState(
           null,
           "",
-          `/workspace/agents/${agent_name}/chats/new`,
+          `/workspace/agents/${encodedAgent}/chats/new`,
         );
       }
     },

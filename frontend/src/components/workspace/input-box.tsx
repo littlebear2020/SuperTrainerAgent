@@ -463,15 +463,26 @@ export function InputBox({
         });
       }
 
-      const submittedText = message.text ?? "";
-      await onSubmitRef.current?.(message);
+      // 纯空白正文 + 附件：正文按空串发出，而不是把 "   " 原样送给后端
+      const outgoing = hasText ? message : { ...message, text: "" };
+      const submittedText = outgoing.text ?? "";
+      await onSubmitRef.current?.(outgoing);
       // 受理后 registry 会无条件清空输入框；等待受理期间（如上传大附件）用户继续
-      // 输入的文字不能跟着丢。registry 的清空发生在本 Promise resolve 之后，所以延后
-      // 一拍把等待期间的新输入放回去。
-      // latestDraftRef 每次渲染都更新，读到的是等待期间的最新输入（闭包里的 textInput.value 是提交那一帧的快照）
+      // 输入的文字不能跟着丢。等待期间输入框里是「已提交正文 + 新输入」，所以只放回
+      // 增量：以已提交正文开头的取后半段；用户删改过已提交部分的，去掉其中残留的
+      // 已提交正文再放回。registry 的清空发生在本 Promise resolve 之后，延后一拍恢复。
+      // 明确取舍：等待期间新加的附件不恢复——恢复它需要复制 registry 的附件状态，
+      // 窗口又只有「附件已上传完、run 尚未受理」这一小段，不在本批。
       const currentText = latestDraftRef.current;
-      if (currentText && currentText !== submittedText) {
-        setTimeout(() => setInput(currentText), 0);
+      const leftover = submittedText
+        ? currentText.startsWith(submittedText)
+          ? currentText.slice(submittedText.length)
+          : currentText.includes(submittedText)
+            ? currentText.replace(submittedText, "")
+            : currentText
+        : currentText;
+      if (leftover) {
+        setTimeout(() => setInput(leftover), 0);
       }
     },
     [context, onContextChange, resolvedModelName, currentMode, setInput],

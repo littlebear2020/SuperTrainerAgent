@@ -307,4 +307,40 @@ describe("agents/new 的三个调用点观察 rejection", () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(unhandled).toEqual([]);
   });
+
+  test("保存抛出普通错误（非 SendRejectedError）：页面提示一次真实错误，状态恢复", async () => {
+    h.sendMessage.mockImplementation(() =>
+      Promise.reject(new Error("boom from hook")),
+    );
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN">
+          <NewAgentPage />
+        </I18nProvider>,
+      );
+    });
+    await reachChatStep();
+    h.sendMessage.mockClear();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="menu-save"]')
+        ?.click();
+    });
+    await settle();
+
+    expect(h.sendMessage).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError.mock.calls[0]![0]).toContain("boom from hook");
+    expect(toastSuccess).not.toHaveBeenCalled();
+    // 状态已恢复：保存入口可再次触发
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="menu-save"]')
+        ?.click();
+    });
+    await settle();
+    expect(h.sendMessage).toHaveBeenCalledTimes(2);
+    expect(unhandled).toEqual([]);
+  });
 });
