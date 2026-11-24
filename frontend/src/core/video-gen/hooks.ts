@@ -133,11 +133,14 @@ export function useVideoTasks() {
  * ready/failed 停轮询——除非 pollWhile() 为真（recompose 宽限期：派发后 status
  * 要等拿到渲染信号量才翻 composing，停轮询会错过 composing→ready 跳变，
  * 视频不刷新、dirty 徽标不清——M8）。
+ * cancelled 是无条件终态：没有 recompose 宽限语义，pollWhile 为真也不继续轮询
+ * （否则取消后的任务详情页每 2s 永久轮询——E4）。
  */
 export function videoTaskRefetchInterval(
   status: string | undefined,
   pollWhile?: () => boolean,
 ): number | false {
+  if (status === "cancelled") return false;
   if (status === "ready" || status === "failed") {
     return pollWhile?.() ? 2000 : false;
   }
