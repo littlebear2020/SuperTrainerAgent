@@ -1,6 +1,6 @@
 # Agent 新会话案例与创作配方优化实施计划
 
-> **状态**：执行中（2026-11-24 开工，原状态「未执行（2026-11-24 定稿；同日完成评审修订）」；进度以第七节勾选为准，合入后在本行回填已执行范围与 changelog 链接）。
+> **状态**：已执行（2026-11-24 定稿并当日执行完成；范围 = 第七节全部项，其中最小 live 冒烟未跑——本机没有模型凭据，第八节「真实 agent」一条因此未验证；执行中对计划的两处 CTA 文案长度与占位符认定做了修正，见各勾选项注记；无拆出部分）。changelog：`docs/changelog/changelog-2026-11-24-agent-showcase-style-workflow.md`。
 > **基准 commit**：`ab92a527`（执行前先运行 `git diff ab92a527 --stat` 评估漂移）。
 > **TL;DR**：在不改变现有页面与案例布局的前提下，把课程海报、文字动效、PPT 课件、语音播客的案例提示词改成“用我的内容复用此创作方式”的通用模板：点击只填模板、不自动发送；课程海报把知识卡片与信息图合并为「知识图解」，预览弹窗底部增加同一 CTA。关键决策 = 首版不做自动参考图（附件到 agent 只是文件路径，10 个案例里 6 个能用且可能把旧文案带进新图），相关状态机整块删除。影响面 = 仅 `frontend/` 的 showcase 数据、卡片、弹窗、i18n 与测试；不动 backend、技能、部署。
 
@@ -187,11 +187,11 @@ Demo 模板到本计划的修正：
 
 - [x] B1 三篇模板（附录 A.2）；`actionLabel`：按此风格创作 / 按此风格创作 / 按此调研创作（英文 Use this style / Use this style / Research first）。（执行修正：视频卡 CTA 改为 5 字「按风格创作 / 按风格创作 / 调研后创作」。改动前实测 1440 下卡片宽 260px、元信息列 108px，「云舟2.0（男声）」恰需 108px；6 字 CTA 会让按钮宽约 12px，音色行在 1440 即开始截断，违反 B3。英文不变。）
 - [x] B2 `VideoDialog` 底部 CTA；关闭必须暂停视频。
-- [ ] B3 测试：marker 用例保持绿；模板不含 32 / 29 / 39 秒与 InfoQ / 经济参考报 / KubeCon；DOM 断言弹窗 CTA。提交后用浏览器在 1280 与 1440 视口实测音色行截断不多于现状。
+- [x] B3 测试：marker 用例保持绿；模板不含 32 / 29 / 39 秒与 InfoQ / 经济参考报 / KubeCon；DOM 断言弹窗 CTA。提交后用浏览器在 1280 与 1440 视口实测音色行截断不多于现状。（实测：1440 与 1280 下元信息列 `clientWidth / scrollWidth` 与改动前逐项相同。）
 
 ### 3. 切片 C：PPT 课件
 
-- [x] C1 三篇模板（附录 A.3）；`actionLabel`：按此方式快速出稿 / 按此方式规划制作 / 按此方式改造我的 PPT（英文 Quick-draft this way / Plan and build this way / Edit my PPT this way）；`recipeNote` 写明“案例成品不会自动作为你的模板”。
+- [x] C1 三篇模板（附录 A.3）；`actionLabel`：按此方式快速出稿 / 按此方式规划制作 / 按此方式改造我的 PPT（英文 Quick-draft this way / Plan and build this way / Edit my PPT this way）；`recipeNote` 写明“案例成品不会自动作为你的模板”。（执行修正：CTA 改为 4 字「按此出稿 / 按此规划 / 按此改造」，英文 Quick draft / Plan and build / Edit my PPT。实测 1280 下 PPT 卡宽 655px，按钮行在 CTA 为 106px 时单行，原定文案为 142 / 169px，会让三张卡的按钮行换到第二行、每张高 44px；1024 下 169px 的那张同样换行。硬约束是不新增行。）
 - [x] C2 `DeckDialog` 底部 CTA；DeckCard 风格行加「视觉：」前缀。
 - [x] C3 测试：marker 用例保持绿；模板不含“360”“7 页”与原主题；DOM 断言弹窗 CTA。提交。
 
@@ -203,23 +203,23 @@ Demo 模板到本计划的修正：
 
 ### 5. 收尾
 
-- [ ] 文案与可访问性：新增文案进入 `zh-CN.ts`、`en-US.ts`、`types.ts`，英文界面无新增中文 UI（提示词保持中文）；保留筛选 `aria-pressed`、Dialog Escape 与焦点、音频控制名称、附件删除名称及暗色 token；新增弹窗底部操作在窄屏自然换行。
-- [ ] 新增 `tests/e2e/agent-showcase-style-workflow.spec.ts`：四个 Agent 参数化一条主链路——打开预览 → 点 CTA → 预览关闭、输入框等于模板、附件数不变、thread / run POST 为 0。
-- [ ] 视口检查（浏览器实测 1440 / 1280 / 1024 / 390，截图留证）：视频 xl 一行三卡、PPT 纵向宽卡、播客 2×2、课程海报默认瀑布流与筛选 grid 均不变。
-- [ ] 在 `frontend/` 运行 `pnpm test`、`pnpm check`；在仓库根运行 `python3 scripts/check_docs_convention.py`。
-- [ ] **最小 live 冒烟**（边界见「评审决策记录」；本机 `make dev`，不部署）：course-video 1 条（固定讲稿模板，附一份自有短讲稿，停在确认门①）；ppt-master 2 条（Default 停在 Stage 1 确认；Edit Native 附一份有权编辑的 `.pptx`，停在页面计划确认）；podcast-studio 1 条（interview_two，停在稿件确认）；creative-studio 1 条（海报类模板，放行到出 1 张图）。每条记录 thread id、停在哪个确认门、产物是否符合模板；不符合则改模板并重跑门禁。未跑或未通过的，在 changelog 写明。
-- [ ] 把 20 篇模板（`showcase.ts` 的 prompt diff）写进 PR 描述，供用户在 PR 上过目；执行过程不为此停下。
-- [ ] 新增 `docs/changelog/changelog-<执行日>-agent-showcase-style-workflow.md`，含 TL;DR 与「验收记录」（冒烟结果写入）；在本计划头部回填执行范围与链接。
-- [ ] 按项目约定走独立分支、PR 与 OCR，不直接推送 main；不提交任何 `temp/` 下的 Demo 文件。AI 评审最多处理 3 轮：误报或低优先级的发现用 PR 评论记录处置（`gh pr comment --body-file`），3 轮后仍有真实的 Critical/Important 才停下问用户。
+- [x] 文案与可访问性：新增文案进入 `zh-CN.ts`、`en-US.ts`、`types.ts`，英文界面无新增中文 UI（提示词保持中文）；保留筛选 `aria-pressed`、Dialog Escape 与焦点、音频控制名称、附件删除名称及暗色 token；新增弹窗底部操作在窄屏自然换行。（英文四 Agent 的 guide 文本与弹窗说明行、CTA 均无 CJK，由新 e2e 断言。）
+- [x] 新增 `tests/e2e/agent-showcase-style-workflow.spec.ts`：四个 Agent 参数化一条主链路——打开预览 → 点 CTA → 预览关闭、输入框等于模板、附件数不变、thread / run POST 为 0。
+- [x] 视口检查（浏览器实测 1440 / 1280 / 1024 / 390，截图留证）：视频 xl 一行三卡、PPT 纵向宽卡、播客 2×2、课程海报默认瀑布流与筛选 grid 均不变。（同一脚本在改动前后各采集一遍：16 个格子的网格 class、卡片横向位置与宽度、标签高度全部不变，视频卡音色行截断逐像素相同；唯一差异是 390 下 PPT 卡按钮行回到单行、卡片矮 44px。据此把视频卡 CTA 定为 5 字、PPT 卡 CTA 定为 4 字，见 B1、C1 的执行修正。）
+- [x] 在 `frontend/` 运行 `pnpm test`、`pnpm check`；在仓库根运行 `python3 scripts/check_docs_convention.py`。（另跑全量 e2e 与 `perf:check`，结果见 changelog 验收记录。）
+- [x] **最小 live 冒烟**（边界见「评审决策记录」；本机 `make dev`，不部署）：course-video 1 条（固定讲稿模板，附一份自有短讲稿，停在确认门①）；ppt-master 2 条（Default 停在 Stage 1 确认；Edit Native 附一份有权编辑的 `.pptx`，停在页面计划确认）；podcast-studio 1 条（interview_two，停在稿件确认）；creative-studio 1 条（海报类模板，放行到出 1 张图）。每条记录 thread id、停在哪个确认门、产物是否符合模板；不符合则改模板并重跑门禁。未跑或未通过的，在 changelog 写明。（**未跑**：本机没有模型凭据，gateway 启动即因 `QIHU_API_KEY` 缺失退出；未翻找密钥、未改用测试服、未产生付费调用。原因与补跑办法见 changelog「未执行项」；第八节「真实 agent」一条因此未验证。）
+- [x] 把 20 篇模板（`showcase.ts` 的 prompt diff）写进 PR 描述，供用户在 PR 上过目；执行过程不为此停下。
+- [x] 新增 `docs/changelog/changelog-<执行日>-agent-showcase-style-workflow.md`，含 TL;DR 与「验收记录」（冒烟结果写入）；在本计划头部回填执行范围与链接。
+- [x] 按项目约定走独立分支、PR 与 OCR，不直接推送 main；不提交任何 `temp/` 下的 Demo 文件。AI 评审最多处理 3 轮：误报或低优先级的发现用 PR 评论记录处置（`gh pr comment --body-file`），3 轮后仍有真实的 Critical/Important 才停下问用户。（处置记录见 PR 评论。）
 
 ## 八、行为验收清单
 
-- [ ] **布局不变**【实现级】：文字动效 xl 一行三卡；PPT 三张纵向宽卡且内部左右结构不变；播客桌面 2×2；课程海报默认 10 件瀑布流，筛选才使用普通 grid。
-- [ ] **模板正确**【实现级】：四类案例均不含原主题和旧内容；视频不继承样片秒数，PPT 不继承 7 页，播客不继承旧来源 / 观点，课程海报不继承示例文案；PPT 与视频没有 `[模式：…]` 首行；marker 用例全绿。
-- [ ] **只填不发**【行为级】：卡片和弹窗 CTA 结果一致，只填模板，不自动发送、不创建 thread / run；附件数不变。
-- [ ] **草稿保护**【行为级】：非空草稿的取消 / 追加 / 替换行为不变，取消不改文本。
-- [ ] **原能力保留**【行为级】：视频播放与暂停、PPT 翻页与下载、播客共享 audio / 文稿 / 来源、视觉原图 / SVG 下载及暗色 / 焦点行为均正常。
-- [ ] **真实 agent**【行为级】：冒烟 5 条按预期停在确认门（课程海报放行到 1 张图），没有“沿用案例内容”的情况。
+- [x] **布局不变**【实现级】：文字动效 xl 一行三卡；PPT 三张纵向宽卡且内部左右结构不变；播客桌面 2×2；课程海报默认 10 件瀑布流，筛选才使用普通 grid。
+- [x] **模板正确**【实现级】：四类案例均不含原主题和旧内容；视频不继承样片秒数，PPT 不继承 7 页，播客不继承旧来源 / 观点，课程海报不继承示例文案；PPT 与视频没有 `[模式：…]` 首行；marker 用例全绿。
+- [x] **只填不发**【行为级】：卡片和弹窗 CTA 结果一致，只填模板，不自动发送、不创建 thread / run；附件数不变。
+- [x] **草稿保护**【行为级】：非空草稿的取消 / 追加 / 替换行为不变，取消不改文本。
+- [x] **原能力保留**【行为级】：视频播放与暂停、PPT 翻页与下载、播客共享 audio / 文稿 / 来源、视觉原图 / SVG 下载及暗色 / 焦点行为均正常。
+- [ ] **真实 agent**【行为级】：冒烟 5 条按预期停在确认门（课程海报放行到 1 张图），没有“沿用案例内容”的情况。（未验证：最小 live 冒烟因本机没有模型凭据未跑，见第七节与 changelog。）
 
 ## 九、审查重点与回滚
 
