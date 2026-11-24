@@ -141,7 +141,7 @@ describe("AgentShowcase", () => {
       open: "showcase-open-ppt-quick",
       promptId: "ppt-quick",
       hasVideo: false,
-      label: "按此方式快速出稿",
+      label: "按此出稿",
     },
     {
       agent: "podcast-studio",

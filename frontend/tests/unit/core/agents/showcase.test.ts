@@ -310,11 +310,13 @@ describe("Agent showcase data and assets", () => {
         expect(item.actionLabel, `${id}/${item.id}`).toBeDefined();
         expect(item.actionLabel?.zh.trim(), `${id}/${item.id}`).not.toBe("");
         expect(item.actionLabel?.en.trim(), `${id}/${item.id}`).not.toBe("");
-        if (item.kind === "video") {
-          // The video card's bottom row shares space with a truncatable meta
-          // column, so its label has a hard length budget.
-          expect(item.actionLabel?.zh.length).toBeLessThanOrEqual(6);
-          expect(item.actionLabel?.en.length).toBeLessThanOrEqual(16);
+        if (item.kind === "video" || item.kind === "deck") {
+          // Video and deck cards share their bottom row with other controls (a
+          // truncatable meta column, or two actions): at 1280 a label wider
+          // than the generic five-character one truncates the meta line or
+          // wraps the deck action row, so it has a hard length budget.
+          expect(item.actionLabel?.zh.length).toBeLessThanOrEqual(5);
+          expect(item.actionLabel?.en.length).toBeLessThanOrEqual(15);
         }
       }
     }
