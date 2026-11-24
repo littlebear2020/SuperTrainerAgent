@@ -1204,10 +1204,14 @@ export function useUpdateFrameVisualSource(taskId: string) {
       }
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (ctx?.prev) {
         qc.setQueryData([STORYBOARD_KEY, taskId], ctx.prev);
       }
+      // E7：此前静默回滚——切换器弹回原值，用户不知道为什么没生效。
+      toast.error(
+        `切换视觉来源失败：${err instanceof Error ? err.message : "未知错误"}`,
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [STORYBOARD_KEY, taskId] });
@@ -1238,10 +1242,14 @@ export function useUpdateFrameLayout(taskId: string) {
       }
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (ctx?.prev) {
         qc.setQueryData([STORYBOARD_KEY, taskId], ctx.prev);
       }
+      // E7：此前静默回滚——版式弹回原值，用户不知道为什么没生效。
+      toast.error(
+        `版式保存失败：${err instanceof Error ? err.message : "未知错误"}`,
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [STORYBOARD_KEY, taskId] });
@@ -1267,10 +1275,14 @@ export function useBulkDisableGraphic(taskId: string) {
       }
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (ctx?.prev) {
         qc.setQueryData([STORYBOARD_KEY, taskId], ctx.prev);
       }
+      // E7：此前静默回滚——批量禁用弹回原值，用户不知道为什么没生效。
+      toast.error(
+        `停用图形镜失败：${err instanceof Error ? err.message : "未知错误"}`,
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: [STORYBOARD_KEY, taskId] });
