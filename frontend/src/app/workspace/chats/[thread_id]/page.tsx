@@ -24,6 +24,7 @@ import { useNotification } from "@/core/notification/hooks";
 import { useThreadSettings } from "@/core/settings";
 import { shouldAutoSend } from "@/core/threads/autosend";
 import { useThreadStream } from "@/core/threads/hooks";
+import { SendRejectedError } from "@/core/threads/submission";
 import { useThreadTokenUsage } from "@/core/threads/token-usage";
 import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
@@ -70,7 +71,10 @@ export default function ChatPage() {
     onSend: (requestedThreadId) => {
       history.replaceState(null, "", `/workspace/chats/${requestedThreadId}`);
     },
-    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 /chats/new
+    // 本次 onSend 已触发、创建前失败或停止：新线程回退到 /chats/new。回退后
+    // useThreadChat 会重新预生成 UUID——重试用新 ID（该线程在服务端尚不存在，没有
+    // 数据要跟随；附件仍在输入框里、重试时重新上传），代价是这次为新线程选的
+    // context / model 回到默认值。
     onSendError: (requestedThreadId, { wasNewThread }) => {
       if (
         wasNewThread &&
@@ -152,10 +156,17 @@ export default function ChatPage() {
       })
     ) {
       autoSendRanRef.current = true;
-      // 受理前失败 / busy：把提示词放回输入框，不让自动发送的内容丢失
-      void sendMessage(threadId, { text, files: [] }).catch(() => {
-        textInput.setInput(text);
-      });
+      // 受理前失败 / busy：把提示词放回输入框，不让自动发送的内容丢失。stopped（切线程
+      // 触发）不回填——那会把原线程的提示词写进用户刚切到的新线程；用户已经在输入的
+      // 草稿也不覆盖。
+      void sendMessage(threadId, { text, files: [] }).catch(
+        (error: unknown) => {
+          const kind = SendRejectedError.rejectionKind(error);
+          if (kind !== "busy" && kind !== "failed") return;
+          if (textInput.value) return;
+          textInput.setInput(text);
+        },
+      );
       return;
     }
     // 预填分支（两步流）：sessionStorage 长 prompt 且不要求 autoSend →

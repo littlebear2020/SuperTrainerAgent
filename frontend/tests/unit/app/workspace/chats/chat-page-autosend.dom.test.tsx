@@ -89,7 +89,10 @@ vi.mock("@/components/workspace/welcome", () => ({
 }));
 
 import ChatPage from "@/app/workspace/chats/[thread_id]/page";
-import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
+import {
+  PromptInputProvider,
+  usePromptInputController,
+} from "@/components/ai-elements/prompt-input";
 import { I18nProvider } from "@/core/i18n/context";
 import { SendRejectedError } from "@/core/threads/submission";
 import { PENDING_PROMPT_KEY } from "@/lib/pending-prompt";
@@ -102,6 +105,17 @@ let unhandled: unknown[];
 const onUnhandled = (reason: unknown) => {
   unhandled.push(reason);
 };
+
+function PromptValue() {
+  const { textInput } = usePromptInputController();
+  return <output data-testid="prompt-value">{textInput.value}</output>;
+}
+
+function promptValue(): string {
+  return (
+    document.querySelector("[data-testid='prompt-value']")?.textContent ?? ""
+  );
+}
 
 /** InputBox 在 mountedRef 置真后的下一次渲染才挂载；全部依赖都是静态替身，
  * 所以由外壳在挂载后再渲染一次（生产里由查询 / 路由更新触发）。 */
@@ -121,6 +135,7 @@ async function renderPage() {
       <I18nProvider initialLocale="zh-CN">
         <PromptInputProvider>
           <Harness />
+          <PromptValue />
         </PromptInputProvider>
       </I18nProvider>,
     );
@@ -168,6 +183,46 @@ describe("普通会话页观察 sendMessage 的 rejection", () => {
       text: "来自灵感库的长提示词",
       files: [],
     });
+    expect(unhandled).toEqual([]);
+  });
+
+  test.each(["busy", "failed"] as const)(
+    "auto-send 被 %s 拒绝：提示词回到输入框",
+    async (kind) => {
+      h.sendMessage.mockImplementation(() =>
+        Promise.reject(new SendRejectedError(kind, kind)),
+      );
+      window.sessionStorage.setItem(
+        PENDING_PROMPT_KEY,
+        JSON.stringify({ prompt: "被拒绝的提示词", autoSend: true }),
+      );
+
+      await renderPage();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      expect(promptValue()).toBe("被拒绝的提示词");
+      expect(unhandled).toEqual([]);
+    },
+  );
+
+  test("auto-send 被 stopped 拒绝（切线程触发）时不在新线程回填提示词", async () => {
+    h.sendMessage.mockImplementation(() =>
+      Promise.reject(new SendRejectedError("stopped", "stopped")),
+    );
+    window.sessionStorage.setItem(
+      PENDING_PROMPT_KEY,
+      JSON.stringify({ prompt: "切换线程时被停止的提示词", autoSend: true }),
+    );
+
+    await renderPage();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(h.sendMessage).toHaveBeenCalledTimes(1);
+    expect(promptValue()).toBe("");
     expect(unhandled).toEqual([]);
   });
 

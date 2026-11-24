@@ -316,4 +316,36 @@ describe("InputBox 受理前保留输入", () => {
     });
     expect(textarea().value).toBe("等待期间继续写的新内容");
   });
+
+  test("受理前等待期间追加的文字只恢复增量，不把已发出的正文放回（OCR 第 2 轮）", async () => {
+    let accept!: () => void;
+    onSubmit.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          accept = resolve;
+        }),
+    );
+    await renderComposer();
+    await clickSubmit();
+    // 等待期间在已提交正文之后追加
+    act(() => {
+      const el = textarea();
+      el.value = `${draft} 继续补的半句`;
+      (
+        el as HTMLTextAreaElement & {
+          _valueTracker?: { setValue(v: string): void };
+        }
+      )._valueTracker?.setValue("");
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await act(async () => {
+      accept();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    // 已发出的 draft 不再出现，只有等待期间补的半句
+    expect(textarea().value).toBe(" 继续补的半句");
+  });
 });
