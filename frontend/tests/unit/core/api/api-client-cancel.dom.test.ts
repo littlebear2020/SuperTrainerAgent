@@ -104,16 +104,21 @@ afterEach(() => {
 });
 
 describe("runs.cancel error containment", () => {
-  test("passes arguments through to the SDK unchanged", async () => {
+  test("passes arguments (including options.signal) through to the SDK unchanged", async () => {
     const client = await freshClient();
+    const signal = new AbortController().signal;
 
-    await client.runs.cancel("thread-1", "run-1", false, "interrupt");
+    await client.runs.cancel("thread-1", "run-1", false, "interrupt", {
+      signal,
+    });
 
+    // 第 5 个参数 options.signal 不能被包装层静默丢弃
     expect(cancelMock).toHaveBeenCalledWith(
       "thread-1",
       "run-1",
       false,
       "interrupt",
+      { signal },
     );
   });
 
