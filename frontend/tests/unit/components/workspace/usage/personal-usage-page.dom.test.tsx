@@ -352,4 +352,81 @@ describe("PersonalUsagePage", () => {
       expect(button.className).toContain("focus-visible:ring-indigo-500");
     }
   });
+
+  it("keeps both existing totals inside one responsive summary panel", async () => {
+    h.result = success(response([task("completed")]));
+    await renderPage();
+
+    const panel = container.querySelector("[data-testid='usage-summary']");
+    expect(panel).not.toBeNull();
+    const items = Array.from(panel!.children).filter((child) =>
+      child.hasAttribute("data-testid"),
+    );
+    expect(items.map((item) => item.getAttribute("data-testid"))).toEqual([
+      "usage-summary-cost",
+      "usage-summary-tokens",
+    ]);
+    for (const item of items) {
+      expect(item.tagName).toBe("SECTION");
+      expect(
+        item.querySelector(`[id='${item.getAttribute("aria-labelledby")}']`),
+      ).not.toBeNull();
+      const icon = item.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon!.closest("[aria-hidden='true']")).not.toBeNull();
+    }
+    expect(items[0].textContent).toContain("已核算费用");
+    expect(items[0].textContent).toContain("¥1.50");
+    expect(items[0].textContent).toContain("含估算；未知不记为 0");
+    expect(
+      items[0].querySelector("[data-testid='usage-summary-cost-source']")
+        ?.textContent,
+    ).toBe("供应商回传");
+    expect(items[1].textContent).toContain("总 Token");
+    expect(items[1].textContent).toContain("100");
+    expect(items[1].textContent).toContain("输入 + 输出，缓存读取不重复累加");
+
+    h.result = success(
+      response([], {
+        summary: {
+          cost: null,
+          currency: null,
+          cost_source: null,
+          total_tokens: null,
+        },
+      }),
+    );
+    await renderPage();
+    expect(
+      container.querySelector("[data-testid='usage-summary-cost']")
+        ?.textContent,
+    ).toContain("—");
+    expect(
+      container.querySelector("[data-testid='usage-summary-tokens']")
+        ?.textContent,
+    ).toContain("—");
+    expect(
+      container.querySelector("[data-testid='usage-summary-cost-source']"),
+    ).toBeNull();
+
+    h.result = success(
+      response([], {
+        summary: {
+          cost: 0,
+          currency: "CNY",
+          cost_source: "real",
+          total_tokens: 0,
+        },
+      }),
+    );
+    await renderPage();
+    expect(
+      container.querySelector("[data-testid='usage-summary-cost']")
+        ?.textContent,
+    ).toContain("¥0.00");
+    expect(
+      container.querySelector("[data-testid='usage-summary-tokens']")
+        ?.textContent,
+    ).toContain("0");
+  });
 });

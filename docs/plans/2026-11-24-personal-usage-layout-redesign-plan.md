@@ -202,11 +202,11 @@ PersonalUsagePage
 - Consumes: `PersonalUsageResponse["summary"]`、`formatUsageCost`、`formatInteger`、现有 `UsageCostSourceBadge`。
 - Produces: 外层 `data-testid="usage-summary"`；既有 `usage-summary-cost`、`usage-summary-tokens`、`usage-summary-cost-source` 保留。
 
-- [ ] **Step 1：先写汇总结构失败测试**。新增 `keeps both existing totals inside one responsive summary panel`：`usage-summary` 同时包含且只包含两个既有汇总 testid；两个汇总项仍是并列语义区域，装饰图标 `aria-hidden=true`；费用值、Token 值、提示与来源徽章保持原响应值，`null` 仍为 `—`，真实 0 仍显示 0。
-- [ ] **Step 2：运行并确认新容器断言失败**。使用任务 1 Step 2 命令，预期仅因 `usage-summary` / 图标结构尚不存在而失败。
-- [ ] **Step 3：实现单面板双栏汇总**。将原来两张独立卡放入同一 `rounded-2xl` 网格容器；≥640px 两栏竖分隔，<640px 上下横分隔。使用 `Coins`、`Cpu` 和 §1.3 局部紫色，不添加第三项指标、趋势或占比；数值格式化与 `UsageCostSourceBadge(source)` 分支不改，两个数值节点保留 `break-all`、不改为 nowrap。
-- [ ] **Step 4：运行 usage 页面测试与格式检查**。重跑页面 DOM 测试，并执行 `cd frontend && pnpm exec prettier --check src/components/workspace/usage/usage-summary.tsx tests/unit/components/workspace/usage/personal-usage-page.dom.test.tsx`，预期全部通过。
-- [ ] **Step 5：提交本任务**。提交主题：`refactor(usage): 合并个人用量汇总面板`。
+- [x] **Step 1：先写汇总结构失败测试**。新增 `keeps both existing totals inside one responsive summary panel`：`usage-summary` 同时包含且只包含两个既有汇总 testid；两个汇总项仍是并列语义区域，装饰图标 `aria-hidden=true`；费用值、Token 值、提示与来源徽章保持原响应值，`null` 仍为 `—`，真实 0 仍显示 0。
+- [x] **Step 2：运行并确认新容器断言失败**。使用任务 1 Step 2 命令，预期仅因 `usage-summary` / 图标结构尚不存在而失败。
+- [x] **Step 3：实现单面板双栏汇总**。将原来两张独立卡放入同一 `rounded-2xl` 网格容器；≥640px 两栏竖分隔，<640px 上下横分隔。使用 `Coins`、`Cpu` 和 §1.3 局部紫色，不添加第三项指标、趋势或占比；数值格式化与 `UsageCostSourceBadge(source)` 分支不改，两个数值节点保留 `break-all`、不改为 nowrap。
+- [x] **Step 4：运行 usage 页面测试与格式检查**。重跑页面 DOM 测试，并执行 `cd frontend && pnpm exec prettier --check src/components/workspace/usage/usage-summary.tsx tests/unit/components/workspace/usage/personal-usage-page.dom.test.tsx`，预期全部通过。
+- [x] **Step 5：提交本任务**。提交主题：`refactor(usage): 合并个人用量汇总面板`。
 
 ### 任务 3：收拢任务面板、响应式行与展开明细
 
