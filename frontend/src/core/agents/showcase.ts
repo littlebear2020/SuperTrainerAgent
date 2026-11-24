@@ -513,7 +513,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，从为什么需要提示词工程到四要素、改写示例、模板和常见误区；跳过策略确认，直接出稿。",
           "Seven slides covering prompt engineering fundamentals, four elements, rewrites, templates, and pitfalls.",
         ),
-        actionLabel: text("按此方式快速出稿", "Quick-draft this way"),
+        actionLabel: text("按此出稿", "Quick draft"),
         recipeNote: text(
           "保留：Quick 流程（跳过 Stage 1/2）与轻量科技、暖纸钴蓝配色。填写：主题或资料；受众、目标、页数可填，也可由 Agent 判断。" +
             deckRecipeFooter,
@@ -547,7 +547,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，包含课程地图、三层架构、RAG 流程、Agent 循环和评估框架；先确认方案再逐页设计。",
           "Seven slides with a course map, three-layer architecture, RAG flow, agent loop, and evaluation framework.",
         ),
-        actionLabel: text("按此方式规划制作", "Plan and build this way"),
+        actionLabel: text("按此规划", "Plan and build"),
         recipeNote: text(
           "保留：Default 两阶段确认与深色杂志、琥珀青配色。填写：主题或资料、受众基础、学习目标与使用场景；页数可由 Agent 推荐。" +
             deckRecipeFooter,
@@ -581,7 +581,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "7 页，保留 360 原封面、页眉标识与绿色视觉语言，把内容重排成通识课；未修改的封面与背景对象保持原样。",
           "Seven slides rebuilt as an introductory course while preserving the 360 cover, header mark, and green visual language.",
         ),
-        actionLabel: text("按此方式改造我的 PPT", "Edit my PPT this way"),
+        actionLabel: text("按此改造", "Edit my PPT"),
         recipeNote: text(
           "保留：Edit Native 的页面计划、源对象保留与原生改造方式。填写：上传你有权编辑的 .pptx、新内容资料，以及保留 / 删除 / 改造范围。案例基于授权的 360 模板制作，这份成品不会自动作为你的模板。",
           "Kept: the Edit Native page plan, source-object preservation and native editing. Fill in: upload a .pptx you may edit, the new source material, and what to keep, remove or rewrite. The case was built on an authorized 360 template; that deck is never used as your template.",

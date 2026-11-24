@@ -1488,7 +1488,7 @@ test.describe("Agent new-chat task guides", () => {
     // Each deck names its own fill-only action; the generic label is gone.
     await expect(
       page.getByRole("button", {
-        name: /^(?:Quick-draft this way|Plan and build this way|Edit my PPT this way): /,
+        name: /^(?:Quick draft|Plan and build|Edit my PPT): /,
       }),
     ).toHaveCount(3);
     await expect(
@@ -1500,7 +1500,7 @@ test.describe("Agent new-chat task guides", () => {
     await expect(recipe).toBeVisible();
     expect(await recipe.innerText()).not.toMatch(/[一-鿿]/);
     await expect(page.getByTestId("showcase-use-style")).toHaveAccessibleName(
-      /^Edit my PPT this way: /,
+      /^Edit my PPT: /,
     );
     await page.getByTestId("showcase-dialog-close").click();
     await page.getByTestId("showcase-prompt-ppt-standard").click();
