@@ -157,6 +157,7 @@ export function UsageTaskList({
                   {formatUsageCost(task.cost, task.currency)}
                 </div>
                 <span
+                  data-testid={`task-chevron-${id}`}
                   aria-hidden="true"
                   className="text-muted-foreground flex items-center justify-center max-[820px]:[grid-area:chevron]"
                 >

@@ -35,6 +35,7 @@
 - 反向验证（三处临时改动各跑一次专用 E2E，随后恢复；`git diff | shasum -a 256` 恢复前后同为 `4d31a233…992a6`）：① 列头去掉 <820px 隐藏 → `expect(usage-task-columns).toBeHidden()` Expected hidden / Received visible；② 任务行在所有宽度固定为桌面列并去掉卡片 areas → `expectCardLayout`「状态在标题下一行」`toBeGreaterThan` Expected > 580.25 / Received 570.25；③ 数值单元格去 `break-all` 加 `whitespace-nowrap` → `expectContained` offenders `["task-tokens-task-05: 150 > 142"]`（两个大数值用例均失败，小数值用例仍过）。
 - 恢复后终跑：专用 E2E + 临时截图用例 → `4 passed (9.8s)`（截图用例不入库，跑完即删）。截图（1440×900 收起/展开、390×844 收起/展开）存主 clone `temp/2026-11-24-personal-usage-layout-evidence/`，对照 §1.2 的桌面/手机结构核对一致。
 - OCR 第 1 轮修复后（几何与包含性断言改为 `expect.poll` / `toPass` 5s 重试读取，夹具去掉嵌套三元、汇总由同一组数值推导并断言对账，缺失节点报出 testid）：专用 E2E → `3 passed (9.5s)`；反向验证 ②③ 在新断言上复跑仍各自失败（`Expected > 580.25 / Received 570.25`；`task-tokens-task-05: 150 > 142`）。
+- OCR 第 2 轮（4 条 low，无 inline）：受理 3 条——展开箭头补 `task-chevron-${id}` testid（生产侧仅此一个属性），侧栏用例前置读取改为 `toPass`，筛选/模型表滚动检查合并为 `expectScrollsInOwnContainer`（断言不变）；「按钮数 7 改由能力目录推导」再次不改（产品常量，计划与单测都钉死 7）。usage DOM → `3 files / 15 passed`；专用 E2E → `3 passed (9.3s)`。
 - `pre-commit run --files <各任务改动文件>` → 每个任务提交前 eslint / prettier / gitleaks / docs convention 全 Passed。
 - `cd frontend && CI=1 pnpm test` → `Test Files 284 passed (284)`、`Tests 1872 passed (1872)`，23.76s。
 - 专用 E2E 门禁：`cd frontend && CI=1 E2E_PORT=3127 E2E_GATEWAY_PORT=3137 pnpm exec playwright test --config playwright.personal-usage.config.ts` → `3 passed (7.8s)`。
