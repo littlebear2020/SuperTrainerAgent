@@ -47,6 +47,10 @@
 - 侧栏展开态只覆盖 1050×900 与 820×844 两个视口；中等列宽只在 1024×768 实测；深色模式只有类名与单测覆盖，未截图核对。
 - 焦点环、hover 与 `prefers-reduced-motion` 只断言了类名，未做视觉回归；无像素基线（计划明确不写）。
 
+## PR 与远端验收
+
+- PR：[#57 个人「我的用量」布局优化](https://github.com/littlebear2020/SuperTrainerAgent/pull/57)（分支 `personal-usage-layout-redesign`，6 笔主题提交 + 本链接提交）。OCR 与 PR 侧 CI 的逐轮处置记录在 PR 评论中；合入方式 `gh pr merge --rebase`。
+
 ## 配置与回滚
 
 - `config_version`：**不涉及**；无 schema、依赖或部署变更。

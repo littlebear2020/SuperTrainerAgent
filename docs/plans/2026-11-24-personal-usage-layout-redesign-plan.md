@@ -1,6 +1,6 @@
 # 个人「我的用量」布局优化实施计划
 
-> **状态**：已执行（任务 0→4 全部完成；代码门禁全绿，三处反向验证各有预期失败；经分支 `personal-usage-layout-redesign` 以 PR 交付，PR 号见 changelog）；定稿日 2026-11-24；执行日 2026-11-24；基准 commit `f44073a1`（执行日 re-pin：`ab92a527..f44073a1` 对五个 usage 组件、既有测试、`personalUsage` i18n 与三个钉死全局文件零漂移）；changelog：[个人用量布局优化](../changelog/changelog-2026-11-24-personal-usage-layout-redesign.md)。
+> **状态**：已执行（任务 0→4 全部完成；代码门禁全绿，三处反向验证各有预期失败；经分支 `personal-usage-layout-redesign` 以 PR #57 交付）；定稿日 2026-11-24；执行日 2026-11-24；基准 commit `f44073a1`（执行日 re-pin：`ab92a527..f44073a1` 对五个 usage 组件、既有测试、`personalUsage` i18n 与三个钉死全局文件零漂移）；changelog：[个人用量布局优化](../changelog/changelog-2026-11-24-personal-usage-layout-redesign.md)。
 > **TL;DR**：按已确认的静态 Demo 重排普通用户「我的用量」，收拢页宽、筛选、双指标和任务列表；只改前端组件结构、样式与必要列名 i18n，不改 API、数据、计费、状态、分页或管理员后台；以既有行为测试全绿 + 1440/1024/820/819/390/320px 浏览器布局断言验收（溢出断言取任务行/单元格级并经反向验证）。
 > **For agentic workers:** REQUIRED SUB-SKILL: Claude 必须使用 `executing-plans`（单执行者、单工作区）逐任务实施；每项遵循“失败测试 → 确认失败原因 → 最小实现 → 定向回归 → 提交”，执行即勾选对应 checkbox，不得把本计划当成直接改生产的授权。
 
