@@ -585,23 +585,24 @@ test.describe("Chat token usage by turn", () => {
       toolResult("token-older-tool", "token-older-call"),
       aiMessage("token-older-final", "Older answer", tokenUsage(40, 50, 90)),
     ];
+    // 真实 API 的 runs 列表是 newest-first：首次只水合最新 run，Load more 向前取旧 run
     const runs = [
-      {
-        run_id: "token-history-older-run",
-        thread_id: MOCK_THREAD_ID,
-        assistant_id: "lead_agent",
-        created_at: "2025-01-01T00:00:00Z",
-        updated_at: "2025-01-01T00:01:00Z",
-        status: "success",
-        metadata: {},
-        multitask_strategy: "reject",
-      },
       {
         run_id: "token-history-latest-run",
         thread_id: MOCK_THREAD_ID,
         assistant_id: "lead_agent",
         created_at: "2025-01-02T00:00:00Z",
         updated_at: "2025-01-02T00:01:00Z",
+        status: "success",
+        metadata: {},
+        multitask_strategy: "reject",
+      },
+      {
+        run_id: "token-history-older-run",
+        thread_id: MOCK_THREAD_ID,
+        assistant_id: "lead_agent",
+        created_at: "2025-01-01T00:00:00Z",
+        updated_at: "2025-01-01T00:01:00Z",
         status: "success",
         metadata: {},
         multitask_strategy: "reject",

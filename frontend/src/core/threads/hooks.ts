@@ -241,6 +241,9 @@ export function useThreadStream({
     messages: history,
     hasMore: hasMoreHistory,
     loadMore: loadMoreHistory,
+    refetchRun: refetchRunHistory,
+    messageRunIds,
+    runsById,
     loading: isHistoryLoading,
   } = useThreadHistory(onStreamThreadId ?? "");
 
@@ -260,6 +263,14 @@ export function useThreadStream({
     }
     threadIdRef.current = normalizedThreadId;
   }, [threadId]);
+
+  // 当前流所属的 run：渲染期按线程派生（切线程后自然回到 null），不在 effect 里 setState
+  const [activeRun, setActiveRun] = useState<{
+    threadId: string;
+    runId: string;
+  } | null>(null);
+  const activeRunId =
+    activeRun && activeRun.threadId === threadId ? activeRun.runId : null;
 
   const handleStreamStart = useCallback((_threadId: string, _runId: string) => {
     threadIdRef.current = _threadId;
@@ -349,6 +360,7 @@ export function useThreadStream({
         runSubmissionsRef.current.set(meta.run_id, pending);
         pending.accept();
       }
+      setActiveRun({ threadId: meta.thread_id, runId: meta.run_id });
       handleStreamStart(meta.thread_id, meta.run_id);
       if (context.agent_name || context.project_type) {
         void getAPIClient()
@@ -476,6 +488,18 @@ export function useThreadStream({
         });
       }
       listeners.current.onFinish?.(state.values);
+      // PR3：强制重取 meta.run_id 指向的分片（补齐流式期间追加的消息）。mount 自动
+      // rejoin 不经过 onCreated，不能依赖只由 onStart 设置的 runId；分片层还有
+      // generation / epoch 兜底，切线程后的迟到 onFinish 不会写进新线程。
+      const finishedRunId = meta?.run_id;
+      if (finishedRunId && meta?.thread_id === threadIdRef.current) {
+        void queryClient
+          .invalidateQueries({ queryKey: ["thread", threadIdRef.current] })
+          .then(() => refetchRunHistory(finishedRunId))
+          .catch((error: unknown) => {
+            console.error("Failed to refetch finished run history", error);
+          });
+      }
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
       // P2-15：run 结束后刷新当前挂载的 artifact。artifact 可能在本次 run 里被改写，
       // 而 useArtifactContent 的 staleTime(5s) 是有意的抗陈旧设计（不动它）；这里主动
@@ -951,33 +975,38 @@ export function useThreadStream({
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    messageRunIds,
+    runsById,
+    /** 当前流所属的 run（SDK onCreated 回传）；没有在途 / 历史流时为 null。 */
+    activeRunId,
   } as const;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const HISTORY_PAGE_SIZE = 200;
-const HISTORY_MAX_PAGES = 25; // 5000 条/run 安全上限
 
 /**
- * 分页拉全单 run 的历史消息（后端 GET /api/threads/{tid}/runs/{rid}/messages
- * 支持 limit/before_seq/after_seq 游标，返回 {data, has_more}）。
- * 此前只拉首 50 条且从未读分页字段 → 长 run 静默截断、首条提示词丢失
- * （2026-07-24 消息丢失 P0）。middleware caller 消息在此过滤（同旧行为）。
+ * 分页拉全单 run 的历史消息（后端 GET /api/threads/{tid}/runs/{rid}/messages：
+ * 首页不带游标、返回**最新**的 limit 条、页内 seq 升序；`has_more` 时用本页第一条的
+ * seq 作 `before_seq` 继续向前取旧页）。PR3（2026-11-24 前端可靠性批）修正了原先
+ * 「首页是最早页 + after_seq」的错误假设：真实 API 的 after_seq 只会反复取到最新页。
+ * 不再保留 25 页 / 5000 条的静默截断——长 run 的首条提示词不能丢；防死循环只靠
+ * 「游标必须严格向前（变小）」，不前进或空页直接抛错。middleware caller 消息在此过滤。
  */
 export async function fetchAllRunMessages(
   threadId: string,
   runId: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<RunMessage[]> {
-  const all: RunMessage[] = [];
-  let afterSeq: number | undefined;
-  for (let pageNum = 0; pageNum < HISTORY_MAX_PAGES; pageNum++) {
+  const collected = new Map<number, RunMessage>();
+  let beforeSeq: number | undefined;
+  for (;;) {
     const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
-    if (afterSeq !== undefined) {
-      params.set("after_seq", String(afterSeq));
+    if (beforeSeq !== undefined) {
+      params.set("before_seq", String(beforeSeq));
     }
-    const result: { data: RunMessage[]; has_more: boolean } = await fetchImpl(
+    const result: { data?: RunMessage[]; has_more?: boolean } = await fetchImpl(
       `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(runId)}/messages?${params}`,
       {
         method: "GET",
@@ -985,14 +1014,25 @@ export async function fetchAllRunMessages(
         credentials: "include",
       },
     ).then((res) => res.json());
-    all.push(...result.data);
-    const last = result.data[result.data.length - 1];
-    if (!result.has_more || !last) {
-      break;
+    const rows = Array.isArray(result.data) ? result.data : [];
+    for (const row of rows) {
+      collected.set(row.seq, row);
     }
-    afterSeq = last.seq;
+    if (!result.has_more) break;
+    const firstSeq = rows[0]?.seq;
+    // 游标必须严格前进：下一页的 before_seq 是本页第一条的 seq，它必须小于上一轮的游标
+    if (
+      typeof firstSeq !== "number" ||
+      (beforeSeq !== undefined && firstSeq >= beforeSeq)
+    ) {
+      throw new Error(
+        `Run messages pagination cursor did not advance (before_seq=${beforeSeq}, first seq=${firstSeq})`,
+      );
+    }
+    beforeSeq = firstSeq;
   }
-  return all
+  return [...collected.values()]
+    .sort((a, b) => a.seq - b.seq)
     .filter((m) => !m.metadata.caller?.startsWith("middleware:"))
     .map((m) => ({
       run_id: m.run_id,
@@ -1018,55 +1058,233 @@ export function shouldClearOptimistic(
   return threadMessages.at(-1)?.id !== prevTailId;
 }
 
+/** 一个 run 的历史分片：消息 + 加载时该 run 的 status / updated_at（新鲜度判定用）。 */
+export interface HistoryShard {
+  runId: string;
+  messages: Message[];
+  status: string | undefined;
+  updatedAt: string | undefined;
+  /** 加载后是否仍新鲜：重取失败保留旧分片时置 false。 */
+  fresh: boolean;
+}
+
+type HistoryState = {
+  threadId: string;
+  shards: Map<string, HistoryShard>;
+  loadedRunIds: Set<string>;
+  loading: boolean;
+};
+
+const EMPTY_HISTORY_STATE: HistoryState = {
+  threadId: "",
+  shards: new Map(),
+  loadedRunIds: new Set(),
+  loading: false,
+};
+
+/**
+ * run 历史（PR3 重写）：runs 列表是 newest-first，首次只加载最新的 run，loadMore
+ * 向前一个 run；每个 run 一个分片，按旧→新、run 内按 seq 拼接。
+ *
+ * - generation：切线程后旧线程的迟到响应一律丢弃（messages 不串台）
+ * - requestEpochByRun：同一 run 的多次请求只让最新一次原子替换分片（慢旧请求不回退）
+ * - loadedRunIds 只在完整成功后写入；失败保留旧分片、不标记新鲜，可重试
+ * - onFinish 用 meta.run_id 指向 `refetchRun` 强制重取（mount 自动 rejoin 不经过 onCreated）
+ */
 export function useThreadHistory(threadId: string) {
   const runs = useThreadRuns(threadId);
-  const threadIdRef = useRef(threadId);
-  const runsRef = useRef(runs.data ?? []);
-  const indexRef = useRef(-1);
-  const loadingRef = useRef(false);
-  const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<HistoryState>(EMPTY_HISTORY_STATE);
+  const generationRef = useRef(0);
+  const requestEpochRef = useRef(new Map<string, number>());
+  const inFlightRef = useRef(new Map<string, Promise<void>>());
+  const runsRef = useRef(runs.data);
+  const stateRef = useRef(state);
 
-  loadingRef.current = loading;
-  const loadMessages = useCallback(async () => {
-    if (runsRef.current.length === 0) {
-      return;
-    }
-    const run = runsRef.current[indexRef.current];
-    if (!run || loadingRef.current) {
-      return;
-    }
-    try {
-      setLoading(true);
-      const all = await fetchAllRunMessages(threadIdRef.current, run.run_id);
-      const _messages = all.map((m) => m.content);
-      setMessages((prev) => [..._messages, ...prev]);
-      indexRef.current -= 1;
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
   useEffect(() => {
-    threadIdRef.current = threadId;
-    if (runs.data && runs.data.length > 0) {
-      runsRef.current = runs.data ?? [];
-      indexRef.current = runs.data.length - 1;
-    }
-    loadMessages().catch(() => {
-      toast.error("Failed to load thread history.");
-    });
-  }, [threadId, runs.data, loadMessages]);
+    runsRef.current = runs.data;
+  }, [runs.data]);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-  const hasMore = indexRef.current >= 0 || !runs.data;
+  /** 写入当前线程的历史状态；上一线程的状态残留时从空状态起步（= 切线程整体重置）。 */
+  const updateState = useCallback(
+    (update: (prev: HistoryState) => HistoryState) => {
+      setState((prev) =>
+        update(
+          prev.threadId === threadId
+            ? prev
+            : {
+                threadId,
+                shards: new Map(),
+                loadedRunIds: new Set(),
+                loading: false,
+              },
+        ),
+      );
+    },
+    [threadId],
+  );
+
+  /** 加载 / 重取一个 run 的全部分片；只让该 run 最新一次请求写入。 */
+  const loadRun = useCallback(
+    async (run: Run): Promise<void> => {
+      const runId = run.run_id;
+      const epoch = (requestEpochRef.current.get(runId) ?? 0) + 1;
+      requestEpochRef.current.set(runId, epoch);
+      const generation = generationRef.current;
+      const token: { promise: Promise<void> | null } = { promise: null };
+      const request = (async () => {
+        updateState((prev) => ({ ...prev, loading: true }));
+        try {
+          const all = await fetchAllRunMessages(threadId, runId);
+          if (
+            generationRef.current !== generation ||
+            requestEpochRef.current.get(runId) !== epoch
+          ) {
+            return;
+          }
+          const shard: HistoryShard = {
+            runId,
+            messages: all.map((m) => m.content),
+            status: run.status,
+            updatedAt: run.updated_at,
+            fresh: true,
+          };
+          updateState((prev) => ({
+            ...prev,
+            shards: new Map(prev.shards).set(runId, shard),
+            loadedRunIds: new Set(prev.loadedRunIds).add(runId),
+          }));
+        } catch (error) {
+          if (generationRef.current !== generation) return;
+          // 失败保留旧分片，但不再把它当作新鲜
+          updateState((prev) => {
+            const shards = new Map(prev.shards);
+            const old = shards.get(runId);
+            if (old) shards.set(runId, { ...old, fresh: false });
+            return { ...prev, shards };
+          });
+          throw error;
+        } finally {
+          if (generationRef.current === generation) {
+            // 只在仍是本次请求占位时释放（可能已被更新的请求替换）
+            if (inFlightRef.current.get(runId) === token.promise) {
+              inFlightRef.current.delete(runId);
+            }
+            updateState((prev) =>
+              inFlightRef.current.size === 0
+                ? { ...prev, loading: false }
+                : prev,
+            );
+          }
+        }
+      })();
+      token.promise = request;
+      inFlightRef.current.set(runId, request);
+      return request;
+    },
+    [threadId, updateState],
+  );
+
+  // 切线程：换代，旧线程的在途响应因 generation 不再写入；状态本身由 updateState 按线程重置
+  useEffect(() => {
+    generationRef.current += 1;
+    requestEpochRef.current.clear();
+    inFlightRef.current.clear();
+  }, [threadId]);
+
+  /** 当前线程的历史快照（上一线程的残留视为空）。 */
+  const snapshot = useCallback(
+    () =>
+      stateRef.current.threadId === threadId
+        ? stateRef.current
+        : EMPTY_HISTORY_STATE,
+    [threadId],
+  );
+
+  // runs 到位后加载最新的 run（newest-first 的第 0 个）
+  useEffect(() => {
+    const latest = runsRef.current?.[0];
+    if (!latest) return;
+    if (inFlightRef.current.has(latest.run_id)) return;
+    if (snapshot().loadedRunIds.has(latest.run_id)) return;
+    void loadRun(latest).catch((error: unknown) => {
+      console.error("Failed to load thread history", error);
+    });
+  }, [runs.data, loadRun, snapshot]);
+
+  /** 只前进一个 run：旧→新方向上第一个尚未加载的 run。 */
+  const loadMore = useCallback(async () => {
+    const list = runsRef.current ?? [];
+    for (const run of [...list].reverse()) {
+      if (snapshot().loadedRunIds.has(run.run_id)) continue;
+      if (inFlightRef.current.has(run.run_id)) {
+        return inFlightRef.current.get(run.run_id);
+      }
+      return loadRun(run);
+    }
+  }, [loadRun, snapshot]);
+
+  /** 强制重取指定 run（onFinish 用 meta.run_id 定位）；runs 列表里没有时先刷新列表。 */
+  const refetchRun = useCallback(
+    async (runId: string): Promise<void> => {
+      let run = runsRef.current?.find((r) => r.run_id === runId);
+      if (!run) {
+        await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+        run = queryClient
+          .getQueryData<Run[]>(["thread", threadId])
+          ?.find((r) => r.run_id === runId);
+      }
+      if (!run) return;
+      await loadRun(run);
+    },
+    [queryClient, threadId, loadRun],
+  );
+
+  // 不在 runs 列表里的分片（如被 regenerate 隐藏）在拼接时自然被过滤，不需要额外清理
+  const current = state.threadId === threadId ? state : EMPTY_HISTORY_STATE;
+  const orderedRuns = useMemo(() => {
+    const list = runs.data ?? [];
+    return [...list]
+      .reverse()
+      .filter((r) => current.shards.has(r.run_id))
+      .map((r) => ({ run: r, shard: current.shards.get(r.run_id)! }));
+  }, [runs.data, current.shards]);
+  const { messages, messageRunIds } = useMemo(() => {
+    const out: Message[] = [];
+    const runIds = new Map<string, string>();
+    for (const { run, shard } of orderedRuns) {
+      const seen = new Set<string>();
+      shard.messages.forEach((message, index) => {
+        const key = message.id ?? `seq:${index}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(message);
+        if (message.id) runIds.set(message.id, run.run_id);
+      });
+    }
+    return { messages: out, messageRunIds: runIds };
+  }, [orderedRuns]);
+  const runsById = useMemo(() => {
+    const out: Record<string, Run> = {};
+    for (const run of runs.data ?? []) out[run.run_id] = run;
+    return out;
+  }, [runs.data]);
+
+  const hasMore = orderedRuns.length < (runs.data?.length ?? 0);
   return {
     runs: runs.data,
+    runsById,
     messages,
-    loading,
+    messageRunIds,
+    loading: current.loading,
     hasMore,
-    loadMore: loadMessages,
-  };
+    loadMore,
+    refetchRun,
+    loadedRunIds: current.loadedRunIds,
+  } as const;
 }
 
 export function useThreads(
@@ -1165,7 +1383,9 @@ export function useThreadRuns(threadId?: string) {
       if (!threadId) {
         return [];
       }
-      const response = await apiClient.runs.list(threadId);
+      // 后端路由当前忽略 limit、固定上限 100；显式传值是防御——路由日后支持 limit 时
+      // 不致回退到 SDK 默认的 10 条。超过 100 个 run 的恢复是明确的未覆盖边界。
+      const response = await apiClient.runs.list(threadId, { limit: 100 });
       return response;
     },
     refetchOnWindowFocus: false,
