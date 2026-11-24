@@ -99,18 +99,50 @@ class StreamRecoveryClient extends RunsClient {
   }
 }
 
+/**
+ * SDK 自带的 AsyncCaller 只按 message 前缀识别中止（"AbortError" / "Cancel"），而
+ * Chromium 对 `AbortController.abort()` 的拒绝消息是 "signal is aborted without
+ * reason"（name 才是 AbortError）——SDK 会把已中止的请求当成普通失败进入退避重试
+ * （默认 4 次、约 15 秒），受理前停止后流迟迟不收尾。这里把中止 rejection 归一成
+ * SDK 认得的形态，让重试立即结束；其余错误原样透传。
+ */
+async function fetchNormalizingAbort(
+  ...args: Parameters<typeof fetch>
+): Promise<Response> {
+  try {
+    return await fetch(...args);
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      Reflect.get(error, "name") === "AbortError"
+    ) {
+      const normalized = new Error(
+        `AbortError: ${String(Reflect.get(error, "message") ?? "")}`,
+      );
+      normalized.name = "AbortError";
+      throw normalized;
+    }
+    throw error;
+  }
+}
+
 function createCompatibleClient(): LangGraphClient {
   const apiUrl = getLangGraphBaseURL();
   const client = new LangGraphClient({
     apiUrl,
     onRequest: injectCsrfHeader,
+    callerOptions: { fetch: fetchNormalizingAbort },
   });
 
   // Creating a run is not idempotent. Retrying an ambiguous gateway failure
   // can create the same run more than once after the backend accepted the
   // original request. The SDK also uses this client's transport for recovery
   // GETs, which must retain normal HTTP retries (including transient 5xx).
-  const streamRecoveryClient = new StreamRecoveryClient({ apiUrl });
+  const streamRecoveryClient = new StreamRecoveryClient({
+    apiUrl,
+    callerOptions: { fetch: fetchNormalizingAbort },
+  });
   const runCreationClient = new RunsClient({
     apiUrl,
     callerOptions: {
