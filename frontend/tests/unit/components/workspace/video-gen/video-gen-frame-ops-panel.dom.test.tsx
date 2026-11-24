@@ -220,6 +220,18 @@ describe("E5 帧面板未保存编辑禁止付费重生", () => {
     renderPanel({ videoType: "ai_image", taskStatus: "failed" });
     typePrompt("改了还没保存的提示词");
     expect(findButton("重生画面").hasAttribute("disabled")).toBe(true);
+    expect(findButton("重生画面").getAttribute("title")).toContain("请先保存");
+  });
+
+  it("draft 态本就不可重生：未保存提示词时不套守卫提示（OCR 第 2 轮）", () => {
+    renderPanel({ videoType: "ai_image", taskStatus: "draft" });
+    typePrompt("改了还没保存的提示词");
+    const btn = findButton("重生画面");
+    expect(btn.hasAttribute("disabled")).toBe(true);
+    expect(btn.getAttribute("title")).toBe("仅 ready/failed 可重生");
+    expect(
+      container!.querySelector('[data-testid="frame-regen-visual-hint"]'),
+    ).toBeNull();
   });
 
   // 触屏收不到 title：被守卫挡住时要有可见文字说明下一步（OCR 第 1 轮）

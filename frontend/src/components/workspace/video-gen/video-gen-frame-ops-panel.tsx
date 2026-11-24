@@ -129,7 +129,9 @@ export function FrameOpsPanel({
     source !== (frame.visual_source ?? "");
   // 三个 dirty 标志只有这一套比较来源
   const dirty = narrationDirty || visualDirty;
-  const blockRegenVisual = visualDirty && supportsVisualDirtyGuard(videoType);
+  // 守卫只在本来可重生的状态（ready/failed）下才接管提示；draft 态维持「仅 ready/failed 可重生」
+  const blockRegenVisual =
+    canRegen && visualDirty && supportsVisualDirtyGuard(videoType);
   const warning = (updateMut.data as { warning?: string } | undefined)?.warning;
 
   // T13（决策 14）：remotion_course 一期专属形态——版式 + 静帧 + 素材区

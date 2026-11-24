@@ -85,6 +85,9 @@ export interface RecordedTaskDetailRequest {
   status: MockVideoTaskStatus;
 }
 
+/** 一次性失败注入的槽位（与各自的 failNext* 一一对应）。 */
+type FailureSlot = "recompose" | "frameUpdate" | "bulkDisable";
+
 export interface MockVideoAPI {
   readonly createRequests: RecordedRequest[];
   readonly frameUpdateRequests: RecordedRequest[];
@@ -245,30 +248,19 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
   const taskDetailRequests: RecordedTaskDetailRequest[] = [];
   let failCreate: { status: 422 | 503; detail: unknown } | undefined;
   let failListStatus: number | undefined;
-  let failRetryStatus: 409 | undefined;
-  let failFrameUpdate: { status: number; detail: unknown } | undefined;
-  let failBulkDisable: { status: number; detail: unknown } | undefined;
+  /** 一次性失败注入，按槽位索引：命中即取出（下一次请求恢复正常）。 */
+  const failures: Partial<
+    Record<FailureSlot, { status: number; detail: unknown }>
+  > = {};
 
-  /**
-   * 一次性失败注入：命中则取出（下一次请求恢复正常）并直接下发错误响应，
-   * 未注入返回 undefined，调用方继续正常分支。
-   */
+  /** 命中则取出并直接下发错误响应；未注入返回 undefined，调用方继续正常分支。 */
   function consumeFailure(
     route: Route,
-    slot: "recompose" | "frameUpdate" | "bulkDisable",
+    slot: FailureSlot,
   ): Promise<void> | undefined {
-    const failure =
-      slot === "recompose"
-        ? failRetryStatus !== undefined
-          ? { status: failRetryStatus, detail: "Storyboard edit required" }
-          : undefined
-        : slot === "frameUpdate"
-          ? failFrameUpdate
-          : failBulkDisable;
+    const failure = failures[slot];
     if (!failure) return undefined;
-    if (slot === "recompose") failRetryStatus = undefined;
-    else if (slot === "frameUpdate") failFrameUpdate = undefined;
-    else failBulkDisable = undefined;
+    delete failures[slot];
     return json(route, failure.status, { detail: failure.detail });
   }
   let createdTaskId: string | undefined;
@@ -565,16 +557,19 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
         }
         const failure = consumeFailure(route, "bulkDisable");
         if (failure) return failure;
-        // 与后端一致：graphic → null（=主引擎）；graphic_spec 保留（前端 api.ts 同约定）
-        let disabled = 0;
         const storyboard = storyboards.get(taskId);
-        if (storyboard?.frames) {
-          storyboard.frames = storyboard.frames.map((frame) => {
-            if (frame.visual_source !== "graphic") return frame;
-            disabled += 1;
-            return { ...frame, visual_source: null };
+        if (!storyboard?.frames) {
+          return json(route, 404, {
+            detail: "Storyboard not found for this task",
           });
         }
+        // 与后端一致：graphic → null（=主引擎）；graphic_spec 保留（前端 api.ts 同约定）
+        let disabled = 0;
+        storyboard.frames = storyboard.frames.map((frame) => {
+          if (frame.visual_source !== "graphic") return frame;
+          disabled += 1;
+          return { ...frame, visual_source: null };
+        });
         return json(route, 200, { disabled });
       }
 
@@ -585,35 +580,36 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
       ) {
         const body = parseBody(route) as { mode?: string } | undefined;
         regenerateRequests.push({ method, url: path, body });
-        // 与后端 frame regenerate 路由同序：状态门 → 帧下标 → 受理
+        // 与后端 frame regenerate 路由同序：状态门 → storyboard → 帧下标 → 受理
         if (task.status !== "ready" && task.status !== "failed") {
           return json(route, 409, {
             detail: "Task must be ready or failed to regenerate a frame",
+          });
+        }
+        const storyboard = storyboards.get(taskId);
+        if (!storyboard?.frames) {
+          return json(route, 404, {
+            detail: "Storyboard not found for this task",
           });
         }
         const frameIndex = Number(suffix.split("/")[1]);
         if (!Number.isInteger(frameIndex) || frameIndex < 0) {
           return json(route, 422, { detail: "Invalid frame index" });
         }
-        const storyboard = storyboards.get(taskId);
-        if (
-          storyboard?.frames &&
-          !storyboard.frames.some((frame) => frame.index === frameIndex)
-        ) {
+        if (!storyboard.frames.some((frame) => frame.index === frameIndex)) {
           return json(route, 400, {
             detail: `frame_index ${frameIndex} out of range (0-${
               storyboard.frames.length - 1
             })`,
           });
         }
-        if (storyboard?.frames) {
-          // 202 受理后帧上 regen_state=running，终态由 storyboard 轮询到达
-          storyboard.frames = storyboard.frames.map((frame) =>
-            frame.index === frameIndex
-              ? { ...frame, regen_state: "running" as const }
-              : frame,
-          );
-        }
+        // 202 受理后帧停在 regen_state=running：本 mock 只服务「零请求 / 受理」断言，
+        // 终态（done / error）须由用例经 upsertStoryboard 整体覆盖
+        storyboard.frames = storyboard.frames.map((frame) =>
+          frame.index === frameIndex
+            ? { ...frame, regen_state: "running" as const }
+            : frame,
+        );
         return json(route, 202, {
           status: "started",
           mode: body?.mode ?? "all",
@@ -724,16 +720,16 @@ export function mockVideoAPI(page: Page): MockVideoAPI {
       failListStatus = undefined;
     },
     failNextRetry(status: 409) {
-      failRetryStatus = status;
+      failures.recompose = { status, detail: "Storyboard edit required" };
     },
     failNextFrameUpdate(status = 500, detail = "Mock frame update failure") {
-      failFrameUpdate = { status, detail };
+      failures.frameUpdate = { status, detail };
     },
     failNextBulkDisableGraphic(
       status = 409,
       detail = "Mock bulk disable failure",
     ) {
-      failBulkDisable = { status, detail };
+      failures.bulkDisable = { status, detail };
     },
     seedProject,
     project(projectId: string) {
