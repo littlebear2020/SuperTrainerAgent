@@ -41,7 +41,7 @@ export async function startHeldOpenStreamServer(options?: {
       "Access-Control-Allow-Origin": "*",
       // 跨源响应默认只暴露 CORS 安全清单里的头；SDK 靠 Content-Location 触发 onCreated
       "Access-Control-Expose-Headers": "Content-Location",
-      ...(runMatch?.groups
+      ...(options?.echoContentLocation && runMatch?.groups
         ? {
             "Content-Location": `/threads/${runMatch.groups.thread}/runs/${runMatch.groups.run}`,
           }
