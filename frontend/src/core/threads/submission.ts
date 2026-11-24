@@ -64,6 +64,8 @@ export interface Submission {
   threadId: string | undefined;
   /** onSend 已触发（上传完成、提交 run 前） */
   onSendFired: boolean;
+  /** thread.submit 已入队：SDK 流收尾却从未 onCreated / onError 时的兜底结案依据 */
+  submitted: boolean;
   readonly state: SubmissionState;
   readonly accepted: Promise<void>;
   readonly completion: Promise<SubmissionOutcome>;
@@ -105,6 +107,7 @@ export function createSubmission(
     runId: undefined,
     threadId: undefined,
     onSendFired: false,
+    submitted: false,
     get state() {
       return state;
     },

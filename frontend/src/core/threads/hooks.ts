@@ -26,6 +26,7 @@ import {
   friendlySendErrorMessage,
   friendlyUploadErrorMessage,
   SEND_BUSY_MESSAGE,
+  SEND_NOT_ACCEPTED_MESSAGE,
   SEND_STOPPED_MESSAGE,
 } from "./errors";
 import {
@@ -85,6 +86,9 @@ export type ThreadStreamOptions = {
 type SendMessageOptions = {
   additionalKwargs?: Record<string, unknown>;
 };
+
+const ABANDON_POLL_MS = 50;
+const ABANDON_TIMEOUT_MS = 1500;
 
 /** Suffix DynamicContextMiddleware's ID-swap gives the real user message (D-3):
  *  the injected reminder SystemMessage takes the original id ``X`` while the
@@ -419,9 +423,20 @@ export function useThreadStream({
       if (submission?.state === "pending") {
         rejectSubmission(submission, "failed", friendly ?? errorMsg, error);
       } else if (submission?.state === "accepted") {
+        if (stopRequestedRef.current) {
+          // 用户主动停止后的收尾错误：completion 按 stopped 结尾，不提示
+          completeSubmission(submission, { status: "stopped" });
+          return;
+        }
         completeSubmission(submission, { status: "failed", error });
       }
-      if (!submission || currentSubmissionRef.current === submission) {
+      // 共享的 optimistic 清理按归属门控：带 run_id 却不属于任何在途 submission 的迟到
+      // 回调（旧 run 的错误）不得清掉新一次发送的 optimistic 消息
+      const hasPending = currentSubmissionRef.current?.state === "pending";
+      if (
+        (submission && currentSubmissionRef.current === submission) ||
+        (!meta?.run_id && !hasPending)
+      ) {
         setOptimisticMessages([]);
       }
       // Stale run reconnection: the run no longer exists on the server
@@ -502,9 +517,14 @@ export function useThreadStream({
       completeSubmission(current, {
         status: stopRequestedRef.current ? "stopped" : "finished",
       });
+    } else if (current?.state === "pending" && current.submitted) {
+      // 兜底：已入队的流收尾了，却既没有 onCreated 也没有 onError / onStop——
+      // submission 永远停在 pending 会把 busy 锁占死，之后每次发送都被静默拒绝
+      rejectSubmission(current, "failed", SEND_NOT_ACCEPTED_MESSAGE);
+      toast.error(SEND_NOT_ACCEPTED_MESSAGE);
     }
     stopRequestedRef.current = false;
-  }, [thread.isLoading, completeSubmission]);
+  }, [thread.isLoading, completeSubmission, rejectSubmission]);
 
   // Reset thread-local pending UI state when switching between threads so
   // optimistic messages and in-flight guards do not leak across chat views.
@@ -552,6 +572,35 @@ export function useThreadStream({
     }
     prevTailIdRef.current = thread.messages.at(-1)?.id;
   }, [thread.messages, optimisticMessages.length]);
+
+  /**
+   * 提交入队后的兜底：SDK 流既没有 onCreated 也没有 onError / onStop 就收尾时（空流），
+   * React 可能从未渲染过 isLoading=true，收尾 effect 不会触发——submission 会永远停在
+   * pending，把 busy 锁占死。轮询直到观察到 isLoading 翻真（之后交给收尾 effect），或
+   * 超时仍未受理则按 failed 结案并提示一次。
+   */
+  const armAbandonWatchdog = useCallback(
+    (submission: Submission) => {
+      const startedAt = Date.now();
+      const tick = () => {
+        if (
+          currentSubmissionRef.current !== submission ||
+          submission.state !== "pending"
+        ) {
+          return;
+        }
+        if (threadRef.current?.isLoading === true) return;
+        if (Date.now() - startedAt > ABANDON_TIMEOUT_MS) {
+          rejectSubmission(submission, "failed", SEND_NOT_ACCEPTED_MESSAGE);
+          toast.error(SEND_NOT_ACCEPTED_MESSAGE);
+          return;
+        }
+        setTimeout(tick, ABANDON_POLL_MS);
+      };
+      setTimeout(tick, ABANDON_POLL_MS);
+    },
+    [rejectSubmission],
+  );
 
   const sendMessage = useCallback(
     async (
@@ -740,6 +789,7 @@ export function useThreadStream({
         listeners.current.onSend?.(threadId);
         if (!stillOwner()) return submission.accepted;
 
+        submission.submitted = true;
         try {
           await thread.submit(
             {
@@ -782,6 +832,10 @@ export function useThreadStream({
             },
           );
         } catch (error) {
+          if (submission.state !== "pending") {
+            // onCreated 先到、run 已受理：错误交给流回调处理，这里不再提示
+            return submission.accepted;
+          }
           // SDK 入队前就拒绝（同步校验）：受理前失败，提示一次
           const errorMessage = getStreamErrorMessage(error);
           toast.error(friendlySendErrorMessage(error) ?? errorMessage);
@@ -789,7 +843,10 @@ export function useThreadStream({
           return submission.accepted;
         }
         void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
-        // 受理与否由 SDK 回调决定：onCreated → resolve；创建前 onError / 停止 → reject
+        // 受理与否由 SDK 回调决定：onCreated → resolve；创建前 onError / 停止 → reject。
+        // 流若在 React 观察到 isLoading 翻转之前就已收尾（空流），收尾 effect 不会再
+        // 触发——轮询兜底。
+        armAbandonWatchdog(submission);
         return submission.accepted;
       } finally {
         if (uploadOpRef.current?.id === uploadOp.id) uploadOpRef.current = null;
@@ -803,6 +860,7 @@ export function useThreadStream({
       queryClient,
       isBusy,
       rejectSubmission,
+      armAbandonWatchdog,
     ],
   );
 
@@ -844,12 +902,22 @@ export function useThreadStream({
     if (pending?.state === "pending") {
       rejectSubmission(pending, "stopped", SEND_STOPPED_MESSAGE);
     }
+    // 已受理：先占住「取消在途」，让流收尾 effect 确定性地等取消结果（否则 isLoading
+    // 先回落会把 completion 记成 stopped，随后 cancel 失败就无处落脚）
+    if (currentSubmissionRef.current?.state === "accepted") {
+      cancelPendingRef.current = true;
+    }
     try {
       await thread.stop();
+    } catch (error) {
+      // SDK 的 stop 不该抛；真抛了也不能让停止按钮产生未处理拒绝
+      toast.error(`停止失败：${getStreamErrorMessage(error)}`);
     } finally {
       const submission = currentSubmissionRef.current;
-      if (submission?.state === "accepted") {
+      if (submission?.state === "accepted" && submission.runId) {
         await cancelAcceptedRun(submission);
+      } else {
+        cancelPendingRef.current = false;
       }
     }
   }, [thread, rejectSubmission, cancelAcceptedRun]);

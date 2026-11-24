@@ -1,3 +1,8 @@
+import {
+  UPLOAD_STALLED_ERROR,
+  UPLOAD_IDLE_TIMEOUT_MS,
+} from "@/core/uploads/api";
+
 /**
  * PR2（2026-11-24 前端可靠性批）：sendMessage 以 busy 拒绝时的文案。
  * busy 不弹提示（输入保留、用户等上一条收尾），与后端并发锁的提示共用同一句。
@@ -30,8 +35,6 @@ export function friendlySendErrorMessage(err: unknown): string | null {
   return null;
 }
 
-import { UPLOAD_STALLED_ERROR } from "@/core/uploads/api";
-
 /** 上传失败的用户可读文案；返回 null 表示走默认文案（后端 detail / 网络错误原串）。 */
 export function friendlyUploadErrorMessage(err: unknown): string | null {
   if (
@@ -39,12 +42,16 @@ export function friendlyUploadErrorMessage(err: unknown): string | null {
     err !== null &&
     Reflect.get(err, "name") === UPLOAD_STALLED_ERROR
   ) {
-    const seconds = Number(Reflect.get(err, "idleTimeoutMs"));
+    const idleTimeoutMs = Number(Reflect.get(err, "idleTimeoutMs"));
     const label =
-      Number.isFinite(seconds) && seconds > 0
-        ? Math.round(seconds / 1000)
-        : 120;
+      Number.isFinite(idleTimeoutMs) && idleTimeoutMs > 0
+        ? Math.round(idleTimeoutMs / 1000)
+        : Math.round(UPLOAD_IDLE_TIMEOUT_MS / 1000);
     return `上传停滞：${label} 秒内没有网络进展，请检查网络后重试`;
   }
   return null;
 }
+
+/** PR2：SDK 流已收尾却从未 onCreated / onError——提交没有被受理，兜底结案时的提示。 */
+export const SEND_NOT_ACCEPTED_MESSAGE =
+  "提交没有被受理：连接已结束但没有创建运行，请重新发送";

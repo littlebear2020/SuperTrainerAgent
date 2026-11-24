@@ -67,7 +67,14 @@ const h = vi.hoisted(() => {
       },
     };
     // 真实 fetch 流在 signal 中止时抛 AbortError（SDK 据此静默收尾）
+    // 可切换：中止时以 error 事件收尾（模拟「用户停止后 SDK 以 onError 收尾」）
+    let abortMessage: string | null = null;
     signal?.addEventListener("abort", () => {
+      if (abortMessage !== null) {
+        buffer.push({ event: "error", data: { message: abortMessage } });
+        notify?.();
+        return;
+      }
       abortError = Object.assign(new Error("The operation was aborted"), {
         name: "AbortError",
       });
@@ -76,6 +83,9 @@ const h = vi.hoisted(() => {
     });
     return {
       iterable,
+      failOnAbort(message: string) {
+        abortMessage = message;
+      },
       push(ev: StreamEvent) {
         buffer.push(ev);
         notify?.();
@@ -694,3 +704,120 @@ describe("上传错误的提示（OCR 第 1 轮）", () => {
     );
   });
 });
+
+describe("OCR 第 2 轮受理项", () => {
+  test("受理后停止、SDK 以 onError 收尾：不提示，completion 按 stopped 收尾", async () => {
+    await mount("t-1");
+    const sent = api().sendMessage("t-1", { text: "A", files: [] });
+    await flush();
+    fireCreated(0, "run-1");
+    await act(async () => {
+      await sent;
+    });
+    // 用户停止：cancel 受理；SDK 流这次以 error 事件收尾（而不是 AbortError）
+    h.streams[0]!.ctrl.failOnAbort("Request was aborted");
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(h.cancelRun).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  test("SDK 流收尾却从未 onCreated：受理前的 submission 以 failed 结案并提示，不永久 busy", async () => {
+    const cb = await mount("t-1");
+    h.stream.mockImplementationOnce(async () => emptyStream());
+    const outcome = api()
+      .sendMessage("t-1", { text: "A", files: [] })
+      .then(
+        () => "resolved",
+        (error: unknown) => (error as { kind?: string }).kind,
+      );
+    // 整段等待放在同一个 act 里：兜底由定时器触发（React 可能从未渲染过
+    // isLoading=true），嵌套 act 退出时不提交，会读到旧快照并拖累后续用例
+    const settled = await act(async () =>
+      Promise.race([
+        outcome,
+        new Promise<"timeout">((resolve) =>
+          setTimeout(() => resolve("timeout"), 2000),
+        ),
+      ]),
+    );
+    expect(settled).toBe("failed");
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(hasOptimistic("A")).toBe(false);
+    // 锁已释放：下一次发送不再被判 busy
+    // A 的流是空流（不入 streams），B 是第一条受控流
+    const again = api().sendMessage("t-1", { text: "B", files: [] });
+    await act(async () => {
+      await flush();
+    });
+    expect(h.stream).toHaveBeenCalledTimes(2);
+    expect(h.streams).toHaveLength(1);
+    fireCreated(0, "run-2");
+    await act(async () => {
+      await again;
+    });
+    expect(cb.onStart).toHaveBeenCalledWith("t-1", "run-2");
+  });
+
+  test("旧 run 的迟到 error（带 run_id）不清理新 submission 的 optimistic 消息", async () => {
+    await mount("t-1");
+    const first = api().sendMessage("t-1", { text: "A", files: [] });
+    await flush();
+    fireCreated(0, "run-1");
+    await act(async () => {
+      await first;
+    });
+    // run-1 正常结束（从归属表移除）
+    h.history.push({ values: { messages: [] } });
+    h.streams[0]!.ctrl.end();
+    await flush();
+
+    // B 正在上传（受理前），optimistic 可见
+    let release!: (value: { files: [] }) => void;
+    h.upload.mockImplementationOnce(
+      () =>
+        new Promise<{ files: [] }>((resolve) => {
+          release = resolve;
+        }),
+    );
+    let secondOutcome = "pending";
+    const second = api()
+      .sendMessage("t-1", {
+        text: "B",
+        files: [ATTACHMENT],
+      })
+      .then(
+        () => {
+          secondOutcome = "resolved";
+        },
+        (error: unknown) => {
+          secondOutcome = `rejected:${String((error as { kind?: string }).kind)}`;
+        },
+      );
+    await flush();
+    expect(hasOptimistic("B")).toBe(true);
+
+    // run-1 的迟到 error 经 rejoin 形态到达
+    await act(async () => {
+      await api().thread.joinStream("run-1");
+    });
+    h.joins[0]!.ctrl.push({ event: "error", data: { message: "late error" } });
+    await flush();
+    expect({ secondOutcome, hasB: hasOptimistic("B") }).toEqual({
+      secondOutcome: "pending",
+      hasB: true,
+    });
+    release({ files: [] });
+    // B 继续走到提交 run 并保持 pending（流未结束），这里不 await 它，只吞掉收尾时的 rejection
+    void second.catch(() => undefined);
+  });
+});
+
+/** 立即结束、不触发 onRunCreated 的流。 */
+function emptyStream(): AsyncIterable<never> {
+  return (async function* () {
+    return;
+  })();
+}
