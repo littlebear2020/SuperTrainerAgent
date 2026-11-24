@@ -1,6 +1,6 @@
 # 核心产品前端可靠性优化 Implementation Plan
 
-> **状态**：未执行（2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。
+> **状态**：部分执行（PR1 已执行、待合入，PR2–PR4 与总验收未执行；2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。**执行进度（2026-11-25）**：PR1 视频编辑安全的验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr1.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr1.md)。同日用户以 /goal 指令授权本批建分支、push、开 PR 与评审通过后合并；仍不授权部署、付费 API 调用与 live 套件。
 > **TL;DR**：分 4 个串行 PR，按视频编辑安全→输入上传→线程恢复→产物引用执行（视频批路径零重叠、体量最小，先止住帧面板的未保存旧参数付费重生）。聊天补齐真实分页、取消恢复和滚动锚定；write-file 补齐流式参数完整性与分工具内容语义；AI 生图/生视频只修帧面板「重生画面」的未保存付费重生、取消轮询和失败反馈。换账号残留与视频跨代 accepted-operation 不在本批：延后项已登记 backlog，后者已拆至 pending 计划。流式停止保留草稿已落地，不得回退。
 
 > **For agentic workers：** 推荐 `superpowers:executing-plans` 在当前会话按文档顺序执行（Task 0 → Task 1–4 即 PR1–PR4 → Task 5）；若用户另行选择，才使用 `superpowers:subagent-driven-development`。先完成 Task 0 的基线预检，再用 `superpowers:using-git-worktrees` 从包含本计划修订的提交建立隔离工作区，按 checkbox 逐项勾选，不得并行派发这 4 个 PR。步骤内的 Commit 步是本地提交，按 Git 约定逐笔落；本计划不授权自动 push、自动合并或部署，push 与开 PR 另行确认。
@@ -77,8 +77,8 @@
 
 ### Task 0：执行基线与范围预检（不新增 PR）
 
-- [ ] **Step 1：冻结计划。** 本计划的基线提交须同时包含本计划、拆出的 pending 计划和 `docs/findings-backlog.md` 的延后项登记（F5、F6、D3、P2-5、P2-6b、P2-6c、C8、C9、E6、E7 与详情页重新生成入口），任一缺失先补齐再提交。以该提交为 `BASE_SHA` 并从它创建 worktree；定稿后计划再有修订时，重新提交并更新 BASE_SHA。确认其中只有 4 个纯前端 PR，执行顺序为 PR1→PR4，没有账号隔离任务，也没有 accepted-operation 实施步骤。F5 是否转 hotfix 由用户另行决定。
-- [ ] **Step 2：核对真实 API 与测试夹具。** 开工前确认 run-messages 首页为最新页、支持 before_seq；`GET /threads/{id}/runs` 路由不声明 `limit`，固定按 `list_by_thread` 默认的 100 条返回（SDK 发出的 `?limit=10` 被忽略）；视频 mutation/list/detail 均无操作代际。若这些契约已变化，先回本计划修订对应决策，不得沿用旧假设。预检 `git status --short` 和 allow/ban，后续所有 diff 均以 BASE_SHA 审查。
+- [x] **Step 1：冻结计划。** 本计划的基线提交须同时包含本计划、拆出的 pending 计划和 `docs/findings-backlog.md` 的延后项登记（F5、F6、D3、P2-5、P2-6b、P2-6c、C8、C9、E6、E7 与详情页重新生成入口），任一缺失先补齐再提交。以该提交为 `BASE_SHA` 并从它创建 worktree；定稿后计划再有修订时，重新提交并更新 BASE_SHA。确认其中只有 4 个纯前端 PR，执行顺序为 PR1→PR4，没有账号隔离任务，也没有 accepted-operation 实施步骤。F5 是否转 hotfix 由用户另行决定。
+- [x] **Step 2：核对真实 API 与测试夹具。** 开工前确认 run-messages 首页为最新页、支持 before_seq；`GET /threads/{id}/runs` 路由不声明 `limit`，固定按 `list_by_thread` 默认的 100 条返回（SDK 发出的 `?limit=10` 被忽略）；视频 mutation/list/detail 均无操作代际。若这些契约已变化，先回本计划修订对应决策，不得沿用旧假设。预检 `git status --short` 和 allow/ban，后续所有 diff 均以 BASE_SHA 审查。
 
 ### Task 1（PR1）：AI 生图/AI 生视频的编辑真实性、取消轮询与失败反馈
 
@@ -99,25 +99,25 @@
 
 **纵切 A：cancelled 终态停轮询**
 
-- [ ] **Step 1：写取消终态与 legacy 轮询矩阵（红）。** 在 `video-task-refetch-interval.test.ts` 断言：普通 cancelled 任务立即停轮询，即使 pollWhile 为 true 也不继续；ready/failed 在无 grace 时停止、有 grace 时维持 2 秒；running/pending/composing/qc_repair 等既有行为不变。remotion_course/ViMax 的 legacy recompose grace 保持，ai_image/ai_video/ai_visual 也不在本批提前删除 grace；断言无 accepted-operation/sessionStorage 写入。
-- [ ] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/video-gen/video-task-refetch-interval.test.ts`，记录 cancelled 仍继续轮询的失败项。
-- [ ] **Step 3：实现 cancelled 停轮询（绿）。** `videoTaskRefetchInterval` 对 `cancelled` 无条件返回 false，直接复用现有终态语义；其余状态与 legacy `pollWhile` 宽限保持不变，不删除 `recomposeGraceUntilRef`。
-- [ ] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
-- [ ] **Step 5：Commit。** 暂存 `video-task-refetch-interval.test.ts` 与 `frontend/src/core/video-gen/hooks.ts`，提交 `fix(video-gen): cancelled 终态停止轮询`。
+- [x] **Step 1：写取消终态与 legacy 轮询矩阵（红）。** 在 `video-task-refetch-interval.test.ts` 断言：普通 cancelled 任务立即停轮询，即使 pollWhile 为 true 也不继续；ready/failed 在无 grace 时停止、有 grace 时维持 2 秒；running/pending/composing/qc_repair 等既有行为不变。remotion_course/ViMax 的 legacy recompose grace 保持，ai_image/ai_video/ai_visual 也不在本批提前删除 grace；断言无 accepted-operation/sessionStorage 写入。
+- [x] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/video-gen/video-task-refetch-interval.test.ts`，记录 cancelled 仍继续轮询的失败项。
+- [x] **Step 3：实现 cancelled 停轮询（绿）。** `videoTaskRefetchInterval` 对 `cancelled` 无条件返回 false，直接复用现有终态语义；其余状态与 legacy `pollWhile` 宽限保持不变，不删除 `recomposeGraceUntilRef`。
+- [x] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
+- [x] **Step 5：Commit。** 暂存 `video-task-refetch-interval.test.ts` 与 `frontend/src/core/video-gen/hooks.ts`，提交 `fix(video-gen): cancelled 终态停止轮询`。
 
 **纵切 B：付费前守卫与乐观回滚提示**
 
-- [ ] **Step 6：写付费前守卫与错误反馈测试（红）。** 在 `hooks-invalidation.dom.test.tsx` 与新增的 `video-gen-frame-ops-panel.dom.test.tsx` 覆盖：三类白名单任务 prompt/source 未保存时帧面板视觉重生禁用且不发付费 mutation；narrationDirty 只挡配音，visualDirty 不误挡配音；ViMax 在同样未保存编辑下保持原按钮规则；`useUpdateFrameVisualSource/useUpdateFrameLayout/useBulkDisableGraphic` 失败分别回滚且 toast 恰好一次。
-- [ ] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run src/core/video-gen/hooks-invalidation.dom.test.tsx tests/unit/components/workspace/video-gen/video-gen-frame-ops-panel.dom.test.tsx`，记录类型门控、dirty guard 和三处 toast 的实际失败项。
-- [ ] **Step 8：实现分类型编辑守卫与回滚提示（绿）。** 只在白名单任务上以 visualDirty 禁用帧面板“重生画面”并提示先保存；`supportsVisualDirtyGuard(videoType)` 做类型门控，narrationDirty 保持独立，ViMax 原行为不变，音色过滤保持 2026-11-23 收敛后的目录。在三个 mutation 各自的 onError 中先恢复 `ctx.prev`，再 toast 一次真实错误；不改其他 mutation，不顺手清理 dead TaskCard 或重写列表。
-- [ ] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
-- [ ] **Step 10：Commit。** 暂存本纵切的测试、`hooks.ts` 与 `video-gen-frame-ops-panel.tsx`，提交 `fix(video-gen): 未保存编辑禁止付费重生，乐观编辑失败回滚并提示`。
+- [x] **Step 6：写付费前守卫与错误反馈测试（红）。** 在 `hooks-invalidation.dom.test.tsx` 与新增的 `video-gen-frame-ops-panel.dom.test.tsx` 覆盖：三类白名单任务 prompt/source 未保存时帧面板视觉重生禁用且不发付费 mutation；narrationDirty 只挡配音，visualDirty 不误挡配音；ViMax 在同样未保存编辑下保持原按钮规则；`useUpdateFrameVisualSource/useUpdateFrameLayout/useBulkDisableGraphic` 失败分别回滚且 toast 恰好一次。
+- [x] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run src/core/video-gen/hooks-invalidation.dom.test.tsx tests/unit/components/workspace/video-gen/video-gen-frame-ops-panel.dom.test.tsx`，记录类型门控、dirty guard 和三处 toast 的实际失败项。
+- [x] **Step 8：实现分类型编辑守卫与回滚提示（绿）。** 只在白名单任务上以 visualDirty 禁用帧面板“重生画面”并提示先保存；`supportsVisualDirtyGuard(videoType)` 做类型门控，narrationDirty 保持独立，ViMax 原行为不变，音色过滤保持 2026-11-23 收敛后的目录。在三个 mutation 各自的 onError 中先恢复 `ctx.prev`，再 toast 一次真实错误；不改其他 mutation，不顺手清理 dead TaskCard 或重写列表。
+- [x] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
+- [x] **Step 10：Commit。** 暂存本纵切的测试、`hooks.ts` 与 `video-gen-frame-ops-panel.tsx`，提交 `fix(video-gen): 未保存编辑禁止付费重生，乐观编辑失败回滚并提示`。
 
 **纵切 C：行为验收与收尾**
 
-- [ ] **Step 11：无付费行为验收。** 先给 `mock-video-api.ts` 补 regenerate 请求记录与 visual-source/layout/bulk 可控失败并做夹具自证，再写 `tests/e2e/video-gen-edit-safety.spec.ts` 并执行 `cd frontend && pnpm exec playwright test tests/e2e/video-gen-edit-safety.spec.ts`：覆盖 ai_image/ai_video/ai_visual 在帧面板未保存 prompt/source 时点“重生画面”零付费请求、visual/narration dirty 独立、ViMax 非目标行为、三处乐观失败回滚与提示、cancelled 后请求停止。
-- [ ] **Step 12：Commit。** 暂存 `mock-video-api.ts` 与 `video-gen-edit-safety.spec.ts`，提交 `test(e2e): video-gen 编辑安全用例与 mock 夹具`。
-- [ ] **Step 13：批次门禁与收尾。** 执行 `make -C frontend check` 和相关 video-gen 既有回归；确认无 remotion/ViMax 专属实现或其他未提交文件进入 diff。写 PR1 changelog「验收记录」，明确记录 E1 跨代轮询仍未修复、去向为 pending 计划；勾选本任务并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR1 验收记录`。push 与开 PR 另行确认。
+- [x] **Step 11：无付费行为验收。** 先给 `mock-video-api.ts` 补 regenerate 请求记录与 visual-source/layout/bulk 可控失败并做夹具自证，再写 `tests/e2e/video-gen-edit-safety.spec.ts` 并执行 `cd frontend && pnpm exec playwright test tests/e2e/video-gen-edit-safety.spec.ts`：覆盖 ai_image/ai_video/ai_visual 在帧面板未保存 prompt/source 时点“重生画面”零付费请求、visual/narration dirty 独立、ViMax 非目标行为、三处乐观失败回滚与提示、cancelled 后请求停止。
+- [x] **Step 12：Commit。** 暂存 `mock-video-api.ts` 与 `video-gen-edit-safety.spec.ts`，提交 `test(e2e): video-gen 编辑安全用例与 mock 夹具`。
+- [x] **Step 13：批次门禁与收尾。** 执行 `make -C frontend check` 和相关 video-gen 既有回归；确认无 remotion/ViMax 专属实现或其他未提交文件进入 diff。写 PR1 changelog「验收记录」，明确记录 E1 跨代轮询仍未修复、去向为 pending 计划；勾选本任务并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR1 验收记录`。push 与开 PR 另行确认。
 
 ### Task 2（PR2）：输入受理契约与上传会话
 
