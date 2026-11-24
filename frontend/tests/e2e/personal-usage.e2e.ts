@@ -133,16 +133,274 @@ async function mockUsageAPI(
   });
 }
 
-async function openPersonalUsage(page: Page) {
+async function openPersonalUsage(
+  page: Page,
+  options: { sidebar?: "open" } = {},
+) {
   await page.context().addCookies([
     { name: "access_token", value: "personal-usage-e2e-session", url: APP_URL },
     { name: "locale", value: "zh-CN", url: APP_URL },
-    { name: "sidebar_state", value: "false", url: APP_URL },
+    {
+      name: "sidebar_state",
+      value: options.sidebar === "open" ? "true" : "false",
+      url: APP_URL,
+    },
   ]);
   const response = await page.goto("/workspace/console");
   expect(response?.status()).toBe(200);
   await expect(page.getByTestId("personal-usage-page")).toBeVisible();
   return response;
+}
+
+// ---- Layout helpers (§1.2 of the redesign plan) ----
+//
+// documentElement.scrollWidth is always <= clientWidth inside the workspace
+// (the shell is h-screen overflow-hidden and the page root clips x), so
+// horizontal containment is asserted on the task rows and numeric cells
+// themselves, never on the document.
+
+type Box = { x: number; y: number; width: number; height: number };
+
+function centerY(box: Box) {
+  return box.y + box.height / 2;
+}
+
+async function expectContained(page: Page) {
+  const offenders = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[data-testid^='task-row-'], [data-testid^='task-cost-'], [data-testid^='task-tokens-']",
+      ),
+    )
+      .filter((node) => node.scrollWidth > node.clientWidth)
+      .map(
+        (node) =>
+          `${node.dataset.testid}: ${node.scrollWidth} > ${node.clientWidth}`,
+      ),
+  );
+  expect(offenders).toEqual([]);
+}
+
+async function expectContentCentered(page: Page) {
+  const content = (await page
+    .getByTestId("usage-layout-content")
+    .boundingBox())!;
+  const pageRoot = (await page
+    .getByTestId("personal-usage-page")
+    .boundingBox())!;
+  expect(content.width).toBeLessThanOrEqual(1120.5);
+  expect(
+    Math.abs(content.x + content.width / 2 - (pageRoot.x + pageRoot.width / 2)),
+  ).toBeLessThanOrEqual(1);
+}
+
+async function expectToolbarOnOneRow(page: Page) {
+  const toolbar = page.getByTestId("usage-filter-toolbar");
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar.getByTestId("usage-filter-scroll")).toHaveCount(1);
+  await expect(toolbar.getByRole("button")).toHaveCount(7);
+  const layout = await toolbar.evaluate((node) => {
+    const box = (element: Element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return {
+      label: box(node.querySelector(":scope > span")!),
+      buttons: Array.from(node.querySelectorAll("button"), box),
+    };
+  });
+  const firstTop = Math.min(...layout.buttons.map((button) => button.y));
+  for (const button of layout.buttons) {
+    expect(Math.abs(button.y - firstTop)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(centerY(button) - centerY(layout.label)),
+    ).toBeLessThanOrEqual(4);
+  }
+}
+
+async function expectSummarySideBySide(page: Page) {
+  const cost = (await page.getByTestId("usage-summary-cost").boundingBox())!;
+  const tokens = (await page
+    .getByTestId("usage-summary-tokens")
+    .boundingBox())!;
+  expect(Math.abs(centerY(cost) - centerY(tokens))).toBeLessThanOrEqual(1);
+  expect(cost.x + cost.width).toBeLessThanOrEqual(tokens.x + 0.5);
+}
+
+async function expectSummaryStacked(page: Page) {
+  const cost = (await page.getByTestId("usage-summary-cost").boundingBox())!;
+  const tokens = (await page
+    .getByTestId("usage-summary-tokens")
+    .boundingBox())!;
+  expect(cost.y + cost.height).toBeLessThanOrEqual(tokens.y + 0.5);
+  expect(Math.abs(cost.x - tokens.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(cost.width - tokens.width)).toBeLessThanOrEqual(1);
+}
+
+async function rowGeometry(page: Page) {
+  return page.evaluate(() => {
+    const row = document.querySelector<HTMLElement>(
+      "[data-testid^='task-row-']",
+    )!;
+    const id = row.dataset.testid!.slice("task-row-".length);
+    const box = (element: Element | null): Box | null => {
+      if (!element) return null;
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    const title = row.querySelector<HTMLElement>(
+      `[data-testid='task-title-${id}']`,
+    )!;
+    const numeric = [`task-tokens-${id}`, `task-cost-${id}`].map(
+      (testId) => row.querySelector<HTMLElement>(`[data-testid='${testId}']`)!,
+    );
+    return {
+      rowHeight: row.getBoundingClientRect().height,
+      titleWhiteSpace: getComputedStyle(title).whiteSpace,
+      numericAlign: numeric.map((cell) => getComputedStyle(cell).textAlign),
+      title: box(title),
+      cost: box(row.querySelector(`[data-testid='task-cost-${id}']`)),
+      tokens: box(row.querySelector(`[data-testid='task-tokens-${id}']`)),
+      status: box(row.querySelector("[data-testid^='task-status-']")),
+      chevron: box(
+        row.querySelector("svg")?.closest("[aria-hidden='true']") ?? null,
+      ),
+    };
+  });
+}
+
+/** ≥820px: column header visible, all five cells share one ≥70px row. */
+async function expectTableLayout(page: Page) {
+  await expect(page.getByTestId("usage-task-columns")).toBeVisible();
+  const geometry = await rowGeometry(page);
+  expect(geometry.rowHeight).toBeGreaterThanOrEqual(70);
+  expect(geometry.titleWhiteSpace).toBe("nowrap");
+  expect(geometry.numericAlign).toEqual(["right", "right"]);
+  const cells = [
+    geometry.title,
+    geometry.status,
+    geometry.tokens,
+    geometry.cost,
+    geometry.chevron,
+  ];
+  for (const cell of cells) {
+    expect(cell).not.toBeNull();
+    expect(
+      Math.abs(centerY(cell!) - centerY(geometry.title!)),
+    ).toBeLessThanOrEqual(4);
+  }
+  const leftEdges = cells.map((cell) => cell!.x);
+  expect(leftEdges).toEqual([...leftEdges].sort((a, b) => a - b));
+  await expectContained(page);
+}
+
+/** <820px: column header hidden, title/cost on row one, status/tokens on row two. */
+async function expectCardLayout(page: Page) {
+  await expect(page.getByTestId("usage-task-columns")).toBeHidden();
+  const geometry = await rowGeometry(page);
+  expect(geometry.titleWhiteSpace).toBe("normal");
+  expect(geometry.numericAlign).toEqual(["right", "right"]);
+  expect(
+    Math.abs(centerY(geometry.title!) - centerY(geometry.cost!)),
+  ).toBeLessThanOrEqual(4);
+  expect(
+    Math.abs(centerY(geometry.status!) - centerY(geometry.tokens!)),
+  ).toBeLessThanOrEqual(4);
+  expect(centerY(geometry.status!)).toBeGreaterThan(
+    centerY(geometry.title!) + 10,
+  );
+  expect(geometry.cost!.x).toBeGreaterThanOrEqual(
+    geometry.title!.x + geometry.title!.width,
+  );
+  expect(centerY(geometry.chevron!)).toBeGreaterThan(
+    centerY(geometry.title!) + 2,
+  );
+  expect(centerY(geometry.chevron!)).toBeLessThan(
+    centerY(geometry.status!) - 2,
+  );
+  await expectContained(page);
+}
+
+async function expectFilterScrollsInItsOwnContainer(page: Page) {
+  const scroller = page.getByTestId("usage-filter-scroll");
+  const dimensions = await scroller.evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    toolbarOverflows:
+      element.parentElement!.scrollWidth > element.parentElement!.clientWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+  expect(dimensions.toolbarOverflows).toBe(false);
+  await scroller.evaluate((element) => {
+    element.scrollLeft = 80;
+  });
+  expect(
+    await scroller.evaluate((element) => element.scrollLeft),
+  ).toBeGreaterThan(0);
+}
+
+async function expectAllTaskFieldsInsideViewport(page: Page) {
+  const outside = await page.evaluate(() => {
+    const width = window.innerWidth;
+    const fields = document.querySelectorAll<HTMLElement>(
+      "[data-testid^='task-title-'], [data-testid^='task-status-'], [data-testid^='task-tokens-'], [data-testid^='task-cost-']",
+    );
+    return Array.from(fields)
+      .filter((field) => {
+        const rect = field.getBoundingClientRect();
+        return rect.width === 0 || rect.left < -0.5 || rect.right > width + 0.5;
+      })
+      .map((field) => field.dataset.testid ?? field.tagName);
+  });
+  expect(outside).toEqual([]);
+}
+
+function pagedFixture() {
+  const longModel = `vendor/${"very-long-model-segment-".repeat(6)}end`;
+  const tasks = Array.from({ length: 21 }, (_, index) => {
+    const id = `task-${String(index).padStart(2, "0")}`;
+    const empty = index === 20;
+    const big = index === 5;
+    let title = `任务 ${index}`;
+    if (index === 3) title = "历史媒体任务";
+    if (index === 4) title = "未计价媒体任务";
+    let status: UsageTask["status"] = "completed";
+    if (index === 1 || empty) status = "running";
+    else if (index === 2) status = "incomplete";
+    return task(id, index === 0 ? "course-video" : "ai_image", {
+      title,
+      status,
+      cost: empty ? null : big ? 1234567.89 : 1,
+      llm_cost: empty ? null : big ? 1234567.89 : 1,
+      media_cost: null,
+      currency: empty ? null : "CNY",
+      cost_source: empty ? null : "real",
+      total_tokens: empty ? null : big ? 9876543210987 : 10,
+      models: index === 0 ? [model(longModel, 8, 2, 0, 1, "real")] : [],
+    });
+  });
+  // task-05 carries huge values so numeric cells are proven to wrap rather
+  // than clip or squeeze the title column. Totals reconcile with the page:
+  // 20 × ¥1 plus task-05's extra ¥1,234,566.89; 20 × 10 tokens plus its extra.
+  const fullSummary = summary(1234586.89, 9876543211177, "real");
+  return { longModel, tasks, fullSummary };
+}
+
+function mockPagedUsage(
+  page: Page,
+  tasks: UsageTask[],
+  fullSummary: PersonalUsageResponse["summary"],
+) {
+  return mockUsageAPI(page, (_days, _capability, offset, limit) => {
+    expect(limit).toBe(20);
+    return response(
+      7,
+      tasks.slice(offset, offset + limit),
+      fullSummary,
+      21,
+      offset + limit < 21,
+    );
+  });
 }
 
 let legacyRequests: string[];
@@ -237,7 +495,28 @@ test("SSR regular identity, windows, filters, two-model reconciliation, and sour
   await expect(page.getByTestId("usage-summary-cost")).toContainText("¥2.00");
   await expect(page.getByTestId("usage-summary-tokens")).toContainText("300");
 
+  // Desktop and medium widths: capped centered content, header + window
+  // control together, one toolbar row, side-by-side totals, a real table.
+  const originalViewport = page.viewportSize()!;
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectContentCentered(page);
+    await expect(
+      page.getByTestId("usage-header").getByTestId("usage-window-control"),
+    ).toHaveCount(1);
+    await expectToolbarOnOneRow(page);
+    await expectSummarySideBySide(page);
+    await expectTableLayout(page);
+  }
+  await page.setViewportSize(originalViewport);
+
   await page.getByTestId("task-row-poster-b").click();
+  await expect(
+    page.getByTestId("usage-task-panel").getByTestId("task-details-poster-b"),
+  ).toBeVisible();
   await expect(page.getByTestId("model-name-0")).toHaveText("priced-model");
   await expect(page.getByTestId("model-name-1")).toHaveText("real-model-2");
   await expect(page.getByTestId("model-input-0")).toHaveText("100");
@@ -300,52 +579,44 @@ test("SSR regular identity, windows, filters, two-model reconciliation, and sour
 test("pagination, statuses, keyboard, unknown media, and narrow-screen containment", async ({
   page,
 }) => {
-  const longModel = `vendor/${"very-long-model-segment-".repeat(6)}end`;
-  const tasks = Array.from({ length: 21 }, (_, index) => {
-    const id = `task-${String(index).padStart(2, "0")}`;
-    const empty = index === 20;
-    let title = `任务 ${index}`;
-    if (index === 3) title = "历史媒体任务";
-    if (index === 4) title = "未计价媒体任务";
-    let status: UsageTask["status"] = "completed";
-    if (index === 1 || empty) status = "running";
-    else if (index === 2) status = "incomplete";
-    return task(id, index === 0 ? "course-video" : "ai_image", {
-      title,
-      status,
-      cost: empty ? null : 1,
-      llm_cost: empty ? null : 1,
-      media_cost: null,
-      currency: empty ? null : "CNY",
-      cost_source: empty ? null : "real",
-      total_tokens: empty ? null : 10,
-      models: index === 0 ? [model(longModel, 8, 2, 0, 1, "real")] : [],
-    });
-  });
-  const fullSummary = summary(20, 200, "real");
-  await mockUsageAPI(page, (_days, _capability, offset, limit) => {
-    expect(limit).toBe(20);
-    return response(
-      7,
-      tasks.slice(offset, offset + limit),
-      fullSummary,
-      21,
-      offset + limit < 21,
-    );
-  });
+  const { longModel, tasks, fullSummary } = pagedFixture();
+  await mockPagedUsage(page, tasks, fullSummary);
   await openPersonalUsage(page);
 
   await expect(
     page.getByRole("list", { name: "用量任务" }).getByRole("listitem"),
   ).toHaveCount(20);
-  await expect(page.getByTestId("usage-summary-cost")).toContainText("¥20.00");
-  await expect(page.getByTestId("usage-summary-tokens")).toContainText("200");
+  await expect(page.getByTestId("usage-summary-cost")).toContainText(
+    "¥1,234,586.89",
+  );
+  await expect(page.getByTestId("usage-summary-tokens")).toContainText(
+    "9,876,543,211,177",
+  );
   await expect(page.getByTestId("usage-page-info")).toContainText("1–20 / 21");
   await expect(page.getByTestId("task-running-note-task-01")).toHaveText(
     "截至目前",
   );
   await expect(page.getByTestId("task-status-incomplete")).toHaveText("未完成");
   await expect(page.getByTestId("task-cost-task-02")).toContainText("¥1.00");
+
+  // Huge values wrap inside their own cells; the totals above reconcile with them.
+  await expect(page.getByTestId("task-tokens-task-05")).toContainText(
+    "9,876,543,210,987",
+  );
+  await expect(page.getByTestId("task-cost-task-05")).toContainText(
+    "¥1,234,567.89",
+  );
+  await expectContained(page);
+
+  // 820px keeps the five-column table; 819px switches to the two-row card.
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 820, height: 900 });
+  await expectTableLayout(page);
+  await expectSummarySideBySide(page);
+  await page.setViewportSize({ width: 819, height: 900 });
+  await expectCardLayout(page);
+  await expectSummarySideBySide(page);
+  await page.setViewportSize(originalViewport);
 
   for (const id of ["task-03", "task-04"]) {
     await page.getByTestId(`task-row-${id}`).click();
@@ -388,6 +659,18 @@ test("pagination, statuses, keyboard, unknown media, and narrow-screen containme
         ),
       )
       .toBe(true);
+    await expectCardLayout(page);
+    await expectSummaryStacked(page);
+    await expectFilterScrollsInItsOwnContainer(page);
+    await expectAllTaskFieldsInsideViewport(page);
+    for (const testId of [
+      "task-title-task-05",
+      "task-status-completed",
+      "task-tokens-task-05",
+      "task-cost-task-05",
+    ]) {
+      await expect(page.getByTestId(testId).first()).toBeVisible();
+    }
     const scroller = page.getByTestId("model-table-scroll");
     const dimensions = await scroller.evaluate((element) => ({
       scrollWidth: element.scrollWidth,
@@ -414,8 +697,12 @@ test("pagination, statuses, keyboard, unknown media, and narrow-screen containme
     page.getByRole("list", { name: "用量任务" }).getByRole("listitem"),
   ).toHaveCount(1);
   await expect(page.getByTestId("usage-page-info")).toContainText("21–21 / 21");
-  await expect(page.getByTestId("usage-summary-cost")).toContainText("¥20.00");
-  await expect(page.getByTestId("usage-summary-tokens")).toContainText("200");
+  await expect(page.getByTestId("usage-summary-cost")).toContainText(
+    "¥1,234,586.89",
+  );
+  await expect(page.getByTestId("usage-summary-tokens")).toContainText(
+    "9,876,543,211,177",
+  );
   await expect(page.getByTestId("task-row-task-20")).toContainText("核算中");
   await page.getByTestId("usage-previous-page").click();
   await expect(
@@ -446,4 +733,27 @@ test("pagination, statuses, keyboard, unknown media, and narrow-screen containme
     page.waitForURL("**/workspace/agents/course-video/chats/task-00"),
     page.keyboard.press("Enter"),
   ]);
+});
+
+test("keeps numeric columns contained with the sidebar expanded", async ({
+  page,
+}) => {
+  const { tasks, fullSummary } = pagedFixture();
+  await mockPagedUsage(page, tasks, fullSummary);
+  await openPersonalUsage(page, { sidebar: "open" });
+
+  // The expanded desktop sidebar (256px instead of 48px) leaves these two
+  // viewports with the least content width: 1050px is the desktop grid's
+  // floor and 820px the medium grid's.
+  for (const viewport of [
+    { width: 1050, height: 900 },
+    { width: 820, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const pageRoot = (await page
+      .getByTestId("personal-usage-page")
+      .boundingBox())!;
+    expect(pageRoot.x).toBeGreaterThanOrEqual(250);
+    await expectTableLayout(page);
+  }
 });
