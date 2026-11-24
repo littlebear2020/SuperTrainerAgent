@@ -29,3 +29,22 @@ export function friendlySendErrorMessage(err: unknown): string | null {
   }
   return null;
 }
+
+import { UPLOAD_STALLED_ERROR } from "@/core/uploads/api";
+
+/** 上传失败的用户可读文案；返回 null 表示走默认文案（后端 detail / 网络错误原串）。 */
+export function friendlyUploadErrorMessage(err: unknown): string | null {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    Reflect.get(err, "name") === UPLOAD_STALLED_ERROR
+  ) {
+    const seconds = Number(Reflect.get(err, "idleTimeoutMs"));
+    const label =
+      Number.isFinite(seconds) && seconds > 0
+        ? Math.round(seconds / 1000)
+        : 120;
+    return `上传停滞：${label} 秒内没有网络进展，请检查网络后重试`;
+  }
+  return null;
+}

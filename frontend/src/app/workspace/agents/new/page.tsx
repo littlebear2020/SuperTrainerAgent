@@ -39,7 +39,9 @@ import {
   getAgent,
 } from "@/core/agents/api";
 import { useI18n } from "@/core/i18n/hooks";
+import { SEND_BUSY_MESSAGE } from "@/core/threads/errors";
 import { useThreadStream } from "@/core/threads/hooks";
+import { SendRejectedError } from "@/core/threads/submission";
 import { uuid } from "@/core/utils/uuid";
 import { isIMEComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
@@ -248,8 +250,12 @@ export default function NewAgentPage() {
         { additionalKwargs: { hide_from_ui: true } },
       );
       toast.success(t.agents.saveRequested);
-    } catch {
-      // 失败提示由 hook 统一负责（每次失败只提示一次）；这里只恢复本地状态
+    } catch (error) {
+      // failed / stopped 由 hook 统一提示；busy 是 hook 刻意不提示的（假设正文还留在
+      // 输入框）——但这里是隐藏的保存命令，没有可重试的输入，需要自己提示一次
+      if (SendRejectedError.rejectionKind(error) === "busy") {
+        toast.error(error instanceof Error ? error.message : SEND_BUSY_MESSAGE);
+      }
       setSetupAgentStatus("idle");
     }
   }, [

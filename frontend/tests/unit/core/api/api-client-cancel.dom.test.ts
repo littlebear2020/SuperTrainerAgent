@@ -335,3 +335,30 @@ describe("compat 层把中止 rejection 归一成 SDK 认得的形态", () => {
     fetchMock.mockRestore();
   });
 });
+
+describe("OCR 第 1 轮受理项", () => {
+  test("SDK cancel 的响应体带 status 字段时不被当成 CancelOutcome 透传", async () => {
+    cancelMock.mockResolvedValueOnce({ status: "success" } as never);
+    const cancelRun = await freshCancelRun();
+
+    await expect(cancelRun("thread-1", "run-1")).resolves.toEqual({
+      status: "cancelled",
+    });
+  });
+
+  test("wait / action 不同的并发取消不合并：SDK 浮动调用（wait=false）与显式 cancelRun（wait=true）各发一次", async () => {
+    const cancelRun = await freshCancelRun();
+    const client = await freshClient();
+
+    // SDK thread.stop() 内部的调用形态：只带 (threadId, runId)，wait 缺省为 false
+    void client.runs.cancel("thread-1", "run-1");
+    const explicit = cancelRun("thread-1", "run-1");
+
+    await explicit;
+    await flush();
+    expect(cancelMock.mock.calls.map((call) => call.slice(0, 4))).toEqual([
+      ["thread-1", "run-1", false, "interrupt"],
+      ["thread-1", "run-1", true, "interrupt"],
+    ]);
+  });
+});

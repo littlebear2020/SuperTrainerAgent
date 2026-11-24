@@ -78,6 +78,7 @@ vi.mock("sonner", () => ({
 
 import NewAgentPage from "@/app/workspace/agents/new/page";
 import { I18nProvider } from "@/core/i18n/context";
+import { SEND_BUSY_MESSAGE } from "@/core/threads/errors";
 import { SendRejectedError } from "@/core/threads/submission";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -276,6 +277,34 @@ describe("agents/new 的三个调用点观察 rejection", () => {
     });
     await settle();
     expect(h.sendMessage).toHaveBeenCalledTimes(2);
+    expect(unhandled).toEqual([]);
+  });
+
+  test("保存被 busy 拒绝：hook 刻意不提示，页面自己提示一次 busy 文案，状态恢复", async () => {
+    h.sendMessage.mockImplementation(() =>
+      Promise.reject(new SendRejectedError("busy", SEND_BUSY_MESSAGE)),
+    );
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN">
+          <NewAgentPage />
+        </I18nProvider>,
+      );
+    });
+    await reachChatStep();
+    h.sendMessage.mockClear();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="menu-save"]')
+        ?.click();
+    });
+    await settle();
+
+    expect(h.sendMessage).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError.mock.calls[0]![0]).toContain("正在生成");
+    expect(toastSuccess).not.toHaveBeenCalled();
     expect(unhandled).toEqual([]);
   });
 });

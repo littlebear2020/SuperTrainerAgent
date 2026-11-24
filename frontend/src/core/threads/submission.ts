@@ -129,18 +129,9 @@ export function createSubmission(
       );
     },
     complete(outcome) {
-      if (!acceptedSettled) {
-        // 尚未受理就走到终态：失败类按 rejected 收尾，其余视为已受理后结束
-        if (outcome.status === "failed" || outcome.status === "cancelFailed") {
-          submission.reject(
-            "failed",
-            "Submission ended before acceptance",
-            outcome.error,
-          );
-          return;
-        }
-        submission.accept();
-      }
+      // 只对「已受理」的 submission 收尾：未受理或已被拒绝的 submission 不因迟到的
+      // complete 变成 finished，也不会被隐式 accept（accepted 只由 accept / reject 决定）
+      if (state !== "accepted") return;
       state = "finished";
       settleCompletion(outcome);
     },
