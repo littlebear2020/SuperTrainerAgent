@@ -322,4 +322,34 @@ describe("PersonalUsagePage", () => {
       container.querySelector("[data-testid='usage-updating']")?.textContent,
     ).toContain("正在加载用量");
   });
+
+  it("groups the window control in the header and all capabilities in one toolbar", async () => {
+    await renderPage();
+
+    const header = container.querySelector("[data-testid='usage-header']");
+    expect(header?.textContent).toContain("我的用量");
+    const windowControl = header?.querySelector(
+      "[data-testid='usage-window-control']",
+    );
+    expect(windowControl).not.toBeNull();
+    expect(windowControl?.querySelectorAll("button")).toHaveLength(3);
+
+    const toolbar = container.querySelector(
+      "[data-testid='usage-filter-toolbar']",
+    );
+    expect(toolbar?.textContent).toContain("按能力筛选");
+    expect(
+      toolbar?.querySelectorAll("[data-testid='usage-filter-scroll']"),
+    ).toHaveLength(1);
+    expect(toolbar?.querySelectorAll("button")).toHaveLength(7);
+    expect(
+      container.querySelectorAll("[data-testid^='usage-capability-']"),
+    ).toHaveLength(7);
+
+    for (const button of container.querySelectorAll(
+      "[data-testid='usage-header'] button, [data-testid='usage-filter-toolbar'] button",
+    )) {
+      expect(button.className).toContain("focus-visible:ring-indigo-500");
+    }
+  });
 });

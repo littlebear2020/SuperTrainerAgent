@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { UsageCapabilityFilter } from "@/components/workspace/usage/usage-capability-filter";
@@ -14,12 +14,14 @@ import type {
   UsageCapabilityFilter as CapabilityFilter,
   UsageDays,
 } from "@/core/usage/types";
+import { cn } from "@/lib/utils";
 
 const WINDOW_OPTIONS: readonly UsageDays[] = [7, 14, 30];
 
 export function PersonalUsagePage() {
   const { t } = useI18n();
   const c = t.personalUsage;
+  const windowLabelId = useId();
   const [days, setDays] = useState<UsageDays>(7);
   const [capability, setCapability] = useState<CapabilityFilter>("all");
   const [offset, setOffset] = useState(0);
@@ -60,128 +62,169 @@ export function PersonalUsagePage() {
   return (
     <main
       data-testid="personal-usage-page"
-      className="flex size-full min-w-0 flex-col gap-5 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
+      className="flex size-full min-w-0 flex-col overflow-x-hidden overflow-y-auto p-4 min-[1050px]:px-8 min-[1050px]:py-10 sm:p-6"
     >
-      <header className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight">{c.title}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{c.subtitle}</p>
-      </header>
-
-      <section
-        className="flex flex-wrap gap-2"
-        role="group"
-        aria-label={c.windowLabel}
+      <div
+        data-testid="usage-layout-content"
+        className="mx-auto flex w-full max-w-[1120px] min-w-0 flex-col"
       >
-        {WINDOW_OPTIONS.map((option) => (
-          <Button
-            key={option}
-            type="button"
-            size="sm"
-            variant={days === option ? "default" : "outline"}
-            aria-pressed={days === option}
-            data-testid={`usage-days-${option}`}
-            onClick={() => changeDays(option)}
-          >
-            {c.lastNDays.replace("{n}", String(option))}
-          </Button>
-        ))}
-      </section>
-
-      <UsageCapabilityFilter value={capability} onChange={changeCapability} />
-
-      {query.isLoading && !query.data ? (
-        <div
-          role="status"
-          className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm"
+        <header
+          data-testid="usage-header"
+          className="flex min-w-0 flex-col gap-3 min-[820px]:flex-row min-[820px]:items-start min-[820px]:justify-between min-[820px]:gap-6"
         >
-          {c.loading}
-        </div>
-      ) : null}
-
-      {query.isError && !query.data ? (
-        <div
-          role="alert"
-          className="border-destructive/30 flex flex-col items-center gap-3 rounded-xl border p-8 text-center"
-        >
-          <p className="text-destructive text-sm">{c.error}</p>
-          <Button
-            data-testid="usage-retry"
-            type="button"
-            variant="outline"
-            onClick={() => void query.refetch()}
+          <div className="min-w-0">
+            <h1 className="text-[25px] leading-tight font-bold tracking-tight min-[820px]:text-[28px]">
+              {c.title}
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">{c.subtitle}</p>
+          </div>
+          <section
+            data-testid="usage-window-control"
+            className="flex min-w-0 flex-col gap-2 min-[820px]:shrink-0 min-[820px]:flex-row min-[820px]:items-center min-[820px]:gap-3"
+            role="group"
+            aria-labelledby={windowLabelId}
           >
-            {c.retry}
-          </Button>
-        </div>
-      ) : null}
-
-      {query.data ? (
-        <>
-          {query.isPlaceholderData ? (
-            <div
-              data-testid="usage-updating"
-              role="status"
-              className="text-muted-foreground text-xs"
+            <span
+              id={windowLabelId}
+              className="text-muted-foreground shrink-0 text-sm"
             >
-              {c.loading}
+              {c.windowLabel}
+            </span>
+            <div className="bg-muted flex min-w-0 gap-1 rounded-xl p-1 min-[820px]:flex-none">
+              {WINDOW_OPTIONS.map((option) => {
+                const active = days === option;
+                return (
+                  <Button
+                    key={option}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={active}
+                    data-testid={`usage-days-${option}`}
+                    onClick={() => changeDays(option)}
+                    className={cn(
+                      "h-8 min-w-[66px] flex-1 rounded-lg px-3 text-sm focus-visible:ring-indigo-500 min-[820px]:flex-none",
+                      active
+                        ? "bg-background text-foreground hover:bg-background hover:text-foreground dark:bg-input/30 dark:hover:bg-input/30 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {c.lastNDays.replace("{n}", String(option))}
+                  </Button>
+                );
+              })}
             </div>
-          ) : null}
-          <UsageSummary summary={query.data.summary} />
-          <section className="min-w-0">
-            {query.data.tasks.length > 0 ? (
-              <UsageTaskList
-                tasks={query.data.tasks}
-                expanded={expanded}
-                onToggle={toggleTask}
-              />
-            ) : (
-              <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
-                {c.empty}
-              </div>
-            )}
           </section>
-          {query.data.total_tasks > 0 ? (
-            <nav
-              className="flex flex-wrap items-center justify-between gap-3"
-              aria-label={c.taskListLabel}
+        </header>
+
+        <div className="mt-[30px] min-w-0">
+          <UsageCapabilityFilter
+            value={capability}
+            onChange={changeCapability}
+          />
+        </div>
+
+        {query.isLoading && !query.data ? (
+          <div
+            role="status"
+            className="text-muted-foreground mt-6 rounded-2xl border border-dashed p-8 text-center text-sm"
+          >
+            {c.loading}
+          </div>
+        ) : null}
+
+        {query.isError && !query.data ? (
+          <div
+            role="alert"
+            className="border-destructive/30 mt-6 flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
+          >
+            <p className="text-destructive text-sm">{c.error}</p>
+            <Button
+              data-testid="usage-retry"
+              type="button"
+              variant="outline"
+              className="focus-visible:ring-indigo-500"
+              onClick={() => void query.refetch()}
             >
-              <span
-                data-testid="usage-page-info"
-                className="text-muted-foreground text-xs"
+              {c.retry}
+            </Button>
+          </div>
+        ) : null}
+
+        {query.data ? (
+          <>
+            {query.isPlaceholderData ? (
+              <div
+                data-testid="usage-updating"
+                role="status"
+                className="text-muted-foreground mt-5 text-xs"
               >
-                {c.pageInfo(
-                  offset + 1,
-                  offset + query.data.tasks.length,
-                  query.data.total_tasks,
-                )}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  data-testid="usage-previous-page"
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={offset === 0}
-                  onClick={() => changeOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  {c.previous}
-                </Button>
-                <Button
-                  data-testid="usage-next-page"
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!query.data.has_more}
-                  onClick={() => changeOffset(offset + PAGE_SIZE)}
-                >
-                  {c.next}
-                </Button>
+                {c.loading}
               </div>
-            </nav>
-          ) : null}
-          <p className="text-muted-foreground text-xs">{c.footerNote}</p>
-        </>
-      ) : null}
+            ) : null}
+            <div className="mt-5 min-w-0">
+              <UsageSummary summary={query.data.summary} />
+            </div>
+            <section className="mt-6 min-w-0">
+              {query.data.tasks.length > 0 ? (
+                <UsageTaskList
+                  tasks={query.data.tasks}
+                  expanded={expanded}
+                  onToggle={toggleTask}
+                />
+              ) : (
+                <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
+                  {c.empty}
+                </div>
+              )}
+            </section>
+            {query.data.total_tasks > 0 ? (
+              <nav
+                className="mt-5 flex flex-wrap items-center justify-between gap-3"
+                aria-label={c.taskListLabel}
+              >
+                <span
+                  data-testid="usage-page-info"
+                  className="text-muted-foreground text-xs"
+                >
+                  {c.pageInfo(
+                    offset + 1,
+                    offset + query.data.tasks.length,
+                    query.data.total_tasks,
+                  )}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    data-testid="usage-previous-page"
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={offset === 0}
+                    onClick={() =>
+                      changeOffset(Math.max(0, offset - PAGE_SIZE))
+                    }
+                  >
+                    {c.previous}
+                  </Button>
+                  <Button
+                    data-testid="usage-next-page"
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!query.data.has_more}
+                    onClick={() => changeOffset(offset + PAGE_SIZE)}
+                  >
+                    {c.next}
+                  </Button>
+                </div>
+              </nav>
+            ) : null}
+            <p className="text-muted-foreground mt-3.5 text-xs">
+              {c.footerNote}
+            </p>
+          </>
+        ) : null}
+      </div>
     </main>
   );
 }
