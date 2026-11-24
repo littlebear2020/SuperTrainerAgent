@@ -244,13 +244,43 @@ def test_emitter_never_raises_on_any_internal_error(mirror, monkeypatch, capsys)
     assert captured.out == "" and captured.err == ""
 
 
-@pytest.mark.parametrize("mirror", MIRRORS, ids=MIRROR_IDS)
-def test_python_310_compatibility_no_datetime_utc(mirror):
-    """只用 Python 3.10 可用的 stdlib API（沙箱解释器上限 3.10）。"""
-    source = mirror.read_text(encoding="utf-8")
-    assert "datetime.UTC" not in source
-    assert "ExceptionGroup" not in source
-    assert "tomllib" not in source
+EMITTER_FILES = MIRRORS + [PPT_SCRIPTS / "media_usage_ledger.py", PPT_SCRIPTS / "tts_backends" / "backend_trainerai.py", PPT_SCRIPTS / "image_backends" / "backend_qihu360.py"]
+EMITTER_IDS = [str(p.relative_to(REPO_ROOT / "skills")) for p in EMITTER_FILES]
+
+
+@pytest.mark.parametrize("path", EMITTER_FILES, ids=EMITTER_IDS)
+def test_emitter_files_parse_as_python_310(path):
+    """只用 Python 3.10 可用的 stdlib 语法/API（沙箱解释器上限 3.10）；覆盖五镜像 + PPT helper + 两 backend（终审 M-7）。"""
+    import ast
+
+    source = path.read_text(encoding="utf-8")
+    ast.parse(source, feature_version=(3, 10))
+    for forbidden in ("datetime.UTC", "ExceptionGroup", "tomllib"):
+        assert forbidden not in source
+
+
+@pytest.mark.parametrize("mirror", MIRRORS[:1], ids=MIRROR_IDS[:1])
+def test_doubao_emitter_tolerates_bad_arguments(mirror, monkeypatch, capsys):
+    """终审 M-6：「永不抛错」要覆盖整个调用——事件字典的构造（len(text)、算术）也得在 try 之内。"""
+    import time
+
+    mod = _load(mirror, "doubao_badargs")
+    mod._emit_tts_usage(None, with_timestamps=False, started=time.monotonic())  # len(None) would raise
+    mod._emit_tts_usage("ok", with_timestamps="not-a-bool", started="not-a-float")  # arithmetic would raise
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_ppt_helper_tolerates_bad_arguments(monkeypatch, capsys):
+    """终审 M-6：PPT 共用 helper 对坏参数不抛；尺寸解析（"WxH" 解包）收进 helper 内的 try。"""
+    import time
+
+    monkeypatch.syspath_prepend(str(PPT_SCRIPTS))
+    helper = _load(PPT_SCRIPTS / "media_usage_ledger.py", "media_usage_ledger_badargs")
+    helper.emit_tts_usage(None, with_timestamps=False, started=time.monotonic())
+    helper.emit_image_usage(model="seedream-x", size="not-a-size", started="not-a-float")
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
 
 
 # ---------------------------------------------------------------------------

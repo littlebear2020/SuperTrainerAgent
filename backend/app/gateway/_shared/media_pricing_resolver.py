@@ -19,7 +19,9 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
+from typing import Any
 
 from sqlalchemy import select
 
@@ -169,6 +171,17 @@ def resolve_media_price(provider: str | None, model_id: str | None, media_type: 
     return flat.get((provider, media_type))
 
 
+def _finite_number(value: Any) -> float | None:
+    """A usable, finite, positive quantity — never ``inf``/``nan`` and never an OverflowError (终审 M-2)."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
 def _estimate_call_cost(metadata: dict | None, method: str, pricing_entry: dict | None) -> float | None:
     """Estimate the cost of a single external API call from metadata + pricing.
 
@@ -187,28 +200,21 @@ def _estimate_call_cost(metadata: dict | None, method: str, pricing_entry: dict 
     if unit == "per_kilo_token":
         # completion → total，依次取第一个可用值，不相加、不用 duration 猜：
         # 成功视频可能只回传 completion_tokens（媒体计量计划 PR 1），修前只认
-        # total_tokens 会把这类行整体漏成 unpriced。坏值（非数字）按缺失处理。
+        # total_tokens 会把这类行整体漏成 unpriced。0 / 负数 / 非数字 / 非有限值按缺失处理
+        # （provider 失败/空响应常回报 completion_tokens=0 并带有效 total_tokens）。
         for key in ("completion_tokens", "total_tokens"):
-            raw = md.get(key)
-            if raw is None:
-                continue
-            try:
-                value = float(raw)
-            except (TypeError, ValueError):
-                continue
-            if value > 0:
-                return (value / 1000.0) * price
-            # 0（或负数）视为缺失：provider 失败/空响应常回报
-            # completion_tokens=0 并带有效 total_tokens，按 0 计价会漏账。
+            tokens = _finite_number(md.get(key))
+            if tokens is not None:
+                return (tokens / 1000.0) * price
         return None  # can't estimate without token count
     if unit == "per_second":
-        duration = md.get("duration")
+        duration = _finite_number(md.get("duration"))
         if duration is not None:
-            return float(duration) * price
+            return duration * price
         return None  # can't estimate without duration
     if unit == "per_kilo_char":
-        char_count = md.get("char_count")
+        char_count = _finite_number(md.get("char_count"))
         if char_count is not None:
-            return (float(char_count) / 1000.0) * price
+            return (char_count / 1000.0) * price
         return None  # can't estimate without char count
     return None

@@ -62,6 +62,12 @@ MAX_EVENTS_PER_DRAIN = 1000
 TTS_CHAR_COUNT_MAX = 100_000
 IMAGE_MODEL_MARKER = "seedream"
 IMAGE_MODEL_MAX_LEN = 128
+#: Bounds that keep parsed events inside what ``external_api_calls`` can store
+#: (INTEGER columns are 32-bit on Postgres; text must be encodable/printable).
+#: Anything past them is a reader ``error`` once, instead of a DB error on every
+#: drain while the line stays in the window (终审 M-4).
+ELAPSED_MS_MAX = 2**31 - 1
+DIMENSION_MAX = 10**6
 METERING_SOURCE = "sandbox_reported"
 
 TTS_PROVIDER = "doubao_tts"
@@ -128,13 +134,18 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _optional_int(raw: dict, key: str) -> int | None:
+def _optional_int(raw: dict, key: str, *, maximum: int) -> int | None:
     value = raw.get(key)
     if value is None:
         return None
-    if not _is_int(value):
+    if not _is_int(value) or not 0 <= value <= maximum:
         raise ValueError(key)
     return value
+
+
+def _printable_text(value: str) -> bool:
+    """No control characters and no lone surrogates (would fail UTF-8 encoding on insert)."""
+    return all(ch.isprintable() for ch in value)
 
 
 def parse_ledger_line(line: str) -> MediaUsageEvent:
@@ -161,15 +172,15 @@ def parse_ledger_line(line: str) -> MediaUsageEvent:
         event = MediaUsageEvent(event_id=event_id, kind="tts", with_timestamps=with_timestamps, char_count=char_count)
     elif kind == "image":
         model = raw.get("model")
-        if not isinstance(model, str) or IMAGE_MODEL_MARKER not in model.lower() or len(model) > IMAGE_MODEL_MAX_LEN:
+        if not isinstance(model, str) or IMAGE_MODEL_MARKER not in model.lower() or len(model) > IMAGE_MODEL_MAX_LEN or not _printable_text(model):
             raise ValueError("model")
         event = MediaUsageEvent(event_id=event_id, kind="image", model=model)
     else:
         raise ValueError("kind")
 
-    event = replace(event, elapsed_ms=_optional_int(raw, "elapsed_ms"))
+    event = replace(event, elapsed_ms=_optional_int(raw, "elapsed_ms", maximum=ELAPSED_MS_MAX))
     if kind == "image":
-        event = replace(event, width=_optional_int(raw, "width"), height=_optional_int(raw, "height"))
+        event = replace(event, width=_optional_int(raw, "width", maximum=DIMENSION_MAX), height=_optional_int(raw, "height", maximum=DIMENSION_MAX))
     # Everything else (provider / method / amount, or ``model`` on a tts event)
     # is deliberately dropped: the sandbox never picks provider, method or price.
     return event
@@ -213,26 +224,30 @@ def read_ledger_events(path: Path, *, window_bytes: int | None = None, max_line_
         return LedgerRead([], 1, False)
 
     try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode):
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                return LedgerRead([], 1, False)
+            size = st.st_size
+            truncated = size > window
+            start = size - window if truncated else 0
+            drop_first = False
+            if truncated and start > 0:
+                # One byte before the window tells whether ``start`` is mid-line.
+                os.lseek(fd, start - 1, os.SEEK_SET)
+                drop_first = os.read(fd, 1) != b"\n"
+            os.lseek(fd, start, os.SEEK_SET)
+            remaining = min(size, window)
+            chunks: list[bytes] = []
+            while remaining > 0:
+                chunk = os.read(fd, min(remaining, 1 << 20))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        except OSError:
+            # EIO / ESTALE on a vanishing mount after a successful open: an error, never a raise (终审 M-5).
             return LedgerRead([], 1, False)
-        size = st.st_size
-        truncated = size > window
-        start = size - window if truncated else 0
-        drop_first = False
-        if truncated and start > 0:
-            # One byte before the window tells whether ``start`` is mid-line.
-            os.lseek(fd, start - 1, os.SEEK_SET)
-            drop_first = os.read(fd, 1) != b"\n"
-        os.lseek(fd, start, os.SEEK_SET)
-        remaining = min(size, window)
-        chunks: list[bytes] = []
-        while remaining > 0:
-            chunk = os.read(fd, min(remaining, 1 << 20))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
     finally:
         os.close(fd)
 

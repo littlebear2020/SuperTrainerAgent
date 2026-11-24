@@ -39,6 +39,20 @@ class ProviderUnavailableError(ProviderError):
     """Provider is down or circuit breaker is open."""
 
 
+def _safe_int(value: Any) -> int | None:
+    """Provider-supplied usage fields are untyped JSON; a malformed value is "missing", never an error.
+
+    ``_build_extra_from_ref`` runs on the success path of a *paid* call: raising here would turn the
+    success into ``status="error"`` and feed the shared circuit breaker (终审 M-1).
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 def _build_extra_from_ref(ref: Any, sink_label: str | None = None) -> dict:
     """Extract C1 metadata fields from an ImageRef/VideoRef.
 
@@ -65,12 +79,12 @@ def _build_extra_from_ref(ref: Any, sink_label: str | None = None) -> dict:
     # the estimator reads completion first, then total, never summed).
     raw_usage = getattr(ref, "raw_usage", None)
     if isinstance(raw_usage, dict):
-        completion_tokens = raw_usage.get("completion_tokens")
+        completion_tokens = _safe_int(raw_usage.get("completion_tokens"))
         if completion_tokens is not None:
-            extra["completion_tokens"] = int(completion_tokens)
-        total_tokens = raw_usage.get("total_tokens")
+            extra["completion_tokens"] = completion_tokens
+        total_tokens = _safe_int(raw_usage.get("total_tokens"))
         if total_tokens is not None:
-            extra["total_tokens"] = int(total_tokens)
+            extra["total_tokens"] = total_tokens
         resolution = raw_usage.get("resolution")
         if resolution:
             extra["resolution"] = resolution

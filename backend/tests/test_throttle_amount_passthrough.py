@@ -159,3 +159,24 @@ async def test_image_passes_completion_tokens_to_sink(captured_sink):
     extra = captured_sink[0]["extra"]
     assert extra["completion_tokens"] == 1000
     assert "total_tokens" not in extra
+
+
+class _GarbageTokenInner:
+    """Provider reports non-integer token values (string floats, 'n/a', dict) on a PAID success."""
+
+    async def generate_video(self, prompt, *, duration=5.0, **kwargs):  # noqa: ANN001, ANN202
+        return VideoRef(url="http://x/paid.mp4", duration=duration, source="seedance", raw_usage={"completion_tokens": "460.0", "total_tokens": "n/a", "prompt_tokens": {"nested": True}})
+
+
+@pytest.mark.asyncio
+async def test_garbage_token_values_never_turn_a_paid_success_into_an_error(captured_sink):
+    """终审 M-1：`int()` 对坏值抛错会让已付费的成功被记成 error 并计入断路器——metadata 构造必须全函数不抛。"""
+    t = ThrottledAIVideoProvider(_GarbageTokenInner(), qps=100, max_retries=0)
+    ref = await t.generate_video("p", duration=5.0)
+    assert ref.duration == 5.0, "付费成功的 Ref 必须原样返回"
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert [c["status"] for c in captured_sink] == ["ok"], "不得被记成 error"
+    extra = captured_sink[0]["extra"]
+    assert "completion_tokens" not in extra and "total_tokens" not in extra, "坏值按缺失，不写稀疏键"
+    assert t._breaker._failure_count == 0 and not t._breaker.is_open, "不得计入断路器"

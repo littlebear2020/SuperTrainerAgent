@@ -113,15 +113,19 @@ def _emit_media_usage(event: dict) -> None:
 
 
 def _emit_tts_usage(text: str, *, with_timestamps: bool, started: float) -> None:
-    _emit_media_usage(
-        {
-            "event_id": uuid.uuid4().hex,
-            "kind": "tts",
-            "with_timestamps": with_timestamps,
-            "char_count": len(text),
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-        }
-    )
+    # 事件字典的构造（len(text)、算术）也在 try 内：「永不抛错」覆盖整个调用。
+    try:
+        _emit_media_usage(
+            {
+                "event_id": uuid.uuid4().hex,
+                "kind": "tts",
+                "with_timestamps": with_timestamps,
+                "char_count": len(text),
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+            }
+        )
+    except Exception:
+        pass  # 计量失败不得影响合成
 
 
 def _build_request(text: str, speaker: str, speed_ratio: float, enable_subtitle: bool) -> urllib.request.Request:

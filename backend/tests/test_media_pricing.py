@@ -201,3 +201,27 @@ class TestCrossAggregationConsistency:
                 break
         else:
             pytest.fail("console_external_calls function not found")
+
+
+class TestEstimateCallCostRejectsNonFinite:
+    """终审 M-2：`inf` / 超大数不得产生 `inf` 成本或 OverflowError 逃逸到 /api/usage。"""
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            {"completion_tokens": float("inf")},
+            {"completion_tokens": "1e999"},
+            {"completion_tokens": 10**400},
+            {"total_tokens": float("inf")},
+            {"completion_tokens": -1, "total_tokens": float("inf")},
+        ],
+        ids=["inf-completion", "str-1e999", "overflow-int", "inf-total", "inf-fallback"],
+    )
+    def test_per_kilo_token_non_finite_is_unpriced(self, metadata) -> None:
+        pricing = {"unit": "per_kilo_token", "unit_price": 0.023, "currency": "CNY"}
+        assert _estimate_call_cost(metadata, "generate_video", pricing) is None
+
+    def test_per_second_and_per_kilo_char_non_finite_are_unpriced(self) -> None:
+        assert _estimate_call_cost({"duration": float("inf")}, "generate_video", {"unit": "per_second", "unit_price": 0.5, "currency": "CNY"}) is None
+        assert _estimate_call_cost({"char_count": 10**400}, "synthesize_sse", {"unit": "per_kilo_char", "unit_price": 0.5, "currency": "CNY"}) is None
+        assert _estimate_call_cost({"duration": "nan"}, "generate_video", {"unit": "per_second", "unit_price": 0.5, "currency": "CNY"}) is None

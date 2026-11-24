@@ -64,25 +64,39 @@ def emit_media_usage(event: dict) -> None:
 
 
 def emit_tts_usage(text: str, *, with_timestamps: bool, started: float) -> None:
-    emit_media_usage(
-        {
-            "event_id": uuid.uuid4().hex,
-            "kind": "tts",
-            "with_timestamps": with_timestamps,
-            "char_count": len(text),
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-        }
-    )
+    # 事件字典的构造（len(text)、算术）也在 try 内：「永不抛错」覆盖整个调用。
+    try:
+        emit_media_usage(
+            {
+                "event_id": uuid.uuid4().hex,
+                "kind": "tts",
+                "with_timestamps": with_timestamps,
+                "char_count": len(text),
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+            }
+        )
+    except Exception:
+        pass  # 计量失败不得影响制作
 
 
-def emit_image_usage(*, model: str, width: int, height: int, started: float) -> None:
-    emit_media_usage(
-        {
-            "event_id": uuid.uuid4().hex,
-            "kind": "image",
-            "model": model,
-            "width": width,
-            "height": height,
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-        }
-    )
+def emit_image_usage(*, model: str, size: str, started: float) -> None:
+    """``size`` is the ``"WxH"`` string actually sent; if it cannot be parsed the event is
+    still emitted (without width/height) — the paid call happened regardless."""
+    try:
+        dimensions: dict = {}
+        try:
+            width, height = (int(value) for value in size.split("x"))
+            dimensions = {"width": width, "height": height}
+        except Exception:
+            pass
+        emit_media_usage(
+            {
+                "event_id": uuid.uuid4().hex,
+                "kind": "image",
+                "model": model,
+                **dimensions,
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+            }
+        )
+    except Exception:
+        pass  # 计量失败不得影响制作
