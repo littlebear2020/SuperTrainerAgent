@@ -27,6 +27,20 @@
 5. 既有线程上的 run 结束后，SDK 用最新 history 头替换流值；共享 mock 的 history 是静态的，所以「切线程后 B 正常发送」以 run stream 响应 200 与输入清空为断言，不以回复文本为断言。
 6. 创建失败用 422：SDK 对 5xx 会退避重试，422 才是即时失败。
 
+## 评审驱动的补充（PR #59，OCR 三轮，均无 Critical/Important）
+
+第 1 轮 7 medium + 17 low、第 2 轮 1 high + 6 medium + 20 low；处置表见 PR 评论，下列是其中改变了行为的部分（用例均先红后绿）：
+
+- **受理兜底**：SDK 流收尾却从未 onCreated / onError 时，submission 此前会永久停在 pending、`sendInFlightRef` 占住 busy 锁，之后每次发送都被静默拒绝。现在流收尾 effect 对「已入队仍 pending」以 failed 结案并提示一次；React 从未渲染过 `isLoading=true` 的空流由入队后的轮询看门狗（50ms 轮询、1.5 秒超时）结案。评审建议的「`thread.submit()` 落定即判 pending」没有采用——SDK 的 `submit()` 在流结束前就已 resolve，照做会拒绝每一次正常提交。
+- **停止收尾**：用户主动停止后 SDK 以 AbortError 进 onError，按 stopped 结案、不提示；`cancelPendingRef` 在 `await thread.stop()` 之前置位，收尾 effect 确定性等待取消结果；`thread.stop()` 抛错被捕获并提示一次。
+- **回调归属**：带 run_id 却不属于任何在途 submission 的迟到 error 不清新一次发送的 optimistic 消息；`submit()` 的 catch 只在仍是 pending 时提示（防与 onError 双重提示、防 run 已受理仍报失败）。
+- **cancel 包装**（`core/api/api-client.ts`）：`CancelOutcome` 白名单判定；去重 key 纳入 wait / action（SDK 浮动调用与显式 `cancelRun` 各发一次）；`cancelRun` 只走一层去重；包装闭包只引用本 client 的绑定；`options.signal` 透传；SDK 浮动路径的失败留 `console.warn`。
+- **输入恢复**：等待受理期间继续输入的文字，受理后只放回增量（第 1 轮先做整段恢复，第 2 轮评审指出会把已发出的正文放回，收敛为增量）；等待期间新加的附件不恢复（注释写明取舍）。纯空白正文 + 附件按空串发出。
+- **auto-send 回填**：只对 busy / failed、且输入框为空时回填；stopped（切线程触发）不回填。
+- **agents/new 保存入口**：busy 拒绝与普通 Error 都由页面提示一次（hook 对 busy 刻意不提示）。
+- **上传**：停滞错误是带 name 的 `UploadStalledError`，映射成中文提示；open → send 同步抛错时监听与计时器也收尾；`idleTimeoutMs` 非法值回退默认；附件 URL fallback 被取消时原样抛出 AbortError，不 warn、不返回 null 丢附件。
+- **其他**：`submission.complete()` 只对 accepted 生效；onFinish 与收尾 effect 用同一停止判定；onError 受理前失败也用 friendly 文案；agent 聊天页 URL 回退两边先编码再比较；e2e 夹具 `threadIdFromUrl` 合并、`createdThreadIds` 只读快照、held-open-stream 的 Content-Location 回显受选项控制。
+
 ## 验收记录
 
 - 纵切 A RED：`cd frontend && pnpm exec vitest run tests/unit/core/threads/submission.test.ts tests/unit/core/threads/stream-submission-lifecycle.dom.test.tsx tests/unit/components/workspace/input-box-submission.dom.test.tsx tests/unit/app/workspace/agents/agent-chat-page.dom.test.tsx tests/unit/app/workspace/agents/new-agent-submission.dom.test.tsx tests/unit/app/workspace/chats/chat-page-autosend.dom.test.tsx tests/unit/core/threads/thread-submit-mode-context.dom.test.tsx` → `12 failed | 13 passed (25)`，另有 4 个文件因 `@/core/threads/submission` 不存在无法加载；失败项为 `sendMessage` 过早 resolve（`expected 'resolved' to be 'pending'`）、不 reject（`promise resolved "undefined" instead of rejecting`）、`api().stop is not a function`、`onSend is not a function`。GREEN → 连同 `input-box-stop-draft` `8 files / 47 passed`；周边回归（app / components / threads / uploads / tasks / messages）`159 files / 994 passed`；`pnpm typecheck` exit 0。
@@ -36,6 +50,11 @@
 - 纵切 D：`pnpm exec playwright test tests/e2e/chat-submission.spec.ts --repeat-each=2` → `10 passed (10.3s)`。用例实际经过：受理前停止（创建挂起时点停止 → 地址栏回退 `/chats/new`、草稿保留、无 toast；放行后重试成功）；受理后长流（真实 SSE 服务保持连接并回显 Content-Location：`onCreated` 后输入清空、流式期间的新草稿在流结束后不被清空）；创建前失败（toast 恰好一次、草稿保留、回退；重试成功后不再提示）；纯附件与新会话首条附件消息（上传用的就是随后被 create 回显的线程 id）；A 上传切 B（A 的上传 `net::ERR_ABORTED`、B 无上传态、B 的 run 正常发起）。全部用例断言 `pageerror` 为空。
 - 每个代码提交前 `pre-commit run --files <改动文件>` → eslint / prettier / gitleaks 全 Passed。
 - `make -C frontend check` → exit 0：ESLint `0 errors, 120 warnings`（存量 warning，与 PR1 前一致）、`tsc --noEmit` 通过、prettier `All matched files use Prettier code style!`、knip 无死导出、i18n `665 个叶子全活`。全量 `cd frontend && pnpm test` → `Test Files 292 passed (292)`、`Tests 1967 passed (1967)`。
+- 评审第 1 轮 RED：`pnpm exec vitest run`（cancel、agents/new、uploads、input-box 四个测试文件）→ `Tests 5 failed | 37 passed (42)`，失败项为 `SDK cancel 的响应体带 status 字段时不被当成 CancelOutcome 透传`、`wait / action 不同的并发取消不合并…`、`保存被 busy 拒绝…`、`上传停滞错误映射为用户可读文案…`、`受理前等待期间用户继续输入的文字，在受理后保留…`。GREEN → 受影响单测 `30 files / 183 passed`。
+- 评审第 2 轮 RED：`pnpm exec vitest run tests/unit/core/threads/stream-submission-lifecycle.dom.test.tsx tests/unit/components/workspace/input-box-submission.dom.test.tsx` → `Tests 4 failed | 40 passed (44)`，失败项为 `受理后停止、SDK 以 onError 收尾：不提示，completion 按 stopped 收尾`、`SDK 流收尾却从未 onCreated…`、`旧 run 的迟到 error（带 run_id）不清理新 submission 的 optimistic 消息`、`受理前等待期间追加的文字只恢复增量，不把已发出的正文放回`；`pnpm exec vitest run tests/unit/app/workspace/chats/chat-page-autosend.dom.test.tsx` → `Tests 2 failed | 21 passed (23)`（`auto-send 被 stopped 拒绝…不在新线程回填提示词`）；同批新增的 uploads / cancel / autosend 用例一起跑 → `Failed Tests 5`，关键行 `promise resolved "null" instead of rejecting`（预 aborted / 中途 abort）与 `expected "vi.fn()" to be called with arguments: ['thread-1','run-1',false,…]`（`options.signal` 未透传）。同一轮里 `真实获取失败：仍返回 null 并 warn` 的失败来自用例自身（warn spy 未安装，`expected "warn" to be called 1 times, but got 0 times`），修正夹具后即绿，实现未为此改动。
+- 评审第 2 轮 GREEN：PR2 回归集 `pnpm exec vitest run tests/unit/app/workspace/agents/new-agent-submission.dom.test.tsx tests/unit/components/workspace/input-box-submission.dom.test.tsx tests/unit/app/workspace/chats/chat-page-autosend.dom.test.tsx tests/unit/core/threads tests/unit/core/api/api-client-cancel.dom.test.ts tests/unit/core/uploads` → `Test Files 22 passed (22)`、`Tests 154 passed (154)`。保存入口对普通 Error 的提示以变异验证：把该分支禁用 → 新用例 `保存抛出普通错误（非 SendRejectedError）…` `1 failed | 5 passed (6)`（`expected "vi.fn()" to be called 1 times, but got 0 times`），恢复后绿。
+- 看门狗用例的过程记录：首版把等待放进 `Promise.race([outcome, flush(2000)])`，外层 act 作用域未结束就读快照——读到旧的 optimistic 消息，并且下一用例的挂载被同一个未结束的 act 作用域压住（`hook not mounted`）。改为单个 act 包住整段等待后 `16 passed (16)`；实现未为此改动。
+- 最终门禁（评审修复之后）：改动文件 `pnpm exec eslint` → `0 errors`（`input-box.tsx` 2 条存量 warning）、`prettier --check` → `All matched files use Prettier code style!`、`tsc --noEmit` exit 0；全量 `cd frontend && pnpm test` → `Test Files 292 passed (292)`、`Tests 1977 passed (1977)`；`pnpm exec playwright test chat.spec.ts agent-chat.spec.ts agent-new-chat-guide.spec.ts chat-submission.spec.ts chat-render-loop.spec.ts gallery-auto-send.spec.ts thread-history.spec.ts vimax-chat.spec.ts` → `72 passed`、`1 skipped`。e2e 跑在注释与一条单测补齐之前的树上，其后的 diff 只有注释和该单测。
 
 ## 未验证项
 
