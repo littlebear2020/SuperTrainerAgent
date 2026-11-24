@@ -51,7 +51,7 @@
 
 ## PR 与远端验收
 
-- PR：[#57 个人「我的用量」布局优化](https://github.com/littlebear2020/SuperTrainerAgent/pull/57)（分支 `personal-usage-layout-redesign`，6 笔主题提交 + 本链接提交）。OCR 与 PR 侧 CI 的逐轮处置记录在 PR 评论中；合入方式 `gh pr merge --rebase`。
+- PR：[#57 个人「我的用量」布局优化](https://github.com/littlebear2020/SuperTrainerAgent/pull/57)（分支 `personal-usage-layout-redesign`）。OCR 三轮：第 1 轮 8 条（2 条「`max-[820px]` 在 820px 仍命中」的 bug 经构建产物核实为误报，test·medium 与 4 条 low 已修复，1 条产品常量不改），第 2 轮 4 条 low（3 条修复、1 条维持不改），第 3 轮 4 条 low（2 条无可操作项/不改，2 条受理并登记 findings backlog，不再推送）；全程无 Critical/Important 未处置。逐轮处置见 PR 评论。每个代码提交的 PR 侧 CI（e2e-tests、frontend-unit-tests、lint-frontend、perf-budgets、quick-checks、review）全绿；合入方式 `gh pr merge --rebase`。
 
 ## 配置与回滚
 
