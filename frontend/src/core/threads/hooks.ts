@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
 import { getAPIClient } from "../api";
+import { cancelRun } from "../api/api-client";
 import { fetch } from "../api/fetcher";
 import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
@@ -228,6 +229,8 @@ export function useThreadStream({
   } | null>(null);
   /** 用户按了停止：SDK 的流收尾时据此把 completion 记为 stopped。 */
   const stopRequestedRef = useRef(false);
+  /** 取消请求在途：SDK 流收尾的 effect 不抢先结案 */
+  const cancelPendingRef = useRef(false);
 
   const {
     messages: history,
@@ -491,6 +494,8 @@ export function useThreadStream({
   // 收尾（如停止导致的 AbortError 不回调），按是否请求过停止来结案。
   useEffect(() => {
     if (thread.isLoading) return;
+    // 取消请求在途：completion 等取消结果（cancelled / cancelFailed）再结案
+    if (cancelPendingRef.current) return;
     const current = currentSubmissionRef.current;
     if (current?.state === "accepted") {
       completeSubmission(current, {
@@ -797,12 +802,34 @@ export function useThreadStream({
 
   /**
    * 停止当前 run（PR2）：先中断 SDK 的本地流——受理前的 submission 以 stopped reject
-   * （此时服务端尚无 runId，不发 cancel）；已受理的收尾见下方取消同步。
+   * （此时服务端尚无 runId，不发 cancel）；已受理的再 await 可等待的 cancel，
+   * 结果写入 submission 的 completion：受理 → stopped，失败 → cancelFailed 并提示一次
+   * （不伪造 interrupted，重试入口由 PR3 提供）。
    */
   const stop = useCallback(async () => {
     stopRequestedRef.current = true;
     await thread.stop();
-  }, [thread]);
+    const submission = currentSubmissionRef.current;
+    if (submission?.state !== "accepted" || !submission.runId) return;
+    cancelPendingRef.current = true;
+    try {
+      const outcome = await cancelRun(
+        submission.threadId ?? submission.requestedThreadId,
+        submission.runId,
+      );
+      if (outcome.status === "failed") {
+        toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
+        completeSubmission(submission, {
+          status: "cancelFailed",
+          error: outcome.error,
+        });
+      } else {
+        completeSubmission(submission, { status: "stopped" });
+      }
+    } finally {
+      cancelPendingRef.current = false;
+    }
+  }, [thread, completeSubmission]);
 
   // Memoized so the merged array keeps a stable identity between renders that
   // don't actually change messages. Consumers put this array in effect deps
