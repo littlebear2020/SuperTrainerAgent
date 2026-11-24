@@ -244,7 +244,7 @@ describe("Agent showcase data and assets", () => {
 
   // Agents whose case prompts are reusable templates; each slice appends its
   // agents as they are converted.
-  const templatedAgents = ["creative-studio"] as const;
+  const templatedAgents = ["course-video", "creative-studio"] as const;
 
   it("turns every case prompt into a reusable template without case facts", () => {
     const sourceLabels = agentIds.flatMap((id) =>
@@ -283,6 +283,12 @@ describe("Agent showcase data and assets", () => {
         if (item.kind === "deck") {
           expect(item.prompt, `${where} leaks the case brand`).not.toContain(
             "360",
+          );
+        }
+        if (item.kind === "video") {
+          // Sample lengths belong to the case, never to the new task.
+          expect(item.prompt, `${where} leaks a sample length`).not.toMatch(
+            /\b(?:32|29|39)\b/,
           );
         }
       }
@@ -324,11 +330,9 @@ describe("Agent showcase data and assets", () => {
     for (const id of templatedAgents) {
       for (const item of agent(id).cases) {
         const where = `${id}/${item.id}`;
+        // A fixed-script video takes an uploaded script, so it may have no
+        // text placeholder at all; every token it does use must be known.
         const tokens = item.prompt.match(/【[^【】\n]*】/g) ?? [];
-        expect(
-          tokens.some((token) => placeholder.test(token)),
-          where,
-        ).toBe(true);
         for (const token of tokens) {
           expect(
             headers.includes(token) || placeholder.test(token),
