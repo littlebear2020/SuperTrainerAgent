@@ -252,7 +252,13 @@ export const VirtualMessageList = forwardRef<
       userScrolledRef.current = true;
     };
     const onKey = (event: KeyboardEvent) => {
-      if (NAVIGATION_KEYS.has(event.key)) mark();
+      // 输入框里打空格、按方向键不是在滚列表：只有事件目标不在可编辑元素上才算
+      const target = event.target as HTMLElement | null;
+      const editable =
+        !!target &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (!editable && NAVIGATION_KEYS.has(event.key)) mark();
     };
     viewport.addEventListener("wheel", mark, { passive: true });
     viewport.addEventListener("touchmove", mark, { passive: true });
@@ -476,6 +482,8 @@ export const VirtualMessageList = forwardRef<
           if (pending.attempts >= PREPEND_ANCHOR_MAX_ADJUSTMENTS) {
             clearPendingAnchor();
           }
+          // 刚改了滚动位置：下面的锚点刷新读的是校正前的坐标，留到滚动后的下一帧
+          return;
         }
       }
     }

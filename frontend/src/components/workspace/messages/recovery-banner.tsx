@@ -31,6 +31,7 @@ export function RecoveryBanner() {
         <Button
           size="sm"
           variant="outline"
+          disabled={recovery.isCancelling}
           onClick={() => void recovery.retryCancel()}
         >
           {t.recovery.retryCancel}

@@ -32,7 +32,7 @@ describe("parseSubtaskResult", () => {
     // PR3：用户取消不是失败——与「run 被停止、任务没有 result」走同一个状态
     const parsed = parseSubtaskResult("Task cancelled by user.");
     expect(parsed.status).toBe("cancelled");
-    expect(parsed.error).toBe("Task cancelled by user.");
+    expect("error" in parsed).toBe(false);
   });
 
   it("recognises the polling-timed-out prefix", () => {

@@ -632,11 +632,11 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
       { timeout: 15_000 },
     );
     await waitSettledAtBottom(page);
-    // 翻到顶时「加载更多」的哨兵进入视口，旧 run 的加载会自动触发：先扣住响应，
-    // 量好锚点再放行。run-mid 也扣住——否则它紧跟着自动加载、入口随 hasMore 消失，
-    // 高度变化会混进锚点测量
-    const release = holdRunMessages(page, "run-older");
-    holdRunMessages(page, "run-mid");
+    // 翻到顶时「加载更多」的哨兵进入视口，旧 run 的加载会自动触发（从新到旧：先
+    // run-mid 再 run-older）：扣住响应，量好锚点再放行。run-older 一直扣着——它紧跟着
+    // 自动加载、入口随 hasMore 消失，高度变化会混进锚点测量
+    const release = holdRunMessages(page, "run-mid");
+    holdRunMessages(page, "run-older");
     await scrollToTopStable(page);
     const firstBefore = page.getByText("latest question 0", { exact: true });
     await expect(firstBefore).toBeInViewport();
@@ -644,16 +644,17 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
       (element) => element.getBoundingClientRect().top,
     );
 
-    const olderResponse = page.waitForResponse(
+    const midResponse = page.waitForResponse(
       (response) =>
         response.request().method() === "GET" &&
         new URL(response.url()).pathname ===
-          runMessagesUrl(MOCK_THREAD_ID, "run-older"),
+          runMessagesUrl(MOCK_THREAD_ID, "run-mid"),
     );
     release();
-    expect((await olderResponse).status()).toBe(200);
+    expect((await midResponse).status()).toBe(200);
 
-    // 新插入的 70 行先按估计高度对齐、实测后逐批校正：原来可见的第一组留在原处
+    // 新插入的几行先按估计高度对齐、实测后逐帧校正：原来可见的第一组留在原处
+    // （这正是 PR #49 记录的 190.5px 偏差的场景：小 prepend、估计 176px 对实测）
     await expect(firstBefore).toBeInViewport({ timeout: 10_000 });
     await expect
       .poll(async () =>

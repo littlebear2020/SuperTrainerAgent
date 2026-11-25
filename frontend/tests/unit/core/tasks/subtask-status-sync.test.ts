@@ -145,6 +145,55 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
     ]);
   });
 
+  it("澄清挂起只看 run 的最后一条工具消息：澄清之前就已完成的任务不被拖成 in_progress", () => {
+    // 同一 run：任务有 result → completed；之后才挂起澄清（goto=END）
+    const answered = deriveSubtasks(
+      [
+        aiTask("a1", "tc1"),
+        toolMsg("t1", "tc1", "Task Succeeded. Result: done"),
+        clarification("c1", "ask-1"),
+      ],
+      { runStatus: "success" },
+    );
+    expect(answered[0]!.status).toBe("completed");
+    // 澄清之后又有工具消息（澄清已被回答、run 继续过）：没有 result 的任务按 success 判 completed
+    const resumed = deriveSubtasks(
+      [
+        aiTask("a1", "tc1"),
+        clarification("c1", "ask-1"),
+        toolMsg("t2", "other", "Tool result"),
+      ],
+      { runStatus: "success" },
+    );
+    expect(resumed[0]!.status).toBe("completed");
+  });
+
+  it("cancelled 不带 error 字段（取消不是失败）", () => {
+    const out = deriveSubtasks(
+      [aiTask("a1", "tc1"), toolMsg("t1", "tc1", "Task cancelled by user.")],
+      { runStatus: "interrupted" },
+    );
+    expect(out[0]!.status).toBe("cancelled");
+    expect("error" in out[0]!).toBe(false);
+  });
+
+  it("归属模式下落在未知 run 的消息：不判终态，只登记元数据", () => {
+    // messageRunIds 不完整（分片未到齐 / 消息无 id）：已结束旧 run 的任务不得被判成进行中
+    const out = deriveSubtasksByRun([aiTask("a-unknown", "tc-unknown")], {
+      messageRunIds: new Map(),
+      runsById: { "run-1": { run_id: "run-1", status: "success" } as Run },
+      activeRunId: null,
+    });
+    expect(out).toEqual([
+      {
+        id: "tc-unknown",
+        subagent_type: "general-purpose",
+        description: "d",
+        prompt: "p",
+      },
+    ]);
+  });
+
   it("history loading / 断线：不判终态——只登记元数据，不下发会覆盖旧终态的 status", () => {
     for (const flag of [
       "isHistoryLoading",

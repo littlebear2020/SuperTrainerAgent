@@ -188,13 +188,13 @@ describe("useThreadHistory.refetchHistory：带新鲜度判定的补齐式重载
     const goodResponder = harness().responder!;
     let hold = true;
     harness().responder = (runId, query) => {
-      if (runId === "run-1" && hold) return slow.promise;
+      if (runId === "run-2" && hold) return slow.promise;
       return goodResponder(runId, query);
     };
-    // run-1 的首次加载挂起（用户点了 Load more）
+    // run-2（紧邻的旧 run）的首次加载挂起（用户点了 Load more）
     const loading = api.loadMore().catch(() => undefined);
     await flush();
-    expect(callsFor("run-1")).toBe(1);
+    expect(callsFor("run-2")).toBe(1);
     hold = false;
 
     let refetched: unknown = "pending";
@@ -212,12 +212,12 @@ describe("useThreadHistory.refetchHistory：带新鲜度判定的补齐式重载
     // 在途请求没结束前，补齐式重载不结束
     expect(refetched).toBe("pending");
 
-    slow.resolve([structuredClone(oldestPage)]);
+    slow.resolve([structuredClone(middlePage)]);
     await settleHistory(() => loading);
     await settleHistory(() => refetch);
     expect(refetched).toBe("done");
-    // 在途的那次加载已带着最新内容：没有为 run-1 再发一次；
-    // 未加载的 run-2 与非终态的 run-3 照常补取
+    // 在途的那次加载已带着最新内容：没有为 run-2 再发一次；
+    // 未加载的 run-1 与非终态的 run-3 照常补取
     expect(callsFor("run-1")).toBe(1);
     expect(callsFor("run-2")).toBe(1);
     expect(callsFor("run-3")).toBe(2);

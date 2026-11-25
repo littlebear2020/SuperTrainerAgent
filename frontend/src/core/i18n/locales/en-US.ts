@@ -937,6 +937,9 @@ export const enUS: Translations = {
     reconnecting: "Reconnecting…",
     cancelFailed: "Could not stop — the task may still be running",
     retryCancel: "Retry stop",
+    stopFailed: (message: string) => `Could not stop: ${message}`,
+    stopTimeout: (seconds: number) =>
+      `Stop timed out: the server did not confirm within ${seconds}s`,
   },
 
   subtasks: {

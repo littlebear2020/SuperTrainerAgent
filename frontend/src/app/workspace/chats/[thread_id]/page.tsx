@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
@@ -202,16 +202,18 @@ export default function ChatPage() {
     await stop();
   }, [stop]);
 
+  const threadContext = useMemo(
+    () => ({
+      thread,
+      isHistoryLoading,
+      hasMoreHistory,
+      refetchHistory,
+      recovery,
+    }),
+    [thread, isHistoryLoading, hasMoreHistory, refetchHistory, recovery],
+  );
   return (
-    <ThreadContext.Provider
-      value={{
-        thread,
-        isHistoryLoading,
-        hasMoreHistory,
-        refetchHistory,
-        recovery,
-      }}
-    >
+    <ThreadContext.Provider value={threadContext}>
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header
