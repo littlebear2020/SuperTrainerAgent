@@ -69,6 +69,16 @@ describe("StatusBadge", () => {
     ).toBe(false);
   });
 
+  it("cancelled：中性样式、不旋转，标签不再落入排队中", async () => {
+    const el = await renderBadge("cancelled");
+    expect(el.className).toContain("bg-neutral-100");
+    expect(el.className).not.toContain("bg-indigo-100");
+    expect(el.querySelector("svg")?.classList.contains("animate-spin")).toBe(
+      false,
+    );
+    expect(el.textContent).toContain("已取消");
+  });
+
   it("composing：indigo 转圈 + 通用文案「合成中」", async () => {
     const el = await renderBadge("composing");
     expect(el.className).toContain("bg-indigo-100");

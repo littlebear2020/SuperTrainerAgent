@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getVideoTaskStatusLabel,
   isTerminalVideoTaskStatus,
   VIDEO_TASK_TERMINAL_STATUSES,
 } from "@/core/video-gen/task-status-label";
+
+describe("getVideoTaskStatusLabel", () => {
+  it("cancelled 显示「已取消」而不是默认「排队中」", () => {
+    expect(getVideoTaskStatusLabel("cancelled")).toBe("已取消");
+  });
+});
 
 describe("VIDEO_TASK_TERMINAL_STATUSES（反馈1-项2）", () => {
   it("集合内容对齐后端 task_framework TERMINAL_STATUSES = {ready, failed, cancelled}", () => {

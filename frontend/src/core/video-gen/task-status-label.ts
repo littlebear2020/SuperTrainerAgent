@@ -25,6 +25,8 @@ export function getVideoTaskStatusLabel(
     // default「排队中」（worker 质检检出异常画面、gateway watcher 重生中）
     case "qc_repair":
       return "质检修复中";
+    case "cancelled":
+      return "已取消";
     default:
       return "排队中"; // pending + any unknown
   }
