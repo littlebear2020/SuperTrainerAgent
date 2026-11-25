@@ -13,6 +13,12 @@ const h = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   inputProps: null as Record<string, unknown> | null,
   setDraft: null as ((value: string) => void) | null,
+  messageListProps: null as Record<string, unknown> | null,
+  threadContextValue: null as Record<string, unknown> | null,
+  messageRunIds: new Map<string, string>(),
+  runsById: {} as Record<string, unknown>,
+  reconnect: vi.fn(async () => undefined),
+  retryCancel: vi.fn(async () => undefined),
 }));
 
 /** 把 provider 的 setInput 交给用例：模拟用户在等待期间输入草稿。 */
@@ -45,6 +51,14 @@ vi.mock("@/core/threads/hooks", () => ({
     isHistoryLoading: false,
     hasMoreHistory: false,
     loadMoreHistory: vi.fn(),
+    messageRunIds: h.messageRunIds,
+    runsById: h.runsById,
+    activeRunId: "run-1",
+    isRecoverableDisconnect: false,
+    reconnectActiveRun: h.reconnect,
+    isReconnecting: false,
+    cancelFailed: false,
+    retryCancel: h.retryCancel,
   }),
 }));
 
@@ -69,7 +83,30 @@ vi.mock("@/env", () => ({
 }));
 
 vi.mock("@/components/workspace/messages", () => ({
-  MessageList: () => <div data-testid="message-list" />,
+  MessageList: (props: Record<string, unknown>) => {
+    h.messageListProps = props;
+    return <div data-testid="message-list" />;
+  },
+}));
+
+// 页面用 ThreadContext.Provider 提供恢复入口：这里把 value 交给用例
+vi.mock("@/components/workspace/messages/context", () => ({
+  ThreadContext: {
+    Provider: ({
+      value,
+      children,
+    }: {
+      value: unknown;
+      children: React.ReactNode;
+    }) => {
+      h.threadContextValue = value as Record<string, unknown>;
+      return children;
+    },
+  },
+  useThread: () => {
+    if (!h.threadContextValue) throw new Error("useThread outside provider");
+    return h.threadContextValue;
+  },
 }));
 
 vi.mock("@/components/workspace/input-box", () => ({
@@ -164,6 +201,10 @@ beforeEach(() => {
   h.threadId = "thread-1";
   h.inputProps = null;
   h.setDraft = null;
+  h.messageListProps = null;
+  h.threadContextValue = null;
+  h.messageRunIds = new Map();
+  h.runsById = {};
   h.sendMessage.mockReset();
   window.sessionStorage.clear();
   container = document.createElement("div");
@@ -266,6 +307,25 @@ describe("普通会话页观察 sendMessage 的 rejection", () => {
     expect(h.sendMessage).toHaveBeenCalledTimes(1);
     expect(promptValue()).toBe("");
     expect(unhandled).toEqual([]);
+  });
+
+  test("把 run 归属与恢复入口接进 MessageList / ThreadContext（PR3）", async () => {
+    h.messageRunIds = new Map([["m1", "run-1"]]);
+    h.runsById = { "run-1": { run_id: "run-1", status: "running" } };
+
+    await renderPage();
+
+    expect(h.messageListProps).toMatchObject({
+      messageRunIds: h.messageRunIds,
+      runsById: h.runsById,
+      activeRunId: "run-1",
+    });
+    expect(h.threadContextValue?.recovery).toMatchObject({
+      isRecoverableDisconnect: false,
+      reconnect: h.reconnect,
+      cancelFailed: false,
+      retryCancel: h.retryCancel,
+    });
   });
 
   test("手动发送把 sendMessage 的 Promise 原样交给 InputBox", async () => {

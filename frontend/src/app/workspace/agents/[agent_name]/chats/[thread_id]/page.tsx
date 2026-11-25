@@ -2,7 +2,7 @@
 
 import { BotIcon, PlusSquare } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   usePromptInputController,
@@ -95,6 +95,11 @@ export default function AgentChatPage() {
     messageRunIds,
     runsById,
     activeRunId,
+    isRecoverableDisconnect,
+    reconnectActiveRun,
+    isReconnecting,
+    cancelFailed,
+    retryCancel,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: { ...settings.context, agent_name: agent_name },
@@ -190,6 +195,24 @@ export default function AgentChatPage() {
     await stop();
   }, [stop]);
 
+  // PR3：会话恢复入口（断线重连、停止失败重试）经 ThreadContext 交给 MessageList
+  const recovery = useMemo(
+    () => ({
+      isRecoverableDisconnect,
+      isReconnecting,
+      reconnect: reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    }),
+    [
+      isRecoverableDisconnect,
+      isReconnecting,
+      reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    ],
+  );
+
   const demoMode = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
   const guideDisplayName = guideAgentName
     ? t.agents.newChatGuides[guideAgentName].displayName
@@ -237,7 +260,7 @@ export default function AgentChatPage() {
   ) : null;
 
   return (
-    <ThreadContext.Provider value={{ thread }}>
+    <ThreadContext.Provider value={{ thread, recovery }}>
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header
@@ -310,6 +333,7 @@ export default function AgentChatPage() {
                     hasMoreHistory={hasMoreHistory}
                     loadMoreHistory={loadMoreHistory}
                     isHistoryLoading={isHistoryLoading}
+                    isRecoverableDisconnect={isRecoverableDisconnect}
                     messageRunIds={messageRunIds}
                     runsById={runsById}
                     activeRunId={activeRunId}

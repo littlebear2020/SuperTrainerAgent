@@ -33,6 +33,7 @@ import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
 import { MessageListItem } from "./message-list-item";
 import { TurnTokenUsage } from "./message-token-usage";
+import { RecoveryBanner } from "./recovery-banner";
 import { MessageListSkeleton } from "./skeleton";
 import { StoryboardConfirmCard } from "./storyboard-confirm-card";
 import { SubtaskCard } from "./subtask-card";
@@ -386,6 +387,8 @@ export function MessageList({
           renderAfterGroup={renderAfterGroup}
         />
         {thread.isLoading && <StreamingIndicator className="my-4" />}
+        {/* PR3：断线重连 / 停止失败重试的入口，从 ThreadContext 读 */}
+        <RecoveryBanner />
         <div style={{ height: `${paddingBottom}px` }} />
       </ConversationContent>
     </Conversation>

@@ -897,6 +897,15 @@ export const zhCN: Translations = {
     retry: "重试（发送「继续」）",
   },
 
+  // 会话恢复入口（PR3：断线重连、停止失败重试）
+  recovery: {
+    disconnected: "连接已中断，任务可能仍在运行",
+    reconnect: "重新连接",
+    reconnecting: "连接中…",
+    cancelFailed: "停止失败，任务可能仍在运行",
+    retryCancel: "重试停止",
+  },
+
   // Shortcuts
   shortcuts: {
     pages: "页面导航",

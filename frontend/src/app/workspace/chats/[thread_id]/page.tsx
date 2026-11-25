@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
@@ -66,6 +66,11 @@ export default function ChatPage() {
     messageRunIds,
     runsById,
     activeRunId,
+    isRecoverableDisconnect,
+    reconnectActiveRun,
+    isReconnecting,
+    cancelFailed,
+    retryCancel,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: settings.context,
@@ -200,8 +205,26 @@ export default function ChatPage() {
     await stop();
   }, [stop]);
 
+  // PR3：会话恢复入口（断线重连、停止失败重试）经 ThreadContext 交给 MessageList
+  const recovery = useMemo(
+    () => ({
+      isRecoverableDisconnect,
+      isReconnecting,
+      reconnect: reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    }),
+    [
+      isRecoverableDisconnect,
+      isReconnecting,
+      reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    ],
+  );
+
   return (
-    <ThreadContext.Provider value={{ thread }}>
+    <ThreadContext.Provider value={{ thread, recovery }}>
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header
@@ -235,6 +258,7 @@ export default function ChatPage() {
                 hasMoreHistory={hasMoreHistory}
                 loadMoreHistory={loadMoreHistory}
                 isHistoryLoading={isHistoryLoading}
+                isRecoverableDisconnect={isRecoverableDisconnect}
                 messageRunIds={messageRunIds}
                 runsById={runsById}
                 activeRunId={activeRunId}

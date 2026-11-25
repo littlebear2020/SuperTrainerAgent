@@ -831,3 +831,63 @@ function emptyStream(): AsyncIterable<never> {
     await new Promise((resolve) => setTimeout(resolve, 0));
   })();
 }
+
+describe("PR3：onFinish 按 meta.run_id 重取分片", () => {
+  test("mount 自动 rejoin（没有 onCreated）收尾时同样重取该 run 的分片", async () => {
+    const runRecord = {
+      run_id: "run-1",
+      thread_id: "t-1",
+      assistant_id: "lead_agent",
+      status: "running",
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-01-01T00:00:00Z",
+      metadata: {},
+      multitask_strategy: "reject",
+      kwargs: {},
+    };
+    const originalList = h.client.runs.list;
+    h.client.runs.list = async () => [runRecord] as never;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => {
+        const row = {
+          run_id: "run-1",
+          seq: 1,
+          content: { id: "m1", type: "human", content: "hi" },
+          metadata: { caller: "user" },
+          created_at: "2025-01-01T00:00:00Z",
+        };
+        return new Response(JSON.stringify({ data: [row], has_more: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      });
+    try {
+      // SDK reconnectOnMount 读这个键：挂载即 joinStream(run-1)，不经过 onCreated
+      window.sessionStorage.setItem("lg:stream:t-1", "run-1");
+      // onFinish 需要 history 头（SDK 的 onSuccess 用它回调）
+      h.history.push({ values: { messages: [] } });
+      await mount("t-1");
+      expect(h.joins).toHaveLength(1);
+      // 首次只加载最新 run 的分片
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      h.joins[0]!.ctrl.end();
+      await flush();
+
+      // 重取的是 meta.run_id 指向的 run（同一端点再请求一次）
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      const secondUrl = fetchSpy.mock.calls[1]![0];
+      const target =
+        typeof secondUrl === "string"
+          ? secondUrl
+          : secondUrl instanceof URL
+            ? secondUrl.href
+            : secondUrl.url;
+      expect(target).toContain("/runs/run-1/messages");
+    } finally {
+      fetchSpy.mockRestore();
+      h.client.runs.list = originalList;
+    }
+  });
+});
