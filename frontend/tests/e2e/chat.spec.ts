@@ -657,15 +657,25 @@ test.describe("Chat token usage by turn", () => {
           `/api/threads/${MOCK_THREAD_ID}/runs/token-history-older-run/messages`
       );
     });
-    await page.getByRole("button", { name: "Load more" }).click();
-    expect((await olderMessagesResponse).status()).toBe(200);
-    await page
-      .getByRole("log")
-      .locator(":scope > div")
-      .first()
-      .evaluate((element) => {
+    // 「加载更多」的哨兵进入视口即自动加载（点按钮反而会和自动加载抢时间）：
+    // 等首次落底的平滑动画停稳再翻顶（否则会被开场定位拉回去），哨兵进视口即加载
+    const scroller = page.getByRole("log").locator(":scope > div").first();
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      await scroller.evaluate((element) => {
         element.scrollTo({ top: 0, behavior: "instant" });
       });
+      await page.waitForTimeout(200);
+      if ((await scroller.evaluate((element) => element.scrollTop)) <= 2) break;
+    }
+    expect((await olderMessagesResponse).status()).toBe(200);
+    // 没有更早的 run 了：入口消失 = prepend 已渲染完
+    await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(
+      0,
+    );
+    // prepend 锚定让原来的第一组留在原处：像用户一样向上滚才看到接续进来的旧 run
+    // （程序化 scrollTo 会被锚定期间的校正拉回，滚轮不会）
+    await page.getByRole("log").hover();
+    await page.mouse.wheel(0, -100000);
     await expect(page.getByText("Older answer", { exact: true })).toBeVisible();
 
     const latestFirstTurn = page.locator(
