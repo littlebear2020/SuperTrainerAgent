@@ -22,7 +22,11 @@ export type RunPage = { data: unknown[]; has_more: boolean };
 export type MessageResponder = (
   runId: string,
   query: URLSearchParams,
-) => RunPage[] | Promise<RunPage[]>;
+) =>
+  | RunPage[]
+  | Promise<RunPage[]>
+  | { status: number; detail?: string }
+  | Promise<{ status: number; detail?: string }>;
 
 const history = vi.hoisted(() => ({
   runsByThread: new Map<string, Run[]>(),
@@ -60,15 +64,25 @@ vi.mock("@/core/api/fetcher", () => ({
     // responder 抛错 / 返回被拒绝的 Promise = 网络失败（fetch reject）
     return Promise.resolve()
       .then(() => responder(runId, url.searchParams))
-      .then((pages) => ({
-        ok: true,
-        status: 200,
-        json: () => {
-          const next = pages.shift();
-          if (!next) throw new Error("no page left");
-          return Promise.resolve(next);
-        },
-      }));
+      .then((pages) => {
+        // 返回 { status, detail }（不是页面数组）= 非 2xx 响应
+        if (!Array.isArray(pages)) {
+          return {
+            ok: false,
+            status: pages.status,
+            json: () => Promise.resolve({ detail: pages.detail ?? "error" }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: () => {
+            const next = pages.shift();
+            if (!next) throw new Error("no page left");
+            return Promise.resolve(next);
+          },
+        };
+      });
   },
 }));
 vi.mock("@/core/config", () => ({

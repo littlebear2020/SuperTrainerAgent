@@ -54,10 +54,12 @@ export function classifyStreamError(error: unknown): StreamErrorKind {
   }
   const status = httpStatus(error);
   const message = messageOf(error);
+  // 只认「run 不存在」：别的资源（Thread / Agent / Tool）的 "not found" 是业务错误，
+  // 不能静默吞掉、也不能顺手清掉 rejoin key
   if (
     status === 404 ||
-    /HTTP\s*404/i.test(message) ||
-    /\bnot found\b/i.test(message)
+    /HTTP\s*404\b/i.test(message) ||
+    /\brun\b.*\bnot found\b/i.test(message)
   ) {
     return "stale_run";
   }

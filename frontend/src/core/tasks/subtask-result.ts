@@ -71,7 +71,8 @@ export function parseSubtaskResult(text: string): SubtaskResultUpdate {
   }
 
   if (trimmed.startsWith(CANCELLED_PREFIX)) {
-    return { status: "failed", error: trimmed };
+    // 用户取消不是失败：与「run 被停止、任务没有 result」走同一个状态（PR3）
+    return { status: "cancelled", error: trimmed };
   }
 
   if (trimmed.startsWith(POLLING_TIMEOUT_PREFIX)) {

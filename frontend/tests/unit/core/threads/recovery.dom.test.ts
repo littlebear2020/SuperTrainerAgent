@@ -268,6 +268,9 @@ describe("classifyStreamError", () => {
         Object.assign(new Error("Validation failed"), { status: 422 }),
       ),
     ).toBe("business");
+    // 别的资源的 "not found" 不是 stale run：不能静默吞掉、也不能清掉 rejoin key
+    expect(classifyStreamError(new Error("Thread not found"))).toBe("business");
+    expect(classifyStreamError(new Error("Agent not found"))).toBe("business");
     expect(classifyStreamError("Request failed.")).toBe("business");
     const aborted = new Error("The operation was aborted");
     aborted.name = "AbortError";
@@ -497,6 +500,90 @@ describe("断线后的恢复 owner", () => {
     expect(api().runsById["run-live"]?.status).toBe("interrupted");
     expect(api().cancelFailed).toBe(false);
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  test("run 正常收尾后 activeRunId 回到 null：stop() 不再对已结束的 run 发 cancel", async () => {
+    h.runs = [run("run-1", "success")];
+    await mount();
+    await acceptRun("run-1");
+    h.runs = [
+      { ...run("run-1", "success"), updated_at: "2025-01-02T00:00:00Z" },
+    ];
+
+    // SDK onFinish（带 meta.run_id）
+    await act(async () => {
+      h.thread.isLoading = false;
+      (
+        h.streamOptions!.onFinish as (
+          state: unknown,
+          meta?: { run_id?: string; thread_id?: string },
+        ) => void
+      )({ values: { messages: [] } }, { run_id: "run-1", thread_id: "t-1" });
+    });
+    await flush();
+    expect(api().activeRunId).toBeNull();
+
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(h.cancelRun).not.toHaveBeenCalled();
+  });
+
+  test("迟到的 stale 回调属于别的线程：不删当前线程的 rejoin key", async () => {
+    h.runs = [run("run-live", "running")];
+    window.sessionStorage.setItem("lg:stream:t-1", "run-live");
+    await mount();
+    expect(api().activeRunId).toBe("run-live");
+
+    await act(async () => {
+      (
+        h.streamOptions!.onError as (
+          error: unknown,
+          meta?: { run_id?: string; thread_id?: string },
+        ) => void
+      )(Object.assign(new Error("Run run-old not found"), { status: 404 }), {
+        run_id: "run-old",
+        thread_id: "t-other",
+      });
+    });
+    await flush();
+    expect(window.sessionStorage.getItem("lg:stream:t-1")).toBe("run-live");
+    expect(api().isRecoverableDisconnect).toBe(false);
+  });
+
+  test("loadMoreHistory 失败不产生未处理拒绝：入口仍可重试", async () => {
+    h.runs = [run("run-2", "success"), run("run-1", "success")];
+    await mount();
+    const goodResponder = h.fetchImpl.getMockImplementation()!;
+    let fail = true;
+    h.fetchImpl.mockImplementation((runId: string) => {
+      if (runId === "run-1" && fail) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          json: () => Promise.resolve({ detail: "unavailable" }),
+        });
+      }
+      return goodResponder(runId);
+    });
+    let rejected: unknown = "not rejected";
+    await act(async () => {
+      await api()
+        .loadMoreHistory()
+        .catch((error: unknown) => {
+          rejected = error;
+        });
+    });
+    await flush();
+    expect(rejected).toBe("not rejected");
+    expect(api().hasMoreHistory).toBe(true);
+    fail = false;
+    await act(async () => {
+      await api().loadMoreHistory();
+    });
+    await flush();
+    expect(api().hasMoreHistory).toBe(false);
   });
 
   test("stale run 404：清 reconnect key 并失效 history / runs，不提示", async () => {

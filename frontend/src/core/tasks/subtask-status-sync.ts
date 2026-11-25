@@ -73,8 +73,8 @@ export function statusWithoutResult(
 export function deriveSubtasks(
   messages: Message[],
   options: DeriveSubtasksOptions = {},
-): Subtask[] {
-  const out: Subtask[] = [];
+): SubtaskPatch[] {
+  const out: SubtaskPatch[] = [];
   for (const message of messages) {
     if (message.type !== "ai") continue;
     for (const tc of message.tool_calls ?? []) {
@@ -92,7 +92,17 @@ export function deriveSubtasks(
         parsed = parseSubtaskResult(resultText);
       } else {
         const status = statusWithoutResult(messages, options);
-        if (status === undefined) continue;
+        if (status === undefined) {
+          // 不确定（history loading / 断线）：只登记元数据，不碰 status——既不判终态，
+          // 也不会用 in_progress 覆盖旧 run 已经落下的终态
+          out.push({
+            id,
+            subagent_type: args.subagent_type ?? "general-purpose",
+            description: args.description ?? "",
+            prompt: args.prompt ?? "",
+          });
+          continue;
+        }
         parsed = { status };
       }
       out.push({
@@ -113,13 +123,16 @@ export function deriveSubtasks(
   return out;
 }
 
+/** 写进 store 的一次子任务 patch：不确定的状态不带 status 字段（applySubtaskPatch 过滤 undefined）。 */
+export type SubtaskPatch = Partial<Subtask> & { id: string };
+
 /** 扁平消息列表 → 按 run 判定所需的归属信息（PR3）。 */
 export type RunAttribution = {
   /** 历史消息 id → 所属 run（useThreadHistory 的 messageRunIds）。 */
   messageRunIds: ReadonlyMap<string, string>;
   /** runs 列表（run_id → run），按加载时 / 最近一次刷新的状态判定。 */
   runsById: Readonly<Record<string, Run>>;
-  /** 当前流所属的 run；不在 messageRunIds 里的消息都属于它。缺省 = 不归属任何 run。 */
+  /** 当前流所属的 run；不在 messageRunIds 里的消息都属于它。缺省 = 没有当前流：这些消息按旧调用方行为（进行中）注册。 */
   activeRunId?: string | null;
 };
 
@@ -132,7 +145,7 @@ export function deriveSubtasksByRun(
   messages: Message[],
   attribution: RunAttribution,
   options: Omit<DeriveSubtasksOptions, "runStatus"> = {},
-): Subtask[] {
+): SubtaskPatch[] {
   const byRun = new Map<string, Message[]>();
   for (const message of messages) {
     const historyRunId = message.id
@@ -143,7 +156,7 @@ export function deriveSubtasksByRun(
     if (bucket) bucket.push(message);
     else byRun.set(runId, [message]);
   }
-  const derived = new Map<string, Subtask>();
+  const derived = new Map<string, SubtaskPatch>();
   for (const [runId, runMessages] of byRun) {
     const runStatus = attribution.runsById[runId]?.status;
     for (const task of deriveSubtasks(runMessages, { ...options, runStatus })) {
@@ -151,7 +164,7 @@ export function deriveSubtasksByRun(
     }
   }
   // 保持消息顺序：按 tool call 在列表里的出现顺序输出
-  const out: Subtask[] = [];
+  const out: SubtaskPatch[] = [];
   for (const message of messages) {
     if (message.type !== "ai") continue;
     for (const tc of message.tool_calls ?? []) {

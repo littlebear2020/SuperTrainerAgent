@@ -2,7 +2,7 @@
 
 import { BotIcon, PlusSquare } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   usePromptInputController,
@@ -96,11 +96,7 @@ export default function AgentChatPage() {
     messageRunIds,
     runsById,
     activeRunId,
-    isRecoverableDisconnect,
-    reconnectActiveRun,
-    isReconnecting,
-    cancelFailed,
-    retryCancel,
+    recovery,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: { ...settings.context, agent_name: agent_name },
@@ -195,24 +191,6 @@ export default function AgentChatPage() {
   const handleStop = useCallback(async () => {
     await stop();
   }, [stop]);
-
-  // PR3：会话恢复入口（断线重连、停止失败重试）经 ThreadContext 交给 MessageList
-  const recovery = useMemo(
-    () => ({
-      isRecoverableDisconnect,
-      isReconnecting,
-      reconnect: reconnectActiveRun,
-      cancelFailed,
-      retryCancel,
-    }),
-    [
-      isRecoverableDisconnect,
-      isReconnecting,
-      reconnectActiveRun,
-      cancelFailed,
-      retryCancel,
-    ],
-  );
 
   const demoMode = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
   const guideDisplayName = guideAgentName
@@ -342,7 +320,6 @@ export default function AgentChatPage() {
                     hasMoreHistory={hasMoreHistory}
                     loadMoreHistory={loadMoreHistory}
                     isHistoryLoading={isHistoryLoading}
-                    isRecoverableDisconnect={isRecoverableDisconnect}
                     messageRunIds={messageRunIds}
                     runsById={runsById}
                     activeRunId={activeRunId}

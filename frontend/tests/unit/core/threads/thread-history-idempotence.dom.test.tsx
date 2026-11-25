@@ -122,6 +122,29 @@ describe("useThreadHistory：newest-first 的 runs 按 run 分片加载", () => 
     expect(historyApi().hasMore).toBe(false);
   });
 
+  test("重取时端点返回 500：按失败处理，已加载的分片不被清空、可重试", async () => {
+    await mountHistory("t-1");
+    expect(messageIds(historyApi())).toEqual(["m3", "m4"]);
+    const goodResponder = harness().responder!;
+    let fail = true;
+    harness().responder = (runId, query) => {
+      if (runId === "run-2" && fail) return { status: 500, detail: "boom" };
+      return goodResponder(runId, query);
+    };
+
+    const error = await rejectsWithHistory(() =>
+      historyApi().refetchRun("run-2"),
+    );
+    expect(error).toMatchObject({ message: /HTTP 500/ });
+    await flush();
+    // 不是「成功的空结果」：旧分片还在
+    expect(messageIds(historyApi())).toEqual(["m3", "m4"]);
+
+    fail = false;
+    await settleHistory(() => historyApi().refetchRun("run-2"));
+    expect(messageIds(historyApi())).toEqual(["m3", "m4"]);
+  });
+
   test("A 慢历史未返回时切到 B：A 的响应不拼入 B", async () => {
     const api = await mountHistory("t-1");
     harness().runsByThread.set("t-2", [run("run-b")]);

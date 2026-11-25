@@ -266,7 +266,7 @@ export function useThreadStream({
   const {
     messages: history,
     hasMore: hasMoreHistory,
-    loadMore: loadMoreHistory,
+    loadMore: loadMoreHistoryRaw,
     refetchRun: refetchRunHistory,
     refetchRunIfStale: refetchRunIfStaleHistory,
     refetchHistory,
@@ -300,7 +300,23 @@ export function useThreadStream({
   // mount 自动 rejoin 的 run 不经过 onCreated：SDK 按 reconnect key（sessionStorage）接续，
   // 这里读同一个键——否则刷新后接续的流没有「当前 run」，停止、重连与终态同步都无从归属。
   // key 在流正常收尾时由 SDK 清掉，随后自然回到 null。
-  const rejoinRunId = readRejoinRunId(threadId);
+  // 只在挂载 / 切线程 / runs 列表刷新时读：流正常收尾后 SDK 清掉 key，runs 列表随之
+  // 刷新（onFinish / 取消 / stale 都会失效它），这里重新读到 null
+  /**
+   * run 结束（正常收尾 / 取消受理 / 已不存在）后放掉「当前 run」；迟到的旧回调只清
+   * 自己那个 run，不会清掉新 run。
+   */
+  const clearActiveRun = useCallback((runId?: string) => {
+    setActiveRun((current) =>
+      !current || !runId || current.runId === runId ? null : current,
+    );
+  }, []);
+  const rejoinRunId = useMemo(
+    () => readRejoinRunId(threadId),
+    // runsById：流收尾后 SDK 清 key 的同时 runs 列表会被失效刷新，借它重新读一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [threadId, runsById],
+  );
   const activeRunId =
     activeRun && activeRun.threadId === threadId
       ? activeRun.runId
@@ -493,16 +509,16 @@ export function useThreadStream({
       // the next mount doesn't retry, and skip the error toast since the
       // thread history still loads correctly via fetchStateHistory.
       if (errorKind === "stale_run") {
-        if (typeof window !== "undefined" && onStreamThreadId) {
+        // 清的是出错那个线程的 reconnect key：迟到的旧线程回调不得动当前线程的 key
+        const keyThreadId = meta?.thread_id ?? threadIdRef.current;
+        if (typeof window !== "undefined" && keyThreadId) {
           window.sessionStorage.removeItem(
-            `${STREAM_REJOIN_KEY_PREFIX}${onStreamThreadId}`,
+            `${STREAM_REJOIN_KEY_PREFIX}${keyThreadId}`,
           );
         }
         // 没有可重连的 run：放掉「当前 run」，并失效 runs 与历史分片（PR3）
         if (onCurrentThread) {
-          setActiveRun((current) =>
-            !meta?.run_id || current?.runId === meta.run_id ? null : current,
-          );
+          clearActiveRun(meta?.run_id);
           void queryClient
             .invalidateQueries({ queryKey: ["thread", threadIdRef.current] })
             .catch(() => undefined);
@@ -549,6 +565,7 @@ export function useThreadStream({
       // refetchRun 自己先登记再刷新 runs 列表（刷新与重取都在它里面）
       const finishedRunId = meta?.run_id;
       if (finishedRunId && meta?.thread_id === threadIdRef.current) {
+        clearActiveRun(finishedRunId);
         void refetchRunHistory(finishedRunId).catch((error: unknown) => {
           console.error("Failed to refetch finished run history", error);
         });
@@ -959,6 +976,7 @@ export function useThreadStream({
       } else {
         setCancelFailure(null);
         if (outcome.status === "cancelled") {
+          clearActiveRun(runId);
           await syncRunAfterCancel(threadId, runId).catch((error: unknown) => {
             console.error("Failed to refresh run after cancel", error);
           });
@@ -966,7 +984,7 @@ export function useThreadStream({
       }
       return outcome;
     },
-    [syncRunAfterCancel],
+    [clearActiveRun, syncRunAfterCancel],
   );
 
   /** 已受理的 run：等可等待的 cancel，结果写入 submission 的 completion。 */
@@ -1125,6 +1143,33 @@ export function useThreadStream({
     [thread, mergedMessages],
   );
 
+  /** 向前加载一个 run：失败只留痕迹、不产生未处理拒绝（「加载更多」入口仍在，可再点）。 */
+  const loadMoreHistory = useCallback(async () => {
+    try {
+      await loadMoreHistoryRaw();
+    } catch (error) {
+      console.error("Failed to load more thread history", error);
+    }
+  }, [loadMoreHistoryRaw]);
+
+  /** 恢复入口（PR3）：两个 chat page 原样放进 ThreadContext.recovery。 */
+  const recovery = useMemo(
+    () => ({
+      isRecoverableDisconnect: recoverableDisconnect,
+      isReconnecting,
+      reconnect: reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    }),
+    [
+      recoverableDisconnect,
+      isReconnecting,
+      reconnectActiveRun,
+      cancelFailed,
+      retryCancel,
+    ],
+  );
+
   return {
     thread: mergedThread,
     sendMessage,
@@ -1134,6 +1179,7 @@ export function useThreadStream({
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    recovery,
     /** 用户显式触发的补齐式重载（PR3；带新鲜度判定，失败 reject 以便重试）。 */
     refetchHistory,
     messageRunIds,
@@ -1183,7 +1229,13 @@ export async function fetchAllRunMessages(
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       },
-    ).then((res) => res.json());
+    ).then(async (res) => {
+      // 非 2xx 的错误响应体不是「空历史」：显式失败，走保留旧分片的路径
+      if (!res.ok) {
+        throw new Error(`Failed to load run messages (HTTP ${res.status})`);
+      }
+      return res.json();
+    });
     const rows = Array.isArray(result.data) ? result.data : [];
     for (const row of rows) {
       collected.set(row.seq, row);
@@ -1261,6 +1313,19 @@ const EMPTY_HISTORY_STATE: HistoryState = {
  * - loadedRunIds 只在完整成功后写入；失败保留旧分片、不标记新鲜，可重试
  * - onFinish 用 meta.run_id 指向 `refetchRun` 强制重取（mount 自动 rejoin 不经过 onCreated）
  */
+/**
+ * 分片是否就是该 run 当前记录的版本：上次加载成功、且 status / updated_at 与 runs 列表
+ * 一致。前提：服务端在 run 终态之后不再更新 updated_at——否则每次 runs 刷新都会被
+ * 判成过期而重取一次分片（多一次请求，不会出错）。
+ */
+function isShardCurrent(shard: HistoryShard, run: Run): boolean {
+  return (
+    shard.fresh &&
+    shard.status === run.status &&
+    shard.updatedAt === run.updated_at
+  );
+}
+
 export function useThreadHistory(threadId: string) {
   const runs = useThreadRuns(threadId);
   const queryClient = useQueryClient();
@@ -1409,15 +1474,6 @@ export function useThreadHistory(threadId: string) {
       return loadRun(run);
     }
   }, [loadRun, snapshot]);
-
-  /** 分片是否就是该 run 当前记录的版本（终态且 status / updated_at 一致才算新鲜）。 */
-  function isShardCurrent(shard: HistoryShard, run: Run): boolean {
-    return (
-      shard.fresh &&
-      shard.status === run.status &&
-      shard.updatedAt === run.updated_at
-    );
-  }
 
   /**
    * 已有在途加载时的统一处理：等它结束；它写出的分片若已是 run 的当前版本就不必再取。
