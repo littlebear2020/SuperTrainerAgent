@@ -85,6 +85,11 @@ export type MockAPIOptions = {
   runs?: MockRun[];
   /** 按 runId 登记的历史消息（seq 从 1 起），端点据此分页。 */
   runMessages?: Record<string, Message[]>;
+  /**
+   * 产物正文：原始路径 → 文件当前内容（`GET /api/threads/{id}/artifacts/{path}`）。
+   * 未登记的路径返回 404。write_file 的 append / str_replace 读的就是这个端点。
+   */
+  artifacts?: Record<string, string>;
 };
 
 export interface MockLangGraphAPI {
@@ -439,6 +444,39 @@ export function mockLangGraphAPI(
       status: 404,
       contentType: "application/json",
       body: JSON.stringify({ detail: "Agent not found" }),
+    });
+  });
+
+  // 产物正文：路径逐段解码后按原始路径查登记的内容（与后端一致——前端对来自 tool
+  // args 的原始路径按字面编码过，解码回来就是原始路径）
+  void page.route(/\/api\/threads\/[^/]+\/artifacts(?:\/|$|\?)/, (route) => {
+    // 没登记产物内容的用例保持原样（请求照旧落到别处）
+    if (!options?.artifacts) return route.fallback();
+    if (route.request().method() !== "GET") return route.fallback();
+    const url = new URL(route.request().url());
+    const encodedPath = url.pathname.split("/artifacts")[1] ?? "";
+    const filepath = encodedPath
+      .split("/")
+      .map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          return segment;
+        }
+      })
+      .join("/");
+    const content = options?.artifacts?.[filepath];
+    if (content === undefined) {
+      return route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Artifact not found" }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "text/plain; charset=utf-8",
+      body: content,
     });
   });
 
