@@ -12,7 +12,17 @@ const h = vi.hoisted(() => ({
   threadId: "thread-1",
   sendMessage: vi.fn(),
   inputProps: null as Record<string, unknown> | null,
+  setDraft: null as ((value: string) => void) | null,
 }));
+
+/** 把 provider 的 setInput 交给用例：模拟用户在等待期间输入草稿。 */
+function DraftBridge() {
+  const { textInput } = usePromptInputController();
+  useEffect(() => {
+    h.setDraft = textInput.setInput;
+  });
+  return null;
+}
 
 vi.mock("@/components/workspace/chats", () => ({
   ChatBox: ({ children }: { children: React.ReactNode }) => children,
@@ -136,6 +146,7 @@ async function renderPage() {
         <PromptInputProvider>
           <Harness />
           <PromptValue />
+          <DraftBridge />
         </PromptInputProvider>
       </I18nProvider>,
     );
@@ -152,6 +163,7 @@ beforeEach(() => {
   h.isNew = true;
   h.threadId = "thread-1";
   h.inputProps = null;
+  h.setDraft = null;
   h.sendMessage.mockReset();
   window.sessionStorage.clear();
   container = document.createElement("div");
@@ -206,6 +218,36 @@ describe("普通会话页观察 sendMessage 的 rejection", () => {
       expect(unhandled).toEqual([]);
     },
   );
+
+  test("auto-send 等待期间用户已写了草稿：failed 后回填不覆盖草稿", async () => {
+    let reject!: (error: unknown) => void;
+    h.sendMessage.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    window.sessionStorage.setItem(
+      PENDING_PROMPT_KEY,
+      JSON.stringify({ prompt: "来自灵感库的长提示词", autoSend: true }),
+    );
+
+    await renderPage();
+    expect(h.sendMessage).toHaveBeenCalledTimes(1);
+    // 上传 / 创建还在途，用户已经开始写下一条
+    await act(async () => {
+      h.setDraft?.("我正在写的新草稿");
+    });
+    expect(promptValue()).toBe("我正在写的新草稿");
+
+    await act(async () => {
+      reject(new SendRejectedError("failed", "create failed"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(promptValue()).toBe("我正在写的新草稿");
+    expect(unhandled).toEqual([]);
+  });
 
   test("auto-send 被 stopped 拒绝（切线程触发）时不在新线程回填提示词", async () => {
     h.sendMessage.mockImplementation(() =>

@@ -122,6 +122,12 @@ export default function ChatPage() {
   const autoSendRanRef = useRef(false);
   const { textInput } = usePromptInputController();
   const prefillRunRef = useRef<string | null>(null);
+  // 输入框的最新正文：auto-send 的 catch 在上传 / 创建失败后才执行，闭包里的
+  // textInput.value 是 effect 那一帧的快照（几乎恒为空），读它会覆盖等待期间的草稿
+  const draftRef = useRef(textInput.value);
+  useEffect(() => {
+    draftRef.current = textInput.value;
+  });
   useEffect(() => {
     if (autoSendRanRef.current) return;
 
@@ -163,7 +169,7 @@ export default function ChatPage() {
         (error: unknown) => {
           const kind = SendRejectedError.rejectionKind(error);
           if (kind !== "busy" && kind !== "failed") return;
-          if (textInput.value) return;
+          if (draftRef.current) return;
           textInput.setInput(text);
         },
       );
