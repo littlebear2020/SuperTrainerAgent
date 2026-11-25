@@ -250,7 +250,7 @@ test.describe("six work capabilities", () => {
     { capability: "ai_image", kind: "work", taskType: "ai_image" },
     { capability: "ai_video", kind: "work", taskType: "ai_video" },
   ] as const) {
-    test(`reviews ${item.capability} card geometry at 1440 and 390`, async ({
+    test(`reviews ${item.capability} card geometry at 1440, 1280, 390 and 320`, async ({
       page,
     }) => {
       if (item.kind === "agent") {
@@ -289,23 +289,27 @@ test.describe("six work capabilities", () => {
         );
       }
 
-      const cardTestId = item.kind === "agent" ? "work-card" : "work-card";
-      await page.setViewportSize({ width: 1440, height: 1000 });
       await page.goto(
         `/workspace/video-gen?tab=works&capability=${item.capability}`,
       );
-      await reviewWorkCards(page, cardTestId, 3);
-      await page.screenshot({
-        path: test.info().outputPath(`${item.capability}-1440.png`),
-        fullPage: true,
-      });
-
-      await page.setViewportSize({ width: 390, height: 844 });
-      await reviewWorkCards(page, cardTestId, 1);
-      await page.screenshot({
-        path: test.info().outputPath(`${item.capability}-390.png`),
-        fullPage: true,
-      });
+      for (const viewport of [
+        { width: 1440, height: 1000, columns: 3, label: "1440" },
+        { width: 1280, height: 800, columns: 3, label: "1280" },
+        { width: 390, height: 844, columns: 1, label: "390" },
+        { width: 320, height: 844, columns: 1, label: "320" },
+      ] as const) {
+        await page.setViewportSize({
+          width: viewport.width,
+          height: viewport.height,
+        });
+        await reviewWorkCards(page, "work-card", viewport.columns);
+        await page.screenshot({
+          path: test
+            .info()
+            .outputPath(`${item.capability}-${viewport.label}.png`),
+          fullPage: true,
+        });
+      }
     });
   }
 

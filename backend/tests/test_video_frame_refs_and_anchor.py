@@ -342,6 +342,7 @@ def _fake_task(task_id: str = "vg_ri1"):
     # attach_task_costs 事后赋值字段--mock 必须显式置 None（MagicMock 自动属性
     # 过不了 pydantic 的 str 校验）。
     task.amount_source = None
+    task.delivery = None
     task.payload = "{}"
     task.result = "{}"
     return task

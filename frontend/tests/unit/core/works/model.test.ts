@@ -2,10 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AgentThread } from "@/core/threads/types";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
-import { WORK_CAPABILITY_IDS } from "@/core/workspace/video-assets-route";
-
-vi.mock("@/core/config", () => ({ getBackendBaseURL: () => "http://backend" }));
-
 import {
   TASK_TYPE_CAPABILITY,
   WORK_CAPABILITY_SOURCES,
@@ -21,6 +17,9 @@ import type {
   ArtifactFileSummary,
   ThreadArtifactSummary,
 } from "@/core/works/types";
+import { WORK_CAPABILITY_IDS } from "@/core/workspace/video-assets-route";
+
+vi.mock("@/core/config", () => ({ getBackendBaseURL: () => "http://backend" }));
 
 function makeTask(
   id: string,

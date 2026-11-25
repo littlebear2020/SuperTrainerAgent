@@ -118,9 +118,12 @@ def test_task_with_thumbnail_router_logic():
     task.result = json.dumps({"thumbnail_path": "/tmp/fake_thumb.jpg", "output_path": "/tmp/fake_out.mp4"})
 
     # 文件在 → 缩略图 URL 下发；ready + output 在 → artifact_missing False
-    with patch("pathlib.Path.exists", return_value=True), patch(
-        "pathlib.Path.stat",
-        return_value=MagicMock(st_size=4, st_mtime=1_700_000_000),
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch(
+            "pathlib.Path.stat",
+            return_value=MagicMock(st_size=4, st_mtime=1_700_000_000),
+        ),
     ):
         brief = _task_with_thumbnail(task)
         assert brief.thumbnail_url == "/api/video/tasks/vg_test123/thumbnail"

@@ -407,4 +407,230 @@ test.describe("works delivery center", () => {
     ).toHaveCount(0);
     await expect(page.getByTestId("work-card")).toHaveCount(1);
   });
+
+  test("does not invent versions for an overwritten same-name path", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page, {
+      threads: [
+        {
+          thread_id: "same-name",
+          title: "同名文件",
+          agent_name: "ppt-master",
+        },
+      ],
+      artifactSummaries: [
+        summary("same-name", "delivered", [output("current.pptx")]),
+      ],
+    });
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ppt-master");
+    await expect(page.getByTestId("work-card")).toContainText("current.pptx");
+    await expect(page.getByTestId("works-view")).not.toContainText("版本");
+    await expect(page.getByTestId("works-view")).not.toContainText("恢复");
+  });
+
+  test("shows cancelled as a neutral non-spinning terminal state", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page, { threads: [] });
+    videoAPI.seedTask({
+      id: "cancelled-task",
+      title: "已取消任务",
+      task_type: "ai_video",
+      status: "cancelled",
+      progress: 45,
+    });
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    const card = taskCard(page, "cancelled-task");
+    await expect(card).toContainText("已取消");
+    await expect(card).not.toContainText("排队中");
+    const badge = card.getByTestId("work-status-badge");
+    await expect(badge).toHaveClass(/bg-neutral-100/);
+    await expect(badge.locator("svg")).not.toHaveClass(/animate-spin/);
+    await expect(
+      card.getByRole("button", { name: "查看", exact: true }),
+    ).toBeDisabled();
+  });
+
+  test("avoids eager Agent media and unloads the selected viewer", async ({
+    page,
+  }) => {
+    const threads = Array.from({ length: 6 }, (_, index) => ({
+      thread_id: `media-${index}`,
+      title: `媒体作品 ${index}`,
+      agent_name: "creative-studio",
+    }));
+    const names = [
+      "movie.mp4",
+      "cover.png",
+      "voice.mp3",
+      "one.pptx",
+      "two.pptx",
+      "three.pptx",
+    ];
+    mockLangGraphAPI(page, {
+      threads,
+      artifactSummaries: threads.map((thread, index) =>
+        summary(thread.thread_id, "delivered", [output(names[index]!)]),
+      ),
+      artifacts: {
+        "/mnt/user-data/outputs/movie.mp4": "mock movie",
+        "/mnt/user-data/outputs/cover.png": "mock image",
+        "/mnt/user-data/outputs/voice.mp3": "mock audio",
+      },
+    });
+    await page.route("**/api/threads/media-0/artifacts/**", (route) =>
+      route.fulfill({
+        status: 200,
+        path: `${process.cwd()}/public/course-samples/image-motion.mp4`,
+        contentType: "video/mp4",
+      }),
+    );
+    const agentMediaRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.pathname.includes("/api/threads/") &&
+        url.pathname.includes("/artifacts/") &&
+        /\.(mp4|mp3)$/.test(url.pathname)
+      ) {
+        agentMediaRequests.push(request.url());
+      }
+    });
+
+    await page.goto(
+      "/workspace/video-gen?tab=works&capability=creative-studio",
+    );
+    await expect(page.getByTestId("work-card")).toHaveCount(6);
+    expect(agentMediaRequests).toEqual([]);
+    await expect(
+      page.locator('[data-thread-id="media-1"] img'),
+    ).toHaveAttribute("loading", "lazy");
+    await expect(page.locator("video, audio")).toHaveCount(0);
+
+    const videoCard = page.locator('[data-thread-id="media-0"]');
+    const viewButton = videoCard.getByRole("button", {
+      name: "查看",
+      exact: true,
+    });
+    await viewButton.click();
+    const dialog = page.getByRole("dialog");
+    const video = dialog.locator("video");
+    await expect(video).toBeVisible();
+    await expect.poll(() => agentMediaRequests.length).toBe(1);
+    expect(new URL(agentMediaRequests[0]!).pathname).toContain(
+      "/api/threads/media-0/artifacts/mnt/user-data/outputs/movie.mp4",
+    );
+    expect(
+      await video.evaluate((element) => ({
+        autoplay: (element as HTMLVideoElement).autoplay,
+        controls: (element as HTMLVideoElement).controls,
+      })),
+    ).toEqual({ autoplay: false, controls: true });
+    await expect(
+      dialog.getByRole("link", { name: "下载当前文件" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator("video, audio")).toHaveCount(0);
+    await expect(viewButton).toBeFocused();
+  });
+
+  test("blocks every missing-task media request", async ({ page }) => {
+    mockLangGraphAPI(page, { threads: [] });
+    videoAPI.seedTask({
+      id: "missing-network",
+      title: "缺失媒体任务",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+      artifact_missing: true,
+      thumbnail_url: "/api/video/tasks/missing-network/thumbnail",
+      delivery: {
+        file_name: "missing.mp4",
+        file_size: null,
+        file_updated_at: null,
+        media_kind: "video",
+        exists: false,
+      },
+    });
+    const requests: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (
+        path === "/api/video/tasks/missing-network/thumbnail" ||
+        path === "/api/video/tasks/missing-network/download"
+      ) {
+        requests.push(request.url());
+      }
+    });
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    const card = taskCard(page, "missing-network");
+    await expect(card).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "查看", exact: true }),
+    ).toBeDisabled();
+    await expect(card.locator("img, video, audio, a[download]")).toHaveCount(0);
+    expect(requests).toEqual([]);
+  });
+
+  test("keeps capability tabs keyboard accessible", async ({ page }) => {
+    mockLangGraphAPI(page, { threads: [] });
+    await page.goto("/workspace/video-gen");
+    const courseTab = page.getByRole("tab", { name: "文字动效", exact: true });
+    await courseTab.focus();
+    await page.keyboard.press("End");
+    await expect(
+      page.getByRole("tab", { name: "语音播客", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Home");
+    await expect(courseTab).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      page.getByRole("tab", { name: "图片动效", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("renders English delivery copy in dark mode", async ({ page }) => {
+    await page
+      .context()
+      .addCookies([
+        { name: "locale", value: "en-US", domain: "localhost", path: "/" },
+      ]);
+    await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+    await page.emulateMedia({ colorScheme: "dark" });
+    mockLangGraphAPI(page, {
+      threads: [
+        {
+          thread_id: "english-dark",
+          title: "English deck",
+          agent_name: "ppt-master",
+        },
+      ],
+      artifactSummaries: [
+        summary("english-dark", "delivered", [output("english.pptx")]),
+      ],
+    });
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ppt-master");
+    await expect(
+      page.getByRole("heading", { name: "My works", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/View and download delivery files/),
+    ).toBeVisible();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: "Download current file" }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: test.info().outputPath("english-dark.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
+  });
 });
