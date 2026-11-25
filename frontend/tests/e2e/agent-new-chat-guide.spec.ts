@@ -346,16 +346,69 @@ test.describe("Agent new-chat task guides", () => {
     await expect(page.locator("[data-testid^='showcase-case-']")).toHaveCount(
       2,
     );
-    await page.getByTestId("showcase-open-visual-diagram-rag").click();
+    await page.getByTestId("showcase-open-visual-diagram-addie").click();
     await expect(page.getByTestId("showcase-visual-original")).toHaveAttribute(
       "src",
-      /diagram-rag-architecture\.svg$/,
+      /diagram-addie-flow\.svg$/,
     );
     const svgPromise = page.waitForEvent("download");
     await page.getByTestId("showcase-download-svg").click();
     const svg = await svgPromise;
-    expect(svg.suggestedFilename()).toBe("visual-diagram-rag.svg");
+    expect(svg.suggestedFilename()).toBe("visual-diagram-addie.svg");
     expect(await svg.failure()).toBeNull();
+  });
+
+  test("creative-studio opens all ten originals at their declared raster dimensions or as editable SVG", async ({
+    page,
+  }) => {
+    mockGuideAPI(page);
+    await openGuide(page, "creative-studio");
+
+    for (const item of showcaseFor("creative-studio")!.cases) {
+      if (item.kind !== "visual") throw new Error("Expected visual cases");
+      const trigger = page.getByTestId(`showcase-open-${item.id}`);
+      await trigger.click();
+      const original = page.getByTestId("showcase-visual-original");
+      await expect(original).toBeVisible();
+      await expect(original).toHaveAttribute("src", item.original);
+      await expect
+        .poll(() =>
+          original.evaluate((image: HTMLImageElement) => image.naturalWidth),
+        )
+        .toBeGreaterThan(0);
+
+      if (item.vector) {
+        const response = await page.request.get(item.original);
+        expect(response.ok(), item.id).toBe(true);
+        const svg = await response.text();
+        const root = /<svg\b[^>]*>/.exec(svg)?.[0];
+        expect(root, item.id).toContain('viewBox="0 0 1600 1000"');
+        expect(root, item.id).not.toMatch(/\s(?:width|height)=/);
+      } else {
+        await expect
+          .poll(() =>
+            original.evaluate((image: HTMLImageElement) => image.naturalWidth),
+          )
+          .toBe(item.width);
+        await expect
+          .poll(() =>
+            original.evaluate((image: HTMLImageElement) => image.naturalHeight),
+          )
+          .toBe(item.height);
+      }
+
+      const download = page.getByTestId(
+        item.vector ? "showcase-download-svg" : "showcase-download-original",
+      );
+      await expect(download).toHaveAttribute(
+        "href",
+        item.vector ?? item.original,
+      );
+      await expect(download).toHaveAttribute("download", item.downloadName);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
   });
 
   test("podcast-studio showcase plays and switches real audio and opens transcript sources", async ({
@@ -1351,7 +1404,7 @@ test.describe("Agent new-chat task guides", () => {
 
     await expect(
       page.locator("[data-testid^='showcase-case-'] h3").first(),
-    ).toHaveText("AI Agent 技术栈");
+    ).toHaveText("企业 AI 人才能力模型");
 
     // Re-clicking the active category returns to the full list.
     await page.getByTestId("showcase-filter-diagram").click();
@@ -1362,6 +1415,141 @@ test.describe("Agent new-chat task guides", () => {
     );
     await expect(page.getByText("10 件", { exact: true })).toBeVisible();
   });
+
+  for (const viewport of [
+    { width: 1440, height: 900, columns: 3 },
+    { width: 1280, height: 900, columns: 3 },
+    { width: 1024, height: 768, columns: 2 },
+    { width: 390, height: 844, columns: 1 },
+  ] as const) {
+    test(`creative-studio ${viewport.width} keeps readable masonry, filtered grids and dialogs without overflow`, async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(60_000);
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      mockGuideAPI(page);
+      await openGuide(page, "creative-studio");
+      await page.waitForLoadState("networkidle");
+      await page.screenshot({
+        path: testInfo.outputPath(`${viewport.width}-initial.png`),
+        animations: "disabled",
+      });
+
+      const cases = page.getByTestId("agent-guide-cases");
+      const cards = page.locator("[data-testid^='showcase-case-']");
+      await expect(cards).toHaveCount(10);
+      await expect(cases).toHaveClass(
+        /columns-1 gap-4 sm:columns-2 xl:columns-3/,
+      );
+      for (const card of await cards.all()) {
+        await card.scrollIntoViewIfNeeded();
+      }
+      await expect
+        .poll(() =>
+          cards
+            .locator("img")
+            .evaluateAll((images) =>
+              images.every(
+                (image) =>
+                  image instanceof HTMLImageElement &&
+                  image.naturalWidth > 0 &&
+                  image.clientWidth > 100,
+              ),
+            ),
+        )
+        .toBe(true);
+      const columnCount = async () =>
+        new Set(
+          await cards.evaluateAll((elements) =>
+            elements.map((element) =>
+              Math.round(element.getBoundingClientRect().x),
+            ),
+          ),
+        ).size;
+      expect(await columnCount()).toBe(viewport.columns);
+      await page
+        .getByTestId("showcase-case-visual-poster-agent")
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`${viewport.width}-masonry.png`),
+        animations: "disabled",
+      });
+
+      for (const [filter, count] of [
+        ["poster", 2],
+        ["card", 4],
+        ["comic", 2],
+        ["diagram", 2],
+      ] as const) {
+        await page.getByTestId(`showcase-filter-${filter}`).click();
+        await expect(cards).toHaveCount(count);
+        await expect(cases).toHaveClass(
+          /grid gap-4 sm:grid-cols-2 xl:grid-cols-3/,
+        );
+        const expectedColumns =
+          viewport.width < 640
+            ? 1
+            : filter === "card" && viewport.width >= 1280
+              ? 3
+              : 2;
+        expect(await columnCount(), filter).toBe(expectedColumns);
+        if (filter === "card") {
+          await expect
+            .poll(() =>
+              cards
+                .locator("img")
+                .evaluateAll((images) =>
+                  images.every(
+                    (image) =>
+                      image instanceof HTMLImageElement &&
+                      image.naturalWidth > 0,
+                  ),
+                ),
+            )
+            .toBe(true);
+          await cards.locator("img").evaluateAll((images) =>
+            Promise.all(
+              images.map((image) => {
+                if (!(image instanceof HTMLImageElement)) {
+                  throw new Error("Expected filtered image");
+                }
+                return image.decode();
+              }),
+            ),
+          );
+          await page.screenshot({
+            path: testInfo.outputPath(`${viewport.width}-filtered-grid.png`),
+            animations: "disabled",
+          });
+        }
+      }
+
+      await page.getByTestId("showcase-filter-diagram").click();
+      await expect(cards).toHaveCount(10);
+      const trigger = page.getByTestId("showcase-open-visual-poster-agent");
+      await trigger.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toContainText("AI Agent 实战训练营");
+      await expect(dialog).toContainText("1080 × 1920 · PNG 图片");
+      const original = page.getByTestId("showcase-visual-original");
+      await expect(original).toBeVisible();
+      await original.evaluate((image: HTMLImageElement) => image.decode());
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`${viewport.width}-dialog.png`),
+        animations: "disabled",
+      });
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+    });
+  }
 
   test("390 long showcase placeholder wraps inside the composer without toolbar overlap", async ({
     page,
@@ -1543,6 +1731,7 @@ test.describe("Agent new-chat task guides", () => {
     await Promise.all(pending);
 
     const bytes = mediaBytes.reduce((total, item) => total + item.bytes, 0);
+    console.log(`[creative-studio initial media] ${bytes} bytes`);
     expect(bytes).toBeLessThanOrEqual(1_500_000);
     expect(mediaBytes.map((item) => item.url)).not.toEqual(
       expect.arrayContaining([

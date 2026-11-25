@@ -296,8 +296,10 @@ describe("AgentNewChatGuide", () => {
     expect(composer().value).toBe(prompt);
     expect(document.activeElement).toBe(composer());
     // The section header 【我的内容】 comes first; the first fill-in wins.
-    expectSelection("【请填写】");
-    expect(composer().selectionStart).toBe(prompt.indexOf("课程主题：") + 5);
+    expectSelection("【请填写，如社群招募】");
+    expect(composer().selectionStart).toBe(
+      prompt.indexOf("【请填写，如社群招募】"),
+    );
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -312,7 +314,7 @@ describe("AgentNewChatGuide", () => {
     await click(button("追加"));
 
     expect(composer().value).toBe(`草稿里的【请填写】不是目标\n${prompt}`);
-    expectSelection("【请填写】");
+    expectSelection("【请填写，如企业内训】");
     expect(composer().selectionStart).toBeGreaterThan(
       "草稿里的【请填写】不是目标\n".length,
     );
