@@ -267,7 +267,9 @@ export function writeFileTargetMayArrive(
   },
 ): boolean {
   if (probe.phase === "incomplete") return true;
-  return Boolean(
-    context.threadLoading || context.isHistoryLoading || context.hasMoreHistory,
+  return (
+    context.threadLoading ||
+    (context.isHistoryLoading ?? false) ||
+    (context.hasMoreHistory ?? false)
   );
 }
