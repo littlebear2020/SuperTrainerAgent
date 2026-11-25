@@ -192,9 +192,9 @@ describe("AgentShowcase", () => {
       `按此风格创作: ${item.title.zh}`,
     );
     // Diagrams advertise the editable SVG output on their badge.
-    expect(element("showcase-open-visual-diagram-stack").textContent).toContain(
-      "SVG 可编辑",
-    );
+    expect(
+      element("showcase-open-visual-diagram-talent").textContent,
+    ).toContain("SVG 可编辑");
   });
 
   it("marks the deck style row and the case-brand note as visual facts", async () => {
@@ -227,7 +227,10 @@ describe("AgentShowcase", () => {
     await renderShowcase("creative-studio");
     await click(element("showcase-open-visual-poster-agent"));
     const dialog = document.querySelector("[role='dialog']");
-    expect(dialog?.textContent).toContain("9:16");
+    expect(dialog?.textContent).toContain(
+      "保留：示例的画幅、构图、配色与版式。替换：主题、文案和知识点。",
+    );
+    expect(dialog?.textContent).toContain("1080 × 1920 · PNG 图片");
     // Live smoke (2026-11-24): with a complete brief the agent generates
     // directly and only asks when content is missing — never promise a
     // confirmation step that does not happen.
@@ -237,6 +240,45 @@ describe("AgentShowcase", () => {
     expect(element("showcase-recipe").textContent).not.toContain(
       "AI Agent 实战训练营",
     );
+  });
+
+  it("keeps internal visual style names off every card and dialog", async () => {
+    await renderShowcase("creative-studio");
+    const forbidden = [
+      "深空科技风",
+      "瑞士编辑风",
+      "深蓝瑞士风",
+      "3D 玻璃三幕",
+      "3D 玻璃叙事",
+      "Prompt 手稿",
+      "日系漫画",
+      "靛蓝水墨",
+      "数据管线",
+      "深绿路线图",
+      "石墨结构图",
+      "石墨暗色",
+      "冷白蓝图",
+      "钴蓝",
+    ];
+
+    for (const item of showcaseFor("creative-studio")!.cases) {
+      const cardText = element(`showcase-case-${item.id}`).textContent ?? "";
+      for (const style of forbidden) {
+        expect(cardText, `${item.id} card exposes ${style}`).not.toContain(
+          style,
+        );
+      }
+
+      await click(element(`showcase-open-${item.id}`));
+      const dialogText =
+        document.querySelector("[role='dialog']")?.textContent ?? "";
+      for (const style of forbidden) {
+        expect(dialogText, `${item.id} dialog exposes ${style}`).not.toContain(
+          style,
+        );
+      }
+      await click(element("showcase-dialog-close"));
+    }
   });
 
   it("disables the dialog CTA together with the other prompt actions", async () => {
@@ -418,7 +460,7 @@ describe("AgentShowcase", () => {
     await renderShowcase("creative-studio");
 
     expect(element("showcase-open-visual-poster-agent").style.aspectRatio).toBe(
-      "1152 / 2048",
+      "1080 / 1920",
     );
     expect(element("showcase-open-visual-card-rag").style.aspectRatio).toBe(
       "2048 / 1152",
@@ -494,14 +536,12 @@ describe("AgentShowcase", () => {
 
     await click(element("showcase-filter-diagram"));
     expect(container.querySelectorAll("article")).toHaveLength(2);
-    await click(element("showcase-open-visual-diagram-rag"));
+    await click(element("showcase-open-visual-diagram-addie"));
     const svg = document.querySelector<HTMLAnchorElement>(
       "[data-testid='showcase-download-svg']",
     );
-    expect(svg?.href).toContain(
-      "/visual/diagrams/diagram-rag-architecture.svg",
-    );
-    expect(svg?.download).toBe("visual-diagram-rag.svg");
+    expect(svg?.href).toContain("/visual/diagrams/diagram-addie-flow.svg");
+    expect(svg?.download).toBe("visual-diagram-addie.svg");
 
     // Clicking the already-active category toggles back to all.
     await click(element("showcase-filter-diagram"));
