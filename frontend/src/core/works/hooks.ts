@@ -72,7 +72,9 @@ export function useWorks(capability: WorkCapability): {
     [capability, hasAgentSource, threads],
   );
   const summariesQuery = useArtifactSummaries(threadIds);
-  const cachedSummaries = queryClient
+  const currentThreadIds = new Set(threadIds);
+  const cachedByThread = new Map<string, ThreadArtifactSummary>();
+  const cachedQueries = queryClient
     .getQueryCache()
     .findAll({ queryKey: ["works", "artifact-summaries"] })
     .filter(
@@ -81,7 +83,19 @@ export function useWorks(capability: WorkCapability): {
     )
     .sort(
       (left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt,
-    )[0]?.state.data as ThreadArtifactSummary[] | undefined;
+    );
+  for (const query of cachedQueries) {
+    for (const summary of query.state.data as ThreadArtifactSummary[]) {
+      if (
+        currentThreadIds.has(summary.thread_id) &&
+        !cachedByThread.has(summary.thread_id)
+      ) {
+        cachedByThread.set(summary.thread_id, summary);
+      }
+    }
+  }
+  const cachedSummaries =
+    cachedByThread.size > 0 ? Array.from(cachedByThread.values()) : undefined;
   const usingCachedFallback =
     summariesQuery.data === undefined && cachedSummaries !== undefined;
   const summaries = summariesQuery.data ?? cachedSummaries;

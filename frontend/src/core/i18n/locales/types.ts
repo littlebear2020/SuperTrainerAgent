@@ -502,6 +502,7 @@ export interface Translations {
       searchPlaceholder: string;
       refresh: string;
       refreshing: string;
+      retrying: string;
       count: (count: number) => string;
       clearSearch: string;
       view: string;
@@ -517,6 +518,7 @@ export interface Translations {
       notDeliveredState: string;
       fileInfoUnavailable: string;
       fileMissing: string;
+      artifactCleaned: string;
       byDownloadResponse: string;
       mediaError: string;
       unsupportedPreview: string;

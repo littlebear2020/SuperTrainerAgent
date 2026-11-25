@@ -47,6 +47,12 @@
 - 全量 Playwright 最终为 `192 passed / 5 failed / 3 skipped`：5 条全部是计划 Step 8 已预告的 `video-gen.spec.ts` `waitForLoadState("networkidle")` 超时。当前分支单独复跑仍 `5 failed`；临时 detached worktree 的本地 `main@64ef5b52` 同命令同样 **`5 failed`**，随后移除基线 worktree。原始失败与 main 对照均保留，本批 39 项必要 E2E 全绿，未修改无关模块。
 - 最终性能复核：`pnpm perf:check` → exit 0；`/workspace/video-gen` **JS 3,595,698 B / CSS 255,242 B**，仍在既有预算内。
 
+## PR #63 评审收口
+
+- 首轮 CI：backend/frontend/lint/quick-checks/perf/e2e/OCR 均通过；E2E CI `6m52s` 通过，未复现本地 main 同有的 5 条 networkidle 超时。
+- OCR 行内 4 条 medium：`artifactCleaned` 与 `retrying` 补中英 key 并增加英文卡片测试；缓存回退改为按当前线程 ID 合并各成功批次、以最近更新时间决胜，新增多缓存合并 RED→GREEN。相关 hooks/grid 测试 `32 passed`，全量 Vitest `2161 passed`。
+- `Promise.all` 并行批次建议不采纳：计划 Q15 明确要求 `for...of` 顺序读取，checkpointer 全局锁使并发无收益；既有 50/50/1 测试同时断言最多 1 个批次在途。18 条 low 的处置汇总见 PR #63 评论，不为低优先建议反复推送。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。
