@@ -99,9 +99,14 @@ function threadIdFromUrl(url: string, fallback = MOCK_THREAD_ID): string {
   return /\/threads\/([^/?#]+)/.exec(url)?.[1] ?? fallback;
 }
 
-/** run stream 请求对应的线程 id（`/threads/{id}/runs/stream`），取不到时回落固定值。 */
+/**
+ * run stream 请求对应的线程 id，取不到时回落固定值。无状态的 `/runs/stream` 路由路径里
+ * 没有线程 id（SDK 把它放在请求体里），所以先读请求体，再看 `/threads/{id}/runs/stream`。
+ */
 export function runStreamThreadId(route: Route): string {
   const url = route.request().url();
+  const fromBody = requestedThreadId(route.request().postData());
+  if (fromBody) return fromBody;
   return /\/runs\/stream(?:\?|$)/.test(url)
     ? threadIdFromUrl(url)
     : MOCK_THREAD_ID;
