@@ -396,6 +396,32 @@ describe("目标 call 或 result 缺失时才看加载状态", () => {
     ).resolves.toEqual({ status: "pending" });
   });
 
+  test("原始串不是合法 JSON、但 result 已到：参数已定型，按 args 判定 ready（与工具步骤同口径）", async () => {
+    // 模型产出的 args 本身非法、或流式分片丢字：SDK 的宽松解析仍给出了 path，工具也执行了
+    const malformed = {
+      id: "msg-1",
+      type: "ai",
+      content: "",
+      tool_calls: [
+        {
+          id: "call-1",
+          name: "write_file",
+          args: { description: "d", path: PATH, content: "正文" },
+        },
+      ],
+      tool_call_chunks: [
+        {
+          id: "call-1",
+          name: "write_file",
+          args: '{"path":"/mnt/data/report.md"',
+        },
+      ],
+    } as unknown as Message;
+    await expect(
+      load(ref(), thread([malformed, toolResult("call-1", "OK")], true)),
+    ).resolves.toEqual({ status: "ready", content: "正文" });
+  });
+
   test("全部 settled 且 hasMoreHistory=false 后仍缺失 → not_found", async () => {
     const settled = thread([ai("msg-other", [write("x", PATH, "别的")])]);
     await expect(load(ref(), settled)).resolves.toEqual({

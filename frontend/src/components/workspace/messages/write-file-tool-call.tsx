@@ -8,7 +8,10 @@ import {
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
 import { useArtifacts } from "@/components/workspace/artifacts";
-import { createWriteFileRef } from "@/core/artifacts/write-file-ref";
+import {
+  completeToolArgs,
+  createWriteFileRef,
+} from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 
 /** 自动打开前留给用户手选的时间：这期间用户选了别的产物就不抢。 */
@@ -24,33 +27,6 @@ type WriteFileToolCallProps = {
   isLast?: boolean;
   isLoading?: boolean;
 };
-
-/**
- * 参数完整的判定：有原始串（流式中）时以严格的 `JSON.parse` 成功为准——SDK 交付的
- * `args` 是宽松的部分 JSON 解析结果，半截 path 也在里面；没有原始串（历史消息）时
- * `args` 即完整。不完整时返回空对象：不显示 path、不构造引用。
- *
- * `settled`（工具已有 result）：参数已定型，直接用 `args`。模型产出的 args 本身就是
- * 非法 JSON 时严格解析永远不会成功——刷新后（没有 chunk）能打开、会话内却永远点不了。
- */
-function completeToolArgs(
-  args: Record<string, unknown>,
-  rawArgs: string | undefined,
-  settled: boolean,
-): Record<string, unknown> {
-  if (rawArgs === undefined || settled)
-    return args && typeof args === "object" ? args : {};
-  try {
-    const parsed: unknown = JSON.parse(rawArgs);
-    return parsed !== null &&
-      typeof parsed === "object" &&
-      !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
-}
 
 /**
  * write_file / str_replace 的工具步骤（PR4）。独立成组件是为了让 auto-open 的 effect
@@ -118,16 +94,19 @@ export function WriteFileToolCall({
     return () => clearTimeout(timer);
   }, [ref, id, isLoading, isLast, autoOpen, autoSelect, hasResult]);
 
-  return (
-    <ChainOfThoughtStep
-      className="cursor-pointer"
-      label={description}
-      icon={NotebookPenIcon}
-      onClick={() => {
-        if (!ref) return;
+  // 没有引用（参数还在流式 / 缺定位字段）时不是一个可点的入口：不给手型、不挂 onClick
+  const open = ref
+    ? () => {
         select(ref);
         setOpen(true);
-      }}
+      }
+    : undefined;
+  return (
+    <ChainOfThoughtStep
+      className={open ? "cursor-pointer" : undefined}
+      label={description}
+      icon={NotebookPenIcon}
+      onClick={open}
     >
       {path && (
         <ChainOfThoughtSearchResult className="cursor-pointer">

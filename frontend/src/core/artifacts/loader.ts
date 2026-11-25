@@ -4,7 +4,13 @@ import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import type { AgentThreadState } from "../threads";
 
 import { urlOfArtifact } from "./utils";
-import { parseWriteFileRef, type WriteFileRef } from "./write-file-ref";
+import {
+  isCompleteToolArgs,
+  isWriteFileToolCall,
+  parseWriteFileRef,
+  rawArgsByToolCallId,
+  type WriteFileRef,
+} from "./write-file-ref";
 
 async function sha256OfText(content: string): Promise<string | null> {
   // crypto.subtle is only available in secure contexts (HTTPS or localhost).
@@ -84,7 +90,7 @@ type ToolMessageLike = Extract<Message, { type: "tool" }>;
 
 /**
  * 定位结果：目标还没定下来时只有阶段；settled 时一定带着工具调用与它的 result
- * （类型上收窄，调用方不必再判空）。
+ * （按 phase 收窄的联合类型，调用方不必再判空）。
  */
 type WriteFileTarget =
   | { phase: Exclude<WriteFileTargetProbe, { phase: "settled" }>["phase"] }
@@ -100,72 +106,40 @@ function toolCallsOf(message: Message): ToolCallLike[] {
 }
 
 /**
- * 流式中的工具参数原始串：`tool_call_chunks` 里这个 id 的 args 片段拼起来（SDK 已按
- * index 归并，后续片段不带 id 也并进了同一条）。没有 chunk 的历史消息返回 undefined。
- */
-function rawArgsOfChunk(
-  message: Message,
-  toolCallId: string,
-): string | undefined {
-  if (message.type !== "ai") return undefined;
-  const chunks = (
-    message as unknown as {
-      tool_call_chunks?: Array<{ id?: string; args?: string }>;
-    }
-  ).tool_call_chunks;
-  if (!Array.isArray(chunks)) return undefined;
-  let raw: string | undefined;
-  for (const chunk of chunks) {
-    if (chunk.id === toolCallId) raw = (raw ?? "") + (chunk.args ?? "");
-  }
-  return raw;
-}
-
-/** 参数是否已完整：原始串能被严格解析成 JSON 对象（流式中的半截串解析失败）。 */
-function isCompleteToolArgs(raw: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed !== null && typeof parsed === "object";
-  } catch {
-    return false;
-  }
-}
-
-/**
  * 定位目标：以 toolCallId 为主键扫描所有同 messageId 的消息，并校验 path / 工具类型。
- * 不在任何消息里 → missing；原始参数串还没拼完 → incomplete。
+ * 一遍扫描同时找工具调用、它的 result 与流式参数的原始串（流式期间 thread 每个 chunk
+ * 都是新引用，这个函数会跟着重跑）。不在任何消息里 → missing；参数还在流式 → incomplete。
  */
 function probeWriteFileTarget(
   ref: WriteFileRef,
   thread: BaseStream<AgentThreadState>,
-): WriteFileTarget | undefined {
+): WriteFileTarget {
   let toolCall: ToolCallLike | undefined;
+  let result: ToolMessageLike | undefined;
+  let raw: string | undefined;
   for (const message of thread.messages) {
-    if (message.id !== ref.messageId) continue;
-    // 参数还在流式：SDK 的宽松解析已经把半截 path 放进了 tool_calls，不能拿它去校验
-    // path（那会闪现「引用无效」）；原始串能严格解析了才算到齐
-    const raw = rawArgsOfChunk(message, ref.toolCallId);
-    if (raw !== undefined && !isCompleteToolArgs(raw)) {
-      return { phase: "incomplete" };
+    // result 可能排在 AI 消息之后，任何位置都算
+    if (message.type === "tool" && message.tool_call_id === ref.toolCallId) {
+      result = message;
     }
+    if (message.id !== ref.messageId) continue;
+    raw ??= rawArgsByToolCallId(message).get(ref.toolCallId);
     const call = toolCallsOf(message).find(
       (call) => call.id === ref.toolCallId,
     );
     if (call) toolCall = call;
   }
-  if (!toolCall) return { phase: "missing" };
-  if (toolCall.name !== "write_file" && toolCall.name !== "str_replace") {
-    return { phase: "invalid" };
+  // 参数还在流式且 result 没到：SDK 的宽松解析已经把半截 path 放进了 tool_calls，不能
+  // 拿它去校验 path（那会闪现「引用无效」）；原始串能严格解析了才算到齐。result 到了
+  // 参数就已定型，直接用 tool_calls 里的 args——与工具步骤（completeToolArgs）同口径
+  if (!result && raw !== undefined && !isCompleteToolArgs(raw)) {
+    return { phase: "incomplete" };
   }
+  if (!toolCall) return { phase: "missing" };
+  if (!isWriteFileToolCall(toolCall.name)) return { phase: "invalid" };
   // path 必须与定位到的工具调用一致：引用不能被改成别的文件
   if ((toolCall.args as { path?: unknown })?.path !== ref.path) {
     return { phase: "invalid" };
-  }
-  let result: ToolMessageLike | undefined;
-  for (const message of thread.messages) {
-    if (message.type === "tool" && message.tool_call_id === ref.toolCallId) {
-      result = message;
-    }
   }
   if (!result) return { phase: "awaiting-result" };
   return { phase: "settled", toolCall, result };
@@ -178,7 +152,7 @@ export function probeWriteFileRef(
 ): WriteFileTargetProbe {
   const ref = parseWriteFileRef(url);
   if (!ref) return { phase: "invalid" };
-  return probeWriteFileTarget(ref, thread) ?? { phase: "missing" };
+  return probeWriteFileTarget(ref, thread);
 }
 
 function resultTextOf(result: ToolMessageLike): string {
@@ -197,17 +171,18 @@ function resultTextOf(result: ToolMessageLike): string {
 }
 
 /**
- * 工具失败的结果文本前缀。后端的 ToolErrorHandlingMiddleware 把工具异常包成
- * `Error: …` 的 ToolMessage 并置 `status="error"`
- * （backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py）。
- * 后端改包装格式时同步。
+ * 工具失败的结果文本前缀。两类出处：
+ * - `ToolErrorHandlingMiddleware` 把工具异常包成 `Error: …` 的 ToolMessage 并置
+ *   `status="error"`（agents/middlewares/tool_error_handling_middleware.py）；
+ * - write_file / str_replace 自己 catch 后直接返回 `Error: …` 文本、**不带 status**
+ *   （sandbox/tools.py）——对这些工具，文本前缀才是主要信号。
+ * 两个信号任一成立即判失败。后端改包装格式时同步。
  */
 const TOOL_ERROR_PREFIX = "Error:";
 
 /**
- * 工具失败：`ToolMessage.status === "error"` 是结构化信号，优先；结果文本以工具错误
- * 前缀开头只在 status 缺失时兜底（历史消息里可能已经丢了 status）——status 是 success
- * 的结果正文恰好以 `Error:` 开头（比如文件内容）不算失败。
+ * 工具失败：`ToolMessage.status === "error"`，或 status 缺失时结果文本以工具错误前缀
+ * 开头；status 是 success 的结果正文恰好以 `Error:` 开头（比如文件内容）不算失败。
  */
 function isToolFailure(result: ToolMessageLike): boolean {
   if (result.status === "error") return true;
@@ -260,7 +235,6 @@ export async function loadArtifactContentFromToolCall({
   const ref = parseWriteFileRef(urlString);
   if (!ref) return { status: "invalid" };
   const target = probeWriteFileTarget(ref, thread);
-  if (!target) return { status: "invalid" };
   if (target.phase === "invalid") return { status: "invalid" };
   if (target.phase !== "settled") {
     // 参数没流式完整、result 没到、目标 call 不在消息里：还在流式 / 加载，或仍有未加载

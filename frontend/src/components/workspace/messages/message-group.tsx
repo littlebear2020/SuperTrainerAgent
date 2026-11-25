@@ -22,6 +22,10 @@ import {
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { Button } from "@/components/ui/button";
+import {
+  isWriteFileToolCall,
+  rawArgsByToolCallId,
+} from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatToolDetail } from "@/core/messages/tool-detail-preview";
 import {
@@ -382,7 +386,7 @@ function ToolCall({
         )}
       </ChainOfThoughtStep>
     );
-  } else if (name === "write_file" || name === "str_replace") {
+  } else if (isWriteFileToolCall(name)) {
     // PR4：独立组件承载 auto-open——流式参数一段段到，半截 path 不能构造引用、不能
     // 选中；auto-open 的 effect 只能放在 hook 规则允许的位置（组件顶层）
     return (
@@ -501,20 +505,6 @@ interface CoTToolCallStep extends GenericCoTStep<"toolCall"> {
 
 type CoTStep = CoTReasoningStep | CoTToolCallStep;
 
-/** `tool_call_chunks` 里每个工具调用的原始 args 串（按 id；SDK 已按 index 合并过）。 */
-function rawArgsByToolCallId(message: Message): Map<string, string> {
-  const out = new Map<string, string>();
-  const chunks = (message as { tool_call_chunks?: unknown }).tool_call_chunks;
-  if (!Array.isArray(chunks)) return out;
-  for (const chunk of chunks) {
-    if (!chunk || typeof chunk !== "object") continue;
-    const { id, args } = chunk as { id?: unknown; args?: unknown };
-    if (typeof id !== "string" || !id || typeof args !== "string") continue;
-    out.set(id, (out.get(id) ?? "") + args);
-  }
-  return out;
-}
-
 function convertToSteps(messages: Message[]): CoTStep[] {
   const steps: CoTStep[] = [];
   // PR-2 4.5：tool_call_id → tool 消息本体索引（Details 面板取 content/status）。
@@ -539,10 +529,17 @@ function convertToSteps(messages: Message[]): CoTStep[] {
         };
         steps.push(step);
       }
-      const rawArgs = rawArgsByToolCallId(message);
+      // 流式参数的原始串只有 write_file / str_replace 的步骤用，而拼接是 O(总长)、流式
+      // 期间每个 chunk 都会重跑：用到才算
+      let rawArgs: Map<string, string> | undefined;
       for (const tool_call of message.tool_calls ?? []) {
         if (tool_call.name === "task") {
           continue;
+        }
+        let raw: string | undefined;
+        if (tool_call.id && isWriteFileToolCall(tool_call.name)) {
+          rawArgs ??= rawArgsByToolCallId(message);
+          raw = rawArgs.get(tool_call.id);
         }
         const step: CoTToolCallStep = {
           id: tool_call.id,
@@ -550,7 +547,7 @@ function convertToSteps(messages: Message[]): CoTStep[] {
           type: "toolCall",
           name: tool_call.name,
           args: tool_call.args,
-          rawArgs: tool_call.id ? rawArgs.get(tool_call.id) : undefined,
+          rawArgs: raw,
         };
         const toolCallId = tool_call.id;
         if (toolCallId) {
