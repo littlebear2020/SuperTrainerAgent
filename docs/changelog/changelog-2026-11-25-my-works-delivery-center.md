@@ -53,7 +53,9 @@
 - OCR 行内 4 条 medium：`artifactCleaned` 与 `retrying` 补中英 key 并增加英文卡片测试；缓存回退改为按当前线程 ID 合并各成功批次、以最近更新时间决胜，新增多缓存合并 RED→GREEN。相关 hooks/grid 测试 `32 passed`，全量 Vitest `2161 passed`。
 - `Promise.all` 并行批次建议不采纳：计划 Q15 明确要求 `for...of` 顺序读取，checkpointer 全局锁使并发无收益；既有 50/50/1 测试同时断言最多 1 个批次在途。18 条 low 的处置汇总见 PR #63 评论，不为低优先建议反复推送。
 
-- 第二轮 OCR 6 条 medium：WorkGrid 增加 rejection catch 且保留 try/finally；useWorks 移除吞错的 fetchQuery catch；mock 对空/51/空白/超长 ID 返回 422；缓存匹配合并用 useMemo。相关单测 `33 passed`，非法批次 + 刷新失败 E2E `2 passed`，全量 Vitest `2162 passed`。`limit: 200` 不采纳，因为 Q4/Q6 要求完整历史且已有 offset 50 后搜索证据；agentNames 过滤建议不采纳，因为 agentNameOfThread 先 canonical 化、当前映射与六能力行为均正确，字段负责来源启停而非另一套映射。
+- 第二轮 OCR 6 条 medium：WorkGrid 增加 rejection catch 且保留 try/finally；useWorks 移除吞错的 fetchQuery catch；mock 对空/51/空白/超长 ID 返回 422；缓存匹配合并用 useMemo。相关单测 `33 passed`，非法批次 + 刷新失败 E2E `2 passed`，全量 Vitest `2162 passed`。`limit: 200` 不采纳，因为 Q4/Q6 要求完整历史且已有 offset 50 后搜索证据；agentNames 过滤建议当时不采纳，第三轮对照实际筛选代码后已纠正，见下条。
+- 第三轮 OCR 4 条 medium：旧任务媒体类型增加显式 `mediaKindGuessed` 标记，不再由查看器通过 `name === null` 反推；Agent 初始筛选、模型归一化与手动刷新统一使用 `agentNames`，新增自定义 Agent 名回归；线程刷新错误直接传播，不再以旧线程覆盖新摘要，任务刷新在 `finally` 中等待，摘要 rejection 继续由 WorkGrid 捕获且 pending 复位。相关 model `26 passed`、hooks + viewer `26 passed`、legacy GIF + 刷新错误 E2E `2 passed`，均先 RED 后 GREEN。
+- 第三轮前端全量：`pnpm check && pnpm test` → exit 0，Vitest **306 files / 2166 tests passed**。全量 Playwright → **193 passed / 5 failed / 3 skipped**；5 条仍全部为已有 main 对照的 `video-gen.spec.ts` `networkidle` 超时，本批交付用例全部通过，未修改无关模块。`pnpm perf:check` → exit 0；`/workspace/video-gen` **JS 3,596,195 B / CSS 255,242 B**，无需调整预算。根 `make check` → exit 0，ESLint **0 errors / 120 个既有 warnings**，i18n **709 个叶子全活**；独立 `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 
 ## 发布与回滚
 

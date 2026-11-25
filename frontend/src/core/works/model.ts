@@ -5,7 +5,10 @@ import { getVideoDownloadUrl } from "@/core/video-gen/api";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import type { WorkCapability } from "@/core/workspace/video-assets-route";
 
-import { TASK_TYPE_CAPABILITY } from "./capability-sources";
+import {
+  TASK_TYPE_CAPABILITY,
+  WORK_CAPABILITY_SOURCES,
+} from "./capability-sources";
 import type {
   ArtifactFileSummary,
   ThreadArtifactSummary,
@@ -44,10 +47,10 @@ export function buildAgentWorks(
   const works: WorkSummary[] = [];
 
   for (const thread of threads) {
-    if (
-      seen.has(thread.thread_id) ||
-      agentNameOfThread(thread) !== capability
-    ) {
+    const configuredAgentMatch = WORK_CAPABILITY_SOURCES[
+      capability
+    ].agentNames.some((name) => name === agentNameOfThread(thread));
+    if (seen.has(thread.thread_id) || !configuredAgentMatch) {
       continue;
     }
     seen.add(thread.thread_id);
@@ -96,6 +99,7 @@ function buildTaskFile(task: VideoTaskBrief): WorkFile | null {
     id: `task:${task.id}:output`,
     name: null,
     mediaKind: "video",
+    mediaKindGuessed: true,
     size: null,
     modifiedAt: null,
     exists: true,

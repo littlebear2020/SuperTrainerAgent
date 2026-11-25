@@ -33,6 +33,7 @@ export interface WorkFile {
   id: string;
   name: string | null;
   mediaKind: WorkMediaKind;
+  mediaKindGuessed?: true;
   size: number | null;
   modifiedAt: string | null;
   exists: boolean;
