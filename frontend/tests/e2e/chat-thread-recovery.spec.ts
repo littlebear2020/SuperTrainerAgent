@@ -90,6 +90,20 @@ async function scrollToTop(page: Page) {
   });
 }
 
+/**
+ * 翻到顶并确认停住：首次落底的平滑动画（registry Conversation 的 resize="smooth"）
+ * 在慢机器上可能还在进行，会把紧随其后的程序化滚动拉回去——这里等它停稳再量。
+ */
+async function scrollToTopStable(page: Page) {
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    await scrollToTop(page);
+    await page.waitForTimeout(200);
+    const top = await scroller(page).evaluate((element) => element.scrollTop);
+    if (top <= 2) return;
+  }
+  throw new Error("scroll position did not settle at the top");
+}
+
 /** 等首次定位的双帧结束：到底且稳定（紧跟着的 scrollTo 才不会被开场定位拉回去）。 */
 async function waitSettledAtBottom(page: Page) {
   await expect
@@ -222,7 +236,7 @@ test.describe("Chat thread recovery: history", () => {
     ]);
     // 452 条都加载了：等开场定位稳定后翻到顶，能看到第一条提示词
     await waitSettledAtBottom(page);
-    await scrollToTop(page);
+    await scrollToTopStable(page);
     await expect(page.getByText("long question 0")).toBeInViewport();
     await expect(page.getByRole("button", { name: "加载更多" })).toHaveCount(0);
     expect(pageErrors).toEqual([]);
@@ -619,9 +633,11 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
     );
     await waitSettledAtBottom(page);
     // 翻到顶时「加载更多」的哨兵进入视口，旧 run 的加载会自动触发：先扣住响应，
-    // 量好锚点再放行
+    // 量好锚点再放行。run-mid 也扣住——否则它紧跟着自动加载、入口随 hasMore 消失，
+    // 高度变化会混进锚点测量
     const release = holdRunMessages(page, "run-older");
-    await scrollToTop(page);
+    holdRunMessages(page, "run-mid");
+    await scrollToTopStable(page);
     const firstBefore = page.getByText("latest question 0", { exact: true });
     await expect(firstBefore).toBeInViewport();
     const topBefore = await firstBefore.evaluate(
@@ -709,7 +725,7 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
       timeout: 15_000,
     });
     await waitSettledAtBottom(page);
-    await scrollToTop(page);
+    await scrollToTopStable(page);
     await expect(page.getByText("alpha question 0")).toBeInViewport();
 
     // 应用内切线程（侧栏）：新线程仍首次落底
@@ -749,7 +765,7 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
       ).toBeInViewport({ timeout: 15_000 });
       await waitSettledAtBottom(page);
       const release = holdRunMessages(page, "run-older");
-      await scrollToTop(page);
+      await scrollToTopStable(page);
       const firstBefore = page.getByText("latest question 0", {
         exact: true,
       });

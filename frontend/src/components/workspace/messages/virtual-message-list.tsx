@@ -8,6 +8,7 @@ import {
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -40,6 +41,16 @@ const GROUP_START_OFFSET = 16;
 const VIRTUAL_SCROLL_SETTLE_ATTEMPTS = 4;
 /** prepend 后按同一锚点校正滚动的最多次数（未测高行逐批变成实测高度）。 */
 const PREPEND_ANCHOR_MAX_ADJUSTMENTS = 8;
+/** 会移动滚动位置的按键：锚定期间按下即视为用户接手。 */
+const NAVIGATION_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " ",
+]);
 const STATIC_SCROLL_SETTLE_ATTEMPTS = 2;
 
 type GroupAlignment = "start" | "center";
@@ -116,9 +127,27 @@ export const VirtualMessageList = forwardRef<
     },
     [renderableViews],
   );
+  /**
+   * 锚定期间强制渲染锚点行（PR3）：prepend 后新插入的行只有估计高度，按估计跳转未必
+   * 把锚点行带进渲染窗口；把它钉进渲染集合，才能按它的真实 DOM 位置校正。
+   * （useVirtualizer 在渲染期同步调用 rangeExtractor，声明必须在它之前。）
+   */
+  const forcedRenderIndexRef = useRef<number | null>(null);
   const rangeExtractor = useCallback(
     (range: Range) => {
       const indices = defaultRangeExtractor(range);
+      // 行数在锚定期间可能变化（optimistic 消息被真实消息替换）：越界的索引会得到
+      // 不存在的 measurement，虚拟列表渲染时就是 undefined 行
+      const forced = forcedRenderIndexRef.current;
+      if (
+        forced !== null &&
+        forced >= 0 &&
+        forced < range.count &&
+        !indices.includes(forced)
+      ) {
+        indices.push(forced);
+        indices.sort((a, b) => a - b);
+      }
       if (activeIndex >= 0 && !indices.includes(activeIndex)) {
         indices.push(activeIndex);
         indices.sort((a, b) => a - b);
@@ -142,16 +171,34 @@ export const VirtualMessageList = forwardRef<
   const positionedInitialVirtualWindowRef = useRef(false);
   const previousCountRef = useRef(viewCount);
   const previousFirstKeyRef = useRef<Key | undefined>(undefined);
-  const anchorRef = useRef<{ key: Key; viewportOffset: number } | undefined>(
-    undefined,
-  );
+  /** 虚拟分支的锚点：首个可见行的键、视口内偏移，以及它当时真实的 DOM top。 */
+  const anchorRef = useRef<
+    { key: Key; viewportOffset: number; domTop?: number } | undefined
+  >(undefined);
   /**
    * prepend 后待校正的锚点：首次对齐时新插入的行还是估计高度，实测高度陆续到位后
-   * 锚点行的起点会再移动——每一帧重新按同一锚点对齐，直到滚动位置稳定。
+   * 锚点行的位置会再移动——之后每一帧按锚点行**真实的 DOM 位置**校正，直到稳定。
+   * 估计坐标（getOffsetForIndex）与实测来回变化时不采用，只认 DOM。
    */
   const pendingAnchorRef = useRef<
-    { key: Key; viewportOffset: number; attempts: number } | undefined
+    | {
+        key: Key;
+        viewportOffset: number;
+        domTop?: number;
+        attempts: number;
+        /** 刚按估计高度跳转、渲染窗口还没跟上：下一帧才开始按 DOM 校正。 */
+        awaitingRender?: boolean;
+        /** 锚点行连续不在渲染窗口的帧数。 */
+        misses?: number;
+      }
+    | undefined
   >(undefined);
+  /** 用户在锚定期间自己滚了（滚轮 / 触摸 / 拖滚动条 / 方向键）：锚定让位。 */
+  const userScrolledRef = useRef(false);
+  const clearPendingAnchor = useCallback(() => {
+    pendingAnchorRef.current = undefined;
+    forcedRenderIndexRef.current = null;
+  }, []);
   /**
    * 静态分支（<60 组）的锚点：首个可见行的键与它相对视口顶部的位置。静态态没有测量
    * 数据，getOffsetForIndex 全是估算坐标，只能按真实 DOM 节点锚定；浏览器的原生滚动
@@ -197,6 +244,27 @@ export const VirtualMessageList = forwardRef<
     },
     [renderableViews, getItemKey, rowForView],
   );
+
+  useEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const mark = () => {
+      userScrolledRef.current = true;
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (NAVIGATION_KEYS.has(event.key)) mark();
+    };
+    viewport.addEventListener("wheel", mark, { passive: true });
+    viewport.addEventListener("touchmove", mark, { passive: true });
+    viewport.addEventListener("pointerdown", mark);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      viewport.removeEventListener("wheel", mark);
+      viewport.removeEventListener("touchmove", mark);
+      viewport.removeEventListener("pointerdown", mark);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [scrollRef]);
 
   const alignGroupToViewport = useCallback(
     (
@@ -326,9 +394,9 @@ export const VirtualMessageList = forwardRef<
       // 静态分支：没有测量数据，按真实 DOM 节点锚定（PR3）；虚拟态的 refs 清零，
       // 防「静态期锚点污染首次虚拟帧」
       anchorRef.current = undefined;
-      pendingAnchorRef.current = undefined;
+      clearPendingAnchor();
       const anchor = staticAnchorRef.current;
-      if (prepended && anchor && viewport) {
+      if (prepended && anchor && viewport && !isAtBottom) {
         const row = rowForView(renderableViews[viewIndexForKey(anchor.key)]);
         if (row) {
           const delta = row.getBoundingClientRect().top - anchor.top;
@@ -345,43 +413,68 @@ export const VirtualMessageList = forwardRef<
       // 静态 → 虚拟（prepend 跨过阈值）：把静态锚点交给虚拟分支的校正流程
       const staticAnchor = staticAnchorRef.current;
       staticAnchorRef.current = undefined;
-      if (prepended && staticAnchor && viewport) {
+      if (prepended && staticAnchor && viewport && !isAtBottom) {
         const anchorViewIndex = viewIndexForKey(staticAnchor.key);
         if (anchorViewIndex >= 0) {
           anchorRef.current = {
             key: staticAnchor.key,
             viewportOffset:
               staticAnchor.top - viewport.getBoundingClientRect().top,
+            domTop: staticAnchor.top,
           };
         }
       }
     }
 
     const anchor = anchorRef.current;
-    if (prepended && anchor) {
-      pendingAnchorRef.current = { ...anchor, attempts: 0 };
-    }
-
-    // 锚点校正（PR3）：首次对齐用的是估计高度；新行实测后按同一锚点再对齐，直到稳定
-    const pending = pendingAnchorRef.current;
-    if (pending) {
-      const anchorViewIndex = viewIndexForKey(pending.key);
-      const anchorStart =
+    // 贴底时到达的「前面多出来的行」是流式 values 事件送来的整段历史（或追加），
+    // 不是用户在顶部点「加载更多」：交给 stick-to-bottom 继续贴底，不锚定
+    if (prepended && anchor && !isAtBottom) {
+      pendingAnchorRef.current = {
+        ...anchor,
+        attempts: 0,
+        awaitingRender: true,
+      };
+      userScrolledRef.current = false;
+      forcedRenderIndexRef.current = viewIndexForKey(anchor.key);
+      // 先按估计高度把锚点行拉回渲染窗口；实测高度到位后由下面的校正按 DOM 修正
+      const anchorViewIndex = viewIndexForKey(anchor.key);
+      const estimated =
         anchorViewIndex >= 0
           ? virtualizer.getOffsetForIndex(anchorViewIndex, "start")?.[0]
           : undefined;
-      if (anchorStart === undefined) {
-        pendingAnchorRef.current = undefined;
+      if (estimated !== undefined) {
+        virtualizer.scrollToOffset(estimated - anchor.viewportOffset, {
+          behavior: "auto",
+        });
+      }
+    }
+
+    const pending = pendingAnchorRef.current;
+    if (pending?.awaitingRender) {
+      // 刚跳转：渲染窗口还没跟上，下一帧再量
+      pending.awaitingRender = false;
+    } else if (pending && userScrolledRef.current) {
+      // 用户已经接手：不再校正
+      clearPendingAnchor();
+    } else if (pending) {
+      const row = rowForView(renderableViews[viewIndexForKey(pending.key)]);
+      if (!row || !viewport) {
+        // 锚点行暂时不在渲染窗口：给渲染两三帧，再不在就不校正
+        pending.misses = (pending.misses ?? 0) + 1;
+        if (pending.misses > 2) clearPendingAnchor();
       } else {
-        const target = anchorStart - pending.viewportOffset;
-        const current = scrollRef.current?.scrollTop ?? 0;
-        if (Math.abs(current - target) <= 1) {
-          pendingAnchorRef.current = undefined;
+        const desiredTop =
+          pending.domTop ??
+          viewport.getBoundingClientRect().top + pending.viewportOffset;
+        const delta = row.getBoundingClientRect().top - desiredTop;
+        if (Math.abs(delta) <= 1) {
+          clearPendingAnchor();
         } else {
-          virtualizer.scrollToOffset(target, { behavior: "auto" });
+          viewport.scrollTop += delta;
           pending.attempts += 1;
           if (pending.attempts >= PREPEND_ANCHOR_MAX_ADJUSTMENTS) {
-            pendingAnchorRef.current = undefined;
+            clearPendingAnchor();
           }
         }
       }
@@ -390,14 +483,18 @@ export const VirtualMessageList = forwardRef<
     const scrollOffset = virtualizer.scrollOffset ?? 0;
     const firstVisible = virtualItems.find((item) => item.end >= scrollOffset);
     if (firstVisible) {
+      const row = rowForView(renderableViews[firstVisible.index]);
       anchorRef.current = {
         key: firstVisible.key,
         viewportOffset: firstVisible.start - scrollOffset,
+        domTop: row?.getBoundingClientRect().top ?? undefined,
       };
     }
   }, [
+    clearPendingAnchor,
     firstVisibleStaticAnchor,
     getItemKey,
+    isAtBottom,
     renderableViews,
     rowForView,
     scrollRef,
