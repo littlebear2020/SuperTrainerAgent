@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  CheckCircle2,
-  Loader2,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Loader2, Pencil, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -39,10 +30,7 @@ import {
   getStallWarning,
 } from "@/core/video-gen/hooks";
 import { recomposeActionFor } from "@/core/video-gen/resume-actions";
-import {
-  getVideoTaskStatusLabel,
-  isTerminalVideoTaskStatus,
-} from "@/core/video-gen/task-status-label";
+import { isTerminalVideoTaskStatus } from "@/core/video-gen/task-status-label";
 import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import {
@@ -55,58 +43,11 @@ import { WORK_CAPABILITIES } from "@/core/workspace/work-capabilities";
 import { cn } from "@/lib/utils";
 
 import { CompletedVideoGrid } from "./completed-video-grid";
+import { StatusBadge } from "./status-badge";
 import { TaskThumbnail } from "./task-thumbnail";
 export { CreateTaskDialog, TYPE_CONFIG } from "./video-gen-create-dialog";
 export { TaskThumbnail } from "./task-thumbnail";
-
-// ── Status badges ───────────────────────────────────────────────────────
-
-/** 活跃态标签；通用 composing 显示「合成中」，主动重合成按钮自行显示 pending 文案。 */
-export function getActiveStatusLabel(status: string): string {
-  if (status === "running") return "处理中";
-  if (status === "composing") return "合成中";
-  return "排队中";
-}
-
-export function StatusBadge({
-  status,
-  progress,
-}: {
-  status: string;
-  progress?: number;
-}) {
-  // Variant (color + icon) selection kept here; the LABEL string comes from the
-  // shared helper so list + detail can never diverge.
-  const draftReady = status === "draft" && (progress ?? 0) >= 100;
-  const variant =
-    status === "ready"
-      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-      : status === "failed"
-        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-        : draftReady
-          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-          : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
-  const Icon =
-    status === "ready"
-      ? CheckCircle2
-      : status === "failed"
-        ? XCircle
-        : draftReady
-          ? Pencil
-          : Loader2;
-  const spin = !(status === "ready" || status === "failed" || draftReady);
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-        variant,
-      )}
-    >
-      <Icon className={cn("h-3 w-3", spin && "animate-spin")} />
-      {getVideoTaskStatusLabel(status, progress)}
-    </span>
-  );
-}
+export { getActiveStatusLabel, StatusBadge } from "./status-badge";
 
 // ── Task card ───────────────────────────────────────────────────────────
 
