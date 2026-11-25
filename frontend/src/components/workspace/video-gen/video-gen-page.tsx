@@ -16,23 +16,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { AgentConversationGrid } from "@/components/workspace/video-gen/agent-conversation-grid";
 import { CourseProjectDialog } from "@/components/workspace/video-gen/course-project-dialog";
 import { CourseProjectPage } from "@/components/workspace/video-gen/course-project-page";
 import { RecomposeConfirmDialog } from "@/components/workspace/video-gen/video-gen-recompose-dialog";
+import { WorkGrid } from "@/components/workspace/video-gen/work-grid";
 import { useI18n } from "@/core/i18n/hooks";
+import { pathOfThread } from "@/core/threads/utils";
 import { formatDateTime } from "@/core/utils/datetime";
 import { formatCost } from "@/core/utils/format";
 import {
+  getStallWarning,
   useDeleteVideoTask,
   useRecomposeTask,
-  useVideoTasks,
-  getStallWarning,
 } from "@/core/video-gen/hooks";
 import { recomposeActionFor } from "@/core/video-gen/resume-actions";
 import { isTerminalVideoTaskStatus } from "@/core/video-gen/task-status-label";
 import { videoTaskTypeLabel } from "@/core/video-gen/task-type-label";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
+import { useWorks } from "@/core/works/hooks";
 import {
   buildVideoAssetsHref,
   DEFAULT_WORK_CAPABILITY,
@@ -42,7 +43,6 @@ import {
 import { WORK_CAPABILITIES } from "@/core/workspace/work-capabilities";
 import { cn } from "@/lib/utils";
 
-import { CompletedVideoGrid } from "./completed-video-grid";
 import { StatusBadge } from "./status-badge";
 import { TaskThumbnail } from "./task-thumbnail";
 export { CreateTaskDialog, TYPE_CONFIG } from "./video-gen-create-dialog";
@@ -224,21 +224,27 @@ export function TaskCard({
 // 常量）移至 video-gen-create-dialog.tsx；本模块 re-export 保既有导入方（测试/e2e）。
 // ── Main page ───────────────────────────────────────────────────────────
 
-function VideoWorkPanel({ workType }: { workType: "ai_image" | "ai_video" }) {
+function WorksView({ capability }: { capability: WorkCapability }) {
   const router = useRouter();
-  const tasksQuery = useVideoTasks();
+  const { works, isLoading, isError, refetch } = useWorks(capability);
   const deleteTask = useDeleteVideoTask();
   return (
-    <CompletedVideoGrid
-      workType={workType}
-      tasks={tasksQuery.data ?? []}
-      isLoading={tasksQuery.isLoading}
-      isError={tasksQuery.isError}
-      onRetry={() => void tasksQuery.refetch()}
+    <WorkGrid
+      key={capability}
+      works={works}
+      capability={capability}
+      isLoading={isLoading}
+      isError={isError}
+      onRetry={refetch}
+      onContinue={(work) => {
+        if (work.source.kind === "agent") {
+          router.push(pathOfThread(work.source.thread));
+        }
+      }}
       onDelete={(id) => deleteTask.mutate(id)}
-      onNavigate={(id, path) =>
+      onTaskNavigate={(task, path) =>
         router.push(
-          `/workspace/video-gen/${id}${path === "storyboard" ? "/storyboard" : ""}`,
+          `/workspace/video-gen/${task.id}${path === "storyboard" ? "/storyboard" : ""}`,
         )
       }
     />
@@ -305,7 +311,12 @@ export function VideoGenPage() {
       <div className="mx-auto w-full max-w-6xl space-y-6">
         {route.tab === "works" && selectedCapability ? (
           <div className="space-y-6">
-            <h1 className="text-lg font-bold">{t.sidebar.myWorks}</h1>
+            <div className="space-y-2">
+              <h1 className="text-lg font-bold">{t.sidebar.myWorks}</h1>
+              <p className="text-muted-foreground text-sm">
+                {t.workspace.works.description}
+              </p>
+            </div>
             <div className="space-y-5">
               <div
                 id="work-capability-tabs"
@@ -355,18 +366,7 @@ export function VideoGenPage() {
                 role="tabpanel"
                 aria-labelledby={`work-capability-tab-${selectedCapability.id}`}
               >
-                {selectedCapability.kind === "agent" ? (
-                  <AgentConversationGrid
-                    agentName={selectedCapability.agentName}
-                    label={
-                      t.workspace.home.courseItems[selectedCapability.id].title
-                    }
-                  />
-                ) : (
-                  <VideoWorkPanel
-                    workType={selectedCapability.initialTaskType}
-                  />
-                )}
+                <WorksView capability={selectedCapability.id} />
               </div>
             </div>
           </div>

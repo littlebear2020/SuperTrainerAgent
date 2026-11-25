@@ -24,18 +24,35 @@ function seedVideo(
 async function reviewWorkCards(page: Page, cardTestId: string, columns: 1 | 3) {
   const cards = page.getByTestId(cardTestId);
   await expect(cards).toHaveCount(3);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-    ),
-  ).toBe(true);
   const metrics = await cards.evaluateAll((elements) =>
+    elements.map((element) => {
+      const card = element.getBoundingClientRect();
+      const gridRight =
+        element.parentElement?.getBoundingClientRect().right ?? card.right;
+      const actions = element.querySelector<HTMLElement>(
+        "[data-testid='work-card-actions']",
+      );
+      return {
+        fitsHorizontally:
+          element.scrollWidth <= element.clientWidth + 1 &&
+          card.right <= gridRight + 1,
+        actionsFit: actions
+          ? actions.scrollWidth <= actions.clientWidth + 1
+          : false,
+      };
+    }),
+  );
+  for (const metric of metrics) {
+    expect(metric.fitsHorizontally).toBe(true);
+    expect(metric.actionsFit).toBe(true);
+  }
+  const cardMetrics = await cards.evaluateAll((elements) =>
     elements.map((element) => {
       const card = element.getBoundingClientRect();
       const media = element.firstElementChild?.getBoundingClientRect();
       const action = element
-        .querySelector("button")
-        ?.parentElement?.getBoundingClientRect();
+        .querySelector("[data-testid='work-card-actions']")
+        ?.getBoundingClientRect();
       return {
         left: card.left,
         top: card.top,
@@ -46,28 +63,30 @@ async function reviewWorkCards(page: Page, cardTestId: string, columns: 1 | 3) {
       };
     }),
   );
-  for (const metric of metrics) {
+  for (const metric of cardMetrics) {
     expect(metric.mediaWidth).toBeGreaterThan(0);
     expect(
       Math.abs(metric.mediaWidth / metric.mediaHeight - 16 / 9),
     ).toBeLessThan(0.02);
   }
   if (columns === 3) {
-    for (const metric of metrics.slice(1)) {
-      expect(Math.abs(metric.top - metrics[0]!.top)).toBeLessThanOrEqual(1);
-      expect(Math.abs(metric.height - metrics[0]!.height)).toBeLessThanOrEqual(
-        1,
-      );
+    for (const metric of cardMetrics.slice(1)) {
+      expect(Math.abs(metric.top - cardMetrics[0]!.top)).toBeLessThanOrEqual(1);
       expect(
-        Math.abs(metric.actionBottom - metrics[0]!.actionBottom),
+        Math.abs(metric.height - cardMetrics[0]!.height),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(metric.actionBottom - cardMetrics[0]!.actionBottom),
       ).toBeLessThanOrEqual(1);
     }
   } else {
-    for (const metric of metrics.slice(1)) {
-      expect(Math.abs(metric.left - metrics[0]!.left)).toBeLessThanOrEqual(1);
+    for (const metric of cardMetrics.slice(1)) {
+      expect(Math.abs(metric.left - cardMetrics[0]!.left)).toBeLessThanOrEqual(
+        1,
+      );
     }
-    expect(metrics[1]!.top).toBeGreaterThan(metrics[0]!.top);
-    expect(metrics[2]!.top).toBeGreaterThan(metrics[1]!.top);
+    expect(cardMetrics[1]!.top).toBeGreaterThan(cardMetrics[0]!.top);
+    expect(cardMetrics[2]!.top).toBeGreaterThan(cardMetrics[1]!.top);
   }
 }
 
@@ -112,6 +131,14 @@ test.describe("six work capabilities", () => {
     });
     seedVideo("image-work", "真实图片作品", "ai_image");
     seedVideo("video-work", "真实视频作品", "ai_video");
+    api.seedTask({
+      id: "vimax-work",
+      title: "ViMax 故事",
+      status: "ready",
+      progress: 100,
+      task_type: "vimax",
+      updated_at: "2026-11-02T09:00:00Z",
+    });
 
     await page.goto("/workspace/video-gen");
     await expect(
@@ -138,6 +165,11 @@ test.describe("six work capabilities", () => {
         .getByText("真实视频作品", { exact: true }),
     ).toBeVisible();
     await expect(page).toHaveURL(/capability=ai_video/);
+    await expect(
+      page
+        .locator("#work-capability-panel-ai_video")
+        .getByRole("heading", { name: "ViMax 故事", exact: true }),
+    ).toBeVisible();
 
     await page.getByRole("tab", { name: "课程海报", exact: true }).click();
     await expect(
@@ -257,10 +289,7 @@ test.describe("six work capabilities", () => {
         );
       }
 
-      const cardTestId =
-        item.kind === "agent"
-          ? "agent-conversation-card"
-          : "completed-work-card";
+      const cardTestId = item.kind === "agent" ? "work-card" : "work-card";
       await page.setViewportSize({ width: 1440, height: 1000 });
       await page.goto(
         `/workspace/video-gen?tab=works&capability=${item.capability}`,
@@ -305,11 +334,11 @@ test.describe("six work capabilities", () => {
     });
 
     await page.goto("/workspace/video-gen");
-    await expect(page.getByTestId("agent-conversation-card")).toHaveCount(6);
+    await expect(page.getByTestId("work-card")).toHaveCount(6);
     await page
-      .getByRole("searchbox", { name: "搜索对话标题" })
+      .getByRole("searchbox", { name: "搜索作品标题与文件名" })
       .fill("  oFFsEt 五十目标  ");
-    await expect(page.getByTestId("agent-conversation-card")).toHaveCount(1);
+    await expect(page.getByTestId("work-card")).toHaveCount(1);
     await expect(
       page
         .locator("#work-capability-tabs + [role='tabpanel']")
@@ -350,19 +379,23 @@ test.describe("six work capabilities", () => {
     await expect(
       page
         .locator("#work-capability-tabs + [role='tabpanel']")
-        .getByText("对话加载失败，请稍后重试"),
+        .getByText("作品加载失败，请稍后重试"),
     ).toBeVisible({
       timeout: 15000,
     });
     await expect(
       page
         .locator("#work-capability-tabs + [role='tabpanel']")
-        .getByText("暂无语音播客对话"),
+        .getByText("暂无语音播客作品"),
     ).toHaveCount(0);
-    await expect(page.getByTestId("agent-conversation-card")).toHaveCount(0);
+    await expect(page.getByTestId("work-card")).toHaveCount(0);
 
     fail = false;
-    await page.getByRole("button", { name: "重试", exact: true }).click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "作品加载失败" })
+      .getByRole("button", { name: "重试", exact: true })
+      .click();
     await expect(
       page
         .locator("#work-capability-tabs + [role='tabpanel']")
@@ -371,7 +404,7 @@ test.describe("six work capabilities", () => {
     await expect(
       page
         .locator("#work-capability-tabs + [role='tabpanel']")
-        .getByText("对话加载失败，请稍后重试"),
+        .getByText("作品加载失败，请稍后重试"),
     ).toHaveCount(0);
   });
 });

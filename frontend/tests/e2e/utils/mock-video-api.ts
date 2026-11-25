@@ -21,6 +21,13 @@ export interface MockVideoTask {
   updated_at?: string;
   thumbnail_url?: string | null;
   artifact_missing?: boolean;
+  delivery?: {
+    file_name: string;
+    file_size: number | null;
+    file_updated_at: string | null;
+    media_kind: "video" | "image" | "audio" | "document" | "other";
+    exists: boolean;
+  } | null;
   error_message?: string | null;
   dirty_frames?: number[];
   course_project_id?: string | null;
@@ -195,6 +202,7 @@ function brief(task: MockVideoTask) {
     updated_at: task.updated_at ?? null,
     thumbnail_url: task.thumbnail_url ?? null,
     artifact_missing: task.artifact_missing ?? false,
+    delivery: task.delivery,
     cost: null,
     currency: null,
     course_project_id: task.course_project_id ?? null,

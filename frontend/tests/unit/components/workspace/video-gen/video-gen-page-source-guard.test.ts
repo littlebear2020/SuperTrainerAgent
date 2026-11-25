@@ -6,8 +6,8 @@ const page = readFileSync(
   "src/components/workspace/video-gen/video-gen-page.tsx",
   "utf8",
 );
-const grid = readFileSync(
-  "src/components/workspace/video-gen/completed-video-grid.tsx",
+const card = readFileSync(
+  "src/components/workspace/video-gen/work-card.tsx",
   "utf8",
 );
 const thumbnail = readFileSync(
@@ -36,11 +36,11 @@ describe("video-gen-page extraction source guards", () => {
   it("wires works operations without moving per-card hooks into a map", () => {
     expect(page).toContain("useDeleteVideoTask()");
     expect(page).toContain("onDelete={");
-    expect(page).toContain("onNavigate={");
-    expect(grid).toContain("function CompletedWorkCard(");
-    expect(grid).toContain("useRecomposeTask(task.id");
-    expect(grid).toContain("videoTaskTypeLabel(task.task_type)");
-    expect(grid).not.toContain("function workTypeLabel(");
-    expect(grid).not.toContain(".map((task) => useRecomposeTask");
+    expect(page).toContain("onTaskNavigate={");
+    expect(card).toContain("function TaskWorkActions(");
+    expect(card).toContain("useRecomposeTask(task.id");
+    expect(card).toContain("videoTaskTypeLabel(task.task_type)");
+    expect(card).not.toContain("function workTypeLabel(");
+    expect(card).not.toContain(".map((task) => useRecomposeTask");
   });
 });
