@@ -51,6 +51,7 @@
 - 批次门禁（第 2 轮修复后重跑）：`make -C frontend check` → exit 0（ESLint `120 problems (0 errors, 120 warnings)` 存量，其余同上，i18n `682 个叶子全活`）；全量 `cd frontend && pnpm exec vitest run` → `Test Files 304 passed (304)`、`Tests 2111 passed (2111)`；`pnpm exec playwright test` 全量 → `181 passed, 3 skipped (3.6m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[thread_id]` JS 3581417 B、CSS 255804 B）。
 - 第 3 轮评审修复 RED → GREEN（把三个源文件临时换回修复前的版本跑同一组用例）：`write-file-content-state.dom.test.ts` → 原始串非法但 result 已到 `expected { status: 'pending' } to deeply equal { status: 'ready', content: '正文' }`；`artifact-file-detail-write-file.dom.test.tsx` → 重载后没有失效查询 `expected "vi.fn()" to be called with arguments: [ { queryKey: [ 'artifact', …(3) ] } ]`；`write-file-auto-open.dom.test.tsx` → 半截参数的步骤仍带手型 `expected 'cursor-pointer' not to contain 'cursor-pointer'`。修复后 artifacts + messages + app 回归集 `Test Files 33 passed (33)`、`Tests 205 passed (205)`。
 - 批次门禁（第 3 轮修复后重跑）：`make -C frontend check` → exit 0（ESLint `120 problems (0 errors, 120 warnings)` 存量，其余同上，i18n `682 个叶子全活`）；全量 `cd frontend && pnpm exec vitest run` → `Test Files 304 passed (304)`、`Tests 2116 passed (2116)`；`pnpm exec playwright test` 全量 → `181 passed, 3 skipped (1.6m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[thread_id]` JS 3581531 B、CSS 255804 B）。
+- 合并前的第 4 轮评审（`23c9e4b7`，超出评审轮次上限，只留处置评论、未再推送）：8 条 = 1 medium + 7 low，无 high。medium「settled 后当前文件不再刷新」不成立——每次 run 结束时 PR3 的 onFinish 会失效所有活跃的 `"artifact"` 查询（`core/threads/hooks.ts`，P2-15），用临时用例实测重载后再 GET 一次、正文更新（用例未提交）；7 条 low 成立但不阻塞，已登记 `docs/findings-backlog.md`。处置见 [PR #62 评论](https://github.com/littlebear2020/SuperTrainerAgent/pull/62#issuecomment-7162256215)。
 - 每个代码提交前 `pre-commit run --files <改动文件>` → eslint / prettier / gitleaks 全 Passed。
 
 ## 未验证项
@@ -60,6 +61,7 @@
 - append / str_replace 显示的是文件**当前**内容，不是那次调用之后的历史版本——这是有意的取舍（不为还原历史版本写文件操作回放器），计划 Interfaces 已写明。
 - 像素 / 交互断言只在 Chromium（Playwright）里验证。
 - 未部署，未跑 `tests/e2e/live/**`。
+- 视频的旧 ready 停机、A/B 操作代际归属、超长队列恢复与产物代际刷新（E1）不在本批，也不在本 PR 宣称修复：另立计划 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md` 承接。
 
 ## 配置与回滚
 

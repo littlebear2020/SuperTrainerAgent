@@ -63,6 +63,7 @@
 - 批次门禁（第 3 轮修复后重跑）：`make -C frontend check` → exit 0（ESLint `120 problems (0 errors, 120 warnings)` 存量，`tsc --noEmit`、`prettier --check`、knip 随 `&&` 链通过，i18n `673 个叶子全活`）；全量 `cd frontend && pnpm exec vitest run` → `Test Files 300 passed (300)`、`Tests 2053 passed (2053)`；`pnpm exec playwright test` 全量 → `168 passed, 3 skipped (1.9m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[thread_id]` JS 3574500 B、CSS 255804 B）。
 - 第 4 轮评审修复 RED → GREEN：`pnpm exec playwright test tests/e2e/chat-thread-recovery.spec.ts -g "scroll anchoring"` 新增 5 条像素用例（首行相对滚动容器的位置 ≤4px），修前 3 条失败——「两次加载之间滚动过」`Expected: <= 4  Received: 36`，「量完锚点后视口下移 80px」静态 / 虚拟各一条 `Received: 80`；静态分支贴顶 prepend 与 56 + 6 组跨阈值两条在修前即通过（前者作回归守卫，后者证伪评审「过渡帧不校正」）。修复后 11 passed，`--repeat-each=3 --workers=2` → `33 passed`。`pnpm exec vitest run tests/unit/core/threads/recovery.dom.test.ts -t classifyStreamError` → `expected 'stale_run' to be 'business'`，修复后回归集 `pnpm exec vitest run tests/unit/core/threads tests/unit/core/tasks tests/unit/components/workspace/messages` → `Test Files 39 passed (39)`、`Tests 268 passed (268)`。
 - 批次门禁（第 4 轮修复后重跑）：`make -C frontend check` → exit 0（ESLint `120 problems (0 errors, 120 warnings)` 存量，其余同上，i18n `673 个叶子全活`）；全量 `cd frontend && pnpm exec vitest run` → `Test Files 300 passed (300)`、`Tests 2053 passed (2053)`；`pnpm exec playwright test` 全量 → `173 passed, 3 skipped (2.0m)`（比上一轮多的 5 条是锚定像素用例）；`pnpm perf:check` → exit 0（`/workspace/chats/[thread_id]` JS 3574726 B、CSS 255804 B）。
+- 合并后的第 5 轮评审（`734cabe5`，超出评审轮次上限，只留处置评论、未再推送）：13 条 = 2 medium + 10 low + 1 条与历史重叠。medium「重连单飞的释放窗口」不成立（SDK 的 `stream.start` 挂上队列即返回，`enqueue` 在同一微任务段先置 `isLoading`，点击是宏任务，落不进这个窗口）；medium「`loadRun` 失败路径不校验 epoch」与 3 条 low 成立但不阻塞，已登记 `docs/findings-backlog.md`。处置见 [PR #60 评论](https://github.com/littlebear2020/SuperTrainerAgent/pull/60#issuecomment-7166240528)。
 - 每个代码提交前 `pre-commit run --files <改动文件>` → eslint / prettier / gitleaks 全 Passed；`pnpm exec eslint . --ext .ts,.tsx --prune-suppressions` → exit 0，`0 errors, 120 warnings`（存量）。
 
 ## 未验证项
@@ -74,6 +75,7 @@
 - 用户在首次水合的约 300ms 平滑落底动画期间上翻，动画可能把视口拉回底部（`resize="smooth"` 是 registry 的 `Conversation` 默认值，本批不改 registry）。
 - 「用户接手」的判定里滚动条按 16px 固定宽度推断：overlay 滚动条（macOS 默认）宽度为 0，校正进行的那几帧内按在容器右 / 下 16px 区域会被当成拖滚动条而提前放弃校正。评审第 4 轮 low 已知未修（需要配套的几何用例），登记到 findings backlog。
 - 未部署，未跑 `tests/e2e/live/**`。
+- 视频的旧 ready 停机、A/B 操作代际归属、超长队列恢复与产物代际刷新（E1）不在本批，也不在本 PR 宣称修复：另立计划 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md` 承接。
 
 ## 配置与回滚
 

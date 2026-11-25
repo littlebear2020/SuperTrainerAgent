@@ -63,6 +63,7 @@
 - 取消失败后的重试入口、`running→interrupted` 的有界同步由 PR3 提供；本批只保证取消结果可等待、失败提示一次、不伪造终态。
 - 上传空闲超时只在 vitest 用假 XHR 与假计时器验证 120 秒边界，未在真实慢网络下实测。
 - 未部署，未跑 `tests/e2e/live/**`。
+- 视频的旧 ready 停机、A/B 操作代际归属、超长队列恢复与产物代际刷新（E1）不在本批，也不在本 PR 宣称修复：另立计划 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md` 承接。
 
 ## 配置与回滚
 
