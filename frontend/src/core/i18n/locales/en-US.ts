@@ -930,6 +930,15 @@ export const enUS: Translations = {
     uploadingFiles: "Uploading files, please wait...",
   },
 
+  // Conversation recovery entry points (PR3: reconnect after a drop, retry a failed stop)
+  recovery: {
+    disconnected: "Connection lost — the task may still be running",
+    reconnect: "Reconnect",
+    reconnecting: "Reconnecting…",
+    cancelFailed: "Could not stop — the task may still be running",
+    retryCancel: "Retry stop",
+  },
+
   subtasks: {
     subtask: "Subtask",
     executing: (count: number) =>

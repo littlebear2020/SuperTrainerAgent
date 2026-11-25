@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
 import { getAPIClient } from "../api";
-import { cancelRun } from "../api/api-client";
+import { type CancelOutcome, cancelRun } from "../api/api-client";
 import { fetch } from "../api/fetcher";
 import { getBackendBaseURL } from "../config";
+import { STREAM_REJOIN_KEY_PREFIX } from "../gallery/stream-rejoin";
 import { useI18n } from "../i18n/hooks";
 import { isHiddenFromUIMessage } from "../messages/utils";
 import type { FileInMessage } from "../messages/utils";
@@ -29,6 +30,13 @@ import {
   SEND_NOT_ACCEPTED_MESSAGE,
   SEND_STOPPED_MESSAGE,
 } from "./errors";
+import {
+  CANCEL_WAIT_LIMIT_MS,
+  classifyStreamError,
+  isRecoverableDisconnect,
+  isTerminalRunStatus,
+  withTimeout,
+} from "./recovery";
 import {
   createSubmission,
   SendRejectedError,
@@ -233,12 +241,21 @@ export function useThreadStream({
   const stopRequestedRef = useRef(false);
   /** 取消请求在途：SDK 流收尾的 effect 不抢先结案 */
   const cancelPendingRef = useRef(false);
+  /** 取消失败（含等待超时）：保留可重试的目标，恢复入口的重试即再次调用同一 cancel。 */
+  const [cancelFailure, setCancelFailure] = useState<{
+    threadId: string;
+    runId: string;
+  } | null>(null);
+  /** 手动重连单飞：按 (threadId, runId) 记在途，SDK 流收尾时清空。 */
+  const reconnectInFlightRef = useRef(new Set<string>());
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const {
     messages: history,
     hasMore: hasMoreHistory,
     loadMore: loadMoreHistory,
     refetchRun: refetchRunHistory,
+    refetchRunIfStale: refetchRunIfStaleHistory,
     messageRunIds,
     runsById,
     loading: isHistoryLoading,
@@ -448,15 +465,36 @@ export function useThreadStream({
       ) {
         setOptimisticMessages([]);
       }
+      const errorKind = classifyStreamError(error);
+      const onCurrentThread =
+        !meta?.thread_id || meta.thread_id === threadIdRef.current;
       // Stale run reconnection: the run no longer exists on the server
       // (restart / multi-worker / cleanup).  Clean up the stored run-id so
       // the next mount doesn't retry, and skip the error toast since the
       // thread history still loads correctly via fetchStateHistory.
-      if (errorMsg.includes("not found") || /HTTP\s*404/i.test(errorMsg)) {
+      if (errorKind === "stale_run") {
         if (typeof window !== "undefined" && onStreamThreadId) {
-          window.sessionStorage.removeItem(`lg:stream:${onStreamThreadId}`);
+          window.sessionStorage.removeItem(
+            `${STREAM_REJOIN_KEY_PREFIX}${onStreamThreadId}`,
+          );
+        }
+        // 没有可重连的 run：放掉「当前 run」，并失效 runs 与历史分片（PR3）
+        if (onCurrentThread) {
+          setActiveRun((current) =>
+            !meta?.run_id || current?.runId === meta.run_id ? null : current,
+          );
+          void queryClient
+            .invalidateQueries({ queryKey: ["thread", threadIdRef.current] })
+            .catch(() => undefined);
         }
         return;
+      }
+      if (errorKind === "connection" && onCurrentThread) {
+        // 断线：runs 列表有界刷新一次——服务端的 run 若已结束，重连入口随之收起，
+        // 分片由下方「终态重取」effect 补齐
+        void queryClient
+          .invalidateQueries({ queryKey: ["thread", threadIdRef.current] })
+          .catch(() => undefined);
       }
       // 原始 error 带 status；errorMsg 兜住 SDK 嵌套形态（{error: Error}）里的后端 detail 文案。
       if (friendly) {
@@ -531,6 +569,8 @@ export function useThreadStream({
   // 收尾（如停止导致的 AbortError 不回调），按是否请求过停止来结案。
   useEffect(() => {
     if (thread.isLoading) return;
+    // SDK 流收尾：手动重连的单飞记录随之清空（下一次重连是新的尝试）
+    reconnectInFlightRef.current.clear();
     // 取消请求在途：completion 等取消结果（cancelled / cancelFailed）再结案
     if (cancelPendingRef.current) return;
     const current = currentSubmissionRef.current;
@@ -863,18 +903,63 @@ export function useThreadStream({
     ],
   );
 
+  /**
+   * 取消受理后的有界刷新（PR3）：失效 runs 列表，再重取该 run 的分片——服务端已把
+   * run 置为 interrupted，子任务据此记为「已取消」而不是失败。只对仍停留在该线程的
+   * 视图重取分片。
+   */
+  const syncRunAfterCancel = useCallback(
+    async (threadId: string, runId: string) => {
+      await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+      if (threadIdRef.current === threadId) await refetchRunHistory(runId);
+    },
+    [queryClient, refetchRunHistory],
+  );
+
+  /** 一次显式取消的结果处理：失败（含等待超时）→ 提示并保留可重试目标；受理 → 有界刷新。 */
+  const applyCancelOutcome = useCallback(
+    async (threadId: string, runId: string) => {
+      let outcome: CancelOutcome;
+      try {
+        // wait=true 要等服务端终态；卡死 / 半开时不能让 busy 锁永远不放
+        outcome = await withTimeout(
+          cancelRun(threadId, runId),
+          CANCEL_WAIT_LIMIT_MS,
+          () =>
+            new Error(
+              `停止超时：服务端 ${CANCEL_WAIT_LIMIT_MS / 1000} 秒内没有确认停止`,
+            ),
+        );
+      } catch (error) {
+        outcome = { status: "failed", error };
+      }
+      if (outcome.status === "failed") {
+        toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
+        setCancelFailure({ threadId, runId });
+      } else {
+        setCancelFailure(null);
+        if (outcome.status === "cancelled") {
+          await syncRunAfterCancel(threadId, runId).catch((error: unknown) => {
+            console.error("Failed to refresh run after cancel", error);
+          });
+        }
+      }
+      return outcome;
+    },
+    [syncRunAfterCancel],
+  );
+
   /** 已受理的 run：等可等待的 cancel，结果写入 submission 的 completion。 */
   const cancelAcceptedRun = useCallback(
     async (submission: Submission) => {
       if (!submission.runId) return;
       cancelPendingRef.current = true;
       try {
-        const outcome = await cancelRun(
+        const outcome = await applyCancelOutcome(
           submission.threadId ?? submission.requestedThreadId,
           submission.runId,
         );
         if (outcome.status === "failed") {
-          toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
           completeSubmission(submission, {
             status: "cancelFailed",
             error: outcome.error,
@@ -886,8 +971,14 @@ export function useThreadStream({
         cancelPendingRef.current = false;
       }
     },
-    [completeSubmission],
+    [applyCancelOutcome, completeSubmission],
   );
+
+  /** 恢复入口的「重试停止」：再次调用同一 cancel（PR3）。 */
+  const retryCancel = useCallback(async () => {
+    if (!cancelFailure) return;
+    await applyCancelOutcome(cancelFailure.threadId, cancelFailure.runId);
+  }, [applyCancelOutcome, cancelFailure]);
 
   /**
    * 停止当前 run（PR2）：受理前的 submission 由这里直接以 stopped reject（中止上传，
@@ -920,6 +1011,66 @@ export function useThreadStream({
       }
     }
   }, [thread, rejectSubmission, cancelAcceptedRun]);
+
+  // ── PR3：断线恢复 owner ───────────────────────────────────────────────
+  const activeRunStatus = activeRunId
+    ? runsById[activeRunId]?.status
+    : undefined;
+  // 流断了、run 可能还在服务端跑：才给重连入口
+  const recoverableDisconnect = isRecoverableDisconnect({
+    error: thread.error,
+    isLoading: thread.isLoading,
+    hasRun: activeRunId !== null,
+    runStatus: activeRunStatus,
+  });
+  /** 取消失败只对「仍是当前 run」有效：换了 run / 换了线程就不再是它的待办。 */
+  const cancelFailed =
+    cancelFailure !== null &&
+    cancelFailure.threadId === onStreamThreadId &&
+    cancelFailure.runId === activeRunId;
+
+  /**
+   * 用户在连接类错误后手动重连（PR3）：按 (threadId, runId) 单飞；SDK 流在途（含
+   * mount 自动 rejoin）时不重复 join——自动恢复归 SDK。join 的 Promise 只表示排队，
+   * 连接结果由 onFinish / onError 驱动，这里不判定成功。stale run 404 由 onError
+   * 清 key 并失效 runs / history；业务 4xx 不进这里。
+   */
+  const reconnectActiveRun = useCallback(async () => {
+    const runId = activeRunId;
+    const currentThreadId = threadIdRef.current;
+    if (!runId || !currentThreadId) return;
+    if (thread.isLoading) return;
+    const key = `${currentThreadId}:${runId}`;
+    if (reconnectInFlightRef.current.has(key)) return;
+    reconnectInFlightRef.current.add(key);
+    setIsReconnecting(true);
+    try {
+      await thread.joinStream(runId);
+    } catch (error) {
+      if (classifyStreamError(error) !== "aborted") {
+        toast.error(getStreamErrorMessage(error));
+      }
+    } finally {
+      setIsReconnecting(false);
+    }
+  }, [activeRunId, thread]);
+
+  // 流出错收尾后，run 在服务端已走到终态（runs 列表刷新得知）：没有 onFinish 替它
+  // 重取分片，这里按新鲜度补取一次，断线期间产生的尾段消息才不会丢
+  useEffect(() => {
+    if (!activeRunId || thread.isLoading || !thread.error) return;
+    const run = runsById[activeRunId];
+    if (!run || !isTerminalRunStatus(run.status)) return;
+    void refetchRunIfStaleHistory(run.run_id).catch((error: unknown) => {
+      console.error("Failed to refetch settled run history", error);
+    });
+  }, [
+    activeRunId,
+    thread.isLoading,
+    thread.error,
+    runsById,
+    refetchRunIfStaleHistory,
+  ]);
 
   // Memoized so the merged array keeps a stable identity between renders that
   // don't actually change messages. Consumers put this array in effect deps
@@ -954,6 +1105,13 @@ export function useThreadStream({
     runsById,
     /** 当前流所属的 run（SDK onCreated 回传）；没有在途 / 历史流时为 null。 */
     activeRunId,
+    /** 流因连接类错误收尾、run 可能仍在服务端运行：给重连入口。 */
+    isRecoverableDisconnect: recoverableDisconnect,
+    reconnectActiveRun,
+    isReconnecting,
+    /** 最近一次显式取消失败（含超时），仍是当前 run 时为 true：恢复入口提供重试。 */
+    cancelFailed,
+    retryCancel,
   } as const;
 }
 
@@ -1218,6 +1376,34 @@ export function useThreadHistory(threadId: string) {
     [queryClient, threadId, loadRun],
   );
 
+  /**
+   * 分片相对 runs 列表已过期时才重取（新鲜度判定）：加载后 run 的 status / updated_at
+   * 变了，或上次加载失败；终态且未变的 run 跳过。
+   */
+  const refetchRunIfStale = useCallback(
+    async (runId: string): Promise<void> => {
+      const run = runsRef.current?.find((r) => r.run_id === runId);
+      if (!run) return;
+      // 该 run 已有在途的加载：它写完的分片就带着当前状态，等它即可（不叠一次请求）
+      const inFlight = inFlightRef.current.get(runId);
+      if (inFlight) {
+        await inFlight;
+        return;
+      }
+      const shard = snapshot().shards.get(runId);
+      if (
+        shard &&
+        shard.fresh &&
+        shard.status === run.status &&
+        shard.updatedAt === run.updated_at
+      ) {
+        return;
+      }
+      await loadRun(run);
+    },
+    [loadRun, snapshot],
+  );
+
   // 不在 runs 列表里的分片（如被 regenerate 隐藏）在拼接时自然被过滤，不需要额外清理
   const current = state.threadId === threadId ? state : EMPTY_HISTORY_STATE;
   const orderedRuns = useMemo(() => {
@@ -1258,6 +1444,7 @@ export function useThreadHistory(threadId: string) {
     hasMore,
     loadMore,
     refetchRun,
+    refetchRunIfStale,
     loadedRunIds: current.loadedRunIds,
   } as const;
 }

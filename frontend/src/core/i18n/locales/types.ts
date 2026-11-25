@@ -597,6 +597,15 @@ export interface Translations {
     uploadingFiles: string;
   };
 
+  // Conversation recovery entry points (PR3)
+  recovery: {
+    disconnected: string;
+    reconnect: string;
+    reconnecting: string;
+    cancelFailed: string;
+    retryCancel: string;
+  };
+
   // Subtasks
   subtasks: {
     subtask: string;

@@ -18,6 +18,14 @@ const h = vi.hoisted(() => ({
   inputMounts: 0,
   inputUnmounts: 0,
   streamOptions: null as Record<string, unknown> | null,
+  messageListProps: null as Record<string, unknown> | null,
+  threadContextValue: null as Record<string, unknown> | null,
+  messageRunIds: new Map<string, string>(),
+  runsById: {} as Record<string, unknown>,
+  reconnect: vi.fn(async () => undefined),
+  retryCancel: vi.fn(async () => undefined),
+  recoverable: false,
+  cancelFailed: false,
   setThreadId: vi.fn(),
   setIsNewThread: vi.fn(),
 }));
@@ -63,6 +71,14 @@ vi.mock("@/core/threads/hooks", () => ({
       isHistoryLoading: false,
       hasMoreHistory: false,
       loadMoreHistory: vi.fn(),
+      messageRunIds: h.messageRunIds,
+      runsById: h.runsById,
+      activeRunId: "run-1",
+      isRecoverableDisconnect: h.recoverable,
+      reconnectActiveRun: h.reconnect,
+      isReconnecting: false,
+      cancelFailed: h.cancelFailed,
+      retryCancel: h.retryCancel,
     };
   },
 }));
@@ -102,8 +118,31 @@ vi.mock("@/components/workspace/chats", () => ({
 }));
 
 vi.mock("@/components/workspace/messages", () => ({
-  MessageList: () => <div data-testid="message-list" />,
+  MessageList: (props: Record<string, unknown>) => {
+    h.messageListProps = props;
+    return <div data-testid="message-list" />;
+  },
   MESSAGE_LIST_DEFAULT_PADDING_BOTTOM: 0,
+}));
+
+// 页面用 ThreadContext.Provider 提供恢复入口：这里把 value 交给用例
+vi.mock("@/components/workspace/messages/context", () => ({
+  ThreadContext: {
+    Provider: ({
+      value,
+      children,
+    }: {
+      value: unknown;
+      children: React.ReactNode;
+    }) => {
+      h.threadContextValue = value as Record<string, unknown>;
+      return children;
+    },
+  },
+  useThread: () => {
+    if (!h.threadContextValue) throw new Error("useThread outside provider");
+    return h.threadContextValue;
+  },
 }));
 
 vi.mock("@/components/workspace/agent-welcome", () => ({
@@ -196,6 +235,14 @@ describe("AgentChatPage guide wiring", () => {
     h.inputMounts = 0;
     h.inputUnmounts = 0;
     h.streamOptions = null;
+    h.messageListProps = null;
+    h.threadContextValue = null;
+    h.messageRunIds = new Map();
+    h.runsById = {};
+    h.reconnect.mockClear();
+    h.retryCancel.mockClear();
+    h.recoverable = false;
+    h.cancelFailed = false;
     h.setThreadId.mockClear();
     h.setIsNewThread.mockClear();
     h.sendMessage.mockReset();
@@ -223,6 +270,29 @@ describe("AgentChatPage guide wiring", () => {
       );
     });
   }
+
+  it("把 run 归属与恢复入口接进 MessageList / ThreadContext（PR3）", async () => {
+    h.isNew = false;
+    h.threadId = "thread-1";
+    h.recoverable = true;
+    h.cancelFailed = true;
+    h.messageRunIds = new Map([["m1", "run-1"]]);
+    h.runsById = { "run-1": { run_id: "run-1", status: "running" } };
+    await renderPage();
+
+    expect(h.messageListProps).toMatchObject({
+      messageRunIds: h.messageRunIds,
+      runsById: h.runsById,
+      activeRunId: "run-1",
+    });
+    expect(h.threadContextValue?.recovery).toMatchObject({
+      isRecoverableDisconnect: true,
+      isReconnecting: false,
+      reconnect: h.reconnect,
+      cancelFailed: true,
+      retryCancel: h.retryCancel,
+    });
+  });
 
   it("uses the guided layout, readable badge and safe input props", async () => {
     await renderPage();
