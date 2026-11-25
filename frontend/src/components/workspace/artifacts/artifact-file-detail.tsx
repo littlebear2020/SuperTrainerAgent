@@ -205,6 +205,11 @@ export function ArtifactFileDetail({
     setIsRefetchingHistory(true);
     try {
       await refetchHistory();
+      // 重载只失效 runs 列表；这条查询的 key 是「阶段 + 加载标志」，目标仍缺失、标志没变时
+      // key 不变、不会自动重取——显式失效，重试一定重新判定一次
+      await queryClient.invalidateQueries({
+        queryKey: ["artifact", "write-file", filepathFromProps, threadId],
+      });
     } catch (error) {
       // 任一 run 的分片加载失败时 refetchHistory 会 reject（旧分片保留）：提示一次，
       // 不让 `void` 调用变成未处理拒绝；重试入口还在
@@ -214,7 +219,13 @@ export function ArtifactFileDetail({
       refetchingRef.current = false;
       setIsRefetchingHistory(false);
     }
-  }, [refetchHistory, t.writeFileRef]);
+  }, [
+    queryClient,
+    refetchHistory,
+    filepathFromProps,
+    threadId,
+    t.writeFileRef,
+  ]);
 
   const [isSaving, setIsSaving] = useState(false);
   const activeDraft = drafts[filepath] ?? createArtifactDraft(filepath);

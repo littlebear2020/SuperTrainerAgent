@@ -20,8 +20,14 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const queryClient = vi.hoisted(() => ({
+  getQueryData: vi.fn(),
+  setQueryData: vi.fn(),
+  invalidateQueries: vi.fn(async () => undefined),
+}));
+
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ getQueryData: vi.fn(), setQueryData: vi.fn() }),
+  useQueryClient: () => queryClient,
 }));
 
 vi.mock("@/core/i18n/hooks", () => ({
@@ -154,6 +160,7 @@ describe("write-file 引用在详情面板里的五态渲染", () => {
     h.writeFileState = null;
     h.refetchHistory = undefined;
     h.hasMoreHistory = false;
+    queryClient.invalidateQueries.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -310,6 +317,7 @@ describe("write-file 引用在详情面板里的五态渲染", () => {
     });
     expect(h.refetchHistory).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledWith(zhCN.writeFileRef.refetchFailed);
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
     // 失败后可以再点
     const again = [...container.querySelectorAll("button")].find((b) =>
       b.textContent?.includes(zhCN.writeFileRef.retry),
@@ -338,8 +346,14 @@ describe("write-file 引用在详情面板里的五态渲染", () => {
       button!.click();
     });
     expect(refetchHistory).toHaveBeenCalledTimes(1);
+    // 重载还没完成时不失效
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
     await act(async () => {
       resolve();
+    });
+    // 重载只失效 runs 列表；这条查询的 key 可能不变，显式失效才会重新判定
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["artifact", "write-file", REF, "th_1"],
     });
   });
 

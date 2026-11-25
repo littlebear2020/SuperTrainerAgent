@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import { loadArtifactContentFromToolCall } from "@/core/artifacts/loader";
 import {
+  completeToolArgs,
   createWriteFileRef,
+  isCompleteToolArgs,
+  isWriteFileToolCall,
   parseWriteFileRef,
+  rawArgsByToolCallId,
 } from "@/core/artifacts/write-file-ref";
 
 /**
@@ -199,5 +203,63 @@ describe("loadArtifactContentFromToolCall：定位与校验（五态里的 ready
     await expect(
       load("write-file:?path=%2Fmnt%2Fdata%2Fa.txt", t),
     ).resolves.toEqual({ status: "invalid" });
+  });
+});
+
+describe("流式工具参数：UI 与内容加载共用的「参数是否完整」判定", () => {
+  it("严格解析：JSON 对象才算完整，半截串与数组都不算", () => {
+    expect(isCompleteToolArgs('{"path":"/a"}')).toBe(true);
+    expect(isCompleteToolArgs('{"path":"/a')).toBe(false);
+    expect(isCompleteToolArgs("[1,2]")).toBe(false);
+    expect(isCompleteToolArgs("")).toBe(false);
+  });
+
+  it("工具步骤用的参数：流式未完整 → 空对象；result 已到或没有原始串 → 直接用 args", () => {
+    const args = { path: "/a", content: "x" };
+    expect(completeToolArgs(args, '{"path":"/a"', false)).toEqual({});
+    expect(completeToolArgs(args, '{"path":"/a"', true)).toEqual(args);
+    expect(completeToolArgs(args, undefined, false)).toEqual(args);
+    expect(completeToolArgs(args, '{"path":"/b"}', false)).toEqual({
+      path: "/b",
+    });
+  });
+
+  it("原始串按 id 归并：没有 id / args 不是字符串的片段不计，没有 chunk 的消息为空", () => {
+    const message = {
+      type: "ai",
+      id: "m1",
+      content: "",
+      tool_call_chunks: [
+        { id: "c1", name: "write_file", args: '{"a":' },
+        { id: "c1", args: "1}" },
+        { args: "ignored" },
+        { id: "c2", args: 7 },
+      ],
+    } as unknown as Message;
+    expect(rawArgsByToolCallId(message).get("c1")).toBe('{"a":1}');
+    expect(rawArgsByToolCallId(message).has("c2")).toBe(false);
+    expect(
+      rawArgsByToolCallId({
+        type: "ai",
+        id: "m2",
+        content: "",
+      } as unknown as Message).size,
+    ).toBe(0);
+    expect(
+      rawArgsByToolCallId({
+        type: "tool",
+        id: "t",
+        tool_call_id: "c1",
+        name: "write_file",
+        content: "",
+      } as unknown as Message).size,
+    ).toBe(0);
+  });
+
+  it("write_file / str_replace 是需要引用定位的两类工具", () => {
+    expect(isWriteFileToolCall("write_file")).toBe(true);
+    expect(isWriteFileToolCall("str_replace")).toBe(true);
+    expect(isWriteFileToolCall("read_file")).toBe(false);
+    expect(isWriteFileToolCall(undefined)).toBe(false);
   });
 });

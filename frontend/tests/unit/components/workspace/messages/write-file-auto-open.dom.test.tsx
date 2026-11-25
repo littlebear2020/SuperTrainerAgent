@@ -77,6 +77,7 @@ vi.mock("@/components/ai-elements/chain-of-thought", () => ({
     <button
       type="button"
       data-testid="step"
+      className={p.className as string | undefined}
       onClick={p.onClick as (() => void) | undefined}
     >
       {p.label as string}
@@ -423,6 +424,8 @@ describe("MessageGroup：tool_call_chunks 的原始串交给 write-file 步骤",
       "[data-testid='step']",
     );
     expect(step).not.toBeNull();
+    // 参数不完整时不是一个可点的入口：不给手型
+    expect(step!.className).not.toContain("cursor-pointer");
     step!.click();
     expect(h.artifacts.select).not.toHaveBeenCalled();
     expect(h.artifacts.setOpen).not.toHaveBeenCalled();
@@ -440,7 +443,12 @@ describe("MessageGroup：tool_call_chunks 的原始串交给 write-file 步骤",
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    container.querySelector<HTMLButtonElement>("[data-testid='step']")!.click();
+    const step = container.querySelector<HTMLButtonElement>(
+      "[data-testid='step']",
+    )!;
+    // 参数完整：是可点的入口
+    expect(step.className).toContain("cursor-pointer");
+    step.click();
     expect(h.artifacts.select).toHaveBeenCalledTimes(1);
     const url = new URL(h.artifacts.select.mock.calls[0]![0] as string);
     expect(url.searchParams.get("path")).toBe("/mnt/data/100% final#1?.md");

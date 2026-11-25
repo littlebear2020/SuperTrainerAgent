@@ -458,6 +458,8 @@ export function mockLangGraphAPI(
     if (!options?.artifacts) return route.fallback();
     if (route.request().method() !== "GET") return route.fallback();
     const url = new URL(route.request().url());
+    // 下载请求（attachment 响应头）不在本夹具的范围内：交还给用例自定的路由
+    if (url.searchParams.has("download")) return route.fallback();
     // 产物路径里可能再有「/artifacts」（如 /mnt/outputs/artifacts/x.md）：只切掉端点前缀
     const marker = "/artifacts";
     const encodedPath = url.pathname.slice(
