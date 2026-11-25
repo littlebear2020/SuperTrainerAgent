@@ -41,6 +41,7 @@ from app.gateway.routers import (
     video_gen,
     voice_twin,
     voice_twin_production,
+    works,
     writer,
 )
 from deerflow.config import app_config as deerflow_app_config
@@ -783,6 +784,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Artifacts API is mounted at /api/threads/{thread_id}/artifacts
     app.include_router(artifacts.router)
+
+    # Works API is mounted at /api/works
+    app.include_router(works.router)
 
     # Uploads API is mounted at /api/threads/{thread_id}/uploads
     app.include_router(uploads.router)
