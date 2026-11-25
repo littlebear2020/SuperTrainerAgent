@@ -314,7 +314,8 @@ export function mockLangGraphAPI(
   // 单 run 历史消息：按真实端点分页（首页不带游标 = 最新 limit 条、页内 seq 升序；
   // before_seq 向前取旧页）。只有 `runMessages` 里登记过的 run 才命中，其余交给用例自定的路由。
   void page.route(
-    /\/api\/threads\/[^/]+\/runs\/[^/?#]+\/messages\?/,
+    // 带不带查询串都命中（不带 = 后端默认 limit）：否则未命中的请求会落到真实网络上挂住用例
+    /\/api\/threads\/[^/]+\/runs\/[^/?#]+\/messages(?:\?|$)/,
     (route) => {
       const url = new URL(route.request().url());
       const runId = url.pathname.split("/")[5] ?? "";

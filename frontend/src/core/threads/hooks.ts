@@ -627,8 +627,6 @@ export function useThreadStream({
   // 收尾（如停止导致的 AbortError 不回调），按是否请求过停止来结案。
   useEffect(() => {
     if (thread.isLoading) return;
-    // SDK 流收尾：手动重连的单飞记录随之清空（下一次重连是新的尝试）
-    reconnectInFlightRef.current.clear();
     // 取消请求在途：completion 等取消结果（cancelled / cancelFailed）再结案
     if (cancelPendingRef.current) return;
     const current = currentSubmissionRef.current;

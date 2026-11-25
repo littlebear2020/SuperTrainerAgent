@@ -171,7 +171,10 @@ export const VirtualMessageList = forwardRef<
   const positionedInitialVirtualWindowRef = useRef(false);
   const previousCountRef = useRef(viewCount);
   const previousFirstKeyRef = useRef<Key | undefined>(undefined);
-  /** 虚拟分支的锚点：首个可见行的键、视口内偏移，以及它当时真实的 DOM top。 */
+  /**
+   * 虚拟分支的锚点：首个可见行的键、视口内偏移，以及它当时相对滚动容器顶部的真实
+   * DOM 距离。
+   */
   const anchorRef = useRef<
     { key: Key; viewportOffset: number; domTop?: number } | undefined
   >(undefined);
@@ -200,13 +203,19 @@ export const VirtualMessageList = forwardRef<
     forcedRenderIndexRef.current = null;
   }, []);
   /**
-   * 静态分支（<60 组）的锚点：首个可见行的键与它相对视口顶部的位置。静态态没有测量
+   * 静态分支（<60 组）的锚点：首个可见行的键与它相对滚动容器顶部的位置。记相对坐标：
+   * 容器自己在两次 prepend 之间移动（头部变高、resize）时不会失真。静态态没有测量
    * 数据，getOffsetForIndex 全是估算坐标，只能按真实 DOM 节点锚定；浏览器的原生滚动
    * 锚定在滚动位置为 0 时不下调（Chrome 刻意如此），所以不能全交给它。
    */
-  const staticAnchorRef = useRef<{ key: Key; top: number } | undefined>(
+  const staticAnchorRef = useRef<{ key: Key; domOffset: number } | undefined>(
     undefined,
   );
+  /** 上一次锚定 effect 运行时的滚动状态：变了说明用户滚过，首个可见行要重新记。 */
+  const lastScrollStateRef = useRef<{
+    isScrolling: boolean;
+    offset: number | null;
+  }>({ isScrolling: false, offset: null });
   const wasVirtualRef = useRef(false);
 
   const viewIndexForKey = useCallback(
@@ -237,7 +246,10 @@ export const VirtualMessageList = forwardRef<
         if (!row) continue;
         const rect = row.getBoundingClientRect();
         if (rect.bottom > viewportTop) {
-          return { key: getItemKey(viewIndex), top: rect.top };
+          return {
+            key: getItemKey(viewIndex),
+            domOffset: rect.top - viewportTop,
+          };
         }
       }
       return undefined;
@@ -410,6 +422,16 @@ export const VirtualMessageList = forwardRef<
     previousFirstKeyRef.current = firstKey;
     const wasVirtual = wasVirtualRef.current;
     wasVirtualRef.current = shouldVirtualize;
+    // 自上次运行以来用户滚过（滚动中标志翻转——滚动开始 / 停下 150ms 后各一次——或
+    // 滚动偏移变了）：首个可见行可能换了，静态锚点要跟着重记
+    const scrollState = {
+      isScrolling: virtualizer.isScrolling,
+      offset: virtualizer.scrollOffset,
+    };
+    const scrolledSinceLastRun =
+      scrollState.isScrolling !== lastScrollStateRef.current.isScrolling ||
+      scrollState.offset !== lastScrollStateRef.current.offset;
+    lastScrollStateRef.current = scrollState;
 
     if (!shouldVirtualize) {
       // 静态分支：没有测量数据，按真实 DOM 节点锚定（PR3）；虚拟态的 refs 清零，
@@ -420,13 +442,17 @@ export const VirtualMessageList = forwardRef<
       if (prepended && anchor && viewport && !isAtBottom) {
         const row = rowForView(renderableViews[viewIndexForKey(anchor.key)]);
         if (row) {
-          const delta = row.getBoundingClientRect().top - anchor.top;
+          const delta =
+            row.getBoundingClientRect().top -
+            (viewport.getBoundingClientRect().top + anchor.domOffset);
           if (Math.abs(delta) > 1) viewport.scrollTop += delta;
         }
       }
-      // 流式追加期间每个 chunk 都换引用：首个可见行只可能被 prepend / 行数变化移动，
-      // 不必每帧重量（修前静态分支是零 DOM 读写）
-      if (prepended || viewCount !== previousCountRef.current) {
+      // 首个可见行只在 prepend（上面的校正之后）或用户滚动之后才变；流式追加只动底部，
+      // 不必每个 chunk 都在 layout effect 里量 DOM（修前静态分支是零 DOM 读写）。
+      // 不能借 previousCountRef 判断行数变化：上面的 settle effect 先运行并把它同步成
+      // 当前值，这里的比较恒为 false，锚点会一直停在上一次 prepend 时的首行
+      if (prepended || scrolledSinceLastRun || !staticAnchorRef.current) {
         staticAnchorRef.current = viewport
           ? firstVisibleStaticAnchor(viewport)
           : undefined;
@@ -443,9 +469,8 @@ export const VirtualMessageList = forwardRef<
         if (anchorViewIndex >= 0) {
           anchorRef.current = {
             key: staticAnchor.key,
-            viewportOffset:
-              staticAnchor.top - viewport.getBoundingClientRect().top,
-            domTop: staticAnchor.top,
+            viewportOffset: staticAnchor.domOffset,
+            domTop: staticAnchor.domOffset,
           };
         }
       }
@@ -489,9 +514,11 @@ export const VirtualMessageList = forwardRef<
         pending.misses = (pending.misses ?? 0) + 1;
         if (pending.misses > 2) clearPendingAnchor();
       } else {
+        // domTop 记的是相对滚动容器顶部的距离：容器自己移动（resize、头部变高）后按
+        // 当前容器位置换算，不会把锚点行校正到旧位置
+        const viewportTop = viewport.getBoundingClientRect().top;
         const desiredTop =
-          pending.domTop ??
-          viewport.getBoundingClientRect().top + pending.viewportOffset;
+          viewportTop + (pending.domTop ?? pending.viewportOffset);
         const delta = row.getBoundingClientRect().top - desiredTop;
         if (Math.abs(delta) <= 1) {
           clearPendingAnchor();
@@ -514,7 +541,11 @@ export const VirtualMessageList = forwardRef<
       anchorRef.current = {
         key: firstVisible.key,
         viewportOffset: firstVisible.start - scrollOffset,
-        domTop: row?.getBoundingClientRect().top ?? undefined,
+        domTop:
+          row && viewport
+            ? row.getBoundingClientRect().top -
+              viewport.getBoundingClientRect().top
+            : undefined,
       };
     }
   }, [
@@ -526,7 +557,6 @@ export const VirtualMessageList = forwardRef<
     rowForView,
     scrollRef,
     shouldVirtualize,
-    viewCount,
     viewIndexForKey,
     virtualItems,
     virtualizer,
