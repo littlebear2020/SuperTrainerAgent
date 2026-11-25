@@ -102,6 +102,8 @@ export interface Translations {
     retry: string;
     invalid: string;
     failed: string;
+    failedWithReason: (reason: string) => string;
+    invalidTitle: string;
     refetchFailed: string;
   };
 

@@ -376,6 +376,26 @@ describe("目标 call 或 result 缺失时才看加载状态", () => {
     await expect(load(ref(), parsed)).resolves.toEqual({ status: "pending" });
   });
 
+  test("参数停在半截、流已经结束（被停止 / 断线 / 输出被截断）：not_found（有重试入口），不是永远 pending", async () => {
+    const stuckMessages = [
+      ai(
+        "msg-1",
+        [{ ...write("call-1", PATH, ""), rawArgs: '{"path":"/mnt/da' }],
+        true,
+      ),
+    ];
+    await expect(load(ref(), thread(stuckMessages))).resolves.toEqual({
+      status: "not_found",
+    });
+    // 还在流式、或仍有未加载的旧 run：照旧 pending
+    await expect(load(ref(), thread(stuckMessages, true))).resolves.toEqual({
+      status: "pending",
+    });
+    await expect(
+      load(ref(), thread(stuckMessages), { hasMoreHistory: true }),
+    ).resolves.toEqual({ status: "pending" });
+  });
+
   test("全部 settled 且 hasMoreHistory=false 后仍缺失 → not_found", async () => {
     const settled = thread([ai("msg-other", [write("x", PATH, "别的")])]);
     await expect(load(ref(), settled)).resolves.toEqual({
@@ -385,6 +405,18 @@ describe("目标 call 或 result 缺失时才看加载状态", () => {
       load(ref(), settled, { isHistoryLoading: false, hasMoreHistory: false }),
     ).resolves.toEqual({
       status: "not_found",
+    });
+  });
+  test("status=success 而正文恰好以 Error: 开头：不算失败——结构化状态优先，文本前缀只在缺 status 时兜底", async () => {
+    const t = thread([
+      ai("msg-1", [write("call-1", PATH, "正文")]),
+      toolResult("call-1", "Error: this file documents an error message", {
+        status: "success",
+      }),
+    ]);
+    await expect(load(ref(), t)).resolves.toEqual({
+      status: "ready",
+      content: "正文",
     });
   });
 });
@@ -464,5 +496,19 @@ describe("raw 路径编码通道（来自 tool args 的原始路径不预解码�
     okGet("a b");
     await load(ref("call-2", literal), t);
     expect(requestedUrl()).toContain("/mnt/data/100%2520x.txt");
+  });
+  test("str_replace 命中 .skill 包：按字面路径读当前文件，不追加 /SKILL.md", async () => {
+    okGet("PK\u0003\u0004");
+    const t = thread([
+      ai("msg-1", [replace("call-1", "/mnt/data/pkg.skill")]),
+      toolResult("call-1", "OK"),
+    ]);
+    await expect(
+      load(ref("call-1", "/mnt/data/pkg.skill"), t),
+    ).resolves.toEqual({
+      status: "ready",
+      content: "PK\u0003\u0004",
+    });
+    expect(requestedUrl()).toMatch(/\/artifacts\/mnt\/data\/pkg\.skill$/);
   });
 });

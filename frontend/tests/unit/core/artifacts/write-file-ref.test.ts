@@ -84,6 +84,18 @@ describe("createWriteFileRef / parseWriteFileRef", () => {
     ).toEqual({ path: "%20", ...IDS });
   });
 
+  it("query 的键被 percent 编码（p%61th）：与 URLSearchParams 同样解码后按新格式解析", () => {
+    expect(
+      parseWriteFileRef(
+        "write-file:?p%61th=%2Fmnt%2Fdata%2Fa.md&message_id=m1&tool_call_id=call-1",
+      ),
+    ).toEqual({
+      path: "/mnt/data/a.md",
+      messageId: "m1",
+      toolCallId: "call-1",
+    });
+  });
+
   it("缺 path / messageId / toolCallId 任一项都不生成引用；解析缺字段返回 null", () => {
     expect(createWriteFileRef({ path: "", ...IDS })).toBeNull();
     expect(

@@ -29,12 +29,16 @@ type WriteFileToolCallProps = {
  * 参数完整的判定：有原始串（流式中）时以严格的 `JSON.parse` 成功为准——SDK 交付的
  * `args` 是宽松的部分 JSON 解析结果，半截 path 也在里面；没有原始串（历史消息）时
  * `args` 即完整。不完整时返回空对象：不显示 path、不构造引用。
+ *
+ * `settled`（工具已有 result）：参数已定型，直接用 `args`。模型产出的 args 本身就是
+ * 非法 JSON 时严格解析永远不会成功——刷新后（没有 chunk）能打开、会话内却永远点不了。
  */
 function completeToolArgs(
   args: Record<string, unknown>,
   rawArgs: string | undefined,
+  settled: boolean,
 ): Record<string, unknown> {
-  if (rawArgs === undefined)
+  if (rawArgs === undefined || settled)
     return args && typeof args === "object" ? args : {};
   try {
     const parsed: unknown = JSON.parse(rawArgs);
@@ -68,7 +72,8 @@ export function WriteFileToolCall({
   const { setOpen, autoOpen, autoSelect, selectedArtifact, select } =
     useArtifacts();
 
-  const completeArgs = completeToolArgs(args, rawArgs);
+  const hasResult = result !== undefined;
+  const completeArgs = completeToolArgs(args, rawArgs, hasResult);
   const description =
     typeof completeArgs.description === "string" && completeArgs.description
       ? completeArgs.description
@@ -77,7 +82,6 @@ export function WriteFileToolCall({
     typeof completeArgs.path === "string" ? completeArgs.path : undefined;
   // PR4：path 作为独立 query 参数编码；缺任一定位字段就不生成引用
   const ref = createWriteFileRef({ path, messageId, toolCallId: id });
-  const hasResult = result !== undefined;
 
   // effect 的依赖只放原始值：select / setOpen 每次渲染可能是新引用，放进依赖会让
   // 计时器被反复清掉重排

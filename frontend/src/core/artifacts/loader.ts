@@ -34,7 +34,8 @@ export async function loadArtifactContent({
   raw?: boolean;
 }) {
   let enhancedFilepath = filepath;
-  if (filepath.endsWith(".skill")) {
+  // raw（write-file 引用读当前文件）：按字面路径读，不把 .skill 包当成 SKILL.md
+  if (!raw && filepath.endsWith(".skill")) {
     enhancedFilepath = filepath + "/SKILL.md";
   }
   const url = urlOfArtifact({ filepath: enhancedFilepath, threadId, raw });
@@ -78,6 +79,20 @@ type ToolCallLike = {
   name?: string;
   args?: Record<string, unknown>;
 };
+
+type ToolMessageLike = Extract<Message, { type: "tool" }>;
+
+/**
+ * 定位结果：目标还没定下来时只有阶段；settled 时一定带着工具调用与它的 result
+ * （类型上收窄，调用方不必再判空）。
+ */
+type WriteFileTarget =
+  | { phase: Exclude<WriteFileTargetProbe, { phase: "settled" }>["phase"] }
+  | {
+      phase: "settled";
+      toolCall: ToolCallLike;
+      result: ToolMessageLike;
+    };
 
 function toolCallsOf(message: Message): ToolCallLike[] {
   if (message.type !== "ai") return [];
@@ -123,13 +138,7 @@ function isCompleteToolArgs(raw: string): boolean {
 function probeWriteFileTarget(
   ref: WriteFileRef,
   thread: BaseStream<AgentThreadState>,
-):
-  | {
-      probe: WriteFileTargetProbe;
-      toolCall?: ToolCallLike;
-      result?: Extract<Message, { type: "tool" }>;
-    }
-  | undefined {
+): WriteFileTarget | undefined {
   let toolCall: ToolCallLike | undefined;
   for (const message of thread.messages) {
     if (message.id !== ref.messageId) continue;
@@ -137,32 +146,29 @@ function probeWriteFileTarget(
     // path（那会闪现「引用无效」）；原始串能严格解析了才算到齐
     const raw = rawArgsOfChunk(message, ref.toolCallId);
     if (raw !== undefined && !isCompleteToolArgs(raw)) {
-      return { probe: { phase: "incomplete" } };
+      return { phase: "incomplete" };
     }
     const call = toolCallsOf(message).find(
       (call) => call.id === ref.toolCallId,
     );
     if (call) toolCall = call;
   }
-  if (!toolCall) return { probe: { phase: "missing" } };
+  if (!toolCall) return { phase: "missing" };
   if (toolCall.name !== "write_file" && toolCall.name !== "str_replace") {
-    return { probe: { phase: "invalid" } };
+    return { phase: "invalid" };
   }
   // path 必须与定位到的工具调用一致：引用不能被改成别的文件
   if ((toolCall.args as { path?: unknown })?.path !== ref.path) {
-    return { probe: { phase: "invalid" } };
+    return { phase: "invalid" };
   }
-  let result: Extract<Message, { type: "tool" }> | undefined;
+  let result: ToolMessageLike | undefined;
   for (const message of thread.messages) {
     if (message.type === "tool" && message.tool_call_id === ref.toolCallId) {
       result = message;
     }
   }
-  return {
-    probe: { phase: result ? "settled" : "awaiting-result" },
-    toolCall,
-    result,
-  };
+  if (!result) return { phase: "awaiting-result" };
+  return { phase: "settled", toolCall, result };
 }
 
 /** 渲染层用：目标现在处在哪个阶段（不读 result 内容）。 */
@@ -172,10 +178,10 @@ export function probeWriteFileRef(
 ): WriteFileTargetProbe {
   const ref = parseWriteFileRef(url);
   if (!ref) return { phase: "invalid" };
-  return probeWriteFileTarget(ref, thread)?.probe ?? { phase: "missing" };
+  return probeWriteFileTarget(ref, thread) ?? { phase: "missing" };
 }
 
-function resultTextOf(result: Extract<Message, { type: "tool" }>): string {
+function resultTextOf(result: ToolMessageLike): string {
   const content = result.content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -193,17 +199,20 @@ function resultTextOf(result: Extract<Message, { type: "tool" }>): string {
 /**
  * 工具失败的结果文本前缀。后端的 ToolErrorHandlingMiddleware 把工具异常包成
  * `Error: …` 的 ToolMessage 并置 `status="error"`
- * （backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py）；
- * 这里两个信号任一成立即判失败——历史消息里 status 可能已经丢了。后端改包装格式时同步。
+ * （backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py）。
+ * 后端改包装格式时同步。
  */
 const TOOL_ERROR_PREFIX = "Error:";
 
-/** 工具失败：ToolMessage.status === "error"，或结果文本以工具错误前缀开头。 */
-function isToolFailure(result: Extract<Message, { type: "tool" }>): boolean {
-  return (
-    result.status === "error" ||
-    resultTextOf(result).trimStart().startsWith(TOOL_ERROR_PREFIX)
-  );
+/**
+ * 工具失败：`ToolMessage.status === "error"` 是结构化信号，优先；结果文本以工具错误
+ * 前缀开头只在 status 缺失时兜底（历史消息里可能已经丢了 status）——status 是 success
+ * 的结果正文恰好以 `Error:` 开头（比如文件内容）不算失败。
+ */
+function isToolFailure(result: ToolMessageLike): boolean {
+  if (result.status === "error") return true;
+  if (result.status !== undefined) return false;
+  return resultTextOf(result).trimStart().startsWith(TOOL_ERROR_PREFIX);
 }
 
 async function fetchCurrentFile(
@@ -252,12 +261,11 @@ export async function loadArtifactContentFromToolCall({
   if (!ref) return { status: "invalid" };
   const target = probeWriteFileTarget(ref, thread);
   if (!target) return { status: "invalid" };
-  const { probe, toolCall, result } = target;
-  if (probe.phase === "invalid") return { status: "invalid" };
-  if (probe.phase !== "settled") {
+  if (target.phase === "invalid") return { status: "invalid" };
+  if (target.phase !== "settled") {
     // 参数没流式完整、result 没到、目标 call 不在消息里：还在流式 / 加载，或仍有未加载
     // 的旧 run 时是 pending（不能判 not_found）；全部 settled 后仍缺失才是 not_found
-    return writeFileTargetMayArrive(probe, {
+    return writeFileTargetMayArrive({
       threadLoading: thread.isThreadLoading || thread.isLoading,
       isHistoryLoading,
       hasMoreHistory,
@@ -265,7 +273,8 @@ export async function loadArtifactContentFromToolCall({
       ? { status: "pending" }
       : { status: "not_found" };
   }
-  if (!toolCall || !result) return { status: "invalid" };
+  // settled：目标调用与 result 都在（类型已收窄）
+  const { toolCall, result } = target;
   if (isToolFailure(result)) {
     return { status: "failed", message: resultTextOf(result) };
   }
@@ -284,16 +293,16 @@ export async function loadArtifactContentFromToolCall({
   return fetchCurrentFile(ref, threadId);
 }
 
-/** 渲染层判定「目标缺失」时该不该等：还在流式 / 加载，或仍有未加载的旧 run。 */
-export function writeFileTargetMayArrive(
-  probe: WriteFileTargetProbe,
-  context: {
-    threadLoading: boolean;
-    isHistoryLoading?: boolean;
-    hasMoreHistory?: boolean;
-  },
-): boolean {
-  if (probe.phase === "incomplete") return true;
+/**
+ * 渲染层判定「目标缺失」时该不该等：还在流式 / 加载，或仍有未加载的旧 run。
+ * 参数停在半截（流被停止 / 断线 / 输出被截断）也一样——全部 settled 后这次写入不会再有
+ * 下文，是 not_found（带重试入口），不是永远 pending。
+ */
+export function writeFileTargetMayArrive(context: {
+  threadLoading: boolean;
+  isHistoryLoading?: boolean;
+  hasMoreHistory?: boolean;
+}): boolean {
   return (
     context.threadLoading ||
     (context.isHistoryLoading ?? false) ||

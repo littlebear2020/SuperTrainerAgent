@@ -124,7 +124,11 @@ export function ArtifactFileDetail({
   // 按前缀判定，与 useArtifactContent 一致：解析失败的引用（截断的旧格式等）也是
   // write-file，不能当成普通文件路径流向下拉 / 打开 / 下载 / iframe 这些链路
   const isWriteFile = filepathFromProps.startsWith(WRITE_FILE_REF_PREFIX);
-  const filepath = writeFileRef?.path ?? filepathFromProps;
+  // 解析失败的引用不拿整串当文件名 / 草稿键（那会把 query 显示出来）
+  const filepath = isWriteFile ? (writeFileRef?.path ?? "") : filepathFromProps;
+  const title = writeFileRef
+    ? getFileName(filepath)
+    : t.writeFileRef.invalidTitle;
   const isSkillFile = useMemo(() => {
     return filepath.endsWith(".skill");
   }, [filepath]);
@@ -186,7 +190,9 @@ export function ArtifactFileDetail({
         return { text: t.writeFileRef.invalid, action: null };
       case "failed":
         return {
-          text: `${t.writeFileRef.failed}${writeFileState.message ? `：${writeFileState.message}` : ""}`,
+          text: writeFileState.message
+            ? t.writeFileRef.failedWithReason(writeFileState.message)
+            : t.writeFileRef.failed,
           action: null,
         };
       case "not_found":
@@ -389,7 +395,7 @@ export function ArtifactFileDetail({
         <div className="flex items-center gap-2">
           <ArtifactTitle>
             {isWriteFile ? (
-              <div className="px-2">{getFileName(filepath)}</div>
+              <div className="px-2">{title}</div>
             ) : (
               <Select
                 value={filepath}

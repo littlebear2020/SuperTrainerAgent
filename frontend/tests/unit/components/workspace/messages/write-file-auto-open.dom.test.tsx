@@ -330,6 +330,34 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
     expect(h.artifacts.select).toHaveBeenCalledTimes(1);
     expect(h.artifacts.setOpen).toHaveBeenCalledWith(true);
   });
+
+  test("原始串不是合法 JSON、但工具已经执行完：以 SDK 宽松解析出的 args 为准，可点", async () => {
+    // 模型产出的 args 本身就非法时，刷新后（没有 chunk）能打开、会话内却永远点不了——
+    // result 到了就说明参数已定型，不再要求严格 JSON
+    h.artifacts.autoOpen = false;
+    h.artifacts.autoSelect = false;
+    const malformed =
+      '{"description":"写报告","path":"/mnt/data/100% final#1?.md","content":"正文"';
+    root = renderInto(
+      <WriteFileToolCall
+        id="call-1"
+        messageId="msg-1"
+        args={COMPLETE}
+        rawArgs={malformed}
+        result="OK"
+        isLoading={false}
+        isLast
+      />,
+      container,
+    );
+    container.querySelector<HTMLButtonElement>("[data-testid='step']")!.click();
+    expect(h.artifacts.select).toHaveBeenCalledTimes(1);
+    expect(
+      new URL(h.artifacts.select.mock.calls[0]![0] as string).searchParams.get(
+        "path",
+      ),
+    ).toBe("/mnt/data/100% final#1?.md");
+  });
 });
 
 describe("MessageGroup：tool_call_chunks 的原始串交给 write-file 步骤", () => {
@@ -600,37 +628,39 @@ describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / faile
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("enabled: false 时 write-file 引用也不加载（str_replace 成功后的 GET 不发）", async () => {
-    const replaceRef =
-      "write-file:?path=%2Fmnt%2Fdata%2Fa.md&message_id=msg-2&tool_call_id=call-2";
-    h.thread = {
-      messages: [
+  const REPLACE_REF =
+    "write-file:?path=%2Fmnt%2Fdata%2Fa.md&message_id=msg-2&tool_call_id=call-2";
+  const REPLACE_MESSAGES = [
+    {
+      id: "msg-2",
+      type: "ai",
+      content: "",
+      tool_calls: [
         {
-          id: "msg-2",
-          type: "ai",
-          content: "",
-          tool_calls: [
-            {
-              id: "call-2",
-              name: "str_replace",
-              args: { path: "/mnt/data/a.md", old_str: "a", new_str: "b" },
-            },
-          ],
-        },
-        {
-          id: "tool-2",
-          type: "tool",
-          tool_call_id: "call-2",
+          id: "call-2",
           name: "str_replace",
-          content: "OK",
+          args: { path: "/mnt/data/a.md", old_str: "a", new_str: "b" },
         },
-      ] as unknown as Message[],
+      ],
+    },
+    {
+      id: "tool-2",
+      type: "tool",
+      tool_call_id: "call-2",
+      name: "str_replace",
+      content: "OK",
+    },
+  ] as unknown as Message[];
+
+  test("enabled: false 时 write-file 引用也不加载：GET 不发，也不显示成「读取中」", async () => {
+    h.thread = {
+      messages: REPLACE_MESSAGES,
       isThreadLoading: false,
       isLoading: false,
     };
     const render = (enabled: boolean) => (
       <QueryClientProvider client={client}>
-        <Probe url={replaceRef} enabled={enabled} />
+        <Probe url={REPLACE_REF} enabled={enabled} />
       </QueryClientProvider>
     );
     await act(async () => {
@@ -638,10 +668,14 @@ describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / faile
     });
     await settle();
     expect(fetchMock).not.toHaveBeenCalled();
+    // 「暂不加载」不能泄漏成「等待中」
+    expect(container.textContent).not.toContain("pending");
 
     // 放开之后才读当前文件
-    fetchMock.mockResolvedValue(
-      new Response("当前文件", { status: 200 }) as unknown as Response,
+    // 每次调用给一个新的 Response（同一个实例的 body 只能读一次）
+    fetchMock.mockImplementation(
+      async () =>
+        new Response("当前文件", { status: 200 }) as unknown as Response,
     );
     await act(async () => {
       root!.render(render(true));
@@ -649,6 +683,42 @@ describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / faile
     await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("ready");
+  });
+
+  test("settled 之后加载标志变化不换 query key：str_replace 的当前文件只 GET 一次", async () => {
+    // 每次调用给一个新的 Response（同一个实例的 body 只能读一次）
+    fetchMock.mockImplementation(
+      async () =>
+        new Response("当前文件", { status: 200 }) as unknown as Response,
+    );
+    h.thread = {
+      messages: REPLACE_MESSAGES,
+      isThreadLoading: false,
+      isLoading: true,
+    };
+    await act(async () => {
+      root!.render(
+        <QueryClientProvider client={client}>
+          <Probe url={REPLACE_REF} />
+        </QueryClientProvider>,
+      );
+    });
+    await settle();
+    expect(container.textContent).toContain("ready");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 流结束：thread.isLoading 翻 false（SDK 每次更新都是新对象）——判定结果不变，不该再 GET
+    await act(async () => {
+      h.thread = { ...h.thread, isLoading: false };
+      root!.render(
+        <QueryClientProvider client={client}>
+          <Probe url={REPLACE_REF} />
+        </QueryClientProvider>,
+      );
+    });
+    await settle();
+    expect(container.textContent).toContain("ready");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   test("查询本身出错：显示 failed，不是一直 pending", async () => {
