@@ -727,14 +727,19 @@ describe("OCR 第 2 轮受理项", () => {
   test("SDK 流收尾却从未 onCreated：受理前的 submission 以 failed 结案并提示，不永久 busy", async () => {
     const cb = await mount("t-1");
     h.stream.mockImplementationOnce(async () => emptyStream());
-    const outcome = api()
-      .sendMessage("t-1", { text: "A", files: [] })
-      .then(
-        () => "resolved",
-        (error: unknown) => (error as { kind?: string }).kind,
-      );
-    // 整段等待放在同一个 act 里：兜底由定时器触发（React 可能从未渲染过
-    // isLoading=true），嵌套 act 退出时不提交，会读到旧快照并拖累后续用例
+    let outcome!: Promise<string | undefined>;
+    await act(async () => {
+      outcome = api()
+        .sendMessage("t-1", { text: "A", files: [] })
+        .then(
+          () => "resolved",
+          (error: unknown) => (error as { kind?: string }).kind,
+        );
+    });
+    // 流在途：isLoading 已渲染为 true（与真实网络一致）
+    expect(api().thread.isLoading).toBe(true);
+    expect(hasOptimistic("A")).toBe(true);
+    // 流结束：isLoading 回落，收尾 effect 结案
     const settled = await act(async () =>
       Promise.race([
         outcome,
@@ -744,6 +749,7 @@ describe("OCR 第 2 轮受理项", () => {
       ]),
     );
     expect(settled).toBe("failed");
+    expect(api().thread.isLoading).toBe(false);
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(hasOptimistic("A")).toBe(false);
     // 锁已释放：下一次发送不再被判 busy
@@ -816,8 +822,12 @@ describe("OCR 第 2 轮受理项", () => {
 });
 
 /** 立即结束、不触发 onRunCreated 的流。 */
+/**
+ * 立即结束、没有任何事件的流。真实网络下 SDK 先置 isLoading=true 再发请求，React
+ * 总会先渲染到「在途」；这里让流过一个宏任务再结束，复现同样的渲染顺序。
+ */
 function emptyStream(): AsyncIterable<never> {
   return (async function* () {
-    return;
+    await new Promise((resolve) => setTimeout(resolve, 0));
   })();
 }

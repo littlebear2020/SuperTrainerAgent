@@ -87,9 +87,6 @@ type SendMessageOptions = {
   additionalKwargs?: Record<string, unknown>;
 };
 
-const ABANDON_POLL_MS = 50;
-const ABANDON_TIMEOUT_MS = 1500;
-
 /** Suffix DynamicContextMiddleware's ID-swap gives the real user message (D-3):
  *  the injected reminder SystemMessage takes the original id ``X`` while the
  *  user copy becomes ``X__user``. Normalizing human-message keys to the base id
@@ -598,34 +595,15 @@ export function useThreadStream({
   }, [thread.messages, optimisticMessages.length]);
 
   /**
-   * 提交入队后的兜底：SDK 流既没有 onCreated 也没有 onError / onStop 就收尾时（空流），
-   * React 可能从未渲染过 isLoading=true，收尾 effect 不会触发——submission 会永远停在
-   * pending，把 busy 锁占死。轮询直到观察到 isLoading 翻真（之后交给收尾 effect），或
-   * 超时仍未受理则按 failed 结案并提示一次。
+   * 提交一条消息。返回的 Promise 就是受理 Promise（PR2），所有调用方都必须观察它的
+   * rejection：
+   * - resolve：上传完成且 SDK `onCreated`（线程与 run 已创建）。
+   * - reject `SendRejectedError`：`busy`（上一次发送或 SDK 的流尚未收尾；不提示，输入
+   *   保留）、`stopped`（受理前停止 / 切线程；不提示）、`failed`（上传失败、创建前失败、
+   *   流收尾却没有受理；已提示一次）。
+   * 经 InputBox 的调用由 registry 的 PromptInput 兜住 rejection（Provider 模式下被拒
+   * 不清空输入框）；直接调用的页面自己 catch。受理之后的完成状态只在 hook 内部管理。
    */
-  const armAbandonWatchdog = useCallback(
-    (submission: Submission) => {
-      const startedAt = Date.now();
-      const tick = () => {
-        if (
-          currentSubmissionRef.current !== submission ||
-          submission.state !== "pending"
-        ) {
-          return;
-        }
-        if (threadRef.current?.isLoading === true) return;
-        if (Date.now() - startedAt > ABANDON_TIMEOUT_MS) {
-          rejectSubmission(submission, "failed", SEND_NOT_ACCEPTED_MESSAGE);
-          toast.error(SEND_NOT_ACCEPTED_MESSAGE);
-          return;
-        }
-        setTimeout(tick, ABANDON_POLL_MS);
-      };
-      setTimeout(tick, ABANDON_POLL_MS);
-    },
-    [rejectSubmission],
-  );
-
   const sendMessage = useCallback(
     async (
       threadId: string,
@@ -868,9 +846,7 @@ export function useThreadStream({
         }
         void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
         // 受理与否由 SDK 回调决定：onCreated → resolve；创建前 onError / 停止 → reject。
-        // 流若在 React 观察到 isLoading 翻转之前就已收尾（空流），收尾 effect 不会再
-        // 触发——轮询兜底。
-        armAbandonWatchdog(submission);
+        // 流收尾却没有回调的兜底在流收尾 effect 里（isLoading 回落时结案）。
         return submission.accepted;
       } finally {
         if (uploadOpRef.current?.id === uploadOp.id) uploadOpRef.current = null;
@@ -884,7 +860,6 @@ export function useThreadStream({
       queryClient,
       isBusy,
       rejectSubmission,
-      armAbandonWatchdog,
     ],
   );
 
