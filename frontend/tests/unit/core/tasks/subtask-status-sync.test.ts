@@ -145,7 +145,7 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
     ]);
   });
 
-  it("history loading / 断线：不判终态，也不下发会覆盖旧终态的 patch", () => {
+  it("history loading / 断线：不判终态——只登记元数据，不下发会覆盖旧终态的 status", () => {
     for (const flag of [
       "isHistoryLoading",
       "isRecoverableDisconnect",
@@ -154,8 +154,28 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
         runStatus: "interrupted",
         [flag]: true,
       });
-      expect(out).toEqual([]);
+      expect(out).toEqual([
+        {
+          id: "tc1",
+          subagent_type: "general-purpose",
+          description: "d",
+          prompt: "p",
+        },
+      ]);
+      expect("status" in out[0]!).toBe(false);
     }
+  });
+
+  it("同一次用户停止只有一种状态：有 result（Task cancelled by user.）与没有 result 都是 cancelled", () => {
+    const withResult = deriveSubtasks(
+      [aiTask("a1", "tc1"), toolMsg("t1", "tc1", "Task cancelled by user.")],
+      { runStatus: "interrupted" },
+    );
+    const withoutResult = deriveSubtasks([aiTask("a1", "tc2")], {
+      runStatus: "interrupted",
+    });
+    expect(withResult[0]!.status).toBe("cancelled");
+    expect(withoutResult[0]!.status).toBe("cancelled");
   });
 
   it("没给 runStatus（agents/new 等旧调用方）：保持原行为 in_progress", () => {

@@ -1,7 +1,7 @@
 import type { Run } from "@langchain/langgraph-sdk";
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 
 import {
   Conversation,
@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { StreamingIndicator } from "../streaming-indicator";
 
+import { ThreadContext } from "./context";
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
 import { MessageListItem } from "./message-list-item";
@@ -160,7 +161,6 @@ export function MessageList({
   messageRunIds,
   runsById,
   activeRunId,
-  isRecoverableDisconnect,
 }: {
   className?: string;
   threadId: string;
@@ -174,10 +174,12 @@ export function MessageList({
   messageRunIds?: ReadonlyMap<string, string>;
   runsById?: Readonly<Record<string, Run>>;
   activeRunId?: string | null;
-  isRecoverableDisconnect?: boolean;
 }) {
   const { t } = useI18n();
   const messages = thread.messages;
+  // 断线状态只走 ThreadContext.recovery 一条通道（RecoveryBanner 也从那里读）
+  const isRecoverableDisconnect =
+    useContext(ThreadContext)?.recovery?.isRecoverableDisconnect;
   // Derive subtask status from messages (post-render) + streaming custom events.
   // Replaces the old in-render updateSubtask churn that mutated state during render.
   // PR3：有 run 归属时逐 run 判定；history loading / 断线期间不下发终态。

@@ -17,8 +17,14 @@ const h = vi.hoisted(() => ({
   threadContextValue: null as Record<string, unknown> | null,
   messageRunIds: new Map<string, string>(),
   runsById: {} as Record<string, unknown>,
-  reconnect: vi.fn(async () => undefined),
-  retryCancel: vi.fn(async () => undefined),
+  // hook 组装好的恢复入口对象：页面只做透传
+  recovery: {
+    isRecoverableDisconnect: false,
+    isReconnecting: false,
+    reconnect: vi.fn(async () => undefined),
+    cancelFailed: false,
+    retryCancel: vi.fn(async () => undefined),
+  },
   refetchHistory: vi.fn(async () => undefined),
 }));
 
@@ -56,11 +62,7 @@ vi.mock("@/core/threads/hooks", () => ({
     messageRunIds: h.messageRunIds,
     runsById: h.runsById,
     activeRunId: "run-1",
-    isRecoverableDisconnect: false,
-    reconnectActiveRun: h.reconnect,
-    isReconnecting: false,
-    cancelFailed: false,
-    retryCancel: h.retryCancel,
+    recovery: h.recovery,
   }),
 }));
 
@@ -322,12 +324,8 @@ describe("普通会话页观察 sendMessage 的 rejection", () => {
       runsById: h.runsById,
       activeRunId: "run-1",
     });
-    expect(h.threadContextValue?.recovery).toMatchObject({
-      isRecoverableDisconnect: false,
-      reconnect: h.reconnect,
-      cancelFailed: false,
-      retryCancel: h.retryCancel,
-    });
+    // hook 组装好的对象原样透传
+    expect(h.threadContextValue?.recovery).toBe(h.recovery);
     // PR3：history 契约（PR4 的 write-file 引用按它区分 pending / not_found）
     expect(h.threadContextValue).toMatchObject({
       isHistoryLoading: false,

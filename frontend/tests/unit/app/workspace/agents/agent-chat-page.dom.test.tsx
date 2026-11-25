@@ -22,11 +22,15 @@ const h = vi.hoisted(() => ({
   threadContextValue: null as Record<string, unknown> | null,
   messageRunIds: new Map<string, string>(),
   runsById: {} as Record<string, unknown>,
-  reconnect: vi.fn(async () => undefined),
-  retryCancel: vi.fn(async () => undefined),
+  // hook 组装好的恢复入口对象：页面只做透传
+  recovery: {
+    isRecoverableDisconnect: false,
+    isReconnecting: false,
+    reconnect: vi.fn(async () => undefined),
+    cancelFailed: false,
+    retryCancel: vi.fn(async () => undefined),
+  },
   refetchHistory: vi.fn(async () => undefined),
-  recoverable: false,
-  cancelFailed: false,
   setThreadId: vi.fn(),
   setIsNewThread: vi.fn(),
 }));
@@ -76,11 +80,7 @@ vi.mock("@/core/threads/hooks", () => ({
       messageRunIds: h.messageRunIds,
       runsById: h.runsById,
       activeRunId: "run-1",
-      isRecoverableDisconnect: h.recoverable,
-      reconnectActiveRun: h.reconnect,
-      isReconnecting: false,
-      cancelFailed: h.cancelFailed,
-      retryCancel: h.retryCancel,
+      recovery: h.recovery,
     };
   },
 }));
@@ -241,10 +241,13 @@ describe("AgentChatPage guide wiring", () => {
     h.threadContextValue = null;
     h.messageRunIds = new Map();
     h.runsById = {};
-    h.reconnect.mockClear();
-    h.retryCancel.mockClear();
-    h.recoverable = false;
-    h.cancelFailed = false;
+    h.recovery = {
+      isRecoverableDisconnect: false,
+      isReconnecting: false,
+      reconnect: vi.fn(async () => undefined),
+      cancelFailed: false,
+      retryCancel: vi.fn(async () => undefined),
+    };
     h.setThreadId.mockClear();
     h.setIsNewThread.mockClear();
     h.sendMessage.mockReset();
@@ -276,8 +279,13 @@ describe("AgentChatPage guide wiring", () => {
   it("把 run 归属与恢复入口接进 MessageList / ThreadContext（PR3）", async () => {
     h.isNew = false;
     h.threadId = "thread-1";
-    h.recoverable = true;
-    h.cancelFailed = true;
+    h.recovery = {
+      isRecoverableDisconnect: true,
+      isReconnecting: false,
+      reconnect: vi.fn(async () => undefined),
+      cancelFailed: true,
+      retryCancel: vi.fn(async () => undefined),
+    };
     h.messageRunIds = new Map([["m1", "run-1"]]);
     h.runsById = { "run-1": { run_id: "run-1", status: "running" } };
     await renderPage();
@@ -287,13 +295,11 @@ describe("AgentChatPage guide wiring", () => {
       runsById: h.runsById,
       activeRunId: "run-1",
     });
-    expect(h.threadContextValue?.recovery).toMatchObject({
-      isRecoverableDisconnect: true,
-      isReconnecting: false,
-      reconnect: h.reconnect,
-      cancelFailed: true,
-      retryCancel: h.retryCancel,
-    });
+    // hook 组装好的对象原样透传
+    expect(h.threadContextValue?.recovery).toBe(h.recovery);
+    expect(h.recovery.isRecoverableDisconnect).toBe(true);
+    expect(h.recovery.cancelFailed).toBe(true);
+    expect("isRecoverableDisconnect" in (h.messageListProps ?? {})).toBe(false);
     // PR3：history 契约（PR4 的 write-file 引用按它区分 pending / not_found）
     expect(h.threadContextValue).toMatchObject({
       isHistoryLoading: false,

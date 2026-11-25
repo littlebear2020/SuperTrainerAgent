@@ -39,7 +39,11 @@ const range = (from: number, to: number): Row[] =>
 function fetchReturning(pages: Array<{ data: unknown; has_more: boolean }>) {
   const fetchImpl = vi.fn();
   for (const p of pages) {
-    fetchImpl.mockResolvedValueOnce({ json: () => Promise.resolve(p) });
+    fetchImpl.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(p),
+    });
   }
   return fetchImpl;
 }
@@ -104,6 +108,17 @@ test("has_more 为真但页为空同样显式失败", async () => {
   await expect(
     fetchAllRunMessages("t1", "r1", fetchImpl as never),
   ).rejects.toThrow(/cursor did not advance|empty/);
+});
+
+test("端点返回非 2xx：显式失败，不把错误响应体当成空历史", async () => {
+  const fetchImpl = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 500,
+    json: () => Promise.resolve({ detail: "boom" }),
+  });
+  await expect(
+    fetchAllRunMessages("t1", "r1", fetchImpl as never),
+  ).rejects.toThrow(/HTTP 500/);
 });
 
 test("fetchAllRunMessages filters middleware-caller messages", async () => {

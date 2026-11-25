@@ -1,3 +1,5 @@
+import type { Subtask } from "./types";
+
 /**
  * Subtask step model shared by the live (SSE) and reload (fetched) paths.
  *
@@ -92,7 +94,7 @@ export function messageToStep(
  */
 export function stepsForDisplay(
   steps: SubtaskStep[] | undefined,
-  status: "in_progress" | "completed" | "failed" | "cancelled",
+  status: Subtask["status"],
 ): SubtaskStep[] {
   const visible = (steps ?? [])
     .filter((step) => step.kind === "tool" || step.text.trim() !== "")

@@ -29,8 +29,9 @@ describe("parseSubtaskResult", () => {
     // bytedance/deer-flow#3131 review: this is one of the five terminal
     // strings task_tool.py actually emits — the previous cut treated it as
     // unrecognised content and pushed the card back to in_progress.
+    // PR3：用户取消不是失败——与「run 被停止、任务没有 result」走同一个状态
     const parsed = parseSubtaskResult("Task cancelled by user.");
-    expect(parsed.status).toBe("failed");
+    expect(parsed.status).toBe("cancelled");
     expect(parsed.error).toBe("Task cancelled by user.");
   });
 
@@ -59,7 +60,7 @@ describe("parseSubtaskResult", () => {
   it("trims whitespace around cancelled and polling-timed-out prefixes", () => {
     // Streaming chunks sometimes arrive with leading/trailing newlines.
     expect(parseSubtaskResult("  Task cancelled by user.  \n").status).toBe(
-      "failed",
+      "cancelled",
     );
     expect(
       parseSubtaskResult("\n\nTask polling timed out after 3 minutes").status,
