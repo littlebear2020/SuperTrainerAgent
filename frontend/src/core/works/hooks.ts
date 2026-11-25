@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useThreads } from "@/core/threads/hooks";
+import type { AgentThread } from "@/core/threads/types";
 import { agentNameOfThread } from "@/core/threads/utils";
 import { useVideoTasks } from "@/core/video-gen/hooks";
 import type { WorkCapability } from "@/core/workspace/video-assets-route";
@@ -29,6 +30,17 @@ async function loadArtifactSummaries(
     summaries.push(...(await fetchArtifactSummaries(batch)));
   }
   return summaries;
+}
+
+function threadIdsForAgents(
+  threads: readonly AgentThread[],
+  agentNames: readonly string[],
+) {
+  return threads
+    .filter((thread) =>
+      agentNames.some((name) => name === agentNameOfThread(thread)),
+    )
+    .map((thread) => thread.thread_id);
 }
 
 export function useArtifactSummaries(threadIds: readonly string[]) {
@@ -64,15 +76,7 @@ export function useWorks(capability: WorkCapability): {
   );
   const threadIds = useMemo(
     () =>
-      hasAgentSource
-        ? threads
-            .filter((thread) =>
-              sources.agentNames.some(
-                (name) => name === agentNameOfThread(thread),
-              ),
-            )
-            .map((thread) => thread.thread_id)
-        : [],
+      hasAgentSource ? threadIdsForAgents(threads, sources.agentNames) : [],
     [hasAgentSource, sources.agentNames, threads],
   );
   const summariesQuery = useArtifactSummaries(threadIds);
@@ -150,18 +154,17 @@ export function useWorks(capability: WorkCapability): {
       (hasTaskSource && tasksQuery.isError),
     refetch: async () => {
       const tasksRequest = hasTaskSource ? tasksQuery.refetch() : null;
+      void tasksRequest?.catch(() => undefined);
+      let primaryRequestFailed = false;
       try {
         if (hasAgentSource) {
           const refreshed = await threadsQuery.refetch();
           if (refreshed.error) throw refreshed.error;
           const refreshedThreads = refreshed.data ?? threads;
-          const nextIds = refreshedThreads
-            .filter((thread) =>
-              sources.agentNames.some(
-                (name) => name === agentNameOfThread(thread),
-              ),
-            )
-            .map((thread) => thread.thread_id);
+          const nextIds = threadIdsForAgents(
+            refreshedThreads,
+            sources.agentNames,
+          );
           const normalizedIds = chunkThreadIds(nextIds).flat();
           if (normalizedIds.length > 0) {
             await queryClient.fetchQuery({
@@ -170,8 +173,15 @@ export function useWorks(capability: WorkCapability): {
             });
           }
         }
+      } catch (error) {
+        primaryRequestFailed = true;
+        throw error;
       } finally {
-        if (tasksRequest) await tasksRequest;
+        if (tasksRequest) {
+          await (primaryRequestFailed
+            ? tasksRequest.catch(() => undefined)
+            : tasksRequest);
+        }
       }
     },
   };
