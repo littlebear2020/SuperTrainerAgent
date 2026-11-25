@@ -256,6 +256,7 @@ export function useThreadStream({
     loadMore: loadMoreHistory,
     refetchRun: refetchRunHistory,
     refetchRunIfStale: refetchRunIfStaleHistory,
+    refetchHistory,
     messageRunIds,
     runsById,
     loading: isHistoryLoading,
@@ -1101,6 +1102,8 @@ export function useThreadStream({
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    /** 用户显式触发的补齐式重载（PR3；带新鲜度判定，失败 reject 以便重试）。 */
+    refetchHistory,
     messageRunIds,
     runsById,
     /** 当前流所属的 run（SDK onCreated 回传）；没有在途 / 历史流时为 null。 */
@@ -1118,6 +1121,8 @@ export function useThreadStream({
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const HISTORY_PAGE_SIZE = 200;
+/** 补齐式重载一次最多处理的 run 数（与 runs 列表的上限一致）。 */
+const HISTORY_REFETCH_MAX_RUNS = 100;
 
 /**
  * 分页拉全单 run 的历史消息（后端 GET /api/threads/{tid}/runs/{rid}/messages：
@@ -1404,6 +1409,54 @@ export function useThreadHistory(threadId: string) {
     [loadRun, snapshot],
   );
 
+  /**
+   * 用户显式触发、带新鲜度判定的补齐式重载（PR3）：先失效并重取 runs 列表，再按
+   * 旧→新串行处理最多 100 个 run——未成功加载、非终态、或 status / updated_at 与加载
+   * 时不同的 run 重取，终态且未变的旧 run 跳过。每个请求受该 run 的 epoch 约束并等待
+   * 既有在途请求 settled（在途的那次加载已带着最新内容，不叠加请求）；任一失败保留
+   * 旧分片、不把该 run 标记为新鲜，其余 run 照常处理，结束后 reject 以便重试。
+   * loadMoreHistory 只前进一个 run，两者不等同。
+   */
+  const refetchHistory = useCallback(async () => {
+    const generation = generationRef.current;
+    await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+    if (generationRef.current !== generation) return;
+    const list = (
+      queryClient.getQueryData<Run[]>(["thread", threadId]) ?? []
+    ).slice(0, HISTORY_REFETCH_MAX_RUNS);
+    const shardsAtStart = snapshot().shards;
+    let firstError: unknown;
+    let failed = false;
+    for (const run of [...list].reverse()) {
+      if (generationRef.current !== generation) break;
+      const inFlight = inFlightRef.current.get(run.run_id);
+      if (inFlight) {
+        try {
+          await inFlight;
+          continue;
+        } catch {
+          // 在途的那次失败了：下面重取
+        }
+      }
+      const shard = shardsAtStart.get(run.run_id);
+      if (
+        shard?.fresh &&
+        isTerminalRunStatus(run.status) &&
+        shard.status === run.status &&
+        shard.updatedAt === run.updated_at
+      ) {
+        continue;
+      }
+      try {
+        await loadRun(run);
+      } catch (error) {
+        if (!failed) firstError = error;
+        failed = true;
+      }
+    }
+    if (failed) throw firstError;
+  }, [queryClient, threadId, snapshot, loadRun]);
+
   // 不在 runs 列表里的分片（如被 regenerate 隐藏）在拼接时自然被过滤，不需要额外清理
   const current = state.threadId === threadId ? state : EMPTY_HISTORY_STATE;
   const orderedRuns = useMemo(() => {
@@ -1445,6 +1498,7 @@ export function useThreadHistory(threadId: string) {
     loadMore,
     refetchRun,
     refetchRunIfStale,
+    refetchHistory,
     loadedRunIds: current.loadedRunIds,
   } as const;
 }

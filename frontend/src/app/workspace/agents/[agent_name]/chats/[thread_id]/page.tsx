@@ -92,6 +92,7 @@ export default function AgentChatPage() {
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    refetchHistory,
     messageRunIds,
     runsById,
     activeRunId,
@@ -260,7 +261,15 @@ export default function AgentChatPage() {
   ) : null;
 
   return (
-    <ThreadContext.Provider value={{ thread, recovery }}>
+    <ThreadContext.Provider
+      value={{
+        thread,
+        isHistoryLoading,
+        hasMoreHistory,
+        refetchHistory,
+        recovery,
+      }}
+    >
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header

@@ -371,7 +371,12 @@ export function MessageList({
     return <MessageListSkeleton />;
   }
   return (
+    // PR3：以 threadId 为 key——切线程时整个会话（StickToBottom、虚拟化 refs、滚动
+    // 位置）整体重挂载，新线程首次落底不受上一个线程的上翻位置影响；initial 用
+    // instant，首次水合直接到底，不做开场动画（不改 registry）。
     <Conversation
+      key={threadId}
+      initial="instant"
       className={cn("flex size-full flex-col justify-center", className)}
     >
       <ConversationContent className="mx-auto w-full max-w-(--container-width-md) gap-8 pt-8">
