@@ -1,6 +1,6 @@
 # 核心产品前端可靠性优化 Implementation Plan
 
-> **状态**：部分执行（PR1 已合入 main，PR2 已执行、待合入，PR3–PR4 与总验收未执行；2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。**执行进度（2026-11-25）**：PR1 视频编辑安全已合入（PR [#58](https://github.com/littlebear2020/SuperTrainerAgent/pull/58)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr1.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr1.md)；PR2 输入受理的验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr2.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr2.md)。同日用户以 /goal 指令授权本批建分支、push、开 PR 与评审通过后合并；仍不授权部署、付费 API 调用与 live 套件。
+> **状态**：部分执行（PR1、PR2 已合入 main，PR3 已执行、待合入，PR4 与总验收未执行；2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。**执行进度（2026-11-25）**：PR1 视频编辑安全已合入（PR [#58](https://github.com/littlebear2020/SuperTrainerAgent/pull/58)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr1.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr1.md)；PR2 输入受理已合入（PR [#59](https://github.com/littlebear2020/SuperTrainerAgent/pull/59)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr2.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr2.md)。PR3 长会话恢复的验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr3.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr3.md)。同日用户以 /goal 指令授权本批建分支、push、开 PR 与评审通过后合并；仍不授权部署、付费 API 调用与 live 套件。
 > **TL;DR**：分 4 个串行 PR，按视频编辑安全→输入上传→线程恢复→产物引用执行（视频批路径零重叠、体量最小，先止住帧面板的未保存旧参数付费重生）。聊天补齐真实分页、取消恢复和滚动锚定；write-file 补齐流式参数完整性与分工具内容语义；AI 生图/生视频只修帧面板「重生画面」的未保存付费重生、取消轮询和失败反馈。换账号残留与视频跨代 accepted-operation 不在本批：延后项已登记 backlog，后者已拆至 pending 计划。流式停止保留草稿已落地，不得回退。
 
 > **For agentic workers：** 推荐 `superpowers:executing-plans` 在当前会话按文档顺序执行（Task 0 → Task 1–4 即 PR1–PR4 → Task 5）；若用户另行选择，才使用 `superpowers:subagent-driven-development`。先完成 Task 0 的基线预检，再用 `superpowers:using-git-worktrees` 从包含本计划修订的提交建立隔离工作区，按 checkbox 逐项勾选，不得并行派发这 4 个 PR。步骤内的 Commit 步是本地提交，按 Git 约定逐笔落；本计划不授权自动 push、自动合并或部署，push 与开 PR 另行确认。
@@ -229,33 +229,33 @@
 
 **纵切 A：before_seq 分页与 requestEpoch 分片**
 
-- [ ] **Step 1：写真实分页、history 幂等和同 run 竞态测试（红）。** 用 451 条消息模拟首页 `252..451`、before_seq 页 `52..251`、`1..51`，最终必须恰好 `1..451`；再用 5001 条廉价 mock 证明超过原 25 页仍不丢首条，游标不前进/重复时显式失败而非死循环。覆盖首次 `run-1:[m1]`、onFinish 重取 `[m1,m2]` 后原子替换，新增 run-2 接续，A 慢历史切 B 不拼入；同 run A/B 请求按 B→A 完成时仍保留 B 的最终分片，旧 run 失败后可重试且 loadedRunIds 不提前写入。runs API newest-first 时 flatten 仍按旧→新，并断言 runs.list 请求 limit=100。
-- [ ] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/threads/thread-history-pagination.test.ts tests/unit/core/threads/thread-history-reset.dom.test.tsx tests/unit/core/threads/thread-history-idempotence.dom.test.tsx`，记录真实首页方向、同 run 覆盖和切线程重置的失败；不得把已撤回的“每次切线程串台”当成唯一测试前提。
-- [ ] **Step 3：实现 before_seq + generation/requestEpoch 分片（绿）。** useThreadRuns 显式传 limit=100。threadId 变化清 messages/historyShards/loadedRunIds/inFlightRunIds/requestEpochByRun/hasMore；每次加载捕获 generation + runId + epoch，只有当前代、当前 run 最新 epoch 且完整成功才替换分片。分页失败保留旧分片并允许重试，游标必须严格前进。复用 PR2 的预生成 UUID 回显，仅为 mock-api 新增 runs/history 分片能力。
-- [ ] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
-- [ ] **Step 5：Commit。** 暂存本纵切测试、`hooks.ts`、`types.ts`、受影响的既有 e2e spec 与 `mock-api.ts`，提交 `fix(chat): run 历史改用 before_seq 向前翻页，按 run 分片并防慢旧请求覆盖`。
+- [x] **Step 1：写真实分页、history 幂等和同 run 竞态测试（红）。** 用 451 条消息模拟首页 `252..451`、before_seq 页 `52..251`、`1..51`，最终必须恰好 `1..451`；再用 5001 条廉价 mock 证明超过原 25 页仍不丢首条，游标不前进/重复时显式失败而非死循环。覆盖首次 `run-1:[m1]`、onFinish 重取 `[m1,m2]` 后原子替换，新增 run-2 接续，A 慢历史切 B 不拼入；同 run A/B 请求按 B→A 完成时仍保留 B 的最终分片，旧 run 失败后可重试且 loadedRunIds 不提前写入。runs API newest-first 时 flatten 仍按旧→新，并断言 runs.list 请求 limit=100。
+- [x] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/threads/thread-history-pagination.test.ts tests/unit/core/threads/thread-history-reset.dom.test.tsx tests/unit/core/threads/thread-history-idempotence.dom.test.tsx`，记录真实首页方向、同 run 覆盖和切线程重置的失败；不得把已撤回的“每次切线程串台”当成唯一测试前提。
+- [x] **Step 3：实现 before_seq + generation/requestEpoch 分片（绿）。** useThreadRuns 显式传 limit=100。threadId 变化清 messages/historyShards/loadedRunIds/inFlightRunIds/requestEpochByRun/hasMore；每次加载捕获 generation + runId + epoch，只有当前代、当前 run 最新 epoch 且完整成功才替换分片。分页失败保留旧分片并允许重试，游标必须严格前进。复用 PR2 的预生成 UUID 回显，仅为 mock-api 新增 runs/history 分片能力。
+- [x] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
+- [x] **Step 5：Commit。** 暂存本纵切测试、`hooks.ts`、`types.ts`、受影响的既有 e2e spec 与 `mock-api.ts`，提交 `fix(chat): run 历史改用 before_seq 向前翻页，按 run 分片并防慢旧请求覆盖`。
 
 **纵切 B：按 run 终态、取消同步与恢复 owner**
 
-- [ ] **Step 6：写按 run 终态、取消与恢复反例（红）。** 覆盖 run-1 error 无 result + run-2 running、run-1 interrupted + run-2 success，旧任务不得被当前 run 改判；当前 run 分别覆盖 success、error/timeout、interrupted（用户停止）、success + 未回答的 `ask_clarification`（澄清）、history loading、断线和正常 running。onFinish 只刷新 `meta.run_id` 对应的分片：mount 自动 rejoin、没有 onCreated 时同样成立。停止后分别模拟：cancel 受理 → running→interrupted，断言有界 refetch runs 和当前分片；cancel 500/网络失败 → 无 unhandled rejection、不显示 interrupted、出现可重试错误，重试即再次调用同一 cancel；`not_cancellable` → 维持现有语义。mount 自动 rejoin 未结束时手动重连不得二次 join，join resolve 不得直接显示恢复成功。
-- [ ] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/threads/recovery.dom.test.ts tests/unit/core/tasks/subtask-status-sync.test.ts`，记录按 run 终态和取消恢复的失败项。
-- [ ] **Step 8：实现按所属 run 的终态、取消同步与恢复 owner（绿）。** MessageList 按 shard/run 调用 derive，保留 runId 和 runsById，不给整个扁平列表套当前 runStatus；agents/new 的可选默认值保持原行为。hook 的 onFinish 用 meta 定位分片并校验 generation，重取后失效 `["thread", threadId]`。错误详情优先使用当前 `thread.error`，runs API 没有 error 字段时使用状态级通用文案，不虚构详细原因。停止后按 PR2 的 `CancelOutcome` 同步：`cancelled` 才做有界刷新，`failed` 保留可重试错误并在恢复入口提供重试，不伪造终态。mount rejoin 归 SDK，手动 reconnect 按 Interfaces 单飞。
-- [ ] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
-- [ ] **Step 10：Commit。** 暂存本纵切测试、`recovery.ts`、`subtask-status-sync.ts`、`hooks.ts`、`errors.ts` 与 `message-list.tsx`，提交 `fix(chat): 子任务终态按所属 run 判定，取消后有界同步，手动重连单飞`。
+- [x] **Step 6：写按 run 终态、取消与恢复反例（红）。** 覆盖 run-1 error 无 result + run-2 running、run-1 interrupted + run-2 success，旧任务不得被当前 run 改判；当前 run 分别覆盖 success、error/timeout、interrupted（用户停止）、success + 未回答的 `ask_clarification`（澄清）、history loading、断线和正常 running。onFinish 只刷新 `meta.run_id` 对应的分片：mount 自动 rejoin、没有 onCreated 时同样成立。停止后分别模拟：cancel 受理 → running→interrupted，断言有界 refetch runs 和当前分片；cancel 500/网络失败 → 无 unhandled rejection、不显示 interrupted、出现可重试错误，重试即再次调用同一 cancel；`not_cancellable` → 维持现有语义。mount 自动 rejoin 未结束时手动重连不得二次 join，join resolve 不得直接显示恢复成功。
+- [x] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/threads/recovery.dom.test.ts tests/unit/core/tasks/subtask-status-sync.test.ts`，记录按 run 终态和取消恢复的失败项。
+- [x] **Step 8：实现按所属 run 的终态、取消同步与恢复 owner（绿）。** MessageList 按 shard/run 调用 derive，保留 runId 和 runsById，不给整个扁平列表套当前 runStatus；agents/new 的可选默认值保持原行为。hook 的 onFinish 用 meta 定位分片并校验 generation，重取后失效 `["thread", threadId]`。错误详情优先使用当前 `thread.error`，runs API 没有 error 字段时使用状态级通用文案，不虚构详细原因。停止后按 PR2 的 `CancelOutcome` 同步：`cancelled` 才做有界刷新，`failed` 保留可重试错误并在恢复入口提供重试，不伪造终态。mount rejoin 归 SDK，手动 reconnect 按 Interfaces 单飞。
+- [x] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
+- [x] **Step 10：Commit。** 暂存本纵切测试、`recovery.ts`、`subtask-status-sync.ts`、`hooks.ts`、`errors.ts` 与 `message-list.tsx`，提交 `fix(chat): 子任务终态按所属 run 判定，取消后有界同步，手动重连单飞`。
 
 **纵切 C：滚动重置、history 契约与补齐式重载**
 
-- [ ] **Step 11：写 URL、滚动与补齐式重载测试（红）。** 发送后地址栏脱离 `/new`，运行中刷新仅 rejoin 一次，创建前失败回退（PR2 已实现，此处做回归）。Playwright 用至少 60 个不同高度消息组验证：长线程初次水合最后一组可见且底部误差 ≤2px；prepend 前后首个原可见组 `getBoundingClientRect().top` 差值 ≤4px（既有实现实测偏移 190.5px，证据见 Spec 所列 changelog）；线程 A 上翻后切 B，B 仍初次落底；静态/虚拟阈值两侧和加载旧页均不跳底。补齐式重载：99 个终态且加载后未变的旧 run 不重取；1 个加载时为 running、之后变 success 的 run 必须重取并补齐新增消息；刷新失败的 run 不被标记为新鲜，可再次重试。
-- [ ] **Step 12：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/components/workspace/messages/message-list-scroll.dom.test.tsx`，并先跑一次 `chat-thread-recovery.spec.ts` 记录失败项；像素位移只能在真实 Playwright 验收，happy-dom 不得冒充布局证据。
-- [ ] **Step 13：实现滚动重置、history 契约与补齐式重载（绿）。** 给整个 Conversation 加 `key={threadId}`，同时重置 StickToBottom 与虚拟化 refs，传 `initial="instant"` 而不修改 registry；仅初次水合落底，prepend 补偿未测高行估计高度与实测高度差并保留锚点。复用 PR2 已冻结的 onSend/onStart/onSendError，不在 onSend 提前翻 controlled threadId。通过 ThreadContextType 提供 isHistoryLoading/hasMoreHistory/refetchHistory，按 Interfaces 实现带新鲜度判定的补齐式重载并等待 settled；保持 thread.isThreadLoading 与自定义 history loading 的可区分组合，不重新引入 P0-3 假设。
-- [ ] **Step 14：重跑 Step 12 确认全绿（含 typecheck）。**
-- [ ] **Step 15：Commit。** 暂存本纵切测试、`core/threads/hooks.ts`、`types.ts`、`messages/**`、`context.ts`、确需改动的 `use-thread-chat.ts` 与两个 chat page，提交 `fix(chat): 切线程整体重置滚动并首次水合落底，暴露带新鲜度判定的 history 加载契约`。
+- [x] **Step 11：写 URL、滚动与补齐式重载测试（红）。** 发送后地址栏脱离 `/new`，运行中刷新仅 rejoin 一次，创建前失败回退（PR2 已实现，此处做回归）。Playwright 用至少 60 个不同高度消息组验证：长线程初次水合最后一组可见且底部误差 ≤2px；prepend 前后首个原可见组 `getBoundingClientRect().top` 差值 ≤4px（既有实现实测偏移 190.5px，证据见 Spec 所列 changelog）；线程 A 上翻后切 B，B 仍初次落底；静态/虚拟阈值两侧和加载旧页均不跳底。补齐式重载：99 个终态且加载后未变的旧 run 不重取；1 个加载时为 running、之后变 success 的 run 必须重取并补齐新增消息；刷新失败的 run 不被标记为新鲜，可再次重试。
+- [x] **Step 12：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/components/workspace/messages/message-list-scroll.dom.test.tsx`，并先跑一次 `chat-thread-recovery.spec.ts` 记录失败项；像素位移只能在真实 Playwright 验收，happy-dom 不得冒充布局证据。
+- [x] **Step 13：实现滚动重置、history 契约与补齐式重载（绿）。** 给整个 Conversation 加 `key={threadId}`，同时重置 StickToBottom 与虚拟化 refs，传 `initial="instant"` 而不修改 registry；仅初次水合落底，prepend 补偿未测高行估计高度与实测高度差并保留锚点。复用 PR2 已冻结的 onSend/onStart/onSendError，不在 onSend 提前翻 controlled threadId。通过 ThreadContextType 提供 isHistoryLoading/hasMoreHistory/refetchHistory，按 Interfaces 实现带新鲜度判定的补齐式重载并等待 settled；保持 thread.isThreadLoading 与自定义 history loading 的可区分组合，不重新引入 P0-3 假设。
+- [x] **Step 14：重跑 Step 12 确认全绿（含 typecheck）。**
+- [x] **Step 15：Commit。** 暂存本纵切测试、`core/threads/hooks.ts`、`types.ts`、`messages/**`、`context.ts`、确需改动的 `use-thread-chat.ts` 与两个 chat page，提交 `fix(chat): 切线程整体重置滚动并首次水合落底，暴露带新鲜度判定的 history 加载契约`。
 
 **纵切 D：行为验收与收尾**
 
-- [ ] **Step 16：长任务 mock 验收。** 重跑 Step 2、Step 7、Step 12 的 vitest 命令全绿；执行 `cd frontend && pnpm exec playwright test tests/e2e/chat-thread-recovery.spec.ts --repeat-each=3 --workers=1`，覆盖同 run 重取、新 run 接续、真实分页、长历史重开、运行中刷新、取消终态、断线重连、interrupt 等待和 Step 11 像素断言。记录 runs list 仅 100 条的未覆盖边界，不用 mock 伪造分页能力。
-- [ ] **Step 17：Commit。** 暂存 `chat-thread-recovery.spec.ts` 与 `mock-api.ts` 的本纵切改动，提交 `test(e2e): 长会话恢复与滚动锚定用例`。
-- [ ] **Step 18：批次门禁与收尾。** 执行 `make -C frontend check` 和 threads/tasks/messages 既有回归；写 PR3 changelog「验收记录」，勾选并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR3 验收记录`。push 与开 PR 另行确认。
+- [x] **Step 16：长任务 mock 验收。** 重跑 Step 2、Step 7、Step 12 的 vitest 命令全绿；执行 `cd frontend && pnpm exec playwright test tests/e2e/chat-thread-recovery.spec.ts --repeat-each=3 --workers=1`，覆盖同 run 重取、新 run 接续、真实分页、长历史重开、运行中刷新、取消终态、断线重连、interrupt 等待和 Step 11 像素断言。记录 runs list 仅 100 条的未覆盖边界，不用 mock 伪造分页能力。
+- [x] **Step 17：Commit。** 暂存 `chat-thread-recovery.spec.ts` 与 `mock-api.ts` 的本纵切改动，提交 `test(e2e): 长会话恢复与滚动锚定用例`。
+- [x] **Step 18：批次门禁与收尾。** 执行 `make -C frontend check` 和 threads/tasks/messages 既有回归；写 PR3 changelog「验收记录」，勾选并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR3 验收记录`。push 与开 PR 另行确认。
 
 ### Task 4（PR4）：结构化 write-file 引用、内容状态与安全 auto-open
 
