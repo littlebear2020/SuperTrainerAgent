@@ -53,6 +53,8 @@
 - OCR 行内 4 条 medium：`artifactCleaned` 与 `retrying` 补中英 key 并增加英文卡片测试；缓存回退改为按当前线程 ID 合并各成功批次、以最近更新时间决胜，新增多缓存合并 RED→GREEN。相关 hooks/grid 测试 `32 passed`，全量 Vitest `2161 passed`。
 - `Promise.all` 并行批次建议不采纳：计划 Q15 明确要求 `for...of` 顺序读取，checkpointer 全局锁使并发无收益；既有 50/50/1 测试同时断言最多 1 个批次在途。18 条 low 的处置汇总见 PR #63 评论，不为低优先建议反复推送。
 
+- 第二轮 OCR 6 条 medium：WorkGrid 增加 rejection catch 且保留 try/finally；useWorks 移除吞错的 fetchQuery catch；mock 对空/51/空白/超长 ID 返回 422；缓存匹配合并用 useMemo。相关单测 `33 passed`，非法批次 + 刷新失败 E2E `2 passed`，全量 Vitest `2162 passed`。`limit: 200` 不采纳，因为 Q4/Q6 要求完整历史且已有 offset 50 后搜索证据；agentNames 过滤建议不采纳，因为 agentNameOfThread 先 canonical 化、当前映射与六能力行为均正确，字段负责来源启停而非另一套映射。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。

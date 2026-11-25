@@ -62,6 +62,8 @@ export function WorkGrid({
     setRefreshPending(true);
     try {
       await onRetry();
+    } catch {
+      // Query errors are surfaced through isError; do not leave an unhandled rejection.
     } finally {
       refreshLock.current = false;
       setRefreshPending(false);

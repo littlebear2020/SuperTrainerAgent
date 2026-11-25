@@ -277,7 +277,7 @@ describe("works data hooks", () => {
 
     h.fetchSummaries.mockRejectedValueOnce(new Error("refresh failed"));
     await act(async () => {
-      await currentWorks().refetch();
+      await expect(currentWorks().refetch()).rejects.toThrow("refresh failed");
     });
     await waitForAssertion(() => expect(currentWorks().isError).toBe(true));
 

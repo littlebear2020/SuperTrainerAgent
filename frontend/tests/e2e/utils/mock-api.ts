@@ -221,7 +221,19 @@ export function mockLangGraphAPI(
     const request = route.request().postDataJSON() as {
       thread_ids?: string[];
     };
-    const threadIds = [...new Set(request.thread_ids ?? [])];
+    const requestedIds = (request.thread_ids ?? []).map((id) => id.trim());
+    if (
+      requestedIds.length === 0 ||
+      requestedIds.length > 50 ||
+      requestedIds.some((id) => id.length === 0 || id.length > 128)
+    ) {
+      return route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Invalid thread ID batch" }),
+      });
+    }
+    const threadIds = [...new Set(requestedIds)];
     artifactSummaryRequests.push(threadIds);
     if (failArtifactSummariesStatus !== undefined) {
       const status = failArtifactSummariesStatus;
