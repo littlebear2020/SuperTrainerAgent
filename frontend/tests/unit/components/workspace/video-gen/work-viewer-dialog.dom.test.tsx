@@ -205,6 +205,24 @@ describe("WorkViewerDialog", () => {
     );
   });
 
+  it("tries image decoding for an unnamed legacy output before failing", async () => {
+    const legacy = makeFile("legacy-output", "video", { name: null });
+    await render(makeWork([legacy], { source: "task" }));
+
+    await act(async () => {
+      document.querySelector("video")?.dispatchEvent(new Event("error"));
+    });
+    const image = document.querySelector("img");
+    expect(image?.src).toBe(legacy.previewUrl);
+    expect(document.body.textContent).not.toContain("媒体暂时无法播放");
+
+    await act(async () => {
+      image?.dispatchEvent(new Event("error"));
+    });
+    expect(document.body.textContent).toContain("媒体暂时无法播放");
+    expect(document.querySelector("a[download]")).not.toBeNull();
+  });
+
   it("unmounts media when closed and resets the selected file when work changes", async () => {
     const first = makeFile("first.mp4", "video");
     const second = makeFile("second.mp4", "video");

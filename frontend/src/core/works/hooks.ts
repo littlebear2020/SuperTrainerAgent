@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useThreads } from "@/core/threads/hooks";
@@ -17,6 +17,20 @@ const THREAD_SEARCH_PARAMS = {
   select: ["thread_id", "created_at", "updated_at", "values", "metadata"],
 } satisfies NonNullable<Parameters<typeof useThreads>[0]>;
 
+function artifactSummariesKey(normalizedIds: readonly string[]) {
+  return ["works", "artifact-summaries", normalizedIds] as const;
+}
+
+async function loadArtifactSummaries(
+  normalizedIds: readonly string[],
+): Promise<ThreadArtifactSummary[]> {
+  const summaries: ThreadArtifactSummary[] = [];
+  for (const batch of chunkThreadIds(normalizedIds)) {
+    summaries.push(...(await fetchArtifactSummaries(batch)));
+  }
+  return summaries;
+}
+
 export function useArtifactSummaries(threadIds: readonly string[]) {
   const normalizedIds = useMemo(
     () => chunkThreadIds(threadIds).flat(),
@@ -24,15 +38,9 @@ export function useArtifactSummaries(threadIds: readonly string[]) {
   );
 
   return useQuery<ThreadArtifactSummary[]>({
-    queryKey: ["works", "artifact-summaries", normalizedIds],
+    queryKey: artifactSummariesKey(normalizedIds),
     enabled: normalizedIds.length > 0,
-    queryFn: async () => {
-      const summaries: ThreadArtifactSummary[] = [];
-      for (const batch of chunkThreadIds(normalizedIds)) {
-        summaries.push(...(await fetchArtifactSummaries(batch)));
-      }
-      return summaries;
-    },
+    queryFn: () => loadArtifactSummaries(normalizedIds),
   });
 }
 
@@ -42,6 +50,7 @@ export function useWorks(capability: WorkCapability): {
   isError: boolean;
   refetch: () => Promise<void>;
 } {
+  const queryClient = useQueryClient();
   const sources = WORK_CAPABILITY_SOURCES[capability];
   const hasAgentSource = sources.agentNames.length > 0;
   const hasTaskSource = sources.taskTypes.length > 0;
@@ -63,13 +72,34 @@ export function useWorks(capability: WorkCapability): {
     [capability, hasAgentSource, threads],
   );
   const summariesQuery = useArtifactSummaries(threadIds);
-  const summariesReady =
-    threadIds.length === 0 || summariesQuery.data !== undefined;
+  const cachedSummaries = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: ["works", "artifact-summaries"] })
+    .filter(
+      (query) =>
+        query.state.status === "success" && Array.isArray(query.state.data),
+    )
+    .sort(
+      (left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt,
+    )[0]?.state.data as ThreadArtifactSummary[] | undefined;
+  const usingCachedFallback =
+    summariesQuery.data === undefined && cachedSummaries !== undefined;
+  const summaries = summariesQuery.data ?? cachedSummaries;
+  const summariesReady = threadIds.length === 0 || summaries !== undefined;
 
   const works = useMemo(() => {
+    const summaryList = summaries ?? [];
+    const coveredThreads =
+      usingCachedFallback || summariesQuery.isError
+        ? threads.filter((thread) =>
+            summaryList.some(
+              (summary) => summary.thread_id === thread.thread_id,
+            ),
+          )
+        : threads;
     const agentWorks =
       hasAgentSource && summariesReady
-        ? buildAgentWorks(threads, summariesQuery.data ?? [], capability)
+        ? buildAgentWorks(coveredThreads, summaryList, capability)
         : [];
     const taskWorks = hasTaskSource
       ? buildTaskWorks(tasksQuery.data ?? [], capability)
@@ -79,10 +109,12 @@ export function useWorks(capability: WorkCapability): {
     capability,
     hasAgentSource,
     hasTaskSource,
-    summariesQuery.data,
+    summaries,
+    summariesQuery.isError,
     summariesReady,
     tasksQuery.data,
     threads,
+    usingCachedFallback,
   ]);
 
   return {
@@ -96,13 +128,24 @@ export function useWorks(capability: WorkCapability): {
       (hasAgentSource && (threadsQuery.isError || summariesQuery.isError)) ||
       (hasTaskSource && tasksQuery.isError),
     refetch: async () => {
-      const requests: Promise<unknown>[] = [];
-      if (hasAgentSource) requests.push(threadsQuery.refetch());
-      if (hasTaskSource) requests.push(tasksQuery.refetch());
-      if (hasAgentSource && threadIds.length > 0) {
-        requests.push(summariesQuery.refetch());
+      const tasksRequest = hasTaskSource ? tasksQuery.refetch() : null;
+      if (hasAgentSource) {
+        const refreshed = await threadsQuery.refetch();
+        const refreshedThreads = refreshed.data ?? threads;
+        const nextIds = refreshedThreads
+          .filter((thread) => agentNameOfThread(thread) === capability)
+          .map((thread) => thread.thread_id);
+        const normalizedIds = chunkThreadIds(nextIds).flat();
+        if (normalizedIds.length > 0) {
+          await queryClient
+            .fetchQuery({
+              queryKey: artifactSummariesKey(normalizedIds),
+              queryFn: () => loadArtifactSummaries(normalizedIds),
+            })
+            .catch(() => undefined);
+        }
       }
-      await Promise.all(requests);
+      if (tasksRequest) await tasksRequest;
     },
   };
 }

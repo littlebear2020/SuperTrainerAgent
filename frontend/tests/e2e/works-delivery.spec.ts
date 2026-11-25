@@ -408,6 +408,45 @@ test.describe("works delivery center", () => {
     await expect(page.getByTestId("work-card")).toHaveCount(1);
   });
 
+  test("opens a legacy GIF as an image after video decoding fails", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page, { threads: [] });
+    videoAPI.seedTask({
+      id: "legacy-gif",
+      title: "旧后端 GIF",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+    });
+    await page.route("**/api/video/tasks/legacy-gif/download", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "image/gif",
+        body: Buffer.from(
+          "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+          "base64",
+        ),
+      }),
+    );
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    await taskCard(page, "legacy-gif")
+      .getByRole("button", { name: "查看", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    const image = dialog.locator("img");
+    await expect(image).toHaveAttribute(
+      "src",
+      "/api/video/tasks/legacy-gif/download",
+    );
+    await expect
+      .poll(() =>
+        image.evaluate((element) => (element as HTMLImageElement).naturalWidth),
+      )
+      .toBe(1);
+  });
+
   test("does not invent versions for an overwritten same-name path", async ({
     page,
   }) => {

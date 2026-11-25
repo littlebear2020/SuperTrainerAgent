@@ -38,6 +38,15 @@
 - 根门禁：`make check` → exit 0；backend Ruff + format、frontend ESLint/tsc/Prettier/knip、i18n **707 个叶子全活**均通过；`python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 - 视觉证据（Playwright 输出目录，评审后清理）：`frontend/test-results/work-capabilities-*/{course-video,ai_image,ai_video,creative-studio,ppt-master,podcast-studio}-{1440,1280,390,320}.png`；暗色英文查看器 `frontend/test-results/works-delivery-*/english-dark.png`。执行侧已抽看 course-video 1440/1280/390 与 english-dark，确认三列/单列、卡片比例、暗色 Dialog 与文案正常。
 
+## 独立评审与最终复验
+
+- 独立全分支评审：无 Critical；3 个 Important 均先 RED 后 GREEN：① A→A+B 摘要失败时从 QueryCache 取最近成功摘要、保留 A，手动刷新按线程刷新返回的新 ID 集 `fetchQuery` 并等待；② 共享 resolver 拒绝日志仅保留脱敏线程与原因类别，不再记录虚拟路径或异常原文；③ 无 delivery 的 unnamed legacy 输出在视频解码失败后尝试图片，GIF 可查看，二次失败才显示通用媒体错误。
+- 修复回归：artifact 服务 `24 passed`；hooks `11 passed`、viewer `10 passed`；legacy GIF + 刷新失败浏览器用例 `2 passed`。另补无 delivery GIF 的真实浏览器图片解码断言。
+- 后端最终全量：外部代理故障使既有 `test_ai_video_character_wiring` 的假 URL 每帧进行有界 60 秒重试（单文件最终自然 `2 passed`，约 369 秒）；使用仅测试进程的离线代理 `127.0.0.1:9`、localhost 直连，让非 hermetic 外呼立即失败，不跳过用例。`uv run pytest tests/ -q` → **`10414 passed, 91 skipped, 421 warnings in 256.33s`**。
+- 前端最终全量：`pnpm check && pnpm test` → exit 0，Vitest **`306 files / 2159 tests passed`**。三组定向 Playwright → **`39 passed`**。
+- 全量 Playwright 最终为 `192 passed / 5 failed / 3 skipped`：5 条全部是计划 Step 8 已预告的 `video-gen.spec.ts` `waitForLoadState("networkidle")` 超时。当前分支单独复跑仍 `5 failed`；临时 detached worktree 的本地 `main@64ef5b52` 同命令同样 **`5 failed`**，随后移除基线 worktree。原始失败与 main 对照均保留，本批 39 项必要 E2E 全绿，未修改无关模块。
+- 最终性能复核：`pnpm perf:check` → exit 0；`/workspace/video-gen` **JS 3,595,698 B / CSS 255,242 B**，仍在既有预算内。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。
