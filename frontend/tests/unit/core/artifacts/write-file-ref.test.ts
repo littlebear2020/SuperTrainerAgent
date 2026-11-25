@@ -118,7 +118,7 @@ describe("createWriteFileRef / parseWriteFileRef", () => {
   });
 });
 
-describe("loadArtifactContentFromToolCall（纵切 A 的过渡签名）", () => {
+describe("loadArtifactContentFromToolCall：定位与校验（五态里的 ready / invalid）", () => {
   const aiWithCall = (
     id: string,
     toolCallId: string,
@@ -134,47 +134,58 @@ describe("loadArtifactContentFromToolCall（纵切 A 的过渡签名）", () => 
       ],
     }) as unknown as Message;
 
+  const toolOk = (toolCallId: string): Message =>
+    ({
+      id: `tool-${toolCallId}`,
+      type: "tool",
+      tool_call_id: toolCallId,
+      name: "write_file",
+      content: "OK",
+    }) as unknown as Message;
+
   const thread = (messages: Message[]) =>
     ({ messages }) as unknown as Parameters<
       typeof loadArtifactContentFromToolCall
     >[0]["thread"];
 
-  it("messageId 重复时以 toolCallId 找到正确的消息", () => {
+  async function load(url: string, t: ReturnType<typeof thread>) {
+    return loadArtifactContentFromToolCall({ url, thread: t, threadId: "t-1" });
+  }
+
+  it("messageId 重复时以 toolCallId 找到正确的消息", async () => {
     const t = thread([
       aiWithCall("dup", "call-a", "/mnt/data/a.txt", "A 的正文"),
       aiWithCall("dup", "call-b", "/mnt/data/b.txt", "B 的正文"),
+      toolOk("call-a"),
+      toolOk("call-b"),
     ]);
     const ref = createWriteFileRef({
       path: "/mnt/data/b.txt",
       messageId: "dup",
       toolCallId: "call-b",
     });
-    expect(loadArtifactContentFromToolCall({ url: ref!, thread: t })).toBe(
-      "B 的正文",
-    );
+    await expect(load(ref!, t)).resolves.toEqual({
+      status: "ready",
+      content: "B 的正文",
+    });
   });
 
-  it("path 与定位到的 tool call 不一致、引用非法或缺字段时返回 undefined", () => {
-    const t = thread([aiWithCall("m1", "call-1", "/mnt/data/a.txt", "正文")]);
+  it("path 与定位到的 tool call 不一致、引用非法或缺字段时是 invalid", async () => {
+    const t = thread([
+      aiWithCall("m1", "call-1", "/mnt/data/a.txt", "正文"),
+      toolOk("call-1"),
+    ]);
     const mismatch = createWriteFileRef({
       path: "/mnt/data/other.txt",
       messageId: "m1",
       toolCallId: "call-1",
     });
-    expect(
-      loadArtifactContentFromToolCall({ url: mismatch!, thread: t }),
-    ).toBeUndefined();
-    expect(
-      loadArtifactContentFromToolCall({
-        url: "write-file:/100%.txt",
-        thread: t,
-      }),
-    ).toBeUndefined();
-    expect(
-      loadArtifactContentFromToolCall({
-        url: "write-file:?path=%2Fmnt%2Fdata%2Fa.txt",
-        thread: t,
-      }),
-    ).toBeUndefined();
+    await expect(load(mismatch!, t)).resolves.toEqual({ status: "invalid" });
+    await expect(load("write-file:/100%.txt", t)).resolves.toEqual({
+      status: "invalid",
+    });
+    await expect(
+      load("write-file:?path=%2Fmnt%2Fdata%2Fa.txt", t),
+    ).resolves.toEqual({ status: "invalid" });
   });
 });

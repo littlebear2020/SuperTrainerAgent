@@ -86,6 +86,16 @@ export const zhCN: Translations = {
     saveFailed: "保存文件失败",
   },
 
+  // write-file 引用的五态文案（PR4）
+  writeFileRef: {
+    pending: "正在读取这次写入的内容…",
+    notFound: "没有找到这次写入对应的消息。",
+    loadFullHistory: "加载完整历史",
+    retry: "重试",
+    invalid: "这个引用无效，无法定位到对应的工具调用。",
+    failed: "这次写入失败了",
+  },
+
   // Input Box
   inputBox: {
     placeholder: "今天我能为你做些什么？",
