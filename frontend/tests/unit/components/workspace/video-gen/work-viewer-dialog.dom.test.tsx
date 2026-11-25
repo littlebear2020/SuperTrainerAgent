@@ -206,7 +206,10 @@ describe("WorkViewerDialog", () => {
   });
 
   it("tries image decoding for an unnamed legacy output before failing", async () => {
-    const legacy = makeFile("legacy-output", "video", { name: null });
+    const legacy = {
+      ...makeFile("legacy-output", "video", { name: null }),
+      mediaKindGuessed: true,
+    } as WorkFile;
     await render(makeWork([legacy], { source: "task" }));
 
     await act(async () => {
@@ -221,6 +224,21 @@ describe("WorkViewerDialog", () => {
     });
     expect(document.body.textContent).toContain("媒体暂时无法播放");
     expect(document.querySelector("a[download]")).not.toBeNull();
+  });
+
+  it("uses the mediaKindGuessed marker instead of inferring legacy output from its name", async () => {
+    const legacy = {
+      ...makeFile("known-output.bin", "video", { name: "known-output.bin" }),
+      mediaKindGuessed: true,
+    } as WorkFile;
+    await render(makeWork([legacy], { source: "task" }));
+
+    await act(async () => {
+      document.querySelector("video")?.dispatchEvent(new Event("error"));
+    });
+
+    expect(document.querySelector("img")?.src).toBe(legacy.previewUrl);
+    expect(document.body.textContent).not.toContain("媒体暂时无法播放");
   });
 
   it("unmounts media when closed and resets the selected file when work changes", async () => {

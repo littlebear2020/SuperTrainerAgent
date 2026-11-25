@@ -262,6 +262,7 @@ describe("buildTaskWorks", () => {
     expect(work?.primaryFile).toMatchObject({
       id: "task:task-1:output",
       name: null,
+      mediaKindGuessed: true,
       mediaKind: "video",
       size: null,
       modifiedAt: null,

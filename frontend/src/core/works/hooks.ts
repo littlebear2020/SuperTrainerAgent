@@ -66,10 +66,14 @@ export function useWorks(capability: WorkCapability): {
     () =>
       hasAgentSource
         ? threads
-            .filter((thread) => agentNameOfThread(thread) === capability)
+            .filter((thread) =>
+              sources.agentNames.some(
+                (name) => name === agentNameOfThread(thread),
+              ),
+            )
             .map((thread) => thread.thread_id)
         : [],
-    [capability, hasAgentSource, threads],
+    [hasAgentSource, sources.agentNames, threads],
   );
   const summariesQuery = useArtifactSummaries(threadIds);
   const cachedSummaries = useMemo(() => {
@@ -146,21 +150,29 @@ export function useWorks(capability: WorkCapability): {
       (hasTaskSource && tasksQuery.isError),
     refetch: async () => {
       const tasksRequest = hasTaskSource ? tasksQuery.refetch() : null;
-      if (hasAgentSource) {
-        const refreshed = await threadsQuery.refetch();
-        const refreshedThreads = refreshed.data ?? threads;
-        const nextIds = refreshedThreads
-          .filter((thread) => agentNameOfThread(thread) === capability)
-          .map((thread) => thread.thread_id);
-        const normalizedIds = chunkThreadIds(nextIds).flat();
-        if (normalizedIds.length > 0) {
-          await queryClient.fetchQuery({
-            queryKey: artifactSummariesKey(normalizedIds),
-            queryFn: () => loadArtifactSummaries(normalizedIds),
-          });
+      try {
+        if (hasAgentSource) {
+          const refreshed = await threadsQuery.refetch();
+          if (refreshed.error) throw refreshed.error;
+          const refreshedThreads = refreshed.data ?? threads;
+          const nextIds = refreshedThreads
+            .filter((thread) =>
+              sources.agentNames.some(
+                (name) => name === agentNameOfThread(thread),
+              ),
+            )
+            .map((thread) => thread.thread_id);
+          const normalizedIds = chunkThreadIds(nextIds).flat();
+          if (normalizedIds.length > 0) {
+            await queryClient.fetchQuery({
+              queryKey: artifactSummariesKey(normalizedIds),
+              queryFn: () => loadArtifactSummaries(normalizedIds),
+            });
+          }
         }
+      } finally {
+        if (tasksRequest) await tasksRequest;
       }
-      if (tasksRequest) await tasksRequest;
     },
   };
 }

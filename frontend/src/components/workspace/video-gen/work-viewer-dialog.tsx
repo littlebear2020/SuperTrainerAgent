@@ -74,7 +74,11 @@ function CurrentFileMedia({
       </div>
     );
   }
-  if (legacyImageFallback && file.name === null && file.previewUrl) {
+  if (
+    legacyImageFallback &&
+    file.mediaKindGuessed === true &&
+    file.previewUrl
+  ) {
     return (
       <div className="flex max-h-[60vh] justify-center overflow-hidden rounded-xl bg-black">
         <img
@@ -94,7 +98,9 @@ function CurrentFileMedia({
         controls
         preload="metadata"
         onError={
-          file.name === null ? () => setLegacyImageFallback(true) : onError
+          file.mediaKindGuessed === true
+            ? () => setLegacyImageFallback(true)
+            : onError
         }
         className="aspect-video max-h-[60vh] w-full rounded-xl bg-black"
       />

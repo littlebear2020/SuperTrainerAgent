@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentThread } from "@/core/threads/types";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
+import { WORK_CAPABILITY_SOURCES } from "@/core/works/capability-sources";
 import { useArtifactSummaries, useWorks } from "@/core/works/hooks";
 import type { ThreadArtifactSummary } from "@/core/works/types";
 import type { WorkCapability } from "@/core/workspace/video-assets-route";
@@ -350,6 +351,80 @@ describe("works data hooks", () => {
     });
 
     expect(h.fetchSummaries).toHaveBeenCalledWith(["thread-1", "thread-2"]);
+  });
+
+  it("uses configured Agent names instead of assuming they equal capability IDs", async () => {
+    const source = WORK_CAPABILITY_SOURCES["creative-studio"];
+    const originalNames = source.agentNames;
+    Reflect.set(source, "agentNames", ["creative-agent"]);
+    const thread = makeThread("custom-agent-thread");
+    Object.assign(thread, { metadata: { agent_name: "creative-agent" } });
+    h.threads = [thread];
+    h.fetchSummaries.mockResolvedValueOnce([summary(thread.thread_id)]);
+
+    try {
+      await render(<WorksProbe capability="creative-studio" />);
+      await waitForAssertion(() =>
+        expect(currentWorks().works).toHaveLength(1),
+      );
+    } finally {
+      Reflect.set(source, "agentNames", originalNames);
+    }
+  });
+
+  it("does not refresh old summaries when the thread refresh fails", async () => {
+    const first = makeThread("thread-1");
+    h.threads = [first];
+    h.fetchSummaries.mockResolvedValueOnce([summary("thread-1")]);
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    h.threadsRefetch.mockResolvedValueOnce({
+      data: undefined,
+      error: new Error("thread refresh failed"),
+    });
+    h.fetchSummaries.mockClear();
+    await act(async () => {
+      await expect(currentWorks().refetch()).rejects.toThrow(
+        "thread refresh failed",
+      );
+    });
+
+    expect(h.fetchSummaries).not.toHaveBeenCalled();
+  });
+
+  it("awaits an already-started task refresh when summary refresh fails", async () => {
+    const thread = makeThread("course-thread");
+    Object.assign(thread, { metadata: { agent_name: "course-video" } });
+    h.threads = [thread];
+    h.fetchSummaries.mockResolvedValueOnce([summary(thread.thread_id)]);
+    await render(<WorksProbe capability="course-video" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    let finishTasks: (() => void) | undefined;
+    h.tasksRefetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTasks = () => resolve({ data: [] });
+        }),
+    );
+    h.fetchSummaries.mockRejectedValueOnce(new Error("summary refresh failed"));
+    let rejected = false;
+    let refreshPromise = Promise.resolve();
+    await act(async () => {
+      refreshPromise = currentWorks().refetch();
+      void refreshPromise.catch(() => {
+        rejected = true;
+      });
+      await Promise.resolve();
+    });
+    await waitForAssertion(() => expect(h.fetchSummaries).toHaveBeenCalled());
+
+    expect(rejected).toBe(false);
+    await act(async () => {
+      finishTasks?.();
+      await expect(refreshPromise).rejects.toThrow("summary refresh failed");
+    });
   });
 
   it.each([
