@@ -1,6 +1,6 @@
 # 核心产品前端可靠性优化 Implementation Plan
 
-> **状态**：部分执行（PR1、PR2、PR3 已合入 main，PR4 与总验收未执行——按用户 2026-11-25 的安排顺延，PR4 排在另一项前端优化任务之后，届时先 rebase 到新 main；2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。**执行进度（2026-11-25）**：PR1 视频编辑安全已合入（PR [#58](https://github.com/littlebear2020/SuperTrainerAgent/pull/58)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr1.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr1.md)；PR2 输入受理已合入（PR [#59](https://github.com/littlebear2020/SuperTrainerAgent/pull/59)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr2.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr2.md)。PR3 长会话恢复已合入（PR [#60](https://github.com/littlebear2020/SuperTrainerAgent/pull/60)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr3.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr3.md)。同日用户以 /goal 指令授权本批建分支、push、开 PR 与评审通过后合并；仍不授权部署、付费 API 调用与 live 套件。
+> **状态**：部分执行（PR1、PR2、PR3 已合入 main，PR4 已执行、待合入，总验收未执行；2026-11-17 定稿；2026-11-24 完成范围裁剪与契约复核，保留 4 个纯前端串行 PR，执行顺序调整为视频编辑安全 → 输入上传 → 线程恢复 → 产物引用并按新顺序重编号；同日第二轮契约修订：agents/new 受控输入、回调归属与可等待取消、分片新鲜度、澄清状态模型、纵切提交闭包、PR1 守卫范围收窄；视频操作代际已拆至 `docs/plans/pending/2026-11-24-video-operation-generation-plan.md`，延后项已登记 `docs/findings-backlog.md`；不授权部署）。**执行进度（2026-11-25）**：PR1 视频编辑安全已合入（PR [#58](https://github.com/littlebear2020/SuperTrainerAgent/pull/58)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr1.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr1.md)；PR2 输入受理已合入（PR [#59](https://github.com/littlebear2020/SuperTrainerAgent/pull/59)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr2.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr2.md)。PR3 长会话恢复已合入（PR [#60](https://github.com/littlebear2020/SuperTrainerAgent/pull/60)），验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr3.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr3.md)。PR4 write-file 引用的验收记录见 [changelog-2026-11-25-core-product-frontend-reliability-pr4.md](../changelog/changelog-2026-11-25-core-product-frontend-reliability-pr4.md)。同日用户以 /goal 指令授权本批建分支、push、开 PR 与评审通过后合并；仍不授权部署、付费 API 调用与 live 套件。
 > **TL;DR**：分 4 个串行 PR，按视频编辑安全→输入上传→线程恢复→产物引用执行（视频批路径零重叠、体量最小，先止住帧面板的未保存旧参数付费重生）。聊天补齐真实分页、取消恢复和滚动锚定；write-file 补齐流式参数完整性与分工具内容语义；AI 生图/生视频只修帧面板「重生画面」的未保存付费重生、取消轮询和失败反馈。换账号残留与视频跨代 accepted-operation 不在本批：延后项已登记 backlog，后者已拆至 pending 计划。流式停止保留草稿已落地，不得回退。
 
 > **For agentic workers：** 推荐 `superpowers:executing-plans` 在当前会话按文档顺序执行（Task 0 → Task 1–4 即 PR1–PR4 → Task 5）；若用户另行选择，才使用 `superpowers:subagent-driven-development`。先完成 Task 0 的基线预检，再用 `superpowers:using-git-worktrees` 从包含本计划修订的提交建立隔离工作区，按 checkbox 逐项勾选，不得并行派发这 4 个 PR。步骤内的 Commit 步是本地提交，按 Git 约定逐笔落；本计划不授权自动 push、自动合并或部署，push 与开 PR 另行确认。
@@ -286,33 +286,33 @@
 
 **纵切 A：安全引用**
 
-- [ ] **Step 1：写路径与旧格式兼容矩阵（红）。** 参数化 `% # ? 中文 空格 +`，断言新格式 round-trip；固定合法旧 URL、旧 `100%.txt`、旧 `#/?` 截断、新 `%2G` 等 fixture，断言不抛 URIError 且不可恢复值返回 null。缺 path/messageId/toolCallId 任一项均不生成 URL；loader 对重复 messageId 以 toolCallId 找到正确消息，path 不匹配返回 undefined。
-- [ ] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/artifacts/write-file-ref.test.ts`，预期新解析尚不存在。
-- [ ] **Step 3：实现并接入安全引用（绿）。** 纵切 A 的过渡签名：`loadArtifactContentFromToolCall` 仍返回 `string | undefined`，引用非法、缺定位字段或 path 不匹配时返回 `undefined`，不触发正文渲染；`core/artifacts/hooks.ts` 本纵切不动。用 URLSearchParams 生成 ref，用单一 parser 读取；message-group 负责生成，loader 与详情页负责解析，详情页不得再 `decodeURIComponent(url.pathname)`；loader 校验 ref.path 与定位到的 toolCall.args.path 一致。保留合法旧格式，已截断且无法恢复的旧值按无效处理。
-- [ ] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
-- [ ] **Step 5：Commit。** 暂存 `write-file-ref.ts`、`loader.ts`、`message-group.tsx`、`artifact-file-detail.tsx` 与本纵切测试，提交 `fix(artifacts): write-file 引用改用 query 参数编码，非法与截断旧格式返回无效`。
+- [x] **Step 1：写路径与旧格式兼容矩阵（红）。** 参数化 `% # ? 中文 空格 +`，断言新格式 round-trip；固定合法旧 URL、旧 `100%.txt`、旧 `#/?` 截断、新 `%2G` 等 fixture，断言不抛 URIError 且不可恢复值返回 null。缺 path/messageId/toolCallId 任一项均不生成 URL；loader 对重复 messageId 以 toolCallId 找到正确消息，path 不匹配返回 undefined。
+- [x] **Step 2：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/artifacts/write-file-ref.test.ts`，预期新解析尚不存在。
+- [x] **Step 3：实现并接入安全引用（绿）。** 纵切 A 的过渡签名：`loadArtifactContentFromToolCall` 仍返回 `string | undefined`，引用非法、缺定位字段或 path 不匹配时返回 `undefined`，不触发正文渲染；`core/artifacts/hooks.ts` 本纵切不动。用 URLSearchParams 生成 ref，用单一 parser 读取；message-group 负责生成，loader 与详情页负责解析，详情页不得再 `decodeURIComponent(url.pathname)`；loader 校验 ref.path 与定位到的 toolCall.args.path 一致。保留合法旧格式，已截断且无法恢复的旧值按无效处理。
+- [x] **Step 4：重跑 Step 2 确认全绿（含 typecheck）。**
+- [x] **Step 5：Commit。** 暂存 `write-file-ref.ts`、`loader.ts`、`message-group.tsx`、`artifact-file-detail.tsx` 与本纵切测试，提交 `fix(artifacts): write-file 引用改用 query 参数编码，非法与截断旧格式返回无效`。
 
 **纵切 B：五态加载与分工具正文来源**
 
-- [ ] **Step 6：写五态与分工具内容测试（红）。** 按目标优先的判定顺序覆盖：目标 call 与成功 result 齐全时，即使另有旧 run 未加载或新 run 正在流式也直接 ready/failed；目标缺失时分别覆盖流式/SDK history/run-history pending、目标 tool call 位于尚未加载旧 run 时 pending、全部 settled 且 hasMoreHistory=false 后 not_found；ready 空/非空文件；工具 Error failed；引用非法与 path 不匹配 invalid。覆盖非 append write_file、初始 write + append、str_replace、同路径连续 toolCall；用真实 `status="success"`/缺省 + `Error: ...` 文本模拟超限和 str_replace 失败，append/str_replace 的 GET 非 OK/网络异常也映射 failed，均不得显示 args.content 为正常 ready 或让 Promise 逸出异常。加载完整历史和 not_found 重试必须调用并等待 refetchHistory，无该能力时不显示这些动作。raw 路径：断言 `%20/%2F/%23` 字面文件名的真实请求 URL 不被预解码。
-- [ ] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/artifacts/write-file-content-state.dom.test.ts tests/unit/components/workspace/artifacts/artifact-file-detail-write-file.dom.test.tsx`，预期状态类型尚不存在，旧空串、全局 pending、append/str_replace、工具失败和 raw 路径断言失败。
-- [ ] **Step 8：实现五态加载与分工具正文来源（绿）。** 在 loader、`core/artifacts/hooks.ts` 与详情层原子切换到 `Promise<WriteFileContentState>`；query key 或 enabled 纳入「目标参数完整、result 已到位」信号。ready 才返回正文且允许空串，pending 显示加载，failed 显示工具错误，not_found 按能力显示真实重试或关闭。按 Interfaces 区分非 append 内联快照和 append/str_replace 当前文件 GET；tool args 的原始路径走 raw 编码通道，artifact list 语义不变。非 write-file 的既有查询和编辑语义不变。
-- [ ] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
-- [ ] **Step 10：Commit。** 暂存 `loader.ts`、`utils.ts`、`core/artifacts/hooks.ts`、`artifact-file-detail.tsx`、`mock-api.ts` 中为本纵切新增的夹具能力与本纵切测试，提交 `fix(artifacts): write-file 内容五态加载，append/str_replace 读取当前文件`。
+- [x] **Step 6：写五态与分工具内容测试（红）。** 按目标优先的判定顺序覆盖：目标 call 与成功 result 齐全时，即使另有旧 run 未加载或新 run 正在流式也直接 ready/failed；目标缺失时分别覆盖流式/SDK history/run-history pending、目标 tool call 位于尚未加载旧 run 时 pending、全部 settled 且 hasMoreHistory=false 后 not_found；ready 空/非空文件；工具 Error failed；引用非法与 path 不匹配 invalid。覆盖非 append write_file、初始 write + append、str_replace、同路径连续 toolCall；用真实 `status="success"`/缺省 + `Error: ...` 文本模拟超限和 str_replace 失败，append/str_replace 的 GET 非 OK/网络异常也映射 failed，均不得显示 args.content 为正常 ready 或让 Promise 逸出异常。加载完整历史和 not_found 重试必须调用并等待 refetchHistory，无该能力时不显示这些动作。raw 路径：断言 `%20/%2F/%23` 字面文件名的真实请求 URL 不被预解码。
+- [x] **Step 7：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/core/artifacts/write-file-content-state.dom.test.ts tests/unit/components/workspace/artifacts/artifact-file-detail-write-file.dom.test.tsx`，预期状态类型尚不存在，旧空串、全局 pending、append/str_replace、工具失败和 raw 路径断言失败。
+- [x] **Step 8：实现五态加载与分工具正文来源（绿）。** 在 loader、`core/artifacts/hooks.ts` 与详情层原子切换到 `Promise<WriteFileContentState>`；query key 或 enabled 纳入「目标参数完整、result 已到位」信号。ready 才返回正文且允许空串，pending 显示加载，failed 显示工具错误，not_found 按能力显示真实重试或关闭。按 Interfaces 区分非 append 内联快照和 append/str_replace 当前文件 GET；tool args 的原始路径走 raw 编码通道，artifact list 语义不变。非 write-file 的既有查询和编辑语义不变。
+- [x] **Step 9：重跑 Step 7 确认全绿（含 typecheck）。**
+- [x] **Step 10：Commit。** 暂存 `loader.ts`、`utils.ts`、`core/artifacts/hooks.ts`、`artifact-file-detail.tsx`、`mock-api.ts` 中为本纵切新增的夹具能力与本纵切测试，提交 `fix(artifacts): write-file 内容五态加载，append/str_replace 读取当前文件`。
 
 **纵切 C：auto-open 竞态**
 
-- [ ] **Step 11：写完整参数与 auto-open 竞态测试（红）。** 用真实 AIMessageChunk/可控 SSE 在 path 中间及 `%/#/?` 前切 chunk，半截 path 时 select 为零，完整参数后只选择一次。覆盖同 toolCallId 不重复、100ms 内用户手选不被覆盖、无关 Provider 重渲染不吞掉唯一尝试、卸载无 timer/setState；缺任一定位字段不构造 URL；run 尚未 onFinish 时参数补全、result 到位能 pending→ready/failed。
-- [ ] **Step 12：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/components/workspace/messages/write-file-auto-open.dom.test.tsx`，记录旧 auto-open 行为的失败项。
-- [ ] **Step 13：用独立组件承载无条件 Hook（绿）。** ToolCall 的 write_file/str_replace 分支只返回 WriteFileToolCall；auto-open effect 位于组件顶层，完整参数前保守等待，timer 实际触发时记录 attempted toolCallId 并清理 timer，用户选择变化后不再抢选。不得在条件分支里直接新增 Hook。
-- [ ] **Step 14：重跑 Step 12 确认全绿（含 typecheck）。**
-- [ ] **Step 15：Commit。** 暂存 `write-file-tool-call.tsx`、`message-group.tsx`、`core/artifacts/hooks.ts` 的本纵切改动与本纵切测试，提交 `fix(messages): write_file 工具调用拆独立组件，完整参数前不 auto-open`。
+- [x] **Step 11：写完整参数与 auto-open 竞态测试（红）。** 用真实 AIMessageChunk/可控 SSE 在 path 中间及 `%/#/?` 前切 chunk，半截 path 时 select 为零，完整参数后只选择一次。覆盖同 toolCallId 不重复、100ms 内用户手选不被覆盖、无关 Provider 重渲染不吞掉唯一尝试、卸载无 timer/setState；缺任一定位字段不构造 URL；run 尚未 onFinish 时参数补全、result 到位能 pending→ready/failed。
+- [x] **Step 12：运行确认旧实现失败。** 执行 `cd frontend && pnpm exec vitest run tests/unit/components/workspace/messages/write-file-auto-open.dom.test.tsx`，记录旧 auto-open 行为的失败项。
+- [x] **Step 13：用独立组件承载无条件 Hook（绿）。** ToolCall 的 write_file/str_replace 分支只返回 WriteFileToolCall；auto-open effect 位于组件顶层，完整参数前保守等待，timer 实际触发时记录 attempted toolCallId 并清理 timer，用户选择变化后不再抢选。不得在条件分支里直接新增 Hook。
+- [x] **Step 14：重跑 Step 12 确认全绿（含 typecheck）。**
+- [x] **Step 15：Commit。** 暂存 `write-file-tool-call.tsx`、`message-group.tsx`、`core/artifacts/hooks.ts` 的本纵切改动与本纵切测试，提交 `fix(messages): write_file 工具调用拆独立组件，完整参数前不 auto-open`。
 
 **纵切 D：行为验收与收尾**
 
-- [ ] **Step 16：端到端验收。** 重跑 Step 2、Step 7、Step 12 的 vitest 命令全绿；执行 `cd frontend && pnpm exec playwright test tests/e2e/chat-artifact-ref.spec.ts`，让特殊文件名 path 分 chunk 流式到达，验证半截不选、完整后 pending→ready、聊天区不崩、正文对应正确 toolCall、合法空文件不误报；另覆盖 append、str_replace 和工具 Error。
-- [ ] **Step 17：Commit。** 暂存 `chat-artifact-ref.spec.ts` 与 `mock-api.ts` 的剩余改动，提交 `test(e2e): write-file 引用端到端用例`。
-- [ ] **Step 18：批次门禁与收尾。** 执行 `make -C frontend check` 和 artifacts 既有回归；写 PR4 changelog「验收记录」，勾选并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR4 验收记录`。push 与开 PR 另行确认。
+- [x] **Step 16：端到端验收。** 重跑 Step 2、Step 7、Step 12 的 vitest 命令全绿；执行 `cd frontend && pnpm exec playwright test tests/e2e/chat-artifact-ref.spec.ts`，让特殊文件名 path 分 chunk 流式到达，验证半截不选、完整后 pending→ready、聊天区不崩、正文对应正确 toolCall、合法空文件不误报；另覆盖 append、str_replace 和工具 Error。
+- [x] **Step 17：Commit。** 暂存 `chat-artifact-ref.spec.ts` 与 `mock-api.ts` 的剩余改动，提交 `test(e2e): write-file 引用端到端用例`。
+- [x] **Step 18：批次门禁与收尾。** 执行 `make -C frontend check` 和 artifacts 既有回归；写 PR4 changelog「验收记录」，勾选并更新状态头，`python3 scripts/check_docs_convention.py` 过后提交 `docs(frontend-reliability): PR4 验收记录`。push 与开 PR 另行确认。
 
 ### 后续独立计划：视频操作代际与长队列恢复（不在本批执行）
 
