@@ -8,7 +8,61 @@ import {
   loadArtifactContentFromToolCall,
   probeWriteFileRef,
   type WriteFileContentState,
+  type WriteFileTargetProbe,
 } from "./loader";
+
+/**
+ * write-file 查询 key 里的归属信号。目标定下来（settled）之后加载标志不再影响判定，
+ * 不进 key——否则 result 到达时 GET 一次、流结束 isLoading 翻 false 又换新 key 再 GET
+ * 一次，同一份当前文件至少请求两遍。
+ */
+function revisionOf(
+  probe: WriteFileTargetProbe | null,
+  flags: {
+    sdkLoading: boolean;
+    streaming: boolean;
+    historyLoading: boolean;
+    hasMore: boolean;
+  },
+): string {
+  if (!probe) return "";
+  if (probe.phase === "settled") return probe.phase;
+  return [
+    probe.phase,
+    flags.sdkLoading,
+    flags.streaming,
+    flags.historyLoading,
+    flags.hasMore,
+  ].join("|");
+}
+
+type WriteFileQueryLike = {
+  isError: boolean;
+  error: unknown;
+  data: WriteFileContentState | undefined;
+};
+
+/**
+ * write-file 引用当前的内容状态。查询禁用时没有状态（「暂不加载」不泄漏成「等待中」，
+ * 与普通文件分支一致）；loader 自己把 GET 失败收敛成 failed，这里只兜底查询本身的
+ * 意外错误，不让它回退成永久的 pending。
+ */
+function resolveWriteFileState(
+  query: WriteFileQueryLike,
+  enabled: boolean,
+): WriteFileContentState | undefined {
+  if (!enabled) return undefined;
+  if (query.isError) {
+    return {
+      status: "failed",
+      message:
+        query.error instanceof Error
+          ? query.error.message
+          : String(query.error),
+    };
+  }
+  return query.data ?? { status: "pending" };
+}
 
 /**
  * 产物正文。普通文件走 GET；write-file 引用（`write-file:` 前缀）按五态判定
@@ -35,15 +89,15 @@ export function useArtifactContent({
     () => (isWriteFile ? probeWriteFileRef(filepath, thread) : null),
     [filepath, isWriteFile, thread],
   );
-  const revision = probe
-    ? [
-        probe.phase,
-        thread.isThreadLoading,
-        thread.isLoading,
-        isHistoryLoading ?? false,
-        hasMoreHistory ?? false,
-      ].join("|")
-    : "";
+  // `enabled` 对两类查询同义：调用方说「暂不加载内容」时，write-file 引用也不判定
+  // （append / str_replace 成功后会真实 GET 文件）
+  const contentEnabled = enabled !== false;
+  const revision = revisionOf(probe, {
+    sdkLoading: thread.isThreadLoading,
+    streaming: thread.isLoading,
+    historyLoading: isHistoryLoading ?? false,
+    hasMore: hasMoreHistory ?? false,
+  });
   const writeFileQuery = useQuery({
     queryKey: ["artifact", "write-file", filepath, threadId, revision],
     queryFn: () =>
@@ -54,9 +108,7 @@ export function useArtifactContent({
         isHistoryLoading,
         hasMoreHistory,
       }),
-    // `enabled` 对两类查询同义：调用方说「暂不加载内容」时，write-file 引用也不判定
-    // （append / str_replace 成功后会真实 GET 文件）
-    enabled: enabled !== false && isWriteFile,
+    enabled: contentEnabled && isWriteFile,
     // 每次归属信号变化都是新 key；同一 key 内不做缓存（流式中的 pending 要能翻）
     staleTime: 0,
     gcTime: 0,
@@ -67,26 +119,15 @@ export function useArtifactContent({
     queryFn: () => {
       return loadArtifactContent({ filepath, threadId });
     },
-    // `enabled` 缺省 = 启用（TanStack 把 undefined 当 true，不能写 `enabled && …`）；
-    // write-file 引用永远不走普通文件的查询
-    enabled: enabled !== false && !isWriteFile,
+    // write-file 引用永远不走普通文件的查询（按前缀挡掉）
+    enabled: contentEnabled && !isWriteFile,
     // Short window only to dedupe the burst of mounts for one artifact (e.g. .skill
     // ZIP extraction). A long staleTime served stale content after the agent
     // rewrote the file in a later run.
     staleTime: 5 * 1000,
   });
-  const writeFileState: WriteFileContentState | undefined = isWriteFile
-    ? writeFileQuery.isError
-      ? {
-          status: "failed",
-          // loader 自己把 GET 失败收敛成 failed；这里只兜底查询本身的意外错误，
-          // 不让它回退成永久的 pending
-          message:
-            writeFileQuery.error instanceof Error
-              ? writeFileQuery.error.message
-              : String(writeFileQuery.error),
-        }
-      : (writeFileQuery.data ?? { status: "pending" })
+  const writeFileState = isWriteFile
+    ? resolveWriteFileState(writeFileQuery, contentEnabled)
     : undefined;
   return {
     content:
@@ -95,10 +136,11 @@ export function useArtifactContent({
         : data?.content,
     url: isWriteFile ? undefined : data?.url,
     sha256: isWriteFile ? undefined : data?.sha256,
-    /** write-file 引用的五态；普通文件为 undefined。 */
+    /** write-file 引用的五态；普通文件、或查询被 `enabled: false` 关掉时为 undefined。 */
     writeFileState,
     isLoading: isWriteFile
-      ? writeFileQuery.isPending || writeFileState?.status === "pending"
+      ? contentEnabled &&
+        (writeFileQuery.isPending || writeFileState?.status === "pending")
       : isLoading,
     error,
   };

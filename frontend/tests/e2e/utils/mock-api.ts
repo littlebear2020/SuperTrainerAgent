@@ -6,6 +6,8 @@
  * `handleRunStream` from here.
  */
 
+import { createHash } from "node:crypto";
+
 import type { Message } from "@langchain/langgraph-sdk";
 import type { Page, Route } from "@playwright/test";
 
@@ -471,17 +473,23 @@ export function mockLangGraphAPI(
         }
       })
       .join("/");
-    const content = options?.artifacts?.[filepath];
-    if (content === undefined) {
+    const artifacts = options.artifacts;
+    // 自有属性：路径恰好是 constructor / toString 一类时不会命中原型链上的成员
+    if (!Object.hasOwn(artifacts, filepath)) {
       return route.fulfill({
         status: 404,
         contentType: "application/json",
         body: JSON.stringify({ detail: "Artifact not found" }),
       });
     }
+    const content = artifacts[filepath]!;
     return route.fulfill({
       status: 200,
       contentType: "text/plain; charset=utf-8",
+      // 与后端文本分支一致：ETag 里带正文的 sha256（前端拿它做 PUT 的乐观并发基线）
+      headers: {
+        etag: `"${createHash("sha256").update(content).digest("hex")}"`,
+      },
       body: content,
     });
   });

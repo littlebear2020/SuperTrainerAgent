@@ -95,6 +95,8 @@ export const enUS: Translations = {
     retry: "Retry",
     invalid: "This reference is invalid: the tool call cannot be located.",
     failed: "This write failed",
+    failedWithReason: (reason: string) => `This write failed: ${reason}`,
+    invalidTitle: "Invalid reference",
     refetchFailed:
       "Failed to reload the conversation history. Please try again.",
   },

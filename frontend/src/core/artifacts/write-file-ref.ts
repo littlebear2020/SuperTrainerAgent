@@ -37,14 +37,23 @@ export function createWriteFileRef({
 /** 不是合法 percent 编码的 `%`（后面没跟两位十六进制）。 */
 const INVALID_PERCENT = /%(?![0-9A-Fa-f]{2})/;
 
-/** query 里的原始键值（不解码）：用来在校验之前发现非法的 percent 编码。 */
+/**
+ * query 里的键值：值不解码（用来在校验之前发现非法的 percent 编码），键按 URLSearchParams
+ * 的规则解码——否则 `p%61th` 这种编码过的键在两套解析里会对不上。
+ */
 function rawParams(search: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const pair of search.replace(/^\?/, "").split("&")) {
     if (!pair) continue;
     const eq = pair.indexOf("=");
-    const key = eq === -1 ? pair : pair.slice(0, eq);
+    const rawKey = eq === -1 ? pair : pair.slice(0, eq);
     const value = eq === -1 ? "" : pair.slice(eq + 1);
+    let key = rawKey;
+    try {
+      key = decodeURIComponent(rawKey.replace(/\+/g, " "));
+    } catch {
+      // 键不是合法的 percent 编码：按原样查，不会命中任何已知键 → 按无效处理
+    }
     if (!out.has(key)) out.set(key, value);
   }
   return out;
