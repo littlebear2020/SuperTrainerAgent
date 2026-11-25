@@ -473,6 +473,32 @@ describe("断线后的恢复 owner", () => {
     expect(h.messageCalls).toEqual(["run-1"]);
   });
 
+  test("mount 自动 rejoin 的 run（reconnect key）归属当前流：断线后给重连入口，停止同样等服务端确认", async () => {
+    h.runs = [run("run-live", "running")];
+    // SDK reconnectOnMount 读这个键接续流，不经过 onCreated
+    window.sessionStorage.setItem("lg:stream:t-1", "run-live");
+    await mount();
+    expect(api().activeRunId).toBe("run-live");
+
+    await act(async () => {
+      h.thread.error = new TypeError("Failed to fetch");
+      h.thread.isLoading = false;
+    });
+    await rerender();
+    expect(api().isRecoverableDisconnect).toBe(true);
+
+    // 用户停止：rejoin 的 run 没有对应的 submission，也要发显式取消并做有界刷新
+    h.runs = [run("run-live", "interrupted")];
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(h.cancelRun).toHaveBeenCalledWith("t-1", "run-live");
+    expect(api().runsById["run-live"]?.status).toBe("interrupted");
+    expect(api().cancelFailed).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   test("stale run 404：清 reconnect key 并失效 history / runs，不提示", async () => {
     h.runs = [run("run-1", "running")];
     await mount();

@@ -38,6 +38,8 @@ const VIRTUALIZATION_THRESHOLD = 60;
 const ESTIMATED_ROW_HEIGHT = 176;
 const GROUP_START_OFFSET = 16;
 const VIRTUAL_SCROLL_SETTLE_ATTEMPTS = 4;
+/** prepend 后按同一锚点校正滚动的最多次数（未测高行逐批变成实测高度）。 */
+const PREPEND_ANCHOR_MAX_ADJUSTMENTS = 8;
 const STATIC_SCROLL_SETTLE_ATTEMPTS = 2;
 
 type GroupAlignment = "start" | "center";
@@ -142,6 +144,58 @@ export const VirtualMessageList = forwardRef<
   const previousFirstKeyRef = useRef<Key | undefined>(undefined);
   const anchorRef = useRef<{ key: Key; viewportOffset: number } | undefined>(
     undefined,
+  );
+  /**
+   * prepend 后待校正的锚点：首次对齐时新插入的行还是估计高度，实测高度陆续到位后
+   * 锚点行的起点会再移动——每一帧重新按同一锚点对齐，直到滚动位置稳定。
+   */
+  const pendingAnchorRef = useRef<
+    { key: Key; viewportOffset: number; attempts: number } | undefined
+  >(undefined);
+  /**
+   * 静态分支（<60 组）的锚点：首个可见行的键与它相对视口顶部的位置。静态态没有测量
+   * 数据，getOffsetForIndex 全是估算坐标，只能按真实 DOM 节点锚定；浏览器的原生滚动
+   * 锚定在滚动位置为 0 时不下调（Chrome 刻意如此），所以不能全交给它。
+   */
+  const staticAnchorRef = useRef<{ key: Key; top: number } | undefined>(
+    undefined,
+  );
+  const wasVirtualRef = useRef(false);
+
+  const viewIndexForKey = useCallback(
+    (key: Key) =>
+      renderableViews.findIndex(
+        (view, viewIndex) => getItemKey(viewIndex) === key,
+      ),
+    [renderableViews, getItemKey],
+  );
+  const rowForView = useCallback((view: RenderableView | undefined) => {
+    return view
+      ? (listRef.current?.querySelector<HTMLElement>(
+          `[data-message-group-index="${view.index}"]`,
+        ) ?? null)
+      : null;
+  }, []);
+
+  /** 静态分支里首个可见的行（底边越过视口顶部的第一行）。 */
+  const firstVisibleStaticAnchor = useCallback(
+    (viewport: HTMLElement) => {
+      const viewportTop = viewport.getBoundingClientRect().top;
+      for (
+        let viewIndex = 0;
+        viewIndex < renderableViews.length;
+        viewIndex += 1
+      ) {
+        const row = rowForView(renderableViews[viewIndex]);
+        if (!row) continue;
+        const rect = row.getBoundingClientRect();
+        if (rect.bottom > viewportTop) {
+          return { key: getItemKey(viewIndex), top: rect.top };
+        }
+      }
+      return undefined;
+    },
+    [renderableViews, getItemKey, rowForView],
   );
 
   const alignGroupToViewport = useCallback(
@@ -256,42 +310,82 @@ export const VirtualMessageList = forwardRef<
   }, [isAtBottom, scrollToBottom, shouldVirtualize, viewCount, virtualizer]);
 
   useLayoutEffect(() => {
-    // 评审 important 订正：prepend 锚定只属虚拟态——静态分支（<60 组）行高
-    // 停留在 estimateSize（measureElement 未挂载），getOffsetForIndex 全是估算
-    // 坐标，主动 scrollToOffset 只会把视口甩到错误位置；静态态交还浏览器原生
-    // 滚动锚定（修前行为）。refs 清零防「静态期锚点污染首次虚拟帧」。
-    if (!shouldVirtualize) {
-      previousFirstKeyRef.current = undefined;
-      anchorRef.current = undefined;
-      return;
-    }
+    const viewport = scrollRef.current;
     const firstKey = getItemKey(0);
     const previousFirstKey = previousFirstKeyRef.current;
-    const anchor = anchorRef.current;
-    // prepend 推演（含空组）：键 = 组 id（见 groupKey），头部插入历史组只让
-    // firstKey 变化、不移位既有键；锚点恢复按**键**反查视图索引，空组不在
-    // 布局中、对偏移零贡献——恢复坐标与无空组时同构。
-    if (
-      previousFirstKey !== undefined &&
-      firstKey !== previousFirstKey &&
-      anchor
-    ) {
-      const anchorViewIndex = renderableViews.findIndex(
-        (view, viewIndex) => getItemKey(viewIndex) === anchor.key,
-      );
-      if (anchorViewIndex >= 0) {
-        const anchorStart = virtualizer.getOffsetForIndex(
-          anchorViewIndex,
-          "start",
-        )?.[0];
-        if (anchorStart !== undefined) {
-          virtualizer.scrollToOffset(anchorStart - anchor.viewportOffset, {
-            behavior: "auto",
-          });
+    // prepend 推演（含空组）：键 = 组 id（见 groupKey），头部插入历史组只让 firstKey
+    // 变化、不移位既有键；锚点恢复按**键**反查视图索引，空组不在布局中、对偏移
+    // 零贡献——恢复坐标与无空组时同构。
+    const prepended =
+      previousFirstKey !== undefined && firstKey !== previousFirstKey;
+    previousFirstKeyRef.current = firstKey;
+    const wasVirtual = wasVirtualRef.current;
+    wasVirtualRef.current = shouldVirtualize;
+
+    if (!shouldVirtualize) {
+      // 静态分支：没有测量数据，按真实 DOM 节点锚定（PR3）；虚拟态的 refs 清零，
+      // 防「静态期锚点污染首次虚拟帧」
+      anchorRef.current = undefined;
+      pendingAnchorRef.current = undefined;
+      const anchor = staticAnchorRef.current;
+      if (prepended && anchor && viewport) {
+        const row = rowForView(renderableViews[viewIndexForKey(anchor.key)]);
+        if (row) {
+          const delta = row.getBoundingClientRect().top - anchor.top;
+          if (Math.abs(delta) > 1) viewport.scrollTop += delta;
+        }
+      }
+      staticAnchorRef.current = viewport
+        ? firstVisibleStaticAnchor(viewport)
+        : undefined;
+      return;
+    }
+
+    if (!wasVirtual) {
+      // 静态 → 虚拟（prepend 跨过阈值）：把静态锚点交给虚拟分支的校正流程
+      const staticAnchor = staticAnchorRef.current;
+      staticAnchorRef.current = undefined;
+      if (prepended && staticAnchor && viewport) {
+        const anchorViewIndex = viewIndexForKey(staticAnchor.key);
+        if (anchorViewIndex >= 0) {
+          anchorRef.current = {
+            key: staticAnchor.key,
+            viewportOffset:
+              staticAnchor.top - viewport.getBoundingClientRect().top,
+          };
         }
       }
     }
-    previousFirstKeyRef.current = firstKey;
+
+    const anchor = anchorRef.current;
+    if (prepended && anchor) {
+      pendingAnchorRef.current = { ...anchor, attempts: 0 };
+    }
+
+    // 锚点校正（PR3）：首次对齐用的是估计高度；新行实测后按同一锚点再对齐，直到稳定
+    const pending = pendingAnchorRef.current;
+    if (pending) {
+      const anchorViewIndex = viewIndexForKey(pending.key);
+      const anchorStart =
+        anchorViewIndex >= 0
+          ? virtualizer.getOffsetForIndex(anchorViewIndex, "start")?.[0]
+          : undefined;
+      if (anchorStart === undefined) {
+        pendingAnchorRef.current = undefined;
+      } else {
+        const target = anchorStart - pending.viewportOffset;
+        const current = scrollRef.current?.scrollTop ?? 0;
+        if (Math.abs(current - target) <= 1) {
+          pendingAnchorRef.current = undefined;
+        } else {
+          virtualizer.scrollToOffset(target, { behavior: "auto" });
+          pending.attempts += 1;
+          if (pending.attempts >= PREPEND_ANCHOR_MAX_ADJUSTMENTS) {
+            pendingAnchorRef.current = undefined;
+          }
+        }
+      }
+    }
 
     const scrollOffset = virtualizer.scrollOffset ?? 0;
     const firstVisible = virtualItems.find((item) => item.end >= scrollOffset);
@@ -302,9 +396,13 @@ export const VirtualMessageList = forwardRef<
       };
     }
   }, [
+    firstVisibleStaticAnchor,
     getItemKey,
     renderableViews,
+    rowForView,
+    scrollRef,
     shouldVirtualize,
+    viewIndexForKey,
     virtualItems,
     virtualizer,
   ]);

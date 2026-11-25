@@ -95,6 +95,19 @@ type SendMessageOptions = {
   additionalKwargs?: Record<string, unknown>;
 };
 
+/** SDK 的 reconnect key（`lg:stream:{threadId}` → run_id）里的 run；没有或不可读时为 null。 */
+function readRejoinRunId(threadId: string | null | undefined): string | null {
+  if (typeof window === "undefined" || !threadId) return null;
+  try {
+    return window.sessionStorage.getItem(
+      `${STREAM_REJOIN_KEY_PREFIX}${threadId}`,
+    );
+  } catch {
+    // sessionStorage 不可用（隐私模式等）：当作没有可接续的 run
+    return null;
+  }
+}
+
 /** Suffix DynamicContextMiddleware's ID-swap gives the real user message (D-3):
  *  the injected reminder SystemMessage takes the original id ``X`` while the
  *  user copy becomes ``X__user``. Normalizing human-message keys to the base id
@@ -284,8 +297,14 @@ export function useThreadStream({
     threadId: string;
     runId: string;
   } | null>(null);
+  // mount 自动 rejoin 的 run 不经过 onCreated：SDK 按 reconnect key（sessionStorage）接续，
+  // 这里读同一个键——否则刷新后接续的流没有「当前 run」，停止、重连与终态同步都无从归属。
+  // key 在流正常收尾时由 SDK 清掉，随后自然回到 null。
+  const rejoinRunId = readRejoinRunId(threadId);
   const activeRunId =
-    activeRun && activeRun.threadId === threadId ? activeRun.runId : null;
+    activeRun && activeRun.threadId === threadId
+      ? activeRun.runId
+      : rejoinRunId;
 
   const handleStreamStart = useCallback((_threadId: string, _runId: string) => {
     threadIdRef.current = _threadId;
@@ -527,14 +546,12 @@ export function useThreadStream({
       // PR3：强制重取 meta.run_id 指向的分片（补齐流式期间追加的消息）。mount 自动
       // rejoin 不经过 onCreated，不能依赖只由 onStart 设置的 runId；分片层还有
       // generation / epoch 兜底，切线程后的迟到 onFinish 不会写进新线程。
+      // refetchRun 自己先登记再刷新 runs 列表（刷新与重取都在它里面）
       const finishedRunId = meta?.run_id;
       if (finishedRunId && meta?.thread_id === threadIdRef.current) {
-        void queryClient
-          .invalidateQueries({ queryKey: ["thread", threadIdRef.current] })
-          .then(() => refetchRunHistory(finishedRunId))
-          .catch((error: unknown) => {
-            console.error("Failed to refetch finished run history", error);
-          });
+        void refetchRunHistory(finishedRunId).catch((error: unknown) => {
+          console.error("Failed to refetch finished run history", error);
+        });
       }
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
       // P2-15：run 结束后刷新当前挂载的 artifact。artifact 可能在本次 run 里被改写，
@@ -911,8 +928,10 @@ export function useThreadStream({
    */
   const syncRunAfterCancel = useCallback(
     async (threadId: string, runId: string) => {
-      await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
+      // refetchRun 自带一次 runs 列表刷新；已切走时只刷新列表、不重取分片
       if (threadIdRef.current === threadId) await refetchRunHistory(runId);
+      else
+        await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
     },
     [queryClient, refetchRunHistory],
   );
@@ -1009,9 +1028,22 @@ export function useThreadStream({
         await cancelAcceptedRun(submission);
       } else {
         cancelPendingRef.current = false;
+        // mount 自动 rejoin 的 run 没有对应的 submission：停止同样要等服务端确认，
+        // 并做同一次有界刷新（PR3）
+        const targetThreadId = threadIdRef.current ?? onStreamThreadId;
+        if (activeRunId && targetThreadId) {
+          await applyCancelOutcome(targetThreadId, activeRunId);
+        }
       }
     }
-  }, [thread, rejectSubmission, cancelAcceptedRun]);
+  }, [
+    thread,
+    rejectSubmission,
+    cancelAcceptedRun,
+    applyCancelOutcome,
+    activeRunId,
+    onStreamThreadId,
+  ]);
 
   // ── PR3：断线恢复 owner ───────────────────────────────────────────────
   const activeRunStatus = activeRunId
@@ -1235,7 +1267,11 @@ export function useThreadHistory(threadId: string) {
   const [state, setState] = useState<HistoryState>(EMPTY_HISTORY_STATE);
   const generationRef = useRef(0);
   const requestEpochRef = useRef(new Map<string, number>());
-  const inFlightRef = useRef(new Map<string, Promise<void>>());
+  /** 已登记的强制重取（onFinish）：runs 列表刷新触发的「加载最新 run」effect 据此不重复请求。 */
+  const pendingForcedRef = useRef(new Set<string>());
+  const inFlightRef = useRef(
+    new Map<string, Promise<HistoryShard | undefined>>(),
+  );
   const runsRef = useRef(runs.data);
   const stateRef = useRef(state);
 
@@ -1265,15 +1301,21 @@ export function useThreadHistory(threadId: string) {
     [threadId],
   );
 
-  /** 加载 / 重取一个 run 的全部分片；只让该 run 最新一次请求写入。 */
+  /**
+   * 加载 / 重取一个 run 的全部分片；只让该 run 最新一次请求写入。
+   * resolve 为写入的分片（被更新的请求取代、或已切线程时为 undefined），失败则 reject——
+   * 调用方据此判断「在途的那次加载是否已经带着最新状态」，不必再发一次请求。
+   */
   const loadRun = useCallback(
-    async (run: Run): Promise<void> => {
+    async (run: Run): Promise<HistoryShard | undefined> => {
       const runId = run.run_id;
       const epoch = (requestEpochRef.current.get(runId) ?? 0) + 1;
       requestEpochRef.current.set(runId, epoch);
       const generation = generationRef.current;
-      const token: { promise: Promise<void> | null } = { promise: null };
-      const request = (async () => {
+      const token: {
+        promise: Promise<HistoryShard | undefined> | null;
+      } = { promise: null };
+      const request = (async (): Promise<HistoryShard | undefined> => {
         updateState((prev) => ({ ...prev, loading: true }));
         try {
           const all = await fetchAllRunMessages(threadId, runId);
@@ -1281,7 +1323,7 @@ export function useThreadHistory(threadId: string) {
             generationRef.current !== generation ||
             requestEpochRef.current.get(runId) !== epoch
           ) {
-            return;
+            return undefined;
           }
           const shard: HistoryShard = {
             runId,
@@ -1295,6 +1337,7 @@ export function useThreadHistory(threadId: string) {
             shards: new Map(prev.shards).set(runId, shard),
             loadedRunIds: new Set(prev.loadedRunIds).add(runId),
           }));
+          return shard;
         } catch (error) {
           if (generationRef.current !== generation) return;
           // 失败保留旧分片，但不再把它当作新鲜
@@ -1346,6 +1389,8 @@ export function useThreadHistory(threadId: string) {
   useEffect(() => {
     const latest = runsRef.current?.[0];
     if (!latest) return;
+    // onFinish 已为这个 run 登记了强制重取：交给它，不叠请求
+    if (pendingForcedRef.current.has(latest.run_id)) return;
     if (inFlightRef.current.has(latest.run_id)) return;
     if (snapshot().loadedRunIds.has(latest.run_id)) return;
     void loadRun(latest).catch((error: unknown) => {
@@ -1365,18 +1410,48 @@ export function useThreadHistory(threadId: string) {
     }
   }, [loadRun, snapshot]);
 
-  /** 强制重取指定 run（onFinish 用 meta.run_id 定位）；runs 列表里没有时先刷新列表。 */
+  /** 分片是否就是该 run 当前记录的版本（终态且 status / updated_at 一致才算新鲜）。 */
+  function isShardCurrent(shard: HistoryShard, run: Run): boolean {
+    return (
+      shard.fresh &&
+      shard.status === run.status &&
+      shard.updatedAt === run.updated_at
+    );
+  }
+
+  /**
+   * 已有在途加载时的统一处理：等它结束；它写出的分片若已是 run 的当前版本就不必再取。
+   * 返回 true = 已有最新分片，调用方可以跳过本次请求。
+   */
+  const settleInFlight = useCallback(async (run: Run): Promise<boolean> => {
+    const inFlight = inFlightRef.current.get(run.run_id);
+    if (!inFlight) return false;
+    const shard = await inFlight.catch(() => undefined);
+    return shard !== undefined && isShardCurrent(shard, run);
+  }, []);
+
+  /**
+   * 强制重取指定 run（onFinish 用 meta.run_id 定位）：不等待、直接取代该 run 的在途请求
+   * （同 run 的慢旧请求不得覆盖它）。先登记、再刷新 runs 列表——runs 更新会触发「加载最新
+   * run」的 effect，它看到登记就不再重复请求；列表里没有这个 run 时也靠刷新把它找回来。
+   */
   const refetchRun = useCallback(
     async (runId: string): Promise<void> => {
-      let run = runsRef.current?.find((r) => r.run_id === runId);
-      if (!run) {
+      pendingForcedRef.current.add(runId);
+      try {
+        const known = runsRef.current?.find((r) => r.run_id === runId);
         await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
-        run = queryClient
-          .getQueryData<Run[]>(["thread", threadId])
-          ?.find((r) => r.run_id === runId);
+        const run =
+          runsRef.current?.find((r) => r.run_id === runId) ??
+          queryClient
+            .getQueryData<Run[]>(["thread", threadId])
+            ?.find((r) => r.run_id === runId) ??
+          known;
+        if (!run) return;
+        await loadRun(run);
+      } finally {
+        pendingForcedRef.current.delete(runId);
       }
-      if (!run) return;
-      await loadRun(run);
     },
     [queryClient, threadId, loadRun],
   );
@@ -1389,24 +1464,12 @@ export function useThreadHistory(threadId: string) {
     async (runId: string): Promise<void> => {
       const run = runsRef.current?.find((r) => r.run_id === runId);
       if (!run) return;
-      // 该 run 已有在途的加载：它写完的分片就带着当前状态，等它即可（不叠一次请求）
-      const inFlight = inFlightRef.current.get(runId);
-      if (inFlight) {
-        await inFlight;
-        return;
-      }
+      if (await settleInFlight(run)) return;
       const shard = snapshot().shards.get(runId);
-      if (
-        shard &&
-        shard.fresh &&
-        shard.status === run.status &&
-        shard.updatedAt === run.updated_at
-      ) {
-        return;
-      }
+      if (shard && isShardCurrent(shard, run)) return;
       await loadRun(run);
     },
-    [loadRun, snapshot],
+    [loadRun, snapshot, settleInFlight],
   );
 
   /**
@@ -1429,21 +1492,13 @@ export function useThreadHistory(threadId: string) {
     let failed = false;
     for (const run of [...list].reverse()) {
       if (generationRef.current !== generation) break;
-      const inFlight = inFlightRef.current.get(run.run_id);
-      if (inFlight) {
-        try {
-          await inFlight;
-          continue;
-        } catch {
-          // 在途的那次失败了：下面重取
-        }
-      }
+      // 在途的那次加载若已带着最新状态就不叠加请求；失败了则在这里重取
+      if (await settleInFlight(run)) continue;
       const shard = shardsAtStart.get(run.run_id);
       if (
-        shard?.fresh &&
+        shard &&
         isTerminalRunStatus(run.status) &&
-        shard.status === run.status &&
-        shard.updatedAt === run.updated_at
+        isShardCurrent(shard, run)
       ) {
         continue;
       }
@@ -1455,7 +1510,7 @@ export function useThreadHistory(threadId: string) {
       }
     }
     if (failed) throw firstError;
-  }, [queryClient, threadId, snapshot, loadRun]);
+  }, [queryClient, threadId, snapshot, loadRun, settleInFlight]);
 
   // 不在 runs 列表里的分片（如被 regenerate 隐藏）在拼接时自然被过滤，不需要额外清理
   const current = state.threadId === threadId ? state : EMPTY_HISTORY_STATE;
