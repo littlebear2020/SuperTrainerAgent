@@ -95,6 +95,14 @@ export interface Translations {
     runInProgress: string;
     saveFailed: string;
   };
+  writeFileRef: {
+    pending: string;
+    notFound: string;
+    loadFullHistory: string;
+    retry: string;
+    invalid: string;
+    failed: string;
+  };
 
   // Input Box
   inputBox: {

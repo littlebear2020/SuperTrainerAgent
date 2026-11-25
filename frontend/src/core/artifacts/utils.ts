@@ -31,11 +31,16 @@ function decodePathSegment(segment: string) {
  * and relative segments are therefore filtered after decoding; legitimate
  * filenames can never be "." or "..".
  */
-export function encodeArtifactPath(filepath: string) {
+export function encodeArtifactPath(
+  filepath: string,
+  options: { raw?: boolean } = {},
+) {
   const segments = filepath.split("/");
   const kept: string[] = [];
   segments.forEach((segment, index) => {
-    const decoded = decodePathSegment(segment);
+    // raw：来自 tool args 的原始路径按字面编码（不先解码）——文件名字面带 %20 / %2F
+    // 时，解码再编码会让后端把它当成空格 / 分隔符，读到别的文件
+    const decoded = options.raw ? segment : decodePathSegment(segment);
     if (decoded === "." || decoded === "..") return;
     if (decoded === "") {
       // Keep exactly one leading separator (absolute sandbox paths like
@@ -52,12 +57,15 @@ export function urlOfArtifact({
   filepath,
   threadId,
   download = false,
+  raw = false,
 }: {
   filepath: string;
   threadId: string;
   download?: boolean;
+  /** true = 不预解码，按字面编码每个片段（来自 tool args 的原始路径）。 */
+  raw?: boolean;
 }) {
-  const encodedPath = encodeArtifactPath(filepath);
+  const encodedPath = encodeArtifactPath(filepath, { raw });
   return `${getBackendBaseURL()}/api/threads/${threadId}/artifacts${encodedPath}${download ? "?download=true" : ""}`;
 }
 

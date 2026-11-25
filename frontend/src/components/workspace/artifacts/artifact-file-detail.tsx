@@ -26,6 +26,7 @@ import {
   ArtifactHeader,
   ArtifactTitle,
 } from "@/components/ai-elements/artifact";
+import { Button } from "@/components/ui/button";
 import { Select, SelectItem } from "@/components/ui/select";
 import {
   SelectContent,
@@ -110,7 +111,7 @@ export function ArtifactFileDetail({
     editingPath,
     setEditingPath,
   } = useArtifacts();
-  const { thread } = useThread();
+  const { thread, hasMoreHistory, refetchHistory } = useThread();
   // PR4：write-file 引用由单一 parser 读取（path 是独立 query 参数；旧格式只解码一次），
   // 不再 decodeURIComponent(url.pathname)——那正是 `%` / `#` / `?` 被截断或抛错的地方
   const writeFileRef = useMemo(
@@ -151,6 +152,7 @@ export function ArtifactFileDetail({
     url,
     sha256,
     isLoading: contentLoading,
+    writeFileState,
   } = useArtifactContent({
     threadId,
     filepath: filepathFromProps,
@@ -158,6 +160,41 @@ export function ArtifactFileDetail({
   });
 
   const displayContent = content ?? "";
+  // PR4：write-file 引用按五态渲染——ready 才显示正文；其余四态在正文区给出说明，
+  // 目标缺失时按能力提供「加载完整历史 / 重试」（都真实调用 refetchHistory）
+  const [isRefetchingHistory, setIsRefetchingHistory] = useState(false);
+  const writeFileNotice = useMemo(() => {
+    if (!writeFileState || writeFileState.status === "ready") return null;
+    switch (writeFileState.status) {
+      case "pending":
+        return { text: t.writeFileRef.pending, action: null };
+      case "invalid":
+        return { text: t.writeFileRef.invalid, action: null };
+      case "failed":
+        return {
+          text: `${t.writeFileRef.failed}${writeFileState.message ? `：${writeFileState.message}` : ""}`,
+          action: null,
+        };
+      case "not_found":
+        return {
+          text: t.writeFileRef.notFound,
+          action: refetchHistory
+            ? hasMoreHistory
+              ? t.writeFileRef.loadFullHistory
+              : t.writeFileRef.retry
+            : null,
+        };
+    }
+  }, [writeFileState, t.writeFileRef, hasMoreHistory, refetchHistory]);
+  const refetchHistoryAction = useCallback(async () => {
+    if (!refetchHistory || isRefetchingHistory) return;
+    setIsRefetchingHistory(true);
+    try {
+      await refetchHistory();
+    } finally {
+      setIsRefetchingHistory(false);
+    }
+  }, [refetchHistory, isRefetchingHistory]);
 
   const [isSaving, setIsSaving] = useState(false);
   const activeDraft = drafts[filepath] ?? createArtifactDraft(filepath);
@@ -495,7 +532,7 @@ export function ArtifactFileDetail({
               <ArtifactAction
                 icon={CopyIcon}
                 label={t.clipboard.copyToClipboard}
-                disabled={!content}
+                disabled={!content || writeFileNotice !== null}
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(editorContent ?? "");
@@ -573,7 +610,28 @@ export function ArtifactFileDetail({
               url={url}
             />
           )}
-        {isCodeFile && viewMode === "code" && (
+        {writeFileNotice && (
+          <div
+            className="text-muted-foreground flex size-full flex-col items-center justify-center gap-3 p-6 text-sm"
+            role="status"
+            data-testid="write-file-notice"
+          >
+            <p className="max-w-xl text-center break-words">
+              {writeFileNotice.text}
+            </p>
+            {writeFileNotice.action && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isRefetchingHistory}
+                onClick={() => void refetchHistoryAction()}
+              >
+                {writeFileNotice.action}
+              </Button>
+            )}
+          </div>
+        )}
+        {isCodeFile && viewMode === "code" && !writeFileNotice && (
           <CodeEditor
             className="size-full resize-none rounded-none border-none"
             value={editorContent ?? ""}

@@ -87,6 +87,16 @@ export const enUS: Translations = {
     saveFailed: "Failed to save artifact",
   },
 
+  // write-file reference content states (PR4)
+  writeFileRef: {
+    pending: "Loading the content of this write…",
+    notFound: "The message for this write could not be found.",
+    loadFullHistory: "Load full history",
+    retry: "Retry",
+    invalid: "This reference is invalid: the tool call cannot be located.",
+    failed: "This write failed",
+  },
+
   // Input Box
   inputBox: {
     placeholder: "How can I assist you today?",
