@@ -60,9 +60,11 @@ export function classifyStreamError(
   const status = httpStatus(error);
   const message = messageOf(error);
   // 只认「run 不存在」：别的资源（Thread / Agent / Tool）的 "not found" 是业务错误，
-  // 不能静默吞掉、也不能顺手清掉 rejoin key。裸 404（HTTP 404: Not Found）只有在这个
-  // 流确实属于某个 run 时才算 stale run——没有 run 的 404 是线程 / 页面不存在
-  if (/\brun\b.*\bnot found\b/i.test(message)) {
+  // 不能静默吞掉、也不能顺手清掉 rejoin key。「Run」与「not found」之间不跨冒号：
+  // `Run failed: Tool 'x' not found` 是 run 里面的工具找不到，失败原因要照常提示。
+  // 裸 404（HTTP 404: Not Found）只有在这个流确实属于某个 run 时才算 stale run——
+  // 没有 run 的 404 是线程 / 页面不存在
+  if (/\brun\b[^:]*\bnot found\b/i.test(message)) {
     return "stale_run";
   }
   if (context.hasRun && (status === 404 || /HTTP\s*404\b/i.test(message))) {

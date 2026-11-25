@@ -281,6 +281,13 @@ describe("classifyStreamError", () => {
     // 别的资源的 "not found" 不是 stale run：不能静默吞掉、也不能清掉 rejoin key
     expect(classifyStreamError(new Error("Thread not found"))).toBe("business");
     expect(classifyStreamError(new Error("Agent not found"))).toBe("business");
+    // run 自己没出问题、是它里面的工具 / agent 找不到：同样是业务错误，失败原因要给用户看
+    expect(
+      classifyStreamError(new Error("Run failed: Tool 'x' not found")),
+    ).toBe("business");
+    expect(classifyStreamError(new Error("Run error: agent not found"))).toBe(
+      "business",
+    );
     // 通用词不算连接类错误：后端业务错误不该弹出重连入口
     expect(classifyStreamError(new Error("Tool unavailable"))).toBe("business");
     expect(classifyStreamError(new Error("Run terminated by policy"))).toBe(

@@ -9,7 +9,7 @@
  * 不改 live 套件；全部走 page.route() mock。
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type ElementHandle, type Page } from "@playwright/test";
 
 import {
   startHeldOpenStreamServer,
@@ -110,6 +110,117 @@ async function waitSettledAtBottom(page: Page) {
     .poll(() => distanceToBottom(page), { timeout: 15_000 })
     .toBeLessThanOrEqual(2);
   await page.waitForTimeout(300);
+}
+
+type RowHandle = ElementHandle<SVGElement | HTMLElement>;
+
+/**
+ * 首个可见行：底边越过滚动容器顶部的第一行（与列表组件的锚定同口径）。返回的是行节点
+ * 本身——行按组 id 作 key，prepend 之后仍是同一个节点，可以在它身上继续量。
+ */
+async function firstVisibleRow(page: Page): Promise<RowHandle> {
+  const handle = await scroller(page).evaluateHandle((container) => {
+    const top = container.getBoundingClientRect().top;
+    const rows = container.querySelectorAll<HTMLElement>(
+      "[data-message-group-index]",
+    );
+    for (const row of rows) {
+      if (row.getBoundingClientRect().bottom > top) return row;
+    }
+    throw new Error("no visible row");
+  });
+  const element = handle.asElement();
+  if (!element) throw new Error("first visible row is not an element");
+  return element as RowHandle;
+}
+
+/** 行顶相对滚动容器顶部的距离：锚定要保住的是这个值，视口自己移动不该改变它。 */
+function rowOffset(row: RowHandle) {
+  return row.evaluate((element) => {
+    let node: HTMLElement = element as HTMLElement;
+    while (
+      node.parentElement &&
+      node.parentElement.getAttribute("role") !== "log"
+    ) {
+      node = node.parentElement;
+    }
+    return (
+      element.getBoundingClientRect().top - node.getBoundingClientRect().top
+    );
+  });
+}
+
+/** 在滚动容器上方插一块占位，模拟视口自身下移（头部变高 / 顶部横幅出现）。 */
+async function moveViewportDown(page: Page, height: number) {
+  // 占位插进去之后它就是 log 的第一个子 div，scroller() 选择器会认错——按句柄量
+  const handle = await scroller(page).elementHandle();
+  if (!handle) throw new Error("scroller not found");
+  const topOf = () => handle.evaluate((el) => el.getBoundingClientRect().top);
+  const before = await topOf();
+  await handle.evaluate((container, px) => {
+    const spacer = document.createElement("div");
+    spacer.style.height = `${px}px`;
+    spacer.style.flex = "none";
+    container.parentElement?.insertBefore(spacer, container);
+  }, height);
+  // 自检：占位确实让滚动容器下移了，否则这条用例量不到任何东西
+  await expect
+    .poll(async () => (await topOf()) - before)
+    .toBeGreaterThanOrEqual(height - 1);
+  await handle.dispose();
+}
+
+/**
+ * 扣住旧 run、翻到顶、量好首个可见行，再放行一次 prepend：首个可见行相对滚动容器的
+ * 位置保持不变（≤4px）。run-older 一直扣着——它紧跟着自动加载、入口随 hasMore 消失，
+ * 高度变化会混进锚点测量。
+ */
+async function expectPrependKeepsFirstVisibleRow(
+  page: Page,
+  scenario: { latest: number; mid: number; moveViewport?: boolean },
+) {
+  mockLangGraphAPI(page, {
+    runs: [
+      { run_id: "run-latest", status: "success" },
+      { run_id: "run-mid", status: "success" },
+      { run_id: "run-older", status: "success" },
+    ],
+    runMessages: {
+      "run-latest": turns("latest", scenario.latest) as never[],
+      "run-mid": turns("mid", scenario.mid) as never[],
+      "run-older": turns("older", 2) as never[],
+    },
+  });
+
+  await page.goto(`/workspace/chats/${MOCK_THREAD_ID}`);
+  await expect(
+    page.getByText(`latest answer ${scenario.latest - 1} paragraph 0`),
+  ).toBeInViewport({ timeout: 15_000 });
+  await waitSettledAtBottom(page);
+  const release = holdRunMessages(page, "run-mid");
+  holdRunMessages(page, "run-older");
+  await scrollToTopStable(page);
+  const firstBefore = page.getByText("latest question 0", { exact: true });
+  await expect(firstBefore).toBeInViewport();
+  const row = await firstVisibleRow(page);
+  const offsetBefore = await rowOffset(row);
+  if (scenario.moveViewport) await moveViewportDown(page, 80);
+
+  const midResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname ===
+        runMessagesUrl(MOCK_THREAD_ID, "run-mid"),
+  );
+  release();
+  expect((await midResponse).status()).toBe(200);
+
+  // 新插入的行先按估计高度对齐、实测后逐帧校正：原来可见的第一行留在原处
+  await expect(firstBefore).toBeInViewport({ timeout: 10_000 });
+  await expect
+    .poll(async () => Math.abs((await rowOffset(row)) - offsetBefore))
+    .toBeLessThanOrEqual(4);
+  await row.dispose();
 }
 
 function runMessagesUrl(threadId: string, runId: string) {
@@ -665,6 +776,107 @@ test.describe("Chat thread recovery: scroll anchoring", () => {
         ),
       )
       .toBeLessThanOrEqual(4);
+  });
+
+  // 静态分支（<60 组）与「prepend 时跨过虚拟化阈值」的过渡帧：静态锚点要么自己校正、
+  // 要么交给虚拟分支继续校正；视口自身在量完锚点之后移动（头部变高）时，锚定保住的是
+  // 行相对滚动容器的位置。四条路径都要保住首个可见行
+  for (const scenario of [
+    { label: "a short thread (static list)", latest: 20, mid: 2 },
+    {
+      label: "a thread that crosses the virtualization threshold on prepend",
+      latest: 28,
+      mid: 3,
+    },
+    {
+      label: "a short thread whose viewport moves before the prepend",
+      latest: 20,
+      mid: 2,
+      moveViewport: true,
+    },
+    {
+      label: "a long thread whose viewport moves before the prepend",
+      latest: 40,
+      mid: 3,
+      moveViewport: true,
+    },
+  ] as const) {
+    test(`${scenario.label}: prepending an older run keeps the first visible row in place (within 4px)`, async ({
+      page,
+    }) => {
+      await expectPrependKeepsFirstVisibleRow(page, scenario);
+    });
+  }
+
+  test("a short thread: scrolling between two loads does not make the second prepend pull the view back", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page, {
+      runs: [
+        { run_id: "run-latest", status: "success" },
+        { run_id: "run-mid", status: "success" },
+        { run_id: "run-older", status: "success" },
+      ],
+      runMessages: {
+        "run-latest": turns("latest", 20) as never[],
+        "run-mid": turns("mid", 2) as never[],
+        "run-older": turns("older", 2) as never[],
+      },
+    });
+
+    await page.goto(`/workspace/chats/${MOCK_THREAD_ID}`);
+    await expect(page.getByText("latest answer 19 paragraph 0")).toBeInViewport(
+      {
+        timeout: 15_000,
+      },
+    );
+    await waitSettledAtBottom(page);
+    const releaseMid = holdRunMessages(page, "run-mid");
+    const releaseOlder = holdRunMessages(page, "run-older");
+
+    // 第一次「加载更多」：停在顶部放行
+    await scrollToTopStable(page);
+    const midResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname ===
+          runMessagesUrl(MOCK_THREAD_ID, "run-mid"),
+    );
+    releaseMid();
+    expect((await midResponse).status()).toBe(200);
+    await expect(page.getByText("mid question 0")).toBeAttached();
+
+    // 第二次：回顶部让入口再次触发（响应扣着），过掉节流窗口，然后往下滚 400px、
+    // 停稳了再量——锚点必须跟着这次滚动走，而不是停在上一次 prepend 时的首行
+    await page.waitForTimeout(1300);
+    const olderRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "GET" &&
+        new URL(request.url()).pathname ===
+          runMessagesUrl(MOCK_THREAD_ID, "run-older"),
+    );
+    await scrollToTopStable(page);
+    await olderRequest;
+    await scroller(page).evaluate((element) => {
+      element.scrollTo({ top: 400, behavior: "instant" });
+    });
+    await page.waitForTimeout(400);
+    const row = await firstVisibleRow(page);
+    const offsetBefore = await rowOffset(row);
+
+    const olderResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname ===
+          runMessagesUrl(MOCK_THREAD_ID, "run-older"),
+    );
+    releaseOlder();
+    expect((await olderResponse).status()).toBe(200);
+    await expect(page.getByText("older question 0")).toBeAttached();
+    await expect
+      .poll(async () => Math.abs((await rowOffset(row)) - offsetBefore))
+      .toBeLessThanOrEqual(4);
+    await row.dispose();
   });
 
   test("switching from a scrolled-up thread to another one lands at the bottom", async ({
