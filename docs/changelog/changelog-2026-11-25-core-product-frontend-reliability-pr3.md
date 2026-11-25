@@ -9,7 +9,8 @@
 - **纵切 C · 滚动重置、history 契约与补齐式重载**：`Conversation` 以 `threadId` 为 key、`initial="instant"`（不改 registry）；`ThreadContextType` 新增可选 `isHistoryLoading / hasMoreHistory / refetchHistory`（PR4 据此区分 pending 与 not_found）；`refetchHistory` 是用户显式触发、带新鲜度判定的补齐式重载——只重取未成功加载、非终态、加载后已变化的 run，在途请求先等它结束，任一失败保留旧分片并 reject 以便重试。
 - **滚动锚定**：`VirtualMessageList` 在 prepend 后先按估计高度把锚点行拉回渲染窗口（锚定期间把它强制放进渲染集合），之后每帧按它**真实的 DOM 位置**与 prepend 前的差值校正，直到稳定；静态分支（<60 组）按真实 DOM 节点锚定（浏览器原生滚动锚定在滚动位置为 0 时不下调）；prepend 跨过虚拟化阈值时静态锚点交给虚拟分支继续校正。锚定期间用户自己滚动（滚轮 / 触摸 / 拖滚动条 / 方向键）立即让位；用户贴底时到达的「前面多出来的行」（流式 values 事件送来的整段历史）不锚定，继续贴底。
 - **PR2 评审遗留在此落地**（PR #59 第 3 / 4 轮处置）：移除受理看门狗轮询（SDK 的 `enqueue` 先置 `isLoading=true` 再发请求，React 总会先渲染到在途；轮询在生产不可达却留有误判面）；`sendMessage` 的拒绝契约 JSDoc；auto-send 回填读最新草稿（不覆盖等待期间写的草稿）；mock 的 run stream 线程 id 先读请求体；显式取消的等待上限。
-- **评审驱动的补充**（PR #60 第 2 轮，2 high + 7 medium + 12 low 受理）：拿着旧线程闭包的迟到 `loadRun` 不再把新线程刚建好的历史重置成空分片；`loadMore` 从最新往旧取紧邻的 run（修前从最旧那头取、在中间留下空洞）；流式 `task_cancelled` 与 reload 路径同为 `cancelled`；澄清挂起只看 run 的最后一条工具消息；每个线程一个令牌，切走再切回也不认旧 run；`not_cancellable` 同样释放当前 run 并有界刷新；停止失败 / 超时的提示走 i18n；裸 404 只在流属于某个 run 时才算 stale run；非 number 的 seq 显式抛错、单 run 分页 500 页安全上限。
+- **评审驱动的补充**（PR #60 第 3 轮，8 medium + 10 low 受理）：stale run 清掉 reconnect key 后显式重读（runs 列表深度相等时引用不换，修前仍把已消失的 run 当成在途）；重连的单飞记录在 `finally` 释放（join 被拒绝 / 立即失败后「重新连接」不再静默返回）；在途分页带 `AbortSignal`，切线程与卸载时中止（卸载同时换代，被中止的请求不算加载失败）；断线 / 历史加载的门控只约束当前流所在的 run；归属模式下 runs 列表里查不到的 run 只登记元数据（显式字段 `deferStatus`，不再借 `isHistoryLoading`）；store 里还没有的任务收到不带 status 的 patch 时按进行中登记；**澄清挂起修正上一轮口径**——最后一次 `ask_clarification` 之后没有用户的回答才算挂起，并行工具调用的结果晚于澄清写入不代表已被回答；停止超时的提示不再被「停止失败」包一层；锚定期间只有按在滚动条上或滚轮有纵向位移才算用户接手（消息里的按钮点击不打断校正）；静态分支只在 prepend / 行数变化时重量锚点；e2e mock 的 runs 按线程返回。
+- **评审驱动的补充**（PR #60 第 2 轮，2 high + 7 medium + 12 low 受理）：拿着旧线程闭包的迟到 `loadRun` 不再把新线程刚建好的历史重置成空分片；`loadMore` 从最新往旧取紧邻的 run（修前从最旧那头取、在中间留下空洞）；流式 `task_cancelled` 与 reload 路径同为 `cancelled`；澄清挂起判定（第 3 轮已修正，见上）；每个线程一个令牌，切走再切回也不认旧 run；`not_cancellable` 同样释放当前 run 并有界刷新；停止失败 / 超时的提示走 i18n；裸 404 只在流属于某个 run 时才算 stale run；非 number 的 seq 显式抛错、单 run 分页 500 页安全上限。
 - **评审驱动的补充**（PR #60 第 1 轮，5 medium + 9 low 受理）：用户取消的 result 与「run 被停止、没有 result」同为 `cancelled`；history loading / 断线时子任务只登记元数据、不带 status；onFinish / 取消受理 / stale_run 统一清「当前 run」，流收尾后 `stop()` 不再对已结束的 run 发 cancel；stale run 的 key 清理按出错线程、分类收窄到 run 相关的 404；run-messages 端点非 2xx 显式失败（修前错误体被当成空历史写进分片并标记新鲜）；`loadMoreHistory` 捕获 rejection；恢复入口对象由 hook 组装、MessageList 只从 context 读断线状态。
 - **e2e 夹具**：`mock-api` 提供 newest-first 的 runs 列表与按真实端点分页的 run-messages 路由。
 
@@ -36,7 +37,10 @@
 11. **看门狗第三次不受理**（第 2 轮评审升为 medium）：`useStream` 的 `isLoading` 走 `useSyncExternalStore`，store 变化是同步 lane、在微任务里就提交；流结束必须经过真实网络的宏任务，React 一定先提交过 `isLoading=true`、收尾 effect 必然触发。「从未渲染过 isLoading=true」需要整条 fetch + 流在同一个微任务检查点内结束，只有同步 mock 做得到；补了一条微任务内空流的回归用例钉住这个结论。
 12. **取消超时后的去重不受理**：超时只发生在服务端迟迟不确认（run 卡在不响应 interrupt 的工具里），那个 cancel 仍在途，重试接回同一请求、再等一个 30 秒窗口是对同一件事的正确表达；网络失败时在途记录已清、重试是真的重发。去重在 `core/api/api-client.ts`（PR3 禁改路径）。
 13. **线程令牌**：「切走再切回也不认旧 run」最初用代际 ref 实现，但渲染期读 ref 是 react-hooks 的 error、effect 里 setState 又是 ratchet——改成 `useMemo(() => ({ threadId }), [threadId])` 的每线程令牌对象。
-14. **reconnect key 的读取方式**（第 1 轮 low）：评审建议改到 effect 里 setState，同样撞 ratchet；保留 `useMemo([threadId, runsById])`：读 sessionStorage 幂等，StrictMode 双渲染结果一致。
+14. **reconnect key 的读取方式**（第 1 轮 low）：评审建议改到 effect 里 setState，同样撞 ratchet；保留 `useMemo([threadId, runsById])`：读 sessionStorage 幂等，StrictMode 双渲染结果一致。第 3 轮 medium 指出 react-query 的 structural sharing 会让深度相等的 runs 列表不换引用、这个 memo 不重跑——改为 stale_run 分支清 key 后递增版本号 state 驱动重算（setState 在流回调里，不撞 ratchet）。
+15. **澄清挂起的口径改了两次**：第 2 轮写成「只看 run 的最后一条工具消息是不是澄清，澄清之后还有工具消息即按 success 判」；第 3 轮 low 指出并行工具调用的结果会晚于澄清写入、而澄清并没有被回答，这时没有 result 的任务会被判成 completed。最终口径：run 里最后一次 `ask_clarification` 之后没有用户的回答 = 仍挂在等回答上。第 2 轮那条「澄清之后有工具消息 → completed」的用例按新口径改写成 → `in_progress`。
+16. **看门狗第四次不受理**（第 3 轮评审再升为 high）：结论同第 11 条；微任务内空流的回归用例仍在。
+17. **卸载时中止分页要同时换代**：只 abort 的话，被中止的请求会走失败路径（`console.error("Failed to load thread history")` + 把分片标记为不新鲜）；卸载的 cleanup 里先递增 generation 再 abort，被中止的请求按「已被更新的请求取代」静默退出。测试夹具的 fetch 替身随之改成与真实 fetch 一致——signal 中止即以 `AbortError` 拒绝。
 
 ## 验收记录
 
@@ -51,6 +55,8 @@
 - 第 1 轮修复后的门禁：`make -C frontend check` → exit 0（ESLint `0 errors, 120 warnings` 存量、`tsc --noEmit` 通过、prettier `All matched files use Prettier code style!`、knip 无死导出、i18n `671 个叶子全活`）；全量 `cd frontend && pnpm test` → `Test Files 300 passed (300)`、`Tests 2033 passed (2033)`；`pnpm test:e2e` 全量 → `168 passed, 3 skipped (1.6m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[id]` JS 3572686 B、CSS 255804 B）。CI 第 2 轮六项全绿。
 - 第 2 轮评审修复 RED → GREEN：`pnpm exec vitest run tests/unit/core/tasks tests/unit/core/threads tests/unit/components/workspace/messages` → `13 failed | 246 passed (259)`（`loadMore 向前取紧邻的旧 run`、`not_cancellable … 释放当前 run`、`run 在切线程期间收尾、再切回`、`maps task_cancelled to cancelled`、`页里出现非 number 的 seq`、`超过 500 页的安全上限` 等），修复后回归集 `45 files / 288 passed`。
 - 批次门禁（第 2 轮修复后重跑）：`make -C frontend check` → exit 0（i18n `673 个叶子全活`，其余同上）；全量 `cd frontend && pnpm test` → `Test Files 300 passed (300)`、`Tests 2044 passed (2044)`；`pnpm test:e2e` 全量 → `168 passed, 3 skipped (1.4m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[id]` JS 3573560 B、CSS 255804 B）。
+- 第 3 轮评审修复 RED → GREEN：`pnpm exec vitest run tests/unit/core/tasks tests/unit/core/threads tests/unit/components/workspace/messages` 先出 3 条预期失败（`expected 'in_progress' to be 'completed'`——澄清之后已有用户的回答；`expected [ { id: 'tc1', …(4) } ] to deeply equal [ { id: 'tc1', …(3) } ]`——有归属但 runsById 里查不到的 run 不该带 status；`expected 'stop failed: stop timed out after 30s' to be 'stop timed out after 30s'`——超时提示被重复包裹）；澄清口径修正 `expected 'completed' to be 'in_progress'`；卸载中止 `expected [ [ 'Failed to load thread history', AbortError {…} ] ] to deeply equal []`。修复后同命令 `Test Files 39 passed (39)`、`Tests 268 passed (268)`。变异验证：把两处 `abort()` 去掉 → `Tests 2 failed | 5 passed (7)`（`expected false to be true`）。
+- 批次门禁（第 3 轮修复后重跑）：`make -C frontend check` → exit 0（ESLint `120 problems (0 errors, 120 warnings)` 存量，`tsc --noEmit`、`prettier --check`、knip 随 `&&` 链通过，i18n `673 个叶子全活`）；全量 `cd frontend && pnpm exec vitest run` → `Test Files 300 passed (300)`、`Tests 2053 passed (2053)`；`pnpm exec playwright test` 全量 → `168 passed, 3 skipped (1.9m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[thread_id]` JS 3574500 B、CSS 255804 B）。
 - 每个代码提交前 `pre-commit run --files <改动文件>` → eslint / prettier / gitleaks 全 Passed；`pnpm exec eslint . --ext .ts,.tsx --prune-suppressions` → exit 0，`0 errors, 120 warnings`（存量）。
 
 ## 未验证项
@@ -60,6 +66,7 @@
 - 像素断言只在 Chromium（Playwright）里验证；其他浏览器的原生滚动锚定与 `use-stick-to-bottom` 的配合未测。锚定在慢机器上的稳定性靠本地 4 worker 并行复现 CI，未在真实低端设备上验证。
 - 断线后 run 在服务端走到终态的补取依赖 runs 列表的 `status / updated_at` 变化；服务端不更新 `updated_at` 时不会触发。
 - 用户在首次水合的约 300ms 平滑落底动画期间上翻，动画可能把视口拉回底部（`resize="smooth"` 是 registry 的 `Conversation` 默认值，本批不改 registry）。
+- 锚点校正记录的是 prepend 那一帧的视口绝对坐标：校正进行的几帧里视口自身移动（窗口 resize、输入框变高、移动端键盘弹出）会让锚点行偏移同样的距离一次。评审第 3 轮 low 已知未修（改成相对视口的坐标需要几何 mock 夹具），登记到 findings backlog。
 - 未部署，未跑 `tests/e2e/live/**`。
 
 ## 配置与回滚
