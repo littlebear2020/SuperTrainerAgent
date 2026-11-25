@@ -121,8 +121,10 @@ describe("works data hooks", () => {
     h.tasksError = false;
     h.threadsOptions = undefined;
     h.tasksOptions = undefined;
-    h.threadsRefetch.mockResolvedValue({ data: [] });
-    h.tasksRefetch.mockResolvedValue({ data: [] });
+    h.threadsRefetch.mockImplementation(() =>
+      Promise.resolve({ data: h.threads }),
+    );
+    h.tasksRefetch.mockImplementation(() => Promise.resolve({ data: h.tasks }));
     latestSummaries = null;
     latestWorks = null;
     queryClient = new QueryClient({
@@ -281,6 +283,45 @@ describe("works data hooks", () => {
 
     expect(currentWorks().works).toHaveLength(1);
     expect(currentWorks().works[0]?.id).toBe("thread:thread-1");
+  });
+
+  it("keeps successful Agent works when an expanded ID-set summary fails", async () => {
+    const first = makeThread("thread-1");
+    const second = makeThread("thread-2");
+    h.threads = [first];
+    h.fetchSummaries.mockResolvedValueOnce([summary("thread-1")]);
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    h.threads = [first, second];
+    h.fetchSummaries.mockRejectedValueOnce(new Error("expanded batch failed"));
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().isError).toBe(true));
+
+    expect(currentWorks().works.map((work) => work.id)).toEqual([
+      "thread:thread-1",
+    ]);
+  });
+
+  it("refetches summaries for the ID set returned by the thread refresh", async () => {
+    const first = makeThread("thread-1");
+    const second = makeThread("thread-2");
+    h.threads = [first];
+    h.fetchSummaries.mockResolvedValueOnce([summary("thread-1")]);
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    h.threadsRefetch.mockResolvedValueOnce({ data: [first, second] });
+    h.fetchSummaries.mockClear();
+    h.fetchSummaries.mockResolvedValue([
+      summary("thread-1"),
+      summary("thread-2"),
+    ]);
+    await act(async () => {
+      await currentWorks().refetch();
+    });
+
+    expect(h.fetchSummaries).toHaveBeenCalledWith(["thread-1", "thread-2"]);
   });
 
   it.each([

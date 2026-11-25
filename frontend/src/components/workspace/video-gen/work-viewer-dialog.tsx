@@ -53,6 +53,7 @@ function CurrentFileMedia({
   onError: () => void;
 }) {
   const { t } = useI18n();
+  const [legacyImageFallback, setLegacyImageFallback] = useState(false);
   if (!file.exists) {
     return (
       <div
@@ -73,6 +74,18 @@ function CurrentFileMedia({
       </div>
     );
   }
+  if (legacyImageFallback && file.name === null && file.previewUrl) {
+    return (
+      <div className="flex max-h-[60vh] justify-center overflow-hidden rounded-xl bg-black">
+        <img
+          src={file.previewUrl}
+          alt={t.workspace.works.byDownloadResponse}
+          onError={onError}
+          className="max-h-[60vh] max-w-full object-contain"
+        />
+      </div>
+    );
+  }
   if (file.mediaKind === "video" && file.previewUrl) {
     return (
       <video
@@ -80,7 +93,9 @@ function CurrentFileMedia({
         src={file.previewUrl}
         controls
         preload="metadata"
-        onError={onError}
+        onError={
+          file.name === null ? () => setLegacyImageFallback(true) : onError
+        }
         className="aspect-video max-h-[60vh] w-full rounded-xl bg-black"
       />
     );
@@ -146,6 +161,7 @@ function WorkViewerContent({
 
       {currentFile ? (
         <CurrentFileMedia
+          key={currentFile.id}
           file={currentFile}
           failed={failedFileId === currentFile.id}
           onError={() => setFailedFileId(currentFile.id)}

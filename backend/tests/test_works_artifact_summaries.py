@@ -225,3 +225,26 @@ async def test_checkpoint_artifacts_are_projected_without_returning_messages(out
     assert summary.delivery_state == "delivered"
     assert summary.files[0].name == "deck.pptx"
     assert "private message" not in str(summary.model_dump())
+
+
+def test_real_resolver_rejection_does_not_log_path_or_control_characters(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    import app.gateway.path_utils as path_utils
+
+    secret = "sensitive-name"
+    raw_path = f"/mnt/user-data/outputs/../{secret}\nforged-line"
+
+    class RejectingPaths:
+        def resolve_virtual_path(self, *_args: object, **_kwargs: object) -> Path:
+            raise ValueError(f"traversal rejected: {raw_path}")
+
+    monkeypatch.setattr(path_utils, "get_paths", lambda: RejectingPaths())
+    with caplog.at_level(logging.WARNING):
+        summary = build_thread_artifact_summary("thread\nforged-thread", [raw_path])
+
+    assert summary.delivery_state == "unknown"
+    assert secret not in caplog.text
+    assert "forged-line" not in caplog.text
+    assert "thread\nforged-thread" not in caplog.text
+    assert "threadforged-thread" in caplog.text
