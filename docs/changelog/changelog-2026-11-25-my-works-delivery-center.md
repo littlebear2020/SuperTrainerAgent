@@ -59,6 +59,8 @@
 
 - 第四轮 OCR 5 条 medium：mock 未播种摘要的默认状态由 `not_delivered` 改为符合无 checkpoint 语义的 `unknown`，真正未交付场景显式播种；去掉 unknown 显式播种后浏览器用例先因显示「未交付」失败，修复后与未交付场景共 `2 passed`。`pnpm check` → exit 0；全量 Playwright 复验仍为 **193 passed / 5 failed / 3 skipped**，失败项仅为同一组已有 main 对照的 `networkidle` 超时。完整历史不设 200 上限（Q4/Q6 与 offset 50 后搜索证据要求）；路由 `dict.fromkeys` 已按首次出现去重，mock 与之一致；保留计划要求的 `satisfies Record<VideoTaskType, ...>` 穷尽映射，works 的 `VideoTaskType` 本身已是 `VideoTaskBrief["task_type"]` 别名，并非重复 union。
 
+- 第五轮 OCR 1 条 medium：修复线程/摘要与任务同时刷新失败时次要任务错误覆盖主错误的问题；任务 Promise 立即挂 rejection handler，主请求失败时仍在 `finally` 等待任务但保留主错误，任务单独失败仍正常传播。初始与手动刷新共用 `threadIdsForAgents`，避免 Agent 过滤规则漂移。双失败新增用例先 RED（实际收到 task refresh failed），修复后 hooks **16 passed**。`pnpm check && pnpm test` → exit 0，Vitest **306 files / 2167 tests passed**；全量 Playwright 仍为 **193 passed / 5 failed / 3 skipped**，仅含同一组既有 `networkidle` 失败。最终 `pnpm perf:check` → exit 0，`/workspace/video-gen` **JS 3,596,238 B / CSS 255,242 B**；根 `make check` 与独立文档约定检查均通过。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。

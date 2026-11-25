@@ -427,6 +427,27 @@ describe("works data hooks", () => {
     });
   });
 
+  it("preserves the thread error when the concurrent task refresh also fails", async () => {
+    const thread = makeThread("course-thread");
+    Object.assign(thread, { metadata: { agent_name: "course-video" } });
+    h.threads = [thread];
+    h.fetchSummaries.mockResolvedValueOnce([summary(thread.thread_id)]);
+    await render(<WorksProbe capability="course-video" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    const threadError = new Error("thread refresh failed");
+    h.threadsRefetch.mockResolvedValueOnce({
+      data: undefined,
+      error: threadError,
+    });
+    h.tasksRefetch.mockRejectedValueOnce(new Error("task refresh failed"));
+
+    await act(async () => {
+      await expect(currentWorks().refetch()).rejects.toBe(threadError);
+    });
+    expect(h.tasksRefetch).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["creative-studio", true, false],
     ["ai_video", false, true],
