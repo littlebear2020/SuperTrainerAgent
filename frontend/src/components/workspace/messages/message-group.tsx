@@ -23,6 +23,7 @@ import {
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { Button } from "@/components/ui/button";
+import { createWriteFileRef } from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatToolDetail } from "@/core/messages/tool-detail-preview";
 import {
@@ -389,15 +390,14 @@ function ToolCall({
       description = t.toolCalls.writeFile;
     }
     const path: string | undefined = (args as { path: string })?.path;
-    if (isLoading && isLast && autoOpen && autoSelect && path && !result) {
+    // PR4：path 作为独立 query 参数编码；缺任一定位字段就不生成引用
+    const ref = createWriteFileRef({ path, messageId, toolCallId: id });
+    if (isLoading && isLast && autoOpen && autoSelect && ref && !result) {
       setTimeout(() => {
-        const url = new URL(
-          `write-file:${path}?message_id=${messageId}&tool_call_id=${id}`,
-        ).toString();
-        if (selectedArtifact === url) {
+        if (selectedArtifact === ref) {
           return;
         }
-        select(url, true);
+        select(ref, true);
         setOpen(true);
       }, 100);
     }
@@ -409,11 +409,8 @@ function ToolCall({
         label={description}
         icon={NotebookPenIcon}
         onClick={() => {
-          select(
-            new URL(
-              `write-file:${path}?message_id=${messageId}&tool_call_id=${id}`,
-            ).toString(),
-          );
+          if (!ref) return;
+          select(ref);
           setOpen(true);
         }}
       >

@@ -3,6 +3,7 @@ import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import type { AgentThreadState } from "../threads";
 
 import { urlOfArtifact } from "./utils";
+import { parseWriteFileRef, type WriteFileRef } from "./write-file-ref";
 
 async function sha256OfText(content: string): Promise<string | null> {
   // crypto.subtle is only available in secure contexts (HTTPS or localhost).
@@ -48,25 +49,48 @@ export async function loadArtifactContent({
   return { content: text, url, sha256 };
 }
 
+/** 引用能定位到的工具调用：按 messageId 找到所有同名消息，再以 toolCallId 为主键。 */
+function locateWriteFileToolCall({
+  ref,
+  thread,
+}: {
+  ref: WriteFileRef;
+  thread: BaseStream<AgentThreadState>;
+}) {
+  for (const message of thread.messages) {
+    if (message.id !== ref.messageId || message.type !== "ai") continue;
+    const toolCall = message.tool_calls?.find(
+      (toolCall) => toolCall.id === ref.toolCallId,
+    );
+    if (!toolCall) continue;
+    if (toolCall.name !== "write_file" && toolCall.name !== "str_replace") {
+      return undefined;
+    }
+    // path 必须与定位到的工具调用一致：引用不能被改成别的文件
+    if ((toolCall.args as { path?: unknown })?.path !== ref.path) {
+      return undefined;
+    }
+    return toolCall;
+  }
+  return undefined;
+}
+
+/**
+ * 纵切 A 的过渡签名：非 append 的 write_file 直接以 args.content 作为内联快照；
+ * 引用非法、缺定位字段或 path 不匹配时返回 undefined，不触发正文渲染。
+ * 五态（pending / not_found / failed、append / str_replace 读当前文件）在纵切 B 切换。
+ */
 export function loadArtifactContentFromToolCall({
   url: urlString,
   thread,
 }: {
   url: string;
   thread: BaseStream<AgentThreadState>;
-}) {
-  const url = new URL(urlString);
-  const toolCallId = url.searchParams.get("tool_call_id");
-  const messageId = url.searchParams.get("message_id");
-  if (messageId && toolCallId) {
-    const message = thread.messages.find((message) => message.id === messageId);
-    if (message?.type === "ai" && message.tool_calls) {
-      const toolCall = message.tool_calls.find(
-        (toolCall) => toolCall.id === toolCallId,
-      );
-      if (toolCall) {
-        return toolCall.args.content;
-      }
-    }
-  }
+}): string | undefined {
+  const ref = parseWriteFileRef(urlString);
+  if (!ref) return undefined;
+  const toolCall = locateWriteFileToolCall({ ref, thread });
+  if (!toolCall) return undefined;
+  const content = (toolCall.args as { content?: unknown }).content;
+  return typeof content === "string" ? content : undefined;
 }
