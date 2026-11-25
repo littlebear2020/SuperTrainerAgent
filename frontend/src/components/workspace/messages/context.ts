@@ -19,6 +19,12 @@ export interface ThreadRecovery {
 
 export interface ThreadContextType {
   thread: BaseStream<AgentThreadState>;
+  /** 自定义 run 历史的加载状态（PR3）；缺省 = 没有自定义历史的消费者。 */
+  isHistoryLoading?: boolean;
+  /** 仍有未加载的旧 run：为 true 时目标消息缺失不等于不存在。 */
+  hasMoreHistory?: boolean;
+  /** 用户显式触发的补齐式重载：带新鲜度判定，失败 reject。 */
+  refetchHistory?: () => Promise<void>;
   recovery?: ThreadRecovery;
 }
 

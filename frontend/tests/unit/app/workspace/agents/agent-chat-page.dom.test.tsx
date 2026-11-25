@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
   runsById: {} as Record<string, unknown>,
   reconnect: vi.fn(async () => undefined),
   retryCancel: vi.fn(async () => undefined),
+  refetchHistory: vi.fn(async () => undefined),
   recoverable: false,
   cancelFailed: false,
   setThreadId: vi.fn(),
@@ -71,6 +72,7 @@ vi.mock("@/core/threads/hooks", () => ({
       isHistoryLoading: false,
       hasMoreHistory: false,
       loadMoreHistory: vi.fn(),
+      refetchHistory: h.refetchHistory,
       messageRunIds: h.messageRunIds,
       runsById: h.runsById,
       activeRunId: "run-1",
@@ -291,6 +293,12 @@ describe("AgentChatPage guide wiring", () => {
       reconnect: h.reconnect,
       cancelFailed: true,
       retryCancel: h.retryCancel,
+    });
+    // PR3：history 契约（PR4 的 write-file 引用按它区分 pending / not_found）
+    expect(h.threadContextValue).toMatchObject({
+      isHistoryLoading: false,
+      hasMoreHistory: false,
+      refetchHistory: h.refetchHistory,
     });
   });
 

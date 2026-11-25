@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   runsById: {} as Record<string, unknown>,
   reconnect: vi.fn(async () => undefined),
   retryCancel: vi.fn(async () => undefined),
+  refetchHistory: vi.fn(async () => undefined),
 }));
 
 /** 把 provider 的 setInput 交给用例：模拟用户在等待期间输入草稿。 */
@@ -51,6 +52,7 @@ vi.mock("@/core/threads/hooks", () => ({
     isHistoryLoading: false,
     hasMoreHistory: false,
     loadMoreHistory: vi.fn(),
+    refetchHistory: h.refetchHistory,
     messageRunIds: h.messageRunIds,
     runsById: h.runsById,
     activeRunId: "run-1",
@@ -325,6 +327,12 @@ describe("普通会话页观察 sendMessage 的 rejection", () => {
       reconnect: h.reconnect,
       cancelFailed: false,
       retryCancel: h.retryCancel,
+    });
+    // PR3：history 契约（PR4 的 write-file 引用按它区分 pending / not_found）
+    expect(h.threadContextValue).toMatchObject({
+      isHistoryLoading: false,
+      hasMoreHistory: false,
+      refetchHistory: h.refetchHistory,
     });
   });
 
