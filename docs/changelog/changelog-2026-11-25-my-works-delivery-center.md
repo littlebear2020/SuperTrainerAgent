@@ -57,6 +57,8 @@
 - 第三轮 OCR 4 条 medium：旧任务媒体类型增加显式 `mediaKindGuessed` 标记，不再由查看器通过 `name === null` 反推；Agent 初始筛选、模型归一化与手动刷新统一使用 `agentNames`，新增自定义 Agent 名回归；线程刷新错误直接传播，不再以旧线程覆盖新摘要，任务刷新在 `finally` 中等待，摘要 rejection 继续由 WorkGrid 捕获且 pending 复位。相关 model `26 passed`、hooks + viewer `26 passed`、legacy GIF + 刷新错误 E2E `2 passed`，均先 RED 后 GREEN。
 - 第三轮前端全量：`pnpm check && pnpm test` → exit 0，Vitest **306 files / 2166 tests passed**。全量 Playwright → **193 passed / 5 failed / 3 skipped**；5 条仍全部为已有 main 对照的 `video-gen.spec.ts` `networkidle` 超时，本批交付用例全部通过，未修改无关模块。`pnpm perf:check` → exit 0；`/workspace/video-gen` **JS 3,596,195 B / CSS 255,242 B**，无需调整预算。根 `make check` → exit 0，ESLint **0 errors / 120 个既有 warnings**，i18n **709 个叶子全活**；独立 `python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`。
 
+- 第四轮 OCR 5 条 medium：mock 未播种摘要的默认状态由 `not_delivered` 改为符合无 checkpoint 语义的 `unknown`，真正未交付场景显式播种；去掉 unknown 显式播种后浏览器用例先因显示「未交付」失败，修复后与未交付场景共 `2 passed`。`pnpm check` → exit 0；全量 Playwright 复验仍为 **193 passed / 5 failed / 3 skipped**，失败项仅为同一组已有 main 对照的 `networkidle` 超时。完整历史不设 200 上限（Q4/Q6 与 offset 50 后搜索证据要求）；路由 `dict.fromkeys` 已按首次出现去重，mock 与之一致；保留计划要求的 `satisfies Record<VideoTaskType, ...>` 穷尽映射，works 的 `VideoTaskType` 本身已是 `VideoTaskBrief["task_type"]` 别名，并非重复 union。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。
