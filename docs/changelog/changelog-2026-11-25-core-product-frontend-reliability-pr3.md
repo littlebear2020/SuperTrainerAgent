@@ -9,6 +9,7 @@
 - **纵切 C · 滚动重置、history 契约与补齐式重载**：`Conversation` 以 `threadId` 为 key、`initial="instant"`（不改 registry）；`ThreadContextType` 新增可选 `isHistoryLoading / hasMoreHistory / refetchHistory`（PR4 据此区分 pending 与 not_found）；`refetchHistory` 是用户显式触发、带新鲜度判定的补齐式重载——只重取未成功加载、非终态、加载后已变化的 run，在途请求先等它结束，任一失败保留旧分片并 reject 以便重试。
 - **滚动锚定**：`VirtualMessageList` 在 prepend 后先按估计高度把锚点行拉回渲染窗口（锚定期间把它强制放进渲染集合），之后每帧按它**真实的 DOM 位置**与 prepend 前的差值校正，直到稳定；静态分支（<60 组）按真实 DOM 节点锚定（浏览器原生滚动锚定在滚动位置为 0 时不下调）；prepend 跨过虚拟化阈值时静态锚点交给虚拟分支继续校正。锚定期间用户自己滚动（滚轮 / 触摸 / 拖滚动条 / 方向键）立即让位；用户贴底时到达的「前面多出来的行」（流式 values 事件送来的整段历史）不锚定，继续贴底。
 - **PR2 评审遗留在此落地**（PR #59 第 3 / 4 轮处置）：移除受理看门狗轮询（SDK 的 `enqueue` 先置 `isLoading=true` 再发请求，React 总会先渲染到在途；轮询在生产不可达却留有误判面）；`sendMessage` 的拒绝契约 JSDoc；auto-send 回填读最新草稿（不覆盖等待期间写的草稿）；mock 的 run stream 线程 id 先读请求体；显式取消的等待上限。
+- **评审驱动的补充**（PR #60 第 2 轮，2 high + 7 medium + 12 low 受理）：拿着旧线程闭包的迟到 `loadRun` 不再把新线程刚建好的历史重置成空分片；`loadMore` 从最新往旧取紧邻的 run（修前从最旧那头取、在中间留下空洞）；流式 `task_cancelled` 与 reload 路径同为 `cancelled`；澄清挂起只看 run 的最后一条工具消息；每个线程一个令牌，切走再切回也不认旧 run；`not_cancellable` 同样释放当前 run 并有界刷新；停止失败 / 超时的提示走 i18n；裸 404 只在流属于某个 run 时才算 stale run；非 number 的 seq 显式抛错、单 run 分页 500 页安全上限。
 - **评审驱动的补充**（PR #60 第 1 轮，5 medium + 9 low 受理）：用户取消的 result 与「run 被停止、没有 result」同为 `cancelled`；history loading / 断线时子任务只登记元数据、不带 status；onFinish / 取消受理 / stale_run 统一清「当前 run」，流收尾后 `stop()` 不再对已结束的 run 发 cancel；stale run 的 key 清理按出错线程、分类收窄到 run 相关的 404；run-messages 端点非 2xx 显式失败（修前错误体被当成空历史写进分片并标记新鲜）；`loadMoreHistory` 捕获 rejection；恢复入口对象由 hook 组装、MessageList 只从 context 读断线状态。
 - **e2e 夹具**：`mock-api` 提供 newest-first 的 runs 列表与按真实端点分页的 run-messages 路由。
 
@@ -32,6 +33,10 @@
 8. **锚定只认 DOM**：按估计坐标（`getOffsetForIndex`）逐帧校正的第一版，在 CI 慢机器上被虚拟器自己的测量调整带偏——实测走到 `12320 → 11580 → 11336` 后被当成「外部滚动」放弃，停在 64px 处；按 DOM 校正的第二版里锚点行又落在渲染窗口之外（估计高度与实测差太多），永远量不到。最终版把锚点行强制放进渲染集合再按 DOM 校正。越界索引必须夹掉：行数在锚定期间变化时，越界的强制索引会让虚拟列表渲染 undefined 行、整页进错误边界（本地 e2e 抓到 `Cannot read properties of undefined (reading 'index')`；happy-dom 无布局复现不了，另加了跨阈值的单元用例）。
 9. **贴底不锚定**：流式 values 事件把整段历史（含更早的轮次）一次送到时首组键会变，看起来像 prepend；但用户停在新会话底部、本该继续贴底。静态 / 虚拟 / 跨阈值三条路径都以 `isAtBottom` 让位给 stick-to-bottom。
 10. **声明顺序**：`useVirtualizer` 在渲染期同步调用 `rangeExtractor`，强制索引的 ref 必须声明在它之前——tsc 不查闭包里的 TDZ，首次提交后本地 e2e 才抓到 `Cannot access 'k' before initialization`。
+11. **看门狗第三次不受理**（第 2 轮评审升为 medium）：`useStream` 的 `isLoading` 走 `useSyncExternalStore`，store 变化是同步 lane、在微任务里就提交；流结束必须经过真实网络的宏任务，React 一定先提交过 `isLoading=true`、收尾 effect 必然触发。「从未渲染过 isLoading=true」需要整条 fetch + 流在同一个微任务检查点内结束，只有同步 mock 做得到；补了一条微任务内空流的回归用例钉住这个结论。
+12. **取消超时后的去重不受理**：超时只发生在服务端迟迟不确认（run 卡在不响应 interrupt 的工具里），那个 cancel 仍在途，重试接回同一请求、再等一个 30 秒窗口是对同一件事的正确表达；网络失败时在途记录已清、重试是真的重发。去重在 `core/api/api-client.ts`（PR3 禁改路径）。
+13. **线程令牌**：「切走再切回也不认旧 run」最初用代际 ref 实现，但渲染期读 ref 是 react-hooks 的 error、effect 里 setState 又是 ratchet——改成 `useMemo(() => ({ threadId }), [threadId])` 的每线程令牌对象。
+14. **reconnect key 的读取方式**（第 1 轮 low）：评审建议改到 effect 里 setState，同样撞 ratchet；保留 `useMemo([threadId, runsById])`：读 sessionStorage 幂等，StrictMode 双渲染结果一致。
 
 ## 验收记录
 
@@ -43,7 +48,9 @@
 - 纵切 D：`pnpm exec playwright test tests/e2e/chat-thread-recovery.spec.ts` 首次 `10 failed / 2 passed`（join 路由的 glob 没放开 SDK 的查询串、短线程的旧 run 自动接续、虚拟列表在底部时首行不在 DOM），逐项修正后 `10 passed / 2 failed` → `12 passed / 1 failed`；`--repeat-each=3 --workers=1` 第一次 `38 passed / 1 failed`（真实分页用例在开场定位动画未结束时翻顶，被拉回），加「到底且稳定」等待后 → `39 passed (35.0s)`。
 - PR #60 第 1 轮 CI：E2E `1 failed / 3 flaky / 164 passed`——既有抖动 `token summaries … after real run-history prepend`，加上本 PR 两条滚动用例在开场动画未结束时翻顶。本地 4 worker 并行复现：按估计坐标校正的那一版 `4 failed / 38 passed`，锚点停在 64px 处（`DBG-OFFSET 64`，校正序列 `12320 → 11580 → 11336` 后位置被虚拟器移动、判定为外部滚动而放弃）；按 DOM 校正但没强制渲染锚点行的那一版锚点行不在渲染窗口（`not-rendered`）。最终版 4 worker ×3 → `42 passed`，chat.spec + 恢复 spec 4 worker ×2 → `50 passed`。
 - 评审修复 RED → GREEN：`pnpm exec vitest run tests/unit/core/tasks tests/unit/core/threads tests/unit/components/workspace/messages tests/unit/app/workspace` → `10 failed | 192 passed (202)`（`expected 'cancelled'`、`expected undefined to be 'run-live'`、`expected "not rejected"` 等），修复后同命令 `44 files / 276 passed`。
-- 批次门禁（评审修复后重跑）：`make -C frontend check` → exit 0（ESLint `0 errors, 120 warnings` 存量、`tsc --noEmit` 通过、prettier `All matched files use Prettier code style!`、knip 无死导出、i18n `671 个叶子全活`）；全量 `cd frontend && pnpm test` → `Test Files 300 passed (300)`、`Tests 2033 passed (2033)`；`pnpm test:e2e` 全量 → `168 passed, 3 skipped (1.6m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[id]` JS 3572686 B、CSS 255804 B，在 `performance-budgets.json` 之内）。
+- 第 1 轮修复后的门禁：`make -C frontend check` → exit 0（ESLint `0 errors, 120 warnings` 存量、`tsc --noEmit` 通过、prettier `All matched files use Prettier code style!`、knip 无死导出、i18n `671 个叶子全活`）；全量 `cd frontend && pnpm test` → `Test Files 300 passed (300)`、`Tests 2033 passed (2033)`；`pnpm test:e2e` 全量 → `168 passed, 3 skipped (1.6m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[id]` JS 3572686 B、CSS 255804 B）。CI 第 2 轮六项全绿。
+- 第 2 轮评审修复 RED → GREEN：`pnpm exec vitest run tests/unit/core/tasks tests/unit/core/threads tests/unit/components/workspace/messages` → `13 failed | 246 passed (259)`（`loadMore 向前取紧邻的旧 run`、`not_cancellable … 释放当前 run`、`run 在切线程期间收尾、再切回`、`maps task_cancelled to cancelled`、`页里出现非 number 的 seq`、`超过 500 页的安全上限` 等），修复后回归集 `45 files / 288 passed`。
+- 批次门禁（第 2 轮修复后重跑）：`make -C frontend check` → exit 0（i18n `673 个叶子全活`，其余同上）；全量 `cd frontend && pnpm test` → `Test Files 300 passed (300)`、`Tests 2044 passed (2044)`；`pnpm test:e2e` 全量 → `168 passed, 3 skipped (1.4m)`；`pnpm perf:check` → exit 0（`/workspace/chats/[id]` JS 3573560 B、CSS 255804 B）。
 - 每个代码提交前 `pre-commit run --files <改动文件>` → eslint / prettier / gitleaks 全 Passed；`pnpm exec eslint . --ext .ts,.tsx --prune-suppressions` → exit 0，`0 errors, 120 warnings`（存量）。
 
 ## 未验证项
