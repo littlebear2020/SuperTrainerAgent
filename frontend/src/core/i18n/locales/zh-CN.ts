@@ -904,6 +904,9 @@ export const zhCN: Translations = {
     reconnecting: "连接中…",
     cancelFailed: "停止失败，任务可能仍在运行",
     retryCancel: "重试停止",
+    stopFailed: (message: string) => `停止失败：${message}`,
+    stopTimeout: (seconds: number) =>
+      `停止超时：服务端 ${seconds} 秒内没有确认停止`,
   },
 
   // Shortcuts

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
+  threadId: "t-1",
   thread: {
     isLoading: false,
     error: null as unknown,
@@ -60,7 +61,15 @@ vi.mock("@/core/config", () => ({
   getLangGraphBaseURL: () => "",
 }));
 vi.mock("@/core/i18n/hooks", () => ({
-  useI18n: () => ({ t: { uploads: { uploadingFiles: "上传中" } } }),
+  useI18n: () => ({
+    t: {
+      uploads: { uploadingFiles: "上传中" },
+      recovery: {
+        stopFailed: (message: string) => `stop failed: ${message}`,
+        stopTimeout: (seconds: number) => `stop timed out after ${seconds}s`,
+      },
+    },
+  }),
 }));
 vi.mock("@/core/models/hooks", () => ({
   useModels: () => ({
@@ -99,7 +108,7 @@ const CONTEXT = {
 
 function Probe() {
   const api = useThreadStream({
-    threadId: "t-1",
+    threadId: h.threadId,
     context: CONTEXT,
     onSend: undefined,
     onStart: undefined,
@@ -215,6 +224,7 @@ async function acceptRun(runId: string) {
 }
 
 beforeEach(() => {
+  h.threadId = "t-1";
   h.thread.isLoading = false;
   h.thread.error = null;
   h.thread.messages = [];
@@ -271,6 +281,31 @@ describe("classifyStreamError", () => {
     // 别的资源的 "not found" 不是 stale run：不能静默吞掉、也不能清掉 rejoin key
     expect(classifyStreamError(new Error("Thread not found"))).toBe("business");
     expect(classifyStreamError(new Error("Agent not found"))).toBe("business");
+    // 通用词不算连接类错误：后端业务错误不该弹出重连入口
+    expect(classifyStreamError(new Error("Tool unavailable"))).toBe("business");
+    expect(classifyStreamError(new Error("Run terminated by policy"))).toBe(
+      "business",
+    );
+    expect(
+      classifyStreamError(new Error("HTTP 503: Service Unavailable")),
+    ).toBe("connection");
+    // 没有当前 run 时的裸 404 是业务错误（线程 / 页面不存在），不是「run 已不存在」
+    expect(
+      classifyStreamError(
+        Object.assign(new Error("Not Found"), { status: 404 }),
+        { hasRun: false },
+      ),
+    ).toBe("business");
+    expect(
+      classifyStreamError(
+        Object.assign(new Error("Not Found"), { status: 404 }),
+        { hasRun: true },
+      ),
+    ).toBe("stale_run");
+    // HTTP 404 文本形态只在有 run 时才算 stale
+    expect(
+      classifyStreamError(new Error("HTTP 404: Not Found"), { hasRun: false }),
+    ).toBe("business");
     expect(classifyStreamError("Request failed.")).toBe("business");
     const aborted = new Error("The operation was aborted");
     aborted.name = "AbortError";
@@ -316,7 +351,7 @@ describe("停止后的同步（CancelOutcome）", () => {
     await flush();
 
     expect(toast.error).toHaveBeenCalledTimes(1);
-    expect(toastErrorText(0)).toMatch(/停止失败/);
+    expect(toastErrorText(0)).toMatch(/stop failed/);
     expect(api().cancelFailed).toBe(true);
     // 不伪造终态：没有刷新，分片仍是加载时的状态
     expect(h.messageCalls).toEqual(["run-1"]);
@@ -353,7 +388,7 @@ describe("停止后的同步（CancelOutcome）", () => {
 
       expect(api().cancelFailed).toBe(true);
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toastErrorText(0)).toMatch(/超时/);
+      expect(toastErrorText(0)).toMatch(/stop timed out/);
       // busy 已释放：SDK 流早已收尾，下一次发送照常入队，不再被判 busy
       let rejected: unknown = null;
       await act(async () => {
@@ -370,10 +405,13 @@ describe("停止后的同步（CancelOutcome）", () => {
     }
   });
 
-  test("not_cancellable（终态 409）：维持现有语义——按已停止处理，不算失败", async () => {
-    h.runs = [run("run-1", "success")];
+  test("not_cancellable（终态 409）：按已停止处理，不算失败；同样释放当前 run 并做一次有界刷新", async () => {
+    h.runs = [run("run-1", "running")];
     await mount();
     await acceptRun("run-1");
+    h.runs = [
+      { ...run("run-1", "success"), updated_at: "2025-01-02T00:00:00Z" },
+    ];
     h.cancelRun.mockResolvedValue({ status: "not_cancellable" });
 
     await act(async () => {
@@ -383,7 +421,76 @@ describe("停止后的同步（CancelOutcome）", () => {
 
     expect(api().cancelFailed).toBe(false);
     expect(toast.error).not.toHaveBeenCalled();
-    expect(h.listCalls).toBe(1);
+    // run 已是终态：不再是「当前 run」，也不再给重连入口
+    expect(api().activeRunId).toBeNull();
+    expect(h.listCalls).toBe(2);
+    expect(h.messageCalls).toEqual(["run-1", "run-1"]);
+  });
+
+  test("重试停止只对仍是当前线程 / 当前 run 的失败生效", async () => {
+    h.runs = [run("run-1", "running")];
+    await mount();
+    await acceptRun("run-1");
+    h.cancelRun.mockResolvedValue({
+      status: "failed",
+      error: new Error("HTTP 500: boom"),
+    });
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(api().cancelFailed).toBe(true);
+
+    // 另一个 run 成为当前 run（或切了线程）：旧失败不再属于它
+    await act(async () => {
+      h.thread.isLoading = true;
+      (
+        h.streamOptions!.onCreated as (meta: {
+          run_id: string;
+          thread_id: string;
+        }) => void
+      )({ run_id: "run-2", thread_id: "t-1" });
+    });
+    await flush();
+    expect(api().cancelFailed).toBe(false);
+    await act(async () => {
+      await api().retryCancel();
+    });
+    expect(h.cancelRun).toHaveBeenCalledTimes(1);
+  });
+
+  test("停止失败 / 超时的提示走 i18n 文案；重试停止在途时按钮态为真", async () => {
+    h.runs = [run("run-1", "running")];
+    await mount();
+    await acceptRun("run-1");
+    h.cancelRun.mockResolvedValue({
+      status: "failed",
+      error: new Error("HTTP 500: boom"),
+    });
+    await act(async () => {
+      await api().stop();
+    });
+    await flush();
+    expect(toastErrorText(0)).toBe("stop failed: HTTP 500: boom");
+
+    let release!: (value: unknown) => void;
+    h.cancelRun.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    let retrying: Promise<void> | null = null;
+    await act(async () => {
+      retrying = api().retryCancel();
+    });
+    expect(api().isCancelling).toBe(true);
+    await act(async () => {
+      release({ status: "cancelled" });
+      await retrying;
+    });
+    await flush();
+    expect(api().isCancelling).toBe(false);
   });
 });
 
@@ -528,6 +635,35 @@ describe("断线后的恢复 owner", () => {
     });
     await flush();
     expect(h.cancelRun).not.toHaveBeenCalled();
+  });
+
+  test("run 在切线程期间收尾、再切回：activeRunId 不指向已结束的旧 run", async () => {
+    h.runs = [run("run-1", "running")];
+    await mount();
+    await acceptRun("run-1");
+
+    // 切到 t-2：旧线程的流此时收尾（onFinish 的 meta 属于 t-1，清理条件不满足）
+    await act(async () => {
+      h.threadId = "t-2";
+    });
+    await rerender();
+    await act(async () => {
+      (
+        h.streamOptions!.onFinish as (
+          state: unknown,
+          meta?: { run_id?: string; thread_id?: string },
+        ) => void
+      )({ values: { messages: [] } }, { run_id: "run-1", thread_id: "t-1" });
+    });
+    // 切回 t-1
+    h.runs = [run("run-1", "success")];
+    await act(async () => {
+      h.threadId = "t-1";
+    });
+    await rerender();
+    await flush();
+    expect(api().activeRunId).toBeNull();
+    expect(api().isRecoverableDisconnect).toBe(false);
   });
 
   test("迟到的 stale 回调属于别的线程：不删当前线程的 rejoin key", async () => {

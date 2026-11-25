@@ -10,7 +10,7 @@ import {
   type SubtaskResultUpdate,
   parseSubtaskResult,
 } from "@/core/tasks/subtask-result";
-import type { Subtask } from "@/core/tasks/types";
+import { type Subtask, type SubtaskPatch } from "@/core/tasks/types";
 
 /** 一个 run 的终态判定输入（PR3）：每次只处理一个 run 的消息和该 run 的状态。 */
 export type DeriveSubtasksOptions = {
@@ -43,14 +43,30 @@ export function statusWithoutResult(
   const runStatus = options.runStatus;
   if (runStatus === undefined) return "in_progress";
   if (runStatus === "success") {
-    // 澄清把 run 正常收尾在等待回答上：没有 result 的任务并未完成
-    return messages.some(isClarificationToolMessage)
+    // 澄清把 run 正常收尾在等待回答上（goto=END）：run 的最后一条工具消息是
+    // ask_clarification 时，没有 result 的任务并未完成；澄清之后还有工具消息的，
+    // 说明澄清已被回答、run 继续过，按 success 判
+    const toolMessages = messages.filter((message) => message.type === "tool");
+    const lastTool = toolMessages.at(-1);
+    return lastTool && isClarificationToolMessage(lastTool)
       ? "in_progress"
       : "completed";
   }
   if (runStatus === "error" || runStatus === "timeout") return "failed";
   if (runStatus === "interrupted") return "cancelled";
   return "in_progress";
+}
+
+function metadataPatch(
+  id: string,
+  args: { subagent_type?: string; description?: string; prompt?: string },
+): SubtaskPatch {
+  return {
+    id,
+    subagent_type: args.subagent_type ?? "general-purpose",
+    description: args.description ?? "",
+    prompt: args.prompt ?? "",
+  };
 }
 
 /**
@@ -93,23 +109,15 @@ export function deriveSubtasks(
       } else {
         const status = statusWithoutResult(messages, options);
         if (status === undefined) {
-          // 不确定（history loading / 断线）：只登记元数据，不碰 status——既不判终态，
-          // 也不会用 in_progress 覆盖旧 run 已经落下的终态
-          out.push({
-            id,
-            subagent_type: args.subagent_type ?? "general-purpose",
-            description: args.description ?? "",
-            prompt: args.prompt ?? "",
-          });
+          // 不确定（history loading / 断线 / 归属未知）：只登记元数据，不碰 status——
+          // 既不判终态，也不会用 in_progress 覆盖旧 run 已经落下的终态
+          out.push(metadataPatch(id, args));
           continue;
         }
         parsed = { status };
       }
       out.push({
-        id,
-        subagent_type: args.subagent_type ?? "general-purpose",
-        description: args.description ?? "",
-        prompt: args.prompt ?? "",
+        ...metadataPatch(id, args),
         status: parsed.status,
         // Only include result/error when actually parsed — an in_progress
         // re-derivation (result message not yet in thread.messages) must not
@@ -122,9 +130,6 @@ export function deriveSubtasks(
   }
   return out;
 }
-
-/** 写进 store 的一次子任务 patch：不确定的状态不带 status 字段（applySubtaskPatch 过滤 undefined）。 */
-export type SubtaskPatch = Partial<Subtask> & { id: string };
 
 /** 扁平消息列表 → 按 run 判定所需的归属信息（PR3）。 */
 export type RunAttribution = {
@@ -141,25 +146,38 @@ export type RunAttribution = {
  * `findToolCallResult` 需要看到同 run 的 result 消息，所以先把消息按 run 归组、
  * 再逐 run 调 deriveSubtasks；输出顺序与消息在列表里的先后一致。
  */
+/** 归属模式下的「未知 run」：既不在 messageRunIds 里、也不是当前流（分片未到齐 / 无 id）。 */
+const UNKNOWN_RUN_ID = "";
+
 export function deriveSubtasksByRun(
   messages: Message[],
-  attribution: RunAttribution,
+  attribution: Partial<RunAttribution>,
   options: Omit<DeriveSubtasksOptions, "runStatus"> = {},
 ): SubtaskPatch[] {
   const byRun = new Map<string, Message[]>();
   for (const message of messages) {
     const historyRunId = message.id
-      ? attribution.messageRunIds.get(message.id)
+      ? attribution.messageRunIds?.get(message.id)
       : undefined;
-    const runId = historyRunId ?? attribution.activeRunId ?? "";
+    const runId = historyRunId ?? attribution.activeRunId ?? UNKNOWN_RUN_ID;
     const bucket = byRun.get(runId);
     if (bucket) bucket.push(message);
     else byRun.set(runId, [message]);
   }
   const derived = new Map<string, SubtaskPatch>();
   for (const [runId, runMessages] of byRun) {
-    const runStatus = attribution.runsById[runId]?.status;
-    for (const task of deriveSubtasks(runMessages, { ...options, runStatus })) {
+    // 未知 run（归属模式下）：不判终态，只登记元数据——有归属却按「旧调用方」把无
+    // result 的任务判成进行中，会让已结束旧 run 的任务永远转圈
+    const runStatus =
+      runId === UNKNOWN_RUN_ID
+        ? undefined
+        : attribution.runsById?.[runId]?.status;
+    const unknownRun = runId === UNKNOWN_RUN_ID;
+    for (const task of deriveSubtasks(runMessages, {
+      ...options,
+      runStatus,
+      ...(unknownRun ? { isHistoryLoading: true } : {}),
+    })) {
       derived.set(task.id, task);
     }
   }
@@ -181,11 +199,7 @@ export function deriveSubtasksByRun(
  */
 export function useSyncSubtaskStatus(
   messages: Message[],
-  attribution?: {
-    messageRunIds?: ReadonlyMap<string, string>;
-    runsById?: Readonly<Record<string, Run>>;
-    activeRunId?: string | null;
-  },
+  attribution?: Partial<RunAttribution>,
   options?: Omit<DeriveSubtasksOptions, "runStatus">,
 ): void {
   const updateSubtask = useUpdateSubtask();

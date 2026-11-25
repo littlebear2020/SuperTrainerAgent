@@ -262,6 +262,8 @@ export function useThreadStream({
   /** 手动重连单飞：按 (threadId, runId) 记在途，SDK 流收尾时清空。 */
   const reconnectInFlightRef = useRef(new Set<string>());
   const [isReconnecting, setIsReconnecting] = useState(false);
+  /** 一次显式取消在途：恢复入口的「重试停止」据此禁用，连点不并发发请求。 */
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const {
     messages: history,
@@ -296,7 +298,11 @@ export function useThreadStream({
   const [activeRun, setActiveRun] = useState<{
     threadId: string;
     runId: string;
+    /** 所属线程的令牌：切走再切回也不认旧 run（流在切线程期间收尾时 onFinish 的清理条件不满足） */
+    token: object;
   } | null>(null);
+  // 每个线程一个新对象（渲染期派生，不读 ref、不在 effect 里 setState）
+  const threadToken = useMemo(() => ({ threadId }), [threadId]);
   // mount 自动 rejoin 的 run 不经过 onCreated：SDK 按 reconnect key（sessionStorage）接续，
   // 这里读同一个键——否则刷新后接续的流没有「当前 run」，停止、重连与终态同步都无从归属。
   // key 在流正常收尾时由 SDK 清掉，随后自然回到 null。
@@ -318,7 +324,9 @@ export function useThreadStream({
     [threadId, runsById],
   );
   const activeRunId =
-    activeRun && activeRun.threadId === threadId
+    activeRun &&
+    activeRun.threadId === threadId &&
+    activeRun.token === threadToken
       ? activeRun.runId
       : rejoinRunId;
 
@@ -410,7 +418,11 @@ export function useThreadStream({
         runSubmissionsRef.current.set(meta.run_id, pending);
         pending.accept();
       }
-      setActiveRun({ threadId: meta.thread_id, runId: meta.run_id });
+      setActiveRun({
+        threadId: meta.thread_id,
+        runId: meta.run_id,
+        token: threadToken,
+      });
       handleStreamStart(meta.thread_id, meta.run_id);
       if (context.agent_name || context.project_type) {
         void getAPIClient()
@@ -501,7 +513,9 @@ export function useThreadStream({
       ) {
         setOptimisticMessages([]);
       }
-      const errorKind = classifyStreamError(error);
+      const errorKind = classifyStreamError(error, {
+        hasRun: Boolean(meta?.run_id) || activeRunId !== null,
+      });
       const onCurrentThread =
         !meta?.thread_id || meta.thread_id === threadIdRef.current;
       // Stale run reconnection: the run no longer exists on the server
@@ -956,35 +970,36 @@ export function useThreadStream({
   /** 一次显式取消的结果处理：失败（含等待超时）→ 提示并保留可重试目标；受理 → 有界刷新。 */
   const applyCancelOutcome = useCallback(
     async (threadId: string, runId: string) => {
+      setIsCancelling(true);
       let outcome: CancelOutcome;
       try {
         // wait=true 要等服务端终态；卡死 / 半开时不能让 busy 锁永远不放
         outcome = await withTimeout(
           cancelRun(threadId, runId),
           CANCEL_WAIT_LIMIT_MS,
-          () =>
-            new Error(
-              `停止超时：服务端 ${CANCEL_WAIT_LIMIT_MS / 1000} 秒内没有确认停止`,
-            ),
+          () => new Error(t.recovery.stopTimeout(CANCEL_WAIT_LIMIT_MS / 1000)),
         );
       } catch (error) {
         outcome = { status: "failed", error };
+      } finally {
+        setIsCancelling(false);
       }
       if (outcome.status === "failed") {
-        toast.error(`停止失败：${getStreamErrorMessage(outcome.error)}`);
+        toast.error(
+          t.recovery.stopFailed(getStreamErrorMessage(outcome.error)),
+        );
         setCancelFailure({ threadId, runId });
       } else {
         setCancelFailure(null);
-        if (outcome.status === "cancelled") {
-          clearActiveRun(runId);
-          await syncRunAfterCancel(threadId, runId).catch((error: unknown) => {
-            console.error("Failed to refresh run after cancel", error);
-          });
-        }
+        // cancelled 与 not_cancellable（终态 409）都是终态：释放当前 run、做一次有界刷新
+        clearActiveRun(runId);
+        await syncRunAfterCancel(threadId, runId).catch((error: unknown) => {
+          console.error("Failed to refresh run after cancel", error);
+        });
       }
       return outcome;
     },
-    [clearActiveRun, syncRunAfterCancel],
+    [clearActiveRun, syncRunAfterCancel, t.recovery],
   );
 
   /** 已受理的 run：等可等待的 cancel，结果写入 submission 的 completion。 */
@@ -1013,11 +1028,6 @@ export function useThreadStream({
   );
 
   /** 恢复入口的「重试停止」：再次调用同一 cancel（PR3）。 */
-  const retryCancel = useCallback(async () => {
-    if (!cancelFailure) return;
-    await applyCancelOutcome(cancelFailure.threadId, cancelFailure.runId);
-  }, [applyCancelOutcome, cancelFailure]);
-
   /**
    * 停止当前 run（PR2）：受理前的 submission 由这里直接以 stopped reject（中止上传，
    * 不依赖 SDK 的 onStop 是否触发；此时服务端尚无 runId，不发 cancel）；再中断 SDK 的
@@ -1079,6 +1089,11 @@ export function useThreadStream({
     cancelFailure !== null &&
     cancelFailure.threadId === onStreamThreadId &&
     cancelFailure.runId === activeRunId;
+  /** 恢复入口的「重试停止」：再次调用同一 cancel（PR3）。只对仍是当前 run 的失败生效。 */
+  const retryCancel = useCallback(async () => {
+    if (!cancelFailed) return;
+    await applyCancelOutcome(cancelFailure.threadId, cancelFailure.runId);
+  }, [applyCancelOutcome, cancelFailure, cancelFailed]);
 
   /**
    * 用户在连接类错误后手动重连（PR3）：按 (threadId, runId) 单飞；SDK 流在途（含
@@ -1090,13 +1105,14 @@ export function useThreadStream({
     const runId = activeRunId;
     const currentThreadId = threadIdRef.current;
     if (!runId || !currentThreadId) return;
-    if (thread.isLoading) return;
+    const current = threadRef.current;
+    if (!current || current.isLoading) return;
     const key = `${currentThreadId}:${runId}`;
     if (reconnectInFlightRef.current.has(key)) return;
     reconnectInFlightRef.current.add(key);
     setIsReconnecting(true);
     try {
-      await thread.joinStream(runId);
+      await current.joinStream(runId);
     } catch (error) {
       if (classifyStreamError(error) !== "aborted") {
         toast.error(getStreamErrorMessage(error));
@@ -1104,7 +1120,7 @@ export function useThreadStream({
     } finally {
       setIsReconnecting(false);
     }
-  }, [activeRunId, thread]);
+  }, [activeRunId]);
 
   // 流出错收尾后，run 在服务端已走到终态（runs 列表刷新得知）：没有 onFinish 替它
   // 重取分片，这里按新鲜度补取一次，断线期间产生的尾段消息才不会丢
@@ -1159,6 +1175,7 @@ export function useThreadStream({
       isReconnecting,
       reconnect: reconnectActiveRun,
       cancelFailed,
+      isCancelling,
       retryCancel,
     }),
     [
@@ -1166,6 +1183,7 @@ export function useThreadStream({
       isReconnecting,
       reconnectActiveRun,
       cancelFailed,
+      isCancelling,
       retryCancel,
     ],
   );
@@ -1192,6 +1210,8 @@ export function useThreadStream({
     isReconnecting,
     /** 最近一次显式取消失败（含超时），仍是当前 run 时为 true：恢复入口提供重试。 */
     cancelFailed,
+    /** 一次显式取消在途。 */
+    isCancelling,
     retryCancel,
   } as const;
 }
@@ -1199,6 +1219,8 @@ export function useThreadStream({
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const HISTORY_PAGE_SIZE = 200;
+/** 单个 run 的分页安全上限（200 条 / 页 → 10 万条）：超过即抛错，不静默截断。 */
+const HISTORY_MAX_PAGES = 500;
 /** 补齐式重载一次最多处理的 run 数（与 runs 列表的上限一致）。 */
 const HISTORY_REFETCH_MAX_RUNS = 100;
 
@@ -1217,7 +1239,14 @@ export async function fetchAllRunMessages(
 ): Promise<RunMessage[]> {
   const collected = new Map<number, RunMessage>();
   let beforeSeq: number | undefined;
-  for (;;) {
+  for (let pageNum = 0; ; pageNum += 1) {
+    // 不丢首条提示词，但也不能没有上界：超长 run 到这里显式失败（保留旧分片），而不是
+    // 无限串行翻页把页面拖死
+    if (pageNum >= HISTORY_MAX_PAGES) {
+      throw new Error(
+        `Run messages exceed the ${HISTORY_MAX_PAGES}-page safety limit (run ${runId})`,
+      );
+    }
     const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
     if (beforeSeq !== undefined) {
       params.set("before_seq", String(beforeSeq));
@@ -1238,6 +1267,12 @@ export async function fetchAllRunMessages(
     });
     const rows = Array.isArray(result.data) ? result.data : [];
     for (const row of rows) {
+      // seq 是去重键：缺 seq / 非 number 会让消息塞进同一个键下互相覆盖、静默丢失
+      if (typeof row.seq !== "number") {
+        throw new Error(
+          `Run messages response has a message without a numeric seq (run ${runId})`,
+        );
+      }
       collected.set(row.seq, row);
     }
     if (!result.has_more) break;
@@ -1331,6 +1366,8 @@ export function useThreadHistory(threadId: string) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<HistoryState>(EMPTY_HISTORY_STATE);
   const generationRef = useRef(0);
+  /** hook 当前的线程：拿着旧 threadId 闭包的迟到请求（取消后的刷新、重取）据此放弃写入 */
+  const currentThreadIdRef = useRef(threadId);
   const requestEpochRef = useRef(new Map<string, number>());
   /** 已登记的强制重取（onFinish）：runs 列表刷新触发的「加载最新 run」effect 据此不重复请求。 */
   const pendingForcedRef = useRef(new Set<string>());
@@ -1347,9 +1384,13 @@ export function useThreadHistory(threadId: string) {
     stateRef.current = state;
   }, [state]);
 
-  /** 写入当前线程的历史状态；上一线程的状态残留时从空状态起步（= 切线程整体重置）。 */
+  /**
+   * 写入当前线程的历史状态；上一线程的状态残留时从空状态起步（= 切线程整体重置）。
+   * 拿着旧线程闭包的迟到写入直接放弃：否则会把新线程刚建好的历史重置成空分片。
+   */
   const updateState = useCallback(
     (update: (prev: HistoryState) => HistoryState) => {
+      if (currentThreadIdRef.current !== threadId) return;
       setState((prev) =>
         update(
           prev.threadId === threadId
@@ -1381,6 +1422,8 @@ export function useThreadHistory(threadId: string) {
         promise: Promise<HistoryShard | undefined> | null;
       } = { promise: null };
       const request = (async (): Promise<HistoryShard | undefined> => {
+        // await 之后才到这里时线程可能已切换：旧线程的请求不得把新线程的历史重置
+        if (currentThreadIdRef.current !== threadId) return undefined;
         updateState((prev) => ({ ...prev, loading: true }));
         try {
           const all = await fetchAllRunMessages(threadId, runId);
@@ -1437,6 +1480,7 @@ export function useThreadHistory(threadId: string) {
   // 切线程：换代，旧线程的在途响应因 generation 不再写入；状态本身由 updateState 按线程重置
   useEffect(() => {
     generationRef.current += 1;
+    currentThreadIdRef.current = threadId;
     requestEpochRef.current.clear();
     inFlightRef.current.clear();
   }, [threadId]);
@@ -1465,8 +1509,10 @@ export function useThreadHistory(threadId: string) {
 
   /** 只前进一个 run：旧→新方向上第一个尚未加载的 run。 */
   const loadMore = useCallback(async () => {
+    // runs 列表 newest-first：从最新往旧找第一个尚未加载的 run，保证分片连续
+    // （从最旧那头找会在中间留下空洞，用户要点很多次才补齐）
     const list = runsRef.current ?? [];
-    for (const run of [...list].reverse()) {
+    for (const run of list) {
       if (snapshot().loadedRunIds.has(run.run_id)) continue;
       if (inFlightRef.current.has(run.run_id)) {
         return inFlightRef.current.get(run.run_id);
@@ -1491,25 +1537,30 @@ export function useThreadHistory(threadId: string) {
    * （同 run 的慢旧请求不得覆盖它）。先登记、再刷新 runs 列表——runs 更新会触发「加载最新
    * run」的 effect，它看到登记就不再重复请求；列表里没有这个 run 时也靠刷新把它找回来。
    */
+  /** runs 列表以 query cache 为准（刷新后 runsRef 要到下一次渲染才更新，可能已过期）。 */
+  const latestRuns = useCallback(
+    () =>
+      queryClient.getQueryData<Run[]>(["thread", threadId]) ??
+      runsRef.current ??
+      [],
+    [queryClient, threadId],
+  );
   const refetchRun = useCallback(
     async (runId: string): Promise<void> => {
       pendingForcedRef.current.add(runId);
       try {
-        const known = runsRef.current?.find((r) => r.run_id === runId);
+        const known = latestRuns().find((r) => r.run_id === runId);
         await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
-        const run =
-          runsRef.current?.find((r) => r.run_id === runId) ??
-          queryClient
-            .getQueryData<Run[]>(["thread", threadId])
-            ?.find((r) => r.run_id === runId) ??
-          known;
+        // 刷新期间切了线程：不再为旧线程重取
+        if (currentThreadIdRef.current !== threadId) return;
+        const run = latestRuns().find((r) => r.run_id === runId) ?? known;
         if (!run) return;
         await loadRun(run);
       } finally {
         pendingForcedRef.current.delete(runId);
       }
     },
-    [queryClient, threadId, loadRun],
+    [queryClient, threadId, loadRun, latestRuns],
   );
 
   /**
@@ -1540,9 +1591,7 @@ export function useThreadHistory(threadId: string) {
     const generation = generationRef.current;
     await queryClient.invalidateQueries({ queryKey: ["thread", threadId] });
     if (generationRef.current !== generation) return;
-    const list = (
-      queryClient.getQueryData<Run[]>(["thread", threadId]) ?? []
-    ).slice(0, HISTORY_REFETCH_MAX_RUNS);
+    const list = latestRuns().slice(0, HISTORY_REFETCH_MAX_RUNS);
     const shardsAtStart = snapshot().shards;
     let firstError: unknown;
     let failed = false;
@@ -1566,7 +1615,7 @@ export function useThreadHistory(threadId: string) {
       }
     }
     if (failed) throw firstError;
-  }, [queryClient, threadId, snapshot, loadRun, settleInFlight]);
+  }, [queryClient, threadId, snapshot, loadRun, settleInFlight, latestRuns]);
 
   // 不在 runs 列表里的分片（如被 regenerate 隐藏）在拼接时自然被过滤，不需要额外清理
   const current = state.threadId === threadId ? state : EMPTY_HISTORY_STATE;

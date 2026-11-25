@@ -604,6 +604,8 @@ export interface Translations {
     reconnecting: string;
     cancelFailed: string;
     retryCancel: string;
+    stopFailed: (message: string) => string;
+    stopTimeout: (seconds: number) => string;
   };
 
   // Subtasks

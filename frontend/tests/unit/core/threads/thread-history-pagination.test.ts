@@ -121,6 +121,34 @@ test("端点返回非 2xx：显式失败，不把错误响应体当成空历史"
   ).rejects.toThrow(/HTTP 500/);
 });
 
+test("页里出现非 number 的 seq：显式失败，不静默合并到同一个键下丢消息", async () => {
+  const fetchImpl = fetchReturning([
+    {
+      data: [row({ seq: undefined } as never), row({ seq: 2 })],
+      has_more: false,
+    },
+  ] as never[]);
+  await expect(
+    fetchAllRunMessages("t1", "r1", fetchImpl as never),
+  ).rejects.toThrow(/seq/);
+});
+
+test("超过 500 页的安全上限：抛错而不是静默截断或无限翻页", async () => {
+  const pages: Array<{ data: unknown; has_more: boolean }> = [];
+  let cursor = 200 * 501;
+  for (let i = 0; i < 501; i += 1) {
+    const from = cursor - 199;
+    pages.push(page(range(from, cursor), true));
+    cursor = from - 1;
+  }
+  const fetchImpl = fetchReturning(pages);
+  await expect(
+    fetchAllRunMessages("t1", "r1", fetchImpl as never),
+  ).rejects.toThrow(/500-page safety limit/);
+  // 第 501 页不再请求：到上限就停
+  expect(fetchImpl).toHaveBeenCalledTimes(500);
+});
+
 test("fetchAllRunMessages filters middleware-caller messages", async () => {
   const mixed = page(
     [{ seq: 1 }, { seq: 2, caller: "middleware:summarization" }],

@@ -14,6 +14,8 @@ export interface ThreadRecovery {
   reconnect: () => Promise<void>;
   /** 最近一次显式取消失败（含超时），仍是当前 run。 */
   cancelFailed: boolean;
+  /** 一次显式取消在途：「重试停止」禁用。 */
+  isCancelling: boolean;
   retryCancel: () => Promise<void>;
 }
 

@@ -2,7 +2,7 @@
 
 import { BotIcon, PlusSquare } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   usePromptInputController,
@@ -238,16 +238,18 @@ export default function AgentChatPage() {
     </div>
   ) : null;
 
+  const threadContext = useMemo(
+    () => ({
+      thread,
+      isHistoryLoading,
+      hasMoreHistory,
+      refetchHistory,
+      recovery,
+    }),
+    [thread, isHistoryLoading, hasMoreHistory, refetchHistory, recovery],
+  );
   return (
-    <ThreadContext.Provider
-      value={{
-        thread,
-        isHistoryLoading,
-        hasMoreHistory,
-        refetchHistory,
-        recovery,
-      }}
-    >
+    <ThreadContext.Provider value={threadContext}>
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header

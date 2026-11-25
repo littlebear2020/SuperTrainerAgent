@@ -52,12 +52,15 @@ export function mapTaskEvent(
       };
     case "task_failed":
     case "task_timed_out":
-    case "task_cancelled":
       return {
         id,
         status: "failed",
         error: typeof e.error === "string" ? e.error : e.type,
       };
+    case "task_cancelled":
+      // 用户取消不是失败：与 reload 路径（run interrupted / 「Task cancelled by user.」
+      // 的 result）同态，流式事件到达时卡片不会先红再灰
+      return { id, status: "cancelled" };
     default:
       return null;
   }

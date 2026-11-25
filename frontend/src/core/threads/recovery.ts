@@ -20,8 +20,10 @@ export type StreamErrorKind =
   /** 业务 4xx 等：重连只会再失败一次。 */
   | "business";
 
+// 只认网络栈 / 网关的固定形态；unavailable、terminated 这类通用词不算（后端业务
+// 错误「Tool unavailable」「Run terminated by policy」不该弹出重连入口）
 const CONNECTION_ERROR_PATTERN =
-  /failed to fetch|fetch failed|load failed|networkerror|network error|network request|econnreset|econnrefused|socket hang up|etimedout|terminated|err_internet_disconnected|err_network_changed|err_connection_|err_name_not_resolved|service unavailable|bad gateway|gateway timeout|unavailable/i;
+  /failed to fetch|fetch failed|load failed|networkerror|network error|econnreset|econnrefused|socket hang up|etimedout|err_internet_disconnected|err_network_changed|err_connection_|err_name_not_resolved|service unavailable|bad gateway|gateway timeout/i;
 
 function httpStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
@@ -43,7 +45,10 @@ function messageOf(error: unknown): string {
  * 流错误分类。SDK 的错误对象形态不一：fetch 的网络失败是 TypeError、HTTP 失败带
  * `status` 或只在 message 里写 `HTTP 404: ...`、后端 detail 嵌在 `error` 里。
  */
-export function classifyStreamError(error: unknown): StreamErrorKind {
+export function classifyStreamError(
+  error: unknown,
+  context: { hasRun?: boolean } = {},
+): StreamErrorKind {
   if (
     typeof error === "object" &&
     error !== null &&
@@ -55,12 +60,12 @@ export function classifyStreamError(error: unknown): StreamErrorKind {
   const status = httpStatus(error);
   const message = messageOf(error);
   // 只认「run 不存在」：别的资源（Thread / Agent / Tool）的 "not found" 是业务错误，
-  // 不能静默吞掉、也不能顺手清掉 rejoin key
-  if (
-    status === 404 ||
-    /HTTP\s*404\b/i.test(message) ||
-    /\brun\b.*\bnot found\b/i.test(message)
-  ) {
+  // 不能静默吞掉、也不能顺手清掉 rejoin key。裸 404（HTTP 404: Not Found）只有在这个
+  // 流确实属于某个 run 时才算 stale run——没有 run 的 404 是线程 / 页面不存在
+  if (/\brun\b.*\bnot found\b/i.test(message)) {
+    return "stale_run";
+  }
+  if (context.hasRun && (status === 404 || /HTTP\s*404\b/i.test(message))) {
     return "stale_run";
   }
   if (status !== undefined && status >= 500 && status < 600) {

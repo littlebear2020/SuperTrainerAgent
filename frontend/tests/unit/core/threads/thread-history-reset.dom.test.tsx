@@ -56,6 +56,39 @@ describe("useThreadHistory：切线程重置", () => {
     expect(historyApi().hasMore).toBe(false);
   });
 
+  test("loadMore 向前取紧邻的旧 run（从新到旧），不会跳到最旧的留下空洞", async () => {
+    harness().runsByThread.set("t-3", [
+      run("run-3"),
+      run("run-2"),
+      run("run-1"),
+    ]);
+    harness().responder = (runId) => [runPage(runId, [`m-${runId}`])];
+    const api = await mountHistory("t-3");
+    expect(messageIds(historyApi())).toEqual(["m-run-3"]);
+
+    await settleHistory(() => api.loadMore());
+    expect(messageIds(historyApi())).toEqual(["m-run-2", "m-run-3"]);
+    await settleHistory(() => api.loadMore());
+    expect(messageIds(historyApi())).toEqual(["m-run-1", "m-run-2", "m-run-3"]);
+    expect(historyApi().hasMore).toBe(false);
+  });
+
+  test("A 线程的重取在切到 B 之后才写分片：不清空 B 的历史", async () => {
+    const api = await mountHistory("t-1");
+    expect(messageIds(historyApi())).toEqual(["m3", "m4"]);
+    // 重取要等 runs 列表刷新；在它 await 期间切到 t-2
+    const refetch = api.refetchRun("run-2").catch(() => undefined);
+    await renderHistory("t-2");
+    expect(messageIds(historyApi())).toEqual(["mb"]);
+    await settleHistory(() => refetch);
+    // A 的迟到写入落在这里：B 的历史仍在，没有被重置成空分片
+    expect(messageIds(historyApi())).toEqual(["mb"]);
+    expect(historyApi().hasMore).toBe(true);
+    await settleHistory(() => historyApi().loadMore());
+    expect(messageIds(historyApi())).toEqual(["ma", "mb"]);
+    expect(historyApi().hasMore).toBe(false);
+  });
+
   test("同一线程重渲染不重复请求 run messages", async () => {
     await mountHistory("t-1");
     const before = harness().messageCalls.length;

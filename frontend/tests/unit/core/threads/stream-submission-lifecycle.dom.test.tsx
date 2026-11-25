@@ -167,7 +167,15 @@ vi.mock("@/core/config", () => ({
   getLangGraphBaseURL: () => "",
 }));
 vi.mock("@/core/i18n/hooks", () => ({
-  useI18n: () => ({ t: { uploads: { uploadingFiles: "上传中" } } }),
+  useI18n: () => ({
+    t: {
+      uploads: { uploadingFiles: "上传中" },
+      recovery: {
+        stopFailed: (message: string) => `stop failed: ${message}`,
+        stopTimeout: (seconds: number) => `stop timed out after ${seconds}s`,
+      },
+    },
+  }),
 }));
 vi.mock("@/core/models/hooks", () => ({
   useModels: () => ({
@@ -826,11 +834,46 @@ describe("OCR 第 2 轮受理项", () => {
  * 立即结束、没有任何事件的流。真实网络下 SDK 先置 isLoading=true 再发请求，React
  * 总会先渲染到「在途」；这里让流过一个宏任务再结束，复现同样的渲染顺序。
  */
+/** 在微任务内就结束、没有任何事件的流：React 可能从未渲染过 isLoading=true。 */
+function immediateEmptyStream(): AsyncIterable<never> {
+  return (async function* () {
+    return;
+  })();
+}
+
 function emptyStream(): AsyncIterable<never> {
   return (async function* () {
     await new Promise((resolve) => setTimeout(resolve, 0));
   })();
 }
+
+describe("PR3：流在 React 渲染 isLoading 之前就收尾的兜底", () => {
+  test("微任务内结束的空流：submit 落定后仍未受理 → 以 failed 结案并提示一次", async () => {
+    const cb = await mount("t-1");
+    h.stream.mockImplementationOnce(async () => immediateEmptyStream());
+    let outcome!: Promise<string | undefined>;
+    await act(async () => {
+      outcome = api()
+        .sendMessage("t-1", { text: "A", files: [] })
+        .then(
+          () => "resolved",
+          (error: unknown) => (error as { kind?: string }).kind,
+        );
+    });
+    const settled = await act(async () =>
+      Promise.race([
+        outcome,
+        new Promise<"timeout">((resolve) =>
+          setTimeout(() => resolve("timeout"), 2000),
+        ),
+      ]),
+    );
+    expect(settled).toBe("failed");
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(hasOptimistic("A")).toBe(false);
+    expect(cb.onStart).not.toHaveBeenCalled();
+  });
+});
 
 describe("PR3：onFinish 按 meta.run_id 重取分片", () => {
   test("mount 自动 rejoin（没有 onCreated）收尾时同样重取该 run 的分片", async () => {

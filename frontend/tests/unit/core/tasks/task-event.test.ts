@@ -33,14 +33,11 @@ describe("mapTaskEvent", () => {
     });
   });
 
-  it("maps task_cancelled", () => {
+  it("maps task_cancelled to cancelled (same state as the reload path)", () => {
+    // PR3：用户取消不是失败——流式事件与「run 被停止、没有 result」的 reload 路径同态
     expect(
       mapTaskEvent({ type: "task_cancelled", task_id: "t1", error: "user" }),
-    ).toEqual({
-      id: "t1",
-      status: "failed",
-      error: "user",
-    });
+    ).toEqual({ id: "t1", status: "cancelled" });
   });
 
   it("maps task_running to a latestMessage patch", () => {

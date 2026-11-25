@@ -37,6 +37,7 @@ function recovery(overrides: Record<string, unknown> = {}) {
     isReconnecting: false,
     reconnect: vi.fn(async () => undefined),
     cancelFailed: false,
+    isCancelling: false,
     retryCancel: vi.fn(async () => undefined),
     ...overrides,
   };
@@ -104,7 +105,7 @@ test("断线且 run 可能仍在运行：显示重新连接；点击调用 recon
   expect(container.textContent).toContain("连接中…");
 });
 
-test("取消失败：显示重试停止；点击调用 retryCancel", async () => {
+test("取消失败：显示重试停止；点击调用 retryCancel；重试在途时禁用", async () => {
   const retryCancel = vi.fn(async () => undefined);
   const reconnect = vi.fn(async () => undefined);
   await render({
@@ -118,4 +119,17 @@ test("取消失败：显示重试停止；点击调用 retryCancel", async () =>
   });
   expect(retryCancel).toHaveBeenCalledTimes(1);
   expect(reconnect).not.toHaveBeenCalled();
+
+  await update({
+    thread,
+    recovery: recovery({
+      cancelFailed: true,
+      isCancelling: true,
+      retryCancel,
+      reconnect,
+    }),
+  });
+  expect(container.querySelector<HTMLButtonElement>("button")?.disabled).toBe(
+    true,
+  );
 });
