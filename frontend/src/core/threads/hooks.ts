@@ -259,7 +259,10 @@ export function useThreadStream({
     threadId: string;
     runId: string;
   } | null>(null);
-  /** 手动重连单飞：按 (threadId, runId) 记在途，SDK 流收尾时清空。 */
+  /**
+   * 手动重连单飞：按 (threadId, runId) 记在途，`reconnectActiveRun` 的 finally 里释放
+   * （join 的 Promise 随排队完成即落定；之后由 `thread.isLoading` 挡住重复 join）。
+   */
   const reconnectInFlightRef = useRef(new Set<string>());
   const [isReconnecting, setIsReconnecting] = useState(false);
   /** 一次显式取消在途：恢复入口的「重试停止」据此禁用，连点不并发发请求。 */
