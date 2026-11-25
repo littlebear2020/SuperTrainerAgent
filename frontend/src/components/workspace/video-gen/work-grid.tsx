@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, Search } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,14 @@ export function WorkGrid({
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
   const [refreshPending, setRefreshPending] = useState(false);
   const refreshLock = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const viewerWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (selectedWorkId === null && viewerWasOpenRef.current) {
+      returnFocusRef.current?.focus();
+    }
+    viewerWasOpenRef.current = selectedWorkId !== null;
+  }, [selectedWorkId]);
   const filteredWorks = useMemo(
     () => selectAndFilterWorks(works, query),
     [query, works],
@@ -58,6 +66,14 @@ export function WorkGrid({
       refreshLock.current = false;
       setRefreshPending(false);
     }
+  };
+
+  const openWork = (workId: string) => {
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setSelectedWorkId(workId);
   };
 
   let content;
@@ -113,7 +129,7 @@ export function WorkGrid({
             <WorkCard
               key={work.id}
               work={work}
-              onOpen={() => setSelectedWorkId(work.id)}
+              onOpen={() => openWork(work.id)}
               onContinue={onContinue}
               onTaskNavigate={onTaskNavigate}
               onDelete={onDelete}

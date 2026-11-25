@@ -32,6 +32,7 @@ def test_task_with_thumbnail_surfaces_av_drift_warning(tmp_path):
     )
 
     task = MagicMock()
+    task.delivery = None
     task.amount_source = None  # 2026-08-27 字段：mock 未跟上过不了 str 校验（同 test_thumbnail 修法）
     task.id = "vg_drift1"
     task.user_id = "u1"
@@ -64,6 +65,7 @@ def test_task_with_thumbnail_no_warning_when_no_sidecar(tmp_path):
     task_dir.mkdir(parents=True)
 
     task = MagicMock()
+    task.delivery = None
     task.amount_source = None  # 2026-08-27 字段：mock 未跟上过不了 str 校验（同 test_thumbnail 修法）
     task.id = "vg_clean1"
     task.user_id = "u1"

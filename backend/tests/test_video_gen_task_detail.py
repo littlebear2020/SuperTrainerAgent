@@ -23,6 +23,7 @@ def _fake_task(*, payload: dict, result: dict) -> MagicMock:
     t.updated_at = None
     t.thumbnail_url = None
     t.amount_source = None  # 2026-08-27 字段：mock 未跟上过不了 str 校验（2026-09-14 基线债修复）
+    t.delivery = None
     t.cost = None
     t.currency = None
     t.payload = json.dumps(payload, ensure_ascii=False)
