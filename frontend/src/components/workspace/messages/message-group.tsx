@@ -7,7 +7,6 @@ import {
   LightbulbIcon,
   ListTodoIcon,
   MessageCircleQuestionMarkIcon,
-  NotebookPenIcon,
   SearchIcon,
   SquareTerminalIcon,
   WrenchIcon,
@@ -23,7 +22,6 @@ import {
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { Button } from "@/components/ui/button";
-import { createWriteFileRef } from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatToolDetail } from "@/core/messages/tool-detail-preview";
 import {
@@ -36,13 +34,13 @@ import { sanitizeCitationUrl } from "@/core/utils/url";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
-import { useArtifacts } from "../artifacts";
 import { FlipDisplay } from "../flip-display";
 import { Tooltip } from "../tooltip";
 
 import { ClarificationOptions } from "./clarification-options";
 import { MarkdownContent } from "./markdown-content";
 import { ToolCallDetails } from "./tool-call-details";
+import { WriteFileToolCall } from "./write-file-tool-call";
 
 interface MessageGroupProps {
   className?: string;
@@ -209,6 +207,7 @@ function ToolCall({
   messageId,
   name,
   args,
+  rawArgs,
   result,
   resultMessage,
   isLast = false,
@@ -218,6 +217,8 @@ function ToolCall({
   messageId?: string;
   name: string;
   args: Record<string, unknown>;
+  /** 流式参数的原始 JSON 串（PR4）：缺省 = 历史消息，`args` 已完整。 */
+  rawArgs?: string;
   result?: string | Record<string, unknown>;
   /** PR-2 4.5：tool 消息本体（Details 面板取 content 与 error 态）。 */
   resultMessage?: Extract<Message, { type: "tool" }>;
@@ -225,8 +226,6 @@ function ToolCall({
   isLoading?: boolean;
 }) {
   const { t } = useI18n();
-  const { setOpen, autoOpen, autoSelect, selectedArtifact, select } =
-    useArtifacts();
 
   if (name === "web_search") {
     let label: React.ReactNode = t.toolCalls.searchForRelatedInfo;
@@ -384,42 +383,19 @@ function ToolCall({
       </ChainOfThoughtStep>
     );
   } else if (name === "write_file" || name === "str_replace") {
-    let description: string | undefined = (args as { description: string })
-      ?.description;
-    if (!description) {
-      description = t.toolCalls.writeFile;
-    }
-    const path: string | undefined = (args as { path: string })?.path;
-    // PR4：path 作为独立 query 参数编码；缺任一定位字段就不生成引用
-    const ref = createWriteFileRef({ path, messageId, toolCallId: id });
-    if (isLoading && isLast && autoOpen && autoSelect && ref && !result) {
-      setTimeout(() => {
-        if (selectedArtifact === ref) {
-          return;
-        }
-        select(ref, true);
-        setOpen(true);
-      }, 100);
-    }
-
+    // PR4：独立组件承载 auto-open——流式参数一段段到，半截 path 不能构造引用、不能
+    // 选中；auto-open 的 effect 只能放在 hook 规则允许的位置（组件顶层）
     return (
-      <ChainOfThoughtStep
-        key={id}
-        className="cursor-pointer"
-        label={description}
-        icon={NotebookPenIcon}
-        onClick={() => {
-          if (!ref) return;
-          select(ref);
-          setOpen(true);
-        }}
-      >
-        {path && (
-          <ChainOfThoughtSearchResult className="cursor-pointer">
-            {path}
-          </ChainOfThoughtSearchResult>
-        )}
-      </ChainOfThoughtStep>
+      <WriteFileToolCall
+        id={id}
+        messageId={messageId}
+        name={name}
+        args={args}
+        rawArgs={rawArgs}
+        result={result}
+        isLast={isLast}
+        isLoading={isLoading}
+      />
     );
   } else if (name === "bash") {
     let description: string | undefined = (args as { description: string })
@@ -513,12 +489,32 @@ interface CoTReasoningStep extends GenericCoTStep<"reasoning"> {
 interface CoTToolCallStep extends GenericCoTStep<"toolCall"> {
   name: string;
   args: Record<string, unknown>;
+  /**
+   * 流式参数的原始 JSON 串（`tool_call_chunks` 的 args 片段）。SDK 交付的 `args` 是宽松的
+   * 部分 JSON 解析结果——半截 path 也在里面；消费者以 `JSON.parse(rawArgs)` 成功作为
+   * 「参数完整」的信号。历史消息没有 chunk，为 undefined = 视为完整。
+   */
+  rawArgs?: string;
   result?: string;
   /** PR-2 4.5：tool 消息本体索引（resultMessages），供 Details 面板消费。 */
   resultMessage?: Extract<Message, { type: "tool" }>;
 }
 
 type CoTStep = CoTReasoningStep | CoTToolCallStep;
+
+/** `tool_call_chunks` 里每个工具调用的原始 args 串（按 id；SDK 已按 index 合并过）。 */
+function rawArgsByToolCallId(message: Message): Map<string, string> {
+  const out = new Map<string, string>();
+  const chunks = (message as { tool_call_chunks?: unknown }).tool_call_chunks;
+  if (!Array.isArray(chunks)) return out;
+  for (const chunk of chunks) {
+    if (!chunk || typeof chunk !== "object") continue;
+    const { id, args } = chunk as { id?: unknown; args?: unknown };
+    if (typeof id !== "string" || !id || typeof args !== "string") continue;
+    out.set(id, (out.get(id) ?? "") + args);
+  }
+  return out;
+}
 
 function convertToSteps(messages: Message[]): CoTStep[] {
   const steps: CoTStep[] = [];
@@ -544,6 +540,7 @@ function convertToSteps(messages: Message[]): CoTStep[] {
         };
         steps.push(step);
       }
+      const rawArgs = rawArgsByToolCallId(message);
       for (const tool_call of message.tool_calls ?? []) {
         if (tool_call.name === "task") {
           continue;
@@ -554,6 +551,7 @@ function convertToSteps(messages: Message[]): CoTStep[] {
           type: "toolCall",
           name: tool_call.name,
           args: tool_call.args,
+          rawArgs: tool_call.id ? rawArgs.get(tool_call.id) : undefined,
         };
         const toolCallId = tool_call.id;
         if (toolCallId) {

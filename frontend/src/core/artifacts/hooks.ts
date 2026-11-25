@@ -65,7 +65,9 @@ export function useArtifactContent({
     queryFn: () => {
       return loadArtifactContent({ filepath, threadId });
     },
-    enabled: enabled && !isWriteFile,
+    // `enabled` 缺省 = 启用（TanStack 把 undefined 当 true，不能写 `enabled && …`）；
+    // write-file 引用永远不走普通文件的查询
+    enabled: enabled !== false && !isWriteFile,
     // Short window only to dedupe the burst of mounts for one artifact (e.g. .skill
     // ZIP extraction). A long staleTime served stale content after the agent
     // rewrote the file in a later run.
