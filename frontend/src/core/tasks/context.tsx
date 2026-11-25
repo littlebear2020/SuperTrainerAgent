@@ -76,6 +76,12 @@ export function applySubtaskPatch(
     Object.entries(patch).filter(([, value]) => value !== undefined),
   ) as Partial<Subtask> & { id: string };
 
+  // 不确定状态的 patch（history loading / 断线 / 未知 run）对已有任务不碰 status；
+  // 新任务不能没有 status（Subtask.status 必填，卡片要渲染），按旧调用方行为记为进行中
+  if (!existing && effective.status === undefined) {
+    effective.status = "in_progress";
+  }
+
   if (
     existing &&
     existing.status !== "in_progress" &&

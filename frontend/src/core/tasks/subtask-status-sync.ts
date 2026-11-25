@@ -20,6 +20,8 @@ export type DeriveSubtasksOptions = {
   isHistoryLoading?: boolean;
   /** 流已断开但服务端的 run 未必结束：不下发终态判定。 */
   isRecoverableDisconnect?: boolean;
+  /** 归属未知（分片未到齐 / runs 列表里查不到）：不判终态，只登记元数据。 */
+  deferStatus?: boolean;
 };
 
 /**
@@ -37,20 +39,33 @@ export function statusWithoutResult(
   messages: Message[],
   options: DeriveSubtasksOptions,
 ): Subtask["status"] | undefined {
-  if (options.isHistoryLoading || options.isRecoverableDisconnect) {
+  if (
+    options.deferStatus ||
+    options.isHistoryLoading ||
+    options.isRecoverableDisconnect
+  ) {
     return undefined;
   }
   const runStatus = options.runStatus;
   if (runStatus === undefined) return "in_progress";
   if (runStatus === "success") {
-    // 澄清把 run 正常收尾在等待回答上（goto=END）：run 的最后一条工具消息是
-    // ask_clarification 时，没有 result 的任务并未完成；澄清之后还有工具消息的，
-    // 说明澄清已被回答、run 继续过，按 success 判
-    const toolMessages = messages.filter((message) => message.type === "tool");
-    const lastTool = toolMessages.at(-1);
-    return lastTool && isClarificationToolMessage(lastTool)
-      ? "in_progress"
-      : "completed";
+    // 澄清把 run 正常收尾在等待回答上（goto=END）：最后一次 ask_clarification 之后
+    // 没有用户的回答时，没有 result 的任务并未完成。不能只看「最后一条工具消息是不是
+    // 澄清」——并行工具调用的结果会晚于澄清写入，不代表澄清已被回答
+    // （lib 低于 es2023，没有 findLast / findLastIndex：手写倒序查找）
+    let lastClarificationIndex = -1;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.type === "tool" && isClarificationToolMessage(message)) {
+        lastClarificationIndex = index;
+        break;
+      }
+    }
+    if (lastClarificationIndex < 0) return "completed";
+    const answered = messages
+      .slice(lastClarificationIndex + 1)
+      .some((message) => message.type === "human");
+    return answered ? "completed" : "in_progress";
   }
   if (runStatus === "error" || runStatus === "timeout") return "failed";
   if (runStatus === "interrupted") return "cancelled";
@@ -168,15 +183,23 @@ export function deriveSubtasksByRun(
   for (const [runId, runMessages] of byRun) {
     // 未知 run（归属模式下）：不判终态，只登记元数据——有归属却按「旧调用方」把无
     // result 的任务判成进行中，会让已结束旧 run 的任务永远转圈
-    const runStatus =
-      runId === UNKNOWN_RUN_ID
-        ? undefined
-        : attribution.runsById?.[runId]?.status;
-    const unknownRun = runId === UNKNOWN_RUN_ID;
+    // 归属模式下的「未知 run」：既不在 messageRunIds 里、也不是当前流，或者有归属但
+    // runsById 里查不到（列表未刷新 / 已被清理）——不判终态，只登记元数据
+    const knownRun =
+      runId !== UNKNOWN_RUN_ID &&
+      (attribution.activeRunId === runId ||
+        attribution.runsById?.[runId] !== undefined);
+    const runStatus = knownRun
+      ? attribution.runsById?.[runId]?.status
+      : undefined;
+    // history loading / 断线只约束当前流：旧 run 的状态在 runsById 里是确定的，
+    // 不该因为用户停在断线态就一直转圈
+    const isActiveRun = runId === attribution.activeRunId;
     for (const task of deriveSubtasks(runMessages, {
-      ...options,
+      deferStatus: !knownRun,
+      isHistoryLoading: isActiveRun && options.isHistoryLoading,
+      isRecoverableDisconnect: isActiveRun && options.isRecoverableDisconnect,
       runStatus,
-      ...(unknownRun ? { isHistoryLoading: true } : {}),
     })) {
       derived.set(task.id, task);
     }

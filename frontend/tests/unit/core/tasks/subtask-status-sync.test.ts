@@ -145,7 +145,7 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
     ]);
   });
 
-  it("澄清挂起只看 run 的最后一条工具消息：澄清之前就已完成的任务不被拖成 in_progress", () => {
+  it("澄清挂起只看澄清之后有没有用户的回答：澄清之前就已完成的任务不被拖成 in_progress", () => {
     // 同一 run：任务有 result → completed；之后才挂起澄清（goto=END）
     const answered = deriveSubtasks(
       [
@@ -156,8 +156,9 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
       { runStatus: "success" },
     );
     expect(answered[0]!.status).toBe("completed");
-    // 澄清之后又有工具消息（澄清已被回答、run 继续过）：没有 result 的任务按 success 判 completed
-    const resumed = deriveSubtasks(
+    // 澄清之后只有别的工具消息、没有用户的回答：澄清并未被回答（并行工具调用的结果
+    // 晚于澄清写入），run 仍停在等回答上，没有 result 的任务不算完成
+    const unanswered = deriveSubtasks(
       [
         aiTask("a1", "tc1"),
         clarification("c1", "ask-1"),
@@ -165,7 +166,36 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
       ],
       { runStatus: "success" },
     );
-    expect(resumed[0]!.status).toBe("completed");
+    expect(unanswered[0]!.status).toBe("in_progress");
+  });
+
+  it("澄清之后已有用户的回答：澄清已被回答，没有 result 的任务按 success 判", () => {
+    const humanReply = {
+      id: "h-1",
+      type: "human",
+      content: "好的，选第一个",
+    } as unknown as Message;
+    const out = deriveSubtasks(
+      [aiTask("a1", "tc1"), clarification("c1", "ask-1"), humanReply],
+      { runStatus: "success" },
+    );
+    expect(out[0]!.status).toBe("completed");
+  });
+
+  it("有归属但 runsById 里查不到这个 run（列表未刷新 / 已被清理）：不判终态，只登记元数据", () => {
+    const out = deriveSubtasksByRun([aiTask("a1", "tc1")], {
+      messageRunIds: new Map([["a1", "run-gone"]]),
+      runsById: {},
+      activeRunId: null,
+    });
+    expect(out).toEqual([
+      {
+        id: "tc1",
+        subagent_type: "general-purpose",
+        description: "d",
+        prompt: "p",
+      },
+    ]);
   });
 
   it("cancelled 不带 error 字段（取消不是失败）", () => {
@@ -192,6 +222,33 @@ describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
         prompt: "p",
       },
     ]);
+  });
+
+  it("history loading / 断线只约束当前流：旧 run 的终态照常判定", () => {
+    // 断线状态下 runsById 的状态是确定的：已结束旧 run 里没有 result 的任务不能一直转圈
+    const run = (runId: string, status: string): Run =>
+      ({ run_id: runId, status }) as unknown as Run;
+    const out = deriveSubtasksByRun(
+      [aiTask("a-old", "tc-old"), aiTask("a-live", "tc-live")],
+      {
+        messageRunIds: new Map([
+          ["a-old", "run-1"],
+          ["a-live", "run-2"],
+        ]),
+        runsById: {
+          "run-1": run("run-1", "interrupted"),
+          "run-2": run("run-2", "running"),
+        },
+        activeRunId: "run-2",
+      },
+      { isHistoryLoading: true, isRecoverableDisconnect: true },
+    );
+    expect(out.map((task) => [task.id, task.status])).toEqual([
+      ["tc-old", "cancelled"],
+      // 当前流在断线态：不判终态（只登记元数据）
+      ["tc-live", undefined],
+    ]);
+    expect("status" in out[1]!).toBe(false);
   });
 
   it("history loading / 断线：不判终态——只登记元数据，不下发会覆盖旧终态的 status", () => {

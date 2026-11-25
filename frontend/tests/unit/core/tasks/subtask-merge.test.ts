@@ -49,6 +49,44 @@ describe("applySubtaskPatch", () => {
     expect(merged.subagent_type).toBe("general-purpose");
   });
 
+  it("metadata-only patch (uncertain status): seeds a new task as in_progress, keeps an existing terminal status", () => {
+    // PR3：history loading / 断线 / 未知 run 时不判终态，patch 不带 status。
+    // 新任务不能没有 status（卡片要渲染），按旧调用方行为记为进行中；
+    // 已有任务的状态原样保留——不会被改写也不会被回退
+    const seeded = applySubtaskPatch(undefined, {
+      id: "t-new",
+      description: "d",
+    });
+    expect(seeded.status).toBe("in_progress");
+
+    const existing = seed("t1", { status: "cancelled" });
+    expect(
+      applySubtaskPatch(existing, { id: "t1", description: "d2" }),
+    ).toEqual({
+      ...existing,
+      description: "d2",
+    });
+  });
+
+  it("metadata-only patch (uncertain status): seeds a new task as in_progress, keeps an existing terminal status", () => {
+    // PR3：history loading / 断线 / 未知 run 时不判终态，patch 不带 status。
+    // 新任务不能没有 status（卡片要渲染），按旧调用方行为记为进行中；
+    // 已有任务的状态原样保留——不会被改写也不会被回退
+    const seeded = applySubtaskPatch(undefined, {
+      id: "t-new",
+      description: "d",
+    });
+    expect(seeded.status).toBe("in_progress");
+
+    const existing = seed("t1", { status: "cancelled" });
+    expect(
+      applySubtaskPatch(existing, { id: "t1", description: "d2" }),
+    ).toEqual({
+      ...existing,
+      description: "d2",
+    });
+  });
+
   it("does NOT regress a terminal status back to in_progress", () => {
     // onCustomEvent marked it completed; a later full-metadata in_progress
     // re-derivation (useSyncSubtaskStatus) must not clobber the status.

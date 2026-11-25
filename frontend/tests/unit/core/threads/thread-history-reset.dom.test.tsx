@@ -4,6 +4,7 @@
  * 夹具见 history-test-harness（必须是第一个 import）。
  */
 import {
+  deferred,
   flush,
   harness,
   historyApi,
@@ -14,11 +15,12 @@ import {
   resetHistoryHarness,
   run,
   runPage,
+  type RunPage,
   unmountHistory,
 } from "./history-test-harness";
 // 夹具必须先于 vitest 求值（vi.mock 的提升规则），顺序与 import/order 相反
 // eslint-disable-next-line import/order
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 describe("useThreadHistory：切线程重置", () => {
   beforeEach(() => {
@@ -107,5 +109,45 @@ describe("useThreadHistory：切线程重置", () => {
     await slow.catch(() => undefined);
     await flush();
     expect(historyApi().loading).toBe(false);
+  });
+
+  test("离开线程（卸载）时在途的分页请求被中止，中止不算加载失败", async () => {
+    const slow = deferred<RunPage[]>();
+    harness().responder = (runId) =>
+      runId === "run-2" ? slow.promise : [runPage(runId, ["m"])];
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    try {
+      await mountHistory("t-1");
+      // 最新 run（run-2）的分页挂在慢响应上
+      expect(harness().messageCalls.at(-1)?.runId).toBe("run-2");
+      const signal = harness().signals.at(-1);
+      expect(signal?.aborted).toBe(false);
+
+      await unmountHistory();
+      expect(signal?.aborted).toBe(true);
+      await flush();
+      const logged = errorSpy.mock.calls.filter((args) =>
+        String(args[0]).includes("Failed to load thread history"),
+      );
+      expect(logged).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("切线程时旧线程在途的分页请求被中止，新线程的请求带自己的信号", async () => {
+    const slow = deferred<RunPage[]>();
+    harness().responder = (runId) =>
+      runId === "run-2" ? slow.promise : [runPage(runId, [`m-${runId}`])];
+    await mountHistory("t-1");
+    const oldSignal = harness().signals.at(-1);
+    expect(harness().messageCalls.at(-1)?.runId).toBe("run-2");
+
+    await renderHistory("t-2");
+    expect(oldSignal?.aborted).toBe(true);
+    expect(harness().messageCalls.at(-1)?.runId).toBe("run-b");
+    expect(harness().signals.at(-1)?.aborted).toBe(false);
   });
 });
