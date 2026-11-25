@@ -104,10 +104,11 @@ export function getStallWarning(
 
 // ── List tasks ───────────────────────────────────────────────────────────
 
-export function useVideoTasks() {
+export function useVideoTasks(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [VIDEO_KEY],
     queryFn: listVideoTasks,
+    enabled: options?.enabled ?? true,
     refetchInterval: (query) => {
       const tasks = query.state.data;
       if (!tasks) return false;

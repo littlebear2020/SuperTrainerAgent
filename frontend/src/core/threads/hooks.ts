@@ -1720,10 +1720,12 @@ export function useThreads(
     sortOrder: "desc",
     select: ["thread_id", "updated_at", "values", "metadata"],
   },
+  options?: { enabled?: boolean },
 ) {
   const apiClient = getAPIClient();
   return useQuery<AgentThread[]>({
     queryKey: ["threads", "search", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const maxResults = params.limit;
       const initialOffset = params.offset ?? 0;
