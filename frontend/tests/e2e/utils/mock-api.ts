@@ -88,6 +88,8 @@ export type MockAPIOptions = {
   /**
    * 产物正文：原始路径 → 文件当前内容（`GET /api/threads/{id}/artifacts/{path}`）。
    * 未登记的路径返回 404。write_file 的 append / str_replace 读的就是这个端点。
+   * `.skill` 包要按 `"<path>.skill/SKILL.md"` 登记——前端对 .skill 路径会自动追加
+   * `/SKILL.md` 再请求。
    */
   artifacts?: Record<string, string>;
 };
@@ -454,7 +456,11 @@ export function mockLangGraphAPI(
     if (!options?.artifacts) return route.fallback();
     if (route.request().method() !== "GET") return route.fallback();
     const url = new URL(route.request().url());
-    const encodedPath = url.pathname.split("/artifacts")[1] ?? "";
+    // 产物路径里可能再有「/artifacts」（如 /mnt/outputs/artifacts/x.md）：只切掉端点前缀
+    const marker = "/artifacts";
+    const encodedPath = url.pathname.slice(
+      url.pathname.indexOf(marker) + marker.length,
+    );
     const filepath = encodedPath
       .split("/")
       .map((segment) => {

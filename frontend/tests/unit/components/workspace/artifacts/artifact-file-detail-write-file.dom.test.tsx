@@ -6,6 +6,7 @@
 
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -216,6 +217,104 @@ describe("write-file 引用在详情面板里的五态渲染", () => {
     await renderDetail();
     expect(container.textContent).toContain(zhCN.writeFileRef.invalid);
     expect(container.querySelector("[data-testid='code-editor']")).toBeNull();
+  });
+
+  it("带 write-file 前缀但解析失败的引用（截断的旧格式）按 write-file 处理：没有文件下拉、打开 / 下载 / 编辑，也没有 iframe", async () => {
+    // 旧格式把 path 放在 pathname：`%` 不合法，解析返回 null；hook 侧仍按前缀判为 write-file
+    const truncated =
+      "write-file:/mnt/data/100%.md?message_id=msg-1&tool_call_id=call-1";
+    h.writeFileState = { status: "invalid" } as WriteFileContentState;
+    await act(async () => {
+      root.render(
+        <DialogProvider>
+          <ArtifactFileDetail filepath={truncated} threadId="th_1" />
+        </DialogProvider>,
+      );
+    });
+    expect(container.textContent).toContain(zhCN.writeFileRef.invalid);
+    // 非法串不能当成普通文件路径流向任何一条普通文件链路
+    expect(
+      container.querySelector("[data-testid='artifact-select']"),
+    ).toBeNull();
+    expect(container.querySelector("iframe")).toBeNull();
+    const actions = [...container.querySelectorAll("button")].map((b) =>
+      b.getAttribute("data-action"),
+    );
+    expect(actions).toContain(zhCN.common.close);
+    for (const label of [
+      zhCN.common.openInNewWindow,
+      zhCN.common.download,
+      zhCN.common.edit,
+      zhCN.common.install,
+    ]) {
+      expect(actions).not.toContain(label);
+    }
+  });
+
+  it("pending：Markdown 预览也不渲染，只显示说明", async () => {
+    h.writeFileState = { status: "pending" } as WriteFileContentState;
+    await act(async () => {
+      root.render(
+        <DialogProvider>
+          <ArtifactFileDetail
+            filepath="write-file:?path=%2Fmnt%2Fdata%2Freport.md&message_id=msg-1&tool_call_id=call-1"
+            threadId="th_1"
+          />
+        </DialogProvider>,
+      );
+    });
+    expect(container.textContent).toContain(zhCN.writeFileRef.pending);
+    // 非 ready 态只显示说明：预览（哪怕内容为空）不挂载
+    expect(
+      container.querySelector("[data-testid='artifact-file-preview']"),
+    ).toBeNull();
+    expect(container.querySelector("[data-testid='code-editor']")).toBeNull();
+  });
+
+  it("ready 的 Markdown 引用照常渲染预览（说明不存在）", async () => {
+    h.writeFileState = {
+      status: "ready",
+      content: "# 报告",
+    } as WriteFileContentState;
+    await act(async () => {
+      root.render(
+        <DialogProvider>
+          <ArtifactFileDetail
+            filepath="write-file:?path=%2Fmnt%2Fdata%2Freport.md&message_id=msg-1&tool_call_id=call-1"
+            threadId="th_1"
+          />
+        </DialogProvider>,
+      );
+    });
+    expect(
+      container.querySelector("[data-testid='artifact-file-preview']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='write-file-notice']"),
+    ).toBeNull();
+  });
+
+  it("refetchHistory 失败：提示一次、按钮恢复可用，不产生未处理拒绝", async () => {
+    h.writeFileState = { status: "not_found" } as WriteFileContentState;
+    h.hasMoreHistory = false;
+    h.refetchHistory = vi.fn(async () => {
+      throw new Error("run history shard failed");
+    });
+    await renderDetail();
+    const retry = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes(zhCN.writeFileRef.retry),
+    );
+    expect(retry).toBeTruthy();
+    await act(async () => {
+      retry!.click();
+    });
+    expect(h.refetchHistory).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(zhCN.writeFileRef.refetchFailed);
+    // 失败后可以再点
+    const again = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes(zhCN.writeFileRef.retry),
+    );
+    expect(again?.disabled).toBe(false);
   });
 
   it("not_found + 仍有未加载的旧 run：显示「加载完整历史」，点击调用并等待 refetchHistory", async () => {

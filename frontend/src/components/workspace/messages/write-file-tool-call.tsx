@@ -17,7 +17,6 @@ const AUTO_OPEN_DELAY_MS = 100;
 type WriteFileToolCallProps = {
   id?: string;
   messageId?: string;
-  name: string;
   args: Record<string, unknown>;
   /** 流式参数的原始 JSON 串（`tool_call_chunks` 拼接）；缺省 = 历史消息，`args` 已完整。 */
   rawArgs?: string;
@@ -90,13 +89,18 @@ export function WriteFileToolCall({
   useEffect(() => {
     selectedRef.current = selectedArtifact;
   }, [selectedArtifact]);
-  /** 已经尝试过 auto-open 的 toolCallId：同一个调用只试一次。 */
+  /**
+   * 已经尝试过 auto-open 的 toolCallId：同一个调用只试一次——计时器真正触发就算尝试过，
+   * 哪怕这次因为用户手选了别的产物而让位。
+   */
   const attemptedRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!ref || !id) return;
     if (!(isLoading && isLast && autoOpen && autoSelect) || hasResult) return;
     if (attemptedRef.current === id) return;
+    // 快照取自本次调度那一刻；依赖变化会清掉计时器重新调度、重新取快照，但用户的手选
+    // 会同时把 autoSelect 关掉（见 artifacts/context 的 select），条件不再成立、不会重排
     const selectionAtSchedule = selectedRef.current;
     const timer = setTimeout(() => {
       // 计时器真正触发才算尝试过
@@ -112,7 +116,6 @@ export function WriteFileToolCall({
 
   return (
     <ChainOfThoughtStep
-      key={id}
       className="cursor-pointer"
       label={description}
       icon={NotebookPenIcon}

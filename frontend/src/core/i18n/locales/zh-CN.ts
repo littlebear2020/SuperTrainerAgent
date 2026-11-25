@@ -94,6 +94,7 @@ export const zhCN: Translations = {
     retry: "重试",
     invalid: "这个引用无效，无法定位到对应的工具调用。",
     failed: "这次写入失败了",
+    refetchFailed: "重新加载会话历史失败，请稍后重试",
   },
 
   // Input Box
