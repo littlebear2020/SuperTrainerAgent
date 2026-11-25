@@ -7,6 +7,7 @@ import {
   showcaseFor,
   type ShowcaseAgent,
   type ShowcaseCase,
+  type VisualCase,
 } from "@/core/agents/showcase";
 
 const publicRoot = join(process.cwd(), "public");
@@ -16,6 +17,315 @@ const agentIds = [
   "podcast-studio",
   "creative-studio",
 ] as const;
+
+const copy = (zh: string, en: string) => ({ zh, en });
+
+type VisualExpectation = {
+  id: string;
+  category: VisualCase["category"];
+  type: string;
+  title: { zh: string; en: string };
+  tag: { zh: string; en: string };
+  description: { zh: string; en: string };
+  formatLabel: { zh: string; en: string };
+  fields: string[];
+  spec: string;
+  preview: string;
+  original: string;
+  vector?: string;
+  downloadName: string;
+  width: number;
+  height: number;
+};
+
+const visualExpectations: VisualExpectation[] = [
+  {
+    id: "visual-poster-agent",
+    category: "poster",
+    type: "课程海报",
+    title: copy("AI Agent 实战训练营", "AI Agent Bootcamp"),
+    tag: copy("课程海报 · 训练营招生", "Course poster · Bootcamp recruitment"),
+    description: copy(
+      "把学习成果、实战项目、适合人群和报名方式集中在一张竖版海报中。",
+      "Present learning outcomes, hands-on projects, target learners, and enrollment details in one portrait poster.",
+    ),
+    formatLabel: copy("PNG 图片", "PNG image"),
+    fields: [
+      "使用场景：【请填写，如社群招募】",
+      "目标受众与基础：【请填写】",
+      "核心学习成果：【请填写】",
+      "三个实战项目：【请填写】",
+      "课程周期与服务：【请填写】",
+      "行动号召：【请填写】",
+    ],
+    spec: "输出 1080×1920 PNG。直接编写自包含 HTML+CSS+SVG，并使用 /opt/chrome-headless-shell/chrome-headless-shell --headless=new --disable-gpu --no-sandbox --screenshot=OUTPUT_PATH.png --window-size=1080,1920 file:///INPUT_PATH.html 截图；不调用 course-poster 固定模板，不套 Systemic Pulse 默认配色或固定区块。深空黑背景、冷青网络拓扑、琥珀强调；依次呈现小眉题、大标题、成果副标题、Agent 工作流、三个项目、受众与课程设置、CTA；不使用无来源数据。",
+    preview: "/agent-showcase/visual/previews/poster-agent-bootcamp.webp",
+    original: "/agent-showcase/visual/originals/poster-agent-bootcamp.png",
+    downloadName: "visual-poster-agent.png",
+    width: 1080,
+    height: 1920,
+  },
+  {
+    id: "visual-poster-manager",
+    category: "poster",
+    type: "课程海报",
+    title: copy("新任管理者 90 天加速营", "90-Day New Manager Accelerator"),
+    tag: copy("课程海报 · 企业内训", "Course poster · Corporate training"),
+    description: copy(
+      "用 90 天成长路径说明课程安排，帮助培训负责人展示企业内训项目。",
+      "Explain the program through a 90-day learning path and help training leaders present an internal management course.",
+    ),
+    formatLabel: copy("PNG 图片", "PNG image"),
+    fields: [
+      "使用场景：【请填写，如企业内训】",
+      "目标受众：【请填写】",
+      "核心学习成果：【请填写】",
+      "三个阶段与内容：【请填写】",
+      "工作坊与情境演练：【请填写】",
+      "行动号召：【请填写】",
+    ],
+    spec: "输出 1080×1920 PNG。直接编写自包含 HTML+CSS+SVG，并使用 /opt/chrome-headless-shell/chrome-headless-shell --headless=new --disable-gpu --no-sandbox --screenshot=OUTPUT_PATH.png --window-size=1080,1920 file:///INPUT_PATH.html 截图；不调用 course-poster 固定模板，不套 Systemic Pulse 默认配色或固定区块。采用暖白底、亮橙、钴蓝与黑色大字的瑞士编辑网格；依次呈现课程标题、大号周期标识、适合人群、三阶段时间轴、工作坊与情境演练、CTA；阶段名称与周期使用用户填写的内容，示例里的 30/60/90 只说明位置，不写进新海报；不使用装饰性伪数据图表。",
+    preview: "/agent-showcase/visual/previews/poster-manager-90-days.webp",
+    original: "/agent-showcase/visual/originals/poster-manager-90-days.png",
+    downloadName: "visual-poster-manager.png",
+    width: 1080,
+    height: 1920,
+  },
+  {
+    id: "visual-card-rag",
+    category: "card",
+    type: "知识图解",
+    title: copy("RAG：让模型先查再答", "RAG: Retrieve Before Answering"),
+    tag: copy(
+      "知识图解 · 技术概念科普",
+      "Knowledge graphic · Technical concept explainer",
+    ),
+    description: copy(
+      "用检索、增强、生成三步，讲清 RAG 如何得到有依据的回答。",
+      "Explain how RAG produces grounded answers through retrieval, augmentation, and generation.",
+    ),
+    formatLabel: copy("JPG 图片", "JPG image"),
+    fields: [
+      "主题：【请填写】",
+      "核心知识点：【请填写】",
+      "必须准确呈现的文字：【请填写】",
+    ],
+    spec: "深靛紫底、半透明 3D 玻璃、青绿高光、三幕横向构图与 16:9 画幅；信息结构按用户内容重新组织",
+    preview: "/agent-showcase/visual/previews/card-rag.webp",
+    original: "/agent-showcase/visual/originals/card-rag.jpg",
+    downloadName: "visual-card-rag.jpg",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-card-prompt",
+    category: "card",
+    type: "知识图解",
+    title: copy("提示词的四个要素", "The Four Elements of a Prompt"),
+    tag: copy(
+      "知识图解 · 方法模板讲解",
+      "Knowledge graphic · Reusable method template",
+    ),
+    description: copy(
+      "用角色、任务、上下文、格式四项，帮助学员写出可复用的提示词。",
+      "Help learners write reusable prompts with four elements: role, task, context, and format.",
+    ),
+    formatLabel: copy("JPG 图片", "JPG image"),
+    fields: [
+      "主题：【请填写】",
+      "核心知识点：【请填写】",
+      "必须准确呈现的文字：【请填写】",
+    ],
+    spec: "深色终端手稿、正文与四段批注、蓝 / 珊瑚 / 绿 / 紫标注，16:9 画幅；手稿内容全部由用户替换",
+    preview: "/agent-showcase/visual/previews/card-prompt.webp",
+    original: "/agent-showcase/visual/originals/card-prompt.jpg",
+    downloadName: "visual-card-prompt.jpg",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-comic-customer",
+    category: "comic",
+    type: "知识漫画",
+    title: copy(
+      "客户投诉处理四步法",
+      "Four Steps for Handling Customer Complaints",
+    ),
+    tag: copy(
+      "知识漫画 · 客服情景演练",
+      "Knowledge comic · Customer service role-play",
+    ),
+    description: copy(
+      "通过四个连续对话场景，练习倾听、复述、给出方案和确认结果。",
+      "Practice listening, paraphrasing, proposing a solution, and confirming the outcome through four connected conversations.",
+    ),
+    formatLabel: copy("PNG 图片", "PNG image"),
+    fields: [
+      "主题：【请填写】",
+      "角色与四格情节：【请填写】",
+      "必须保留的对白：【请填写】",
+    ],
+    spec: "使用 trainerai-comic 现有 --art ligne-claire --tone warm --layout four-panel --aspect 16:9；不要使用 --style four-panel。严格四格起承转合，统一人物造型与正常比例，表情清晰，包含职场环境和关键道具，对白简洁且逻辑连续。",
+    preview: "/agent-showcase/visual/previews/comic-customer-service.webp",
+    original: "/agent-showcase/visual/originals/comic-customer-service.png",
+    downloadName: "visual-comic-customer.png",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-comic-gradient",
+    category: "comic",
+    type: "知识漫画",
+    title: copy("梯度下降：下山的路", "Gradient Descent: The Way Downhill"),
+    tag: copy(
+      "知识漫画 · 抽象概念入门",
+      "Knowledge comic · Abstract concept primer",
+    ),
+    description: copy(
+      "用下山比喻解释梯度、学习率和参数更新，降低初学者的理解门槛。",
+      "Use a downhill metaphor to explain gradients, learning rate, and parameter updates for beginners.",
+    ),
+    formatLabel: copy("JPG 图片", "JPG image"),
+    fields: [
+      "主题：【请填写】",
+      "角色与四格情节：【请填写】",
+      "必须保留的对白：【请填写】",
+    ],
+    spec: "使用 trainerai-comic 的 ink-brush 画风，16:9 四格连续叙事、克制留白；不要套用极简 four-panel 预设。比喻需附带必要技术边界，不承诺全局最优。",
+    preview: "/agent-showcase/visual/previews/comic-gradient.webp",
+    original: "/agent-showcase/visual/originals/comic-gradient.jpg",
+    downloadName: "visual-comic-gradient.jpg",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-infographic-training",
+    category: "infographic",
+    type: "知识图解",
+    title: copy("大模型训练与上线", "LLM Training and Deployment"),
+    tag: copy(
+      "知识图解 · 技术流程梳理",
+      "Knowledge graphic · Technical workflow overview",
+    ),
+    description: copy(
+      "从数据清洗到部署，快速看清大模型训练与上线的关键环节。",
+      "See the key stages from data cleaning to deployment in one LLM training and serving overview.",
+    ),
+    formatLabel: copy("JPG 图片", "JPG image"),
+    fields: [
+      "主题：【请填写】",
+      "核心知识点：【请填写】",
+      "必须准确呈现的文字：【请填写】",
+    ],
+    spec: "冷白数据管线、横向节点、连续箭头和输入 / 输出标注，16:9 画幅；阶段数量与内容由用户决定，简化流程须明确标注。",
+    preview: "/agent-showcase/visual/previews/infographic-training.webp",
+    original: "/agent-showcase/visual/originals/infographic-training.jpg",
+    downloadName: "visual-infographic-training.jpg",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-infographic-roadmap",
+    category: "infographic",
+    type: "知识图解",
+    title: copy(
+      "企业 AI Agent 落地路线图",
+      "Enterprise AI Agent Adoption Roadmap",
+    ),
+    tag: copy(
+      "知识图解 · 企业落地规划",
+      "Knowledge graphic · Enterprise adoption planning",
+    ),
+    description: copy(
+      "用评估、试点、扩展、治理四阶段，讨论企业 Agent 项目如何推进。",
+      "Discuss enterprise Agent adoption through assessment, pilot, scale, and governance.",
+    ),
+    formatLabel: copy("JPG 图片", "JPG image"),
+    fields: [
+      "主题：【请填写】",
+      "核心知识点：【请填写】",
+      "必须准确呈现的文字：【请填写】",
+    ],
+    spec: "深绿时间线、S 形路径、阶段节点与停止条件，16:9 画幅；阶段与说明由用户重新填写",
+    preview: "/agent-showcase/visual/previews/infographic-roadmap.webp",
+    original: "/agent-showcase/visual/originals/infographic-roadmap.jpg",
+    downloadName: "visual-infographic-roadmap.jpg",
+    width: 2048,
+    height: 1152,
+  },
+  {
+    id: "visual-diagram-talent",
+    category: "diagram",
+    type: "结构图",
+    title: copy(
+      "企业 AI 人才能力模型",
+      "Enterprise AI Talent Competency Model",
+    ),
+    tag: copy("结构图 · 人才能力分层", "Diagram · Talent competency layers"),
+    description: copy(
+      "把业务场景、AI 协作、学习资源和评价标准组织成一套培养体系。",
+      "Organize business scenarios, AI collaboration, learning resources, and assessment into one development framework.",
+    ),
+    formatLabel: copy("可编辑 SVG", "Editable SVG"),
+    fields: [
+      "主题：【请填写】",
+      "节点与层级：【请填写】",
+      "连接关系：【请填写】",
+    ],
+    spec: "使用 trainerai-diagram 手写自包含横版 SVG；石墨暗色底、四层组织与蓝 / 绿 / 琥珀 / 紫分组，层级、节点与关系由用户内容决定；根节点不设置固定 width/height，viewBox 根据实际内容和 30px 边距计算，内容超出时扩大 viewBox。",
+    preview: "/agent-showcase/visual/previews/diagram-talent-model.webp",
+    original: "/agent-showcase/visual/diagrams/diagram-talent-model.svg",
+    vector: "/agent-showcase/visual/diagrams/diagram-talent-model.svg",
+    downloadName: "visual-diagram-talent.svg",
+    width: 1600,
+    height: 1000,
+  },
+  {
+    id: "visual-diagram-addie",
+    category: "diagram",
+    type: "结构图",
+    title: copy("ADDIE 课程开发流程", "ADDIE Course Development Process"),
+    tag: copy("结构图 · 课程开发设计", "Diagram · Course development design"),
+    description: copy(
+      "展示从分析到评估的课程开发闭环，以及每个阶段需要交付的成果。",
+      "Show the course development loop from analysis to evaluation and the deliverables expected at each stage.",
+    ),
+    formatLabel: copy("可编辑 SVG", "Editable SVG"),
+    fields: [
+      "主题：【请填写】",
+      "节点与层级：【请填写】",
+      "连接关系：【请填写】",
+    ],
+    spec: "使用 trainerai-diagram 手写自包含横版 SVG；钴蓝暗色网格、五阶段流程、阶段产物与评估回流，节点与拓扑由用户内容决定；根节点不设置固定 width/height，viewBox 根据实际内容和 30px 边距计算，内容超出时扩大 viewBox。",
+    preview: "/agent-showcase/visual/previews/diagram-addie-flow.webp",
+    original: "/agent-showcase/visual/diagrams/diagram-addie-flow.svg",
+    vector: "/agent-showcase/visual/diagrams/diagram-addie-flow.svg",
+    downloadName: "visual-diagram-addie.svg",
+    width: 1600,
+    height: 1000,
+  },
+];
+
+function creativeVisualCases(): VisualCase[] {
+  return agent("creative-studio").cases.filter(
+    (item): item is VisualCase => item.kind === "visual",
+  );
+}
+
+function expectedVisualPrompt(expected: VisualExpectation): string {
+  return [
+    `[模式: ${expected.category === "diagram" ? "结构图" : "视觉创作"}]`,
+    `请按参考风格制作一张${expected.type}。`,
+    "",
+    "【我的内容】",
+    ...expected.fields,
+    "",
+    "【风格与版式】",
+    expected.spec,
+    "",
+    "仅参考视觉风格，不复制案例标题、知识点和文案。如果我的内容仍为空，请先向我索取，不要使用案例内容补齐。",
+  ].join("\n");
+}
 
 function agent(id: (typeof agentIds)[number]): ShowcaseAgent {
   const value = showcaseFor(id);
@@ -100,6 +410,70 @@ describe("Agent showcase data and assets", () => {
         expect(item.prompt.trim()).not.toBe("");
         expect(item.prompt).toMatch(/[一-鿿]/);
       }
+    }
+  });
+
+  it("matches all ten approved visual cases, prompts, formats and asset contracts", () => {
+    const visuals = creativeVisualCases();
+    expect(visuals.map((item) => item.id)).toEqual(
+      visualExpectations.map((item) => item.id),
+    );
+    expect(agent("creative-studio").note).toEqual(
+      copy(
+        "10 个案例覆盖课程海报、知识图解、知识漫画与结构图，用于招生推广、概念讲解、情景演练、流程梳理和可编辑结构图；实际作品按用户内容选择生图、精确排版或 SVG。",
+        "Ten examples across course posters, knowledge graphics, knowledge comics, and diagrams, covering recruitment, concept explainers, role-play, workflow overviews, and editable diagrams; each output uses image generation, precise layout, or SVG as appropriate for the user's content.",
+      ),
+    );
+
+    for (const [index, expected] of visualExpectations.entries()) {
+      const item = visuals[index]!;
+      const where = expected.id;
+      expect(item.category, where).toBe(expected.category);
+      expect(item.title, where).toEqual(expected.title);
+      expect(item.tag, where).toEqual(expected.tag);
+      expect(item.description, where).toEqual(expected.description);
+      expect(item.formatLabel, where).toEqual(expected.formatLabel);
+      expect(item.recipeNote, where).toEqual(
+        copy(
+          "保留：示例的画幅、构图、配色与版式。替换：主题、文案和知识点。内容齐全时 agent 会直接出图；缺内容会先向你索取。",
+          "Kept: the example's aspect ratio, composition, palette, and layout. Replace: the topic, copy, and knowledge points. With complete content the agent generates directly; it asks first when something is missing.",
+        ),
+      );
+      expect(item.prompt, where).toBe(expectedVisualPrompt(expected));
+      expect(item.preview, where).toBe(expected.preview);
+      expect(item.original, where).toBe(expected.original);
+      expect(item.vector, where).toBe(expected.vector);
+      expect(item.downloadName, where).toBe(expected.downloadName);
+      expect(item.width, where).toBe(expected.width);
+      expect(item.height, where).toBe(expected.height);
+
+      const extension = expected.formatLabel.zh.startsWith("PNG")
+        ? "png"
+        : expected.formatLabel.zh.startsWith("JPG")
+          ? "jpg"
+          : "svg";
+      expect(item.original.endsWith(`.${extension}`), where).toBe(true);
+      expect(item.downloadName.endsWith(`.${extension}`), where).toBe(true);
+      expect(item.preview.endsWith(".webp"), where).toBe(true);
+      if (extension === "svg") expect(item.vector, where).toBe(item.original);
+    }
+  });
+
+  it("ships both replacement diagrams as self-contained scalable SVG files", () => {
+    for (const name of ["diagram-talent-model", "diagram-addie-flow"]) {
+      const svg = readFileSync(
+        join(publicRoot, "agent-showcase/visual/diagrams", `${name}.svg`),
+        "utf8",
+      );
+      const root = /<svg\b[^>]*>/.exec(svg)?.[0];
+      expect(root, name).toBeDefined();
+      expect(root, name).toContain('viewBox="0 0 1600 1000"');
+      expect(root, name).not.toMatch(/\s(?:width|height)=/);
+      expect(svg.match(/https?:\/\/[^"\s)]+/g), name).toEqual([
+        "http://www.w3.org/2000/svg",
+      ]);
+      expect(svg, name).not.toMatch(/<image\b/i);
+      expect(svg, name).not.toMatch(/@import/i);
     }
   });
 

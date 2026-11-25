@@ -416,7 +416,7 @@ export function VisualDialog({
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-muted-foreground text-xs">
-            {localized(item.styleLabel, locale)} · {item.width} × {item.height}
+            {item.width} × {item.height} · {localized(item.formatLabel, locale)}
           </span>
           <a
             data-testid={

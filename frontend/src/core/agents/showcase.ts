@@ -34,7 +34,7 @@ export type VideoCase = ShowcaseCaseBase & {
 export type VisualCase = ShowcaseCaseBase & {
   kind: "visual";
   category: "poster" | "card" | "comic" | "infographic" | "diagram";
-  styleLabel: LocalizedText;
+  formatLabel: LocalizedText;
   preview: string;
   original: string;
   downloadName: string;
@@ -114,9 +114,20 @@ const createInThisStyle = text("按此风格创作", "Create in this style");
 // left as placeholders, only the style, layout and output format are kept.
 const visualFields = {
   poster: [
-    "课程主题：【请填写】",
-    "主标题：【请填写】",
-    "副标题与关键信息：【请填写】",
+    "使用场景：【请填写，如社群招募】",
+    "目标受众与基础：【请填写】",
+    "核心学习成果：【请填写】",
+    "三个实战项目：【请填写】",
+    "课程周期与服务：【请填写】",
+    "行动号召：【请填写】",
+  ],
+  workshop: [
+    "使用场景：【请填写，如企业内训】",
+    "目标受众：【请填写】",
+    "核心学习成果：【请填写】",
+    "三个阶段与内容：【请填写】",
+    "工作坊与情境演练：【请填写】",
+    "行动号召：【请填写】",
   ],
   knowledge: [
     "主题：【请填写】",
@@ -133,6 +144,12 @@ const visualFields = {
     "节点与层级：【请填写】",
     "连接关系：【请填写】",
   ],
+} as const;
+
+const visualFormatLabels = {
+  png: text("PNG 图片", "PNG image"),
+  jpg: text("JPG 图片", "JPG image"),
+  svg: text("可编辑 SVG", "Editable SVG"),
 } as const;
 
 const visualTemplate = ({
@@ -165,6 +182,12 @@ const visualTemplate = ({
 const recipeFooter = "内容齐全时 agent 会直接出图；缺内容会先向你索取。";
 const recipeFooterEn =
   "With complete content the agent generates directly; it asks first when something is missing.";
+const visualRecipeNote = text(
+  "保留：示例的画幅、构图、配色与版式。替换：主题、文案和知识点。" +
+    recipeFooter,
+  "Kept: the example's aspect ratio, composition, palette, and layout. Replace: the topic, copy, and knowledge points. " +
+    recipeFooterEn,
+);
 
 // Video templates (plan appendix A.2): the user's own script or topic; the case
 // lends only its visual style and default voice.
@@ -944,8 +967,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
     ),
     badge: text("产物已核验", "Verified output"),
     note: text(
-      "10 个案例覆盖 4 类作品：课程海报与知识漫画各 2 种风格，知识图解 4 种，结构图 2 种；海报、知识图解与结构图按真实成品类型分别排版，全部使用冷色系（深蓝/石墨/靛蓝/青绿/珊瑚），不用奶油纸感；漫画为生图产物。",
-      "Ten designs across four categories: two poster and two comic styles, four knowledge graphics and two diagrams, laid out by their real artifact type (poster, graphic, diagram) in a cool palette of deep blue, graphite, indigo, teal, and coral—no cream grounds; the comics are generated art.",
+      "10 个案例覆盖课程海报、知识图解、知识漫画与结构图，用于招生推广、概念讲解、情景演练、流程梳理和可编辑结构图；实际作品按用户内容选择生图、精确排版或 SVG。",
+      "Ten examples across course posters, knowledge graphics, knowledge comics, and diagrams, covering recruitment, concept explainers, role-play, workflow overviews, and editable diagrams; each output uses image generation, precise layout, or SVG as appropriate for the user's content.",
     ),
     steps: [
       {
@@ -975,83 +998,71 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         id: "visual-poster-agent",
         kind: "visual",
         category: "poster",
-        title: text("AI Agent 实战训练营", "AI Agent bootcamp"),
-        tag: text("课程海报 · 深空科技风", "Course poster · Deep-space tech"),
+        title: text("AI Agent 实战训练营", "AI Agent Bootcamp"),
+        tag: text(
+          "课程海报 · 训练营招生",
+          "Course poster · Bootcamp recruitment",
+        ),
         description: text(
-          "神经网络球体作为主视觉，适合课程封面和社群传播。",
-          "A luminous neural-network sphere for course covers and community promotion.",
+          "把学习成果、实战项目、适合人群和报名方式集中在一张竖版海报中。",
+          "Present learning outcomes, hands-on projects, target learners, and enrollment details in one portrait poster.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：深空科技风、9:16 竖版与细线框排版。填写：课程主题、主标题、副标题与关键信息；主视觉按你的主题重新设计。" +
-            recipeFooter,
-          "Kept: the deep-space tech look, 9:16 portrait and thin-frame layout. Fill in: course topic, headline, subtitle and key details; the key visual is redesigned for your topic. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("深空科技风", "Deep-space tech"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.png,
         prompt: visualTemplate({
           type: "课程海报",
           fields: visualFields.poster,
           style:
-            "深空科技风，深蓝黑背景、青蓝光线、中文大标题与细线框，9:16 竖版；用 trainerai-imagine 生图，不走 course-poster 固定模板；主视觉根据课程主题重新设计",
+            "输出 1080×1920 PNG。直接编写自包含 HTML+CSS+SVG，并使用 /opt/chrome-headless-shell/chrome-headless-shell --headless=new --disable-gpu --no-sandbox --screenshot=OUTPUT_PATH.png --window-size=1080,1920 file:///INPUT_PATH.html 截图；不调用 course-poster 固定模板，不套 Systemic Pulse 默认配色或固定区块。深空黑背景、冷青网络拓扑、琥珀强调；依次呈现小眉题、大标题、成果副标题、Agent 工作流、三个项目、受众与课程设置、CTA；不使用无来源数据。",
         }),
-        preview: asset("visual/previews/poster-agent-dark.webp"),
-        original: asset("visual/originals/poster-agent-dark-v2.jpg"),
-        downloadName: "visual-poster-agent.jpg",
-        width: 1152,
-        height: 2048,
+        preview: asset("visual/previews/poster-agent-bootcamp.webp"),
+        original: asset("visual/originals/poster-agent-bootcamp.png"),
+        downloadName: "visual-poster-agent.png",
+        width: 1080,
+        height: 1920,
       },
       {
-        id: "visual-poster-llm",
+        id: "visual-poster-manager",
         kind: "visual",
         category: "poster",
-        title: text("大模型应用开发", "LLM application development"),
-        tag: text("课程海报 · 深蓝瑞士风", "Course poster · Deep-blue Swiss"),
+        title: text("新任管理者 90 天加速营", "90-Day New Manager Accelerator"),
+        tag: text("课程海报 · 企业内训", "Course poster · Corporate training"),
         description: text(
-          "深蓝底、荧光绿与朱红的几何色块，以及克制的瑞士网格排版。",
-          "Deep-blue ground, lime and vermilion blocks, and a restrained Swiss grid.",
+          "用 90 天成长路径说明课程安排，帮助培训负责人展示企业内训项目。",
+          "Explain the program through a 90-day learning path and help training leaders present an internal management course.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：深蓝底、瑞士网格与荧光绿 / 朱红色块，9:16 竖版。填写：课程主题、主标题、副标题与关键信息；主视觉和文案按你的内容重新设计。" +
-            recipeFooter,
-          "Kept: deep-blue ground, Swiss grid and lime / vermilion blocks in 9:16. Fill in: course topic, headline, subtitle and key details; the key visual and copy are redesigned for your content. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("深蓝瑞士风", "Deep-blue Swiss"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.png,
         prompt: visualTemplate({
           type: "课程海报",
-          fields: visualFields.poster,
+          fields: visualFields.workshop,
           style:
-            "深蓝底、瑞士网格、荧光绿与朱红几何色块，9:16 竖版；用 trainerai-imagine 生图，不走 course-poster 固定模板；主视觉和文案根据课程内容重新设计",
+            "输出 1080×1920 PNG。直接编写自包含 HTML+CSS+SVG，并使用 /opt/chrome-headless-shell/chrome-headless-shell --headless=new --disable-gpu --no-sandbox --screenshot=OUTPUT_PATH.png --window-size=1080,1920 file:///INPUT_PATH.html 截图；不调用 course-poster 固定模板，不套 Systemic Pulse 默认配色或固定区块。采用暖白底、亮橙、钴蓝与黑色大字的瑞士编辑网格；依次呈现课程标题、大号周期标识、适合人群、三阶段时间轴、工作坊与情境演练、CTA；阶段名称与周期使用用户填写的内容，示例里的 30/60/90 只说明位置，不写进新海报；不使用装饰性伪数据图表。",
         }),
-        preview: asset("visual/previews/poster-llm-deep-blue.webp"),
-        original: asset("visual/originals/poster-llm-deep-blue.jpg"),
-        downloadName: "visual-poster-llm.jpg",
-        width: 1152,
-        height: 2048,
+        preview: asset("visual/previews/poster-manager-90-days.webp"),
+        original: asset("visual/originals/poster-manager-90-days.png"),
+        downloadName: "visual-poster-manager.png",
+        width: 1080,
+        height: 1920,
       },
       {
         id: "visual-card-rag",
         kind: "visual",
         category: "card",
-        title: text("RAG：让模型先查再答", "RAG: retrieve before answering"),
+        title: text("RAG：让模型先查再答", "RAG: Retrieve Before Answering"),
         tag: text(
-          "知识图解 · 3D 玻璃三幕",
-          "Knowledge graphics · 3D glass triptych",
+          "知识图解 · 技术概念科普",
+          "Knowledge graphic · Technical concept explainer",
         ),
         description: text(
-          "三块半透明玻璃模块由数据流连接，把检索、增强、生成讲成一条链路。",
-          "Three translucent glass modules linked by a data stream, tracing retrieval, augmentation, and generation.",
+          "用检索、增强、生成三步，讲清 RAG 如何得到有依据的回答。",
+          "Explain how RAG produces grounded answers through retrieval, augmentation, and generation.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：深靛紫底、半透明 3D 玻璃与青绿高光，16:9 三幕横向构图。填写：主题、核心知识点与必须准确呈现的文字；信息结构按你的内容重新组织。" +
-            recipeFooter,
-          "Kept: deep indigo, translucent 3D glass and teal highlights in a 16:9 three-act layout. Fill in: topic, key points and text that must be exact; the information structure is reorganized for your content. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("3D 玻璃叙事", "3D glass story"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.jpg,
         prompt: visualTemplate({
           type: "知识图解",
           fields: visualFields.knowledge,
@@ -1068,23 +1079,18 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         id: "visual-card-prompt",
         kind: "visual",
         category: "card",
-        title: text("提示词的四个要素", "The four elements of a prompt"),
+        title: text("提示词的四个要素", "The Four Elements of a Prompt"),
         tag: text(
-          "知识图解 · Prompt 手稿",
-          "Knowledge graphics · Prompt transcript",
+          "知识图解 · 方法模板讲解",
+          "Knowledge graphic · Reusable method template",
         ),
         description: text(
-          "深色 prompt 手稿与四段批注，把角色、任务、上下文、格式写成可执行的占位符。",
-          "A dark prompt transcript with four margin notes, turning role, task, context, and format into executable placeholders.",
+          "用角色、任务、上下文、格式四项，帮助学员写出可复用的提示词。",
+          "Help learners write reusable prompts with four elements: role, task, context, and format.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：深色终端手稿、正文加四段批注与四色标注，16:9。填写：主题、核心知识点与必须准确呈现的文字；手稿内容全部换成你的。" +
-            recipeFooter,
-          "Kept: the dark terminal transcript with four margin notes in four colors, 16:9. Fill in: topic, key points and text that must be exact; the transcript content is entirely yours. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("Prompt 手稿", "Prompt transcript"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.jpg,
         prompt: visualTemplate({
           type: "知识图解",
           fields: visualFields.knowledge,
@@ -1098,32 +1104,33 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         height: 1152,
       },
       {
-        id: "visual-comic-agent",
+        id: "visual-comic-customer",
         kind: "visual",
         category: "comic",
-        title: text("什么是 AI Agent", "What is an AI agent?"),
-        tag: text("知识漫画 · 日系漫画", "Knowledge comic · Japanese manga"),
+        title: text(
+          "客户投诉处理四步法",
+          "Four Steps for Handling Customer Complaints",
+        ),
+        tag: text(
+          "知识漫画 · 客服情景演练",
+          "Knowledge comic · Customer service role-play",
+        ),
         description: text(
-          "四格漫画，用学生和机器人解释定目标、调用工具和检查结果。",
-          "A student and robot explain goals, tool use, and checking results in four panels.",
+          "通过四个连续对话场景，练习倾听、复述、给出方案和确认结果。",
+          "Practice listening, paraphrasing, proposing a solution, and confirming the outcome through four connected conversations.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：16:9 四格日系漫画与清晰的阅读顺序。填写：主题、角色与四格情节、必须保留的对白；角色、情节与对白按你的主题重新创作。" +
-            recipeFooter,
-          "Kept: a 16:9 four-panel manga with a clear reading order. Fill in: topic, characters and four-panel plot, and lines to keep; characters, plot and dialogue are created for your topic. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("日系漫画", "Japanese manga"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.png,
         prompt: visualTemplate({
           type: "知识漫画",
           fields: visualFields.comic,
           style:
-            "16:9 四格日系漫画、清晰阅读顺序和角色一致性；角色、情节与对白均根据用户主题重新创作",
+            "使用 trainerai-comic 现有 --art ligne-claire --tone warm --layout four-panel --aspect 16:9；不要使用 --style four-panel。严格四格起承转合，统一人物造型与正常比例，表情清晰，包含职场环境和关键道具，对白简洁且逻辑连续。",
         }),
-        preview: asset("visual/previews/comic-agent.webp"),
-        original: asset("visual/originals/comic-agent.jpg"),
-        downloadName: "visual-comic-agent.jpg",
+        preview: asset("visual/previews/comic-customer-service.webp"),
+        original: asset("visual/originals/comic-customer-service.png"),
+        downloadName: "visual-comic-customer.png",
         width: 2048,
         height: 1152,
       },
@@ -1131,25 +1138,23 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         id: "visual-comic-gradient",
         kind: "visual",
         category: "comic",
-        title: text("梯度下降：下山的路", "Gradient descent: the way downhill"),
-        tag: text("知识漫画 · 靛蓝水墨", "Knowledge comic · Indigo ink"),
+        title: text("梯度下降：下山的路", "Gradient Descent: The Way Downhill"),
+        tag: text(
+          "知识漫画 · 抽象概念入门",
+          "Knowledge comic · Abstract concept primer",
+        ),
         description: text(
-          "用靛蓝水墨的四格画面，解释看方向、走一步、重复。",
-          "Four indigo-ink panels explain choosing a direction, taking a step, and repeating.",
+          "用下山比喻解释梯度、学习率和参数更新，降低初学者的理解门槛。",
+          "Use a downhill metaphor to explain gradients, learning rate, and parameter updates for beginners.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：16:9 四格靛蓝水墨、克制留白与连续叙事。填写：主题、角色与四格情节、必须保留的对白；角色与比喻按你的主题重新设计。" +
-            recipeFooter,
-          "Kept: a 16:9 four-panel indigo ink comic with restrained whitespace and a continuous story. Fill in: topic, characters and four-panel plot, and lines to keep; characters and metaphors are designed for your topic. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("靛蓝水墨", "Indigo ink"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.jpg,
         prompt: visualTemplate({
           type: "知识漫画",
           fields: visualFields.comic,
           style:
-            "16:9 四格靛蓝水墨、克制留白和连续叙事；角色与比喻根据用户主题重新设计",
+            "使用 trainerai-comic 的 ink-brush 画风，16:9 四格连续叙事、克制留白；不要套用极简 four-panel 预设。比喻需附带必要技术边界，不承诺全局最优。",
         }),
         preview: asset("visual/previews/comic-gradient.webp"),
         original: asset("visual/originals/comic-gradient.jpg"),
@@ -1161,25 +1166,23 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         id: "visual-infographic-training",
         kind: "visual",
         category: "infographic",
-        title: text("大模型训练全流程", "The complete LLM training pipeline"),
-        tag: text("知识图解 · 数据管线", "Knowledge graphics · Data pipeline"),
+        title: text("大模型训练与上线", "LLM Training and Deployment"),
+        tag: text(
+          "知识图解 · 技术流程梳理",
+          "Knowledge graphic · Technical workflow overview",
+        ),
         description: text(
-          "五个阶段排成一条横向管线，标注 INPUT / OUTPUT 与连续箭头；从数据清洗到推理部署一张图看完。",
-          "Five stages on one horizontal pipeline with INPUT / OUTPUT labels and continuous arrows, from data cleaning to deployment.",
+          "从数据清洗到部署，快速看清大模型训练与上线的关键环节。",
+          "See the key stages from data cleaning to deployment in one LLM training and serving overview.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：冷白数据管线、横向节点与连续箭头，16:9。填写：主题、核心知识点与必须准确呈现的文字；阶段数量与内容由你决定。" +
-            recipeFooter,
-          "Kept: the cool-white data pipeline with horizontal nodes and continuous arrows, 16:9. Fill in: topic, key points and text that must be exact; you decide the stages and content. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("数据管线", "Data pipeline"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.jpg,
         prompt: visualTemplate({
           type: "知识图解",
           fields: visualFields.knowledge,
           style:
-            "冷白数据管线、横向节点、连续箭头和输入 / 输出标注，16:9 画幅；阶段数量与内容由用户决定",
+            "冷白数据管线、横向节点、连续箭头和输入 / 输出标注，16:9 画幅；阶段数量与内容由用户决定，简化流程须明确标注。",
         }),
         preview: asset("visual/previews/infographic-training.webp"),
         original: asset("visual/originals/infographic-training.jpg"),
@@ -1193,24 +1196,19 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         category: "infographic",
         title: text(
           "企业 AI Agent 落地路线图",
-          "Enterprise AI agent adoption roadmap",
+          "Enterprise AI Agent Adoption Roadmap",
         ),
         tag: text(
-          "知识图解 · 深绿路线图",
-          "Knowledge graphics · Emerald roadmap",
+          "知识图解 · 企业落地规划",
+          "Knowledge graphic · Enterprise adoption planning",
         ),
         description: text(
-          "深绿时间线上，一条 S 形路径串起评估、试点、扩展、治理四个阶段与停止条件。",
-          "An S-curve on a deep-green timeline links assessment, pilot, scale, and governance, with stop conditions.",
+          "用评估、试点、扩展、治理四阶段，讨论企业 Agent 项目如何推进。",
+          "Discuss enterprise Agent adoption through assessment, pilot, scale, and governance.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：深绿时间线、S 形路径与阶段节点，16:9。填写：主题、核心知识点与必须准确呈现的文字；阶段与说明由你重新填写。" +
-            recipeFooter,
-          "Kept: the deep-green timeline with an S-curve and stage nodes, 16:9. Fill in: topic, key points and text that must be exact; you rewrite the stages and captions. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("深绿路线图", "Emerald roadmap"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.jpg,
         prompt: visualTemplate({
           type: "知识图解",
           fields: visualFields.knowledge,
@@ -1224,72 +1222,65 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
         height: 1152,
       },
       {
-        id: "visual-diagram-stack",
+        id: "visual-diagram-talent",
         kind: "visual",
         category: "diagram",
-        title: text("AI Agent 技术栈", "The AI agent technology stack"),
+        title: text(
+          "企业 AI 人才能力模型",
+          "Enterprise AI Talent Competency Model",
+        ),
         tag: text(
-          "知识结构图 · 石墨结构图",
-          "Knowledge diagram · Graphite structure",
+          "结构图 · 人才能力分层",
+          "Diagram · Talent competency layers",
         ),
         description: text(
-          "按应用层、编排层、模型层、基础设施四层组织，适合课程导论和方案讲解。",
-          "Four layers from applications to infrastructure for introductions and solution reviews.",
+          "把业务场景、AI 协作、学习资源和评价标准组织成一套培养体系。",
+          "Organize business scenarios, AI collaboration, learning resources, and assessment into one development framework.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：石墨黑底、分层组织与蓝 / 青 / 琥珀 / 黄绿配色，输出可编辑 SVG。填写：主题、节点与层级、连接关系；层级与拓扑由你的内容决定。" +
-            recipeFooter,
-          "Kept: graphite black, layered groups and the blue / teal / amber / lime palette, delivered as an editable SVG. Fill in: topic, nodes and layers, and connections; the layers and topology follow your content. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("石墨结构图", "Graphite diagram"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.svg,
         prompt: visualTemplate({
           type: "结构图",
           fields: visualFields.diagram,
           diagram: true,
           style:
-            "石墨黑底、分层组织、蓝 / 青 / 琥珀 / 黄绿配色，输出可编辑 SVG；层级、节点与关系由用户内容决定",
+            "使用 trainerai-diagram 手写自包含横版 SVG；石墨暗色底、四层组织与蓝 / 绿 / 琥珀 / 紫分组，层级、节点与关系由用户内容决定；根节点不设置固定 width/height，viewBox 根据实际内容和 30px 边距计算，内容超出时扩大 viewBox。",
         }),
-        preview: asset("visual/previews/diagram-agent-stack.webp"),
-        original: asset("visual/diagrams/diagram-agent-stack.svg"),
-        vector: asset("visual/diagrams/diagram-agent-stack.svg"),
-        downloadName: "visual-diagram-stack.svg",
+        preview: asset("visual/previews/diagram-talent-model.webp"),
+        original: asset("visual/diagrams/diagram-talent-model.svg"),
+        vector: asset("visual/diagrams/diagram-talent-model.svg"),
+        downloadName: "visual-diagram-talent.svg",
         width: 1600,
         height: 1000,
       },
       {
-        id: "visual-diagram-rag",
+        id: "visual-diagram-addie",
         kind: "visual",
         category: "diagram",
-        title: text("RAG 系统架构", "RAG system architecture"),
+        title: text("ADDIE 课程开发流程", "ADDIE Course Development Process"),
         tag: text(
-          "知识结构图 · 冷白蓝图",
-          "Knowledge diagram · Cool blueprint",
+          "结构图 · 课程开发设计",
+          "Diagram · Course development design",
         ),
         description: text(
-          "文档源、解析切分、向量库、检索器、生成模型与评估层，一张图理清链路。",
-          "Sources, parsing, vector store, retrieval, generation, and evaluation in one diagram.",
+          "展示从分析到评估的课程开发闭环，以及每个阶段需要交付的成果。",
+          "Show the course development loop from analysis to evaluation and the deliverables expected at each stage.",
         ),
         actionLabel: createInThisStyle,
-        recipeNote: text(
-          "保留：靛蓝 / 珊瑚 / 青绿分组与清晰的连接关系，底色沿用技能默认暗色主题，输出可编辑 SVG。填写：主题、节点与层级、连接关系；节点和拓扑由你的内容决定。" +
-            recipeFooter,
-          "Kept: indigo / coral / teal groups with clear connections on the skill's default dark theme, delivered as an editable SVG. Fill in: topic, nodes and layers, and connections; the nodes and topology follow your content. " +
-            recipeFooterEn,
-        ),
-        styleLabel: text("冷白蓝图", "Cool blueprint"),
+        recipeNote: visualRecipeNote,
+        formatLabel: visualFormatLabels.svg,
         prompt: visualTemplate({
           type: "结构图",
           fields: visualFields.diagram,
           diagram: true,
           style:
-            "靛蓝 / 珊瑚 / 青绿分组和清晰连接关系，底色沿用技能默认暗色主题，输出可编辑 SVG；节点和拓扑由用户内容决定",
+            "使用 trainerai-diagram 手写自包含横版 SVG；钴蓝暗色网格、五阶段流程、阶段产物与评估回流，节点与拓扑由用户内容决定；根节点不设置固定 width/height，viewBox 根据实际内容和 30px 边距计算，内容超出时扩大 viewBox。",
         }),
-        preview: asset("visual/previews/diagram-rag-architecture.webp"),
-        original: asset("visual/diagrams/diagram-rag-architecture.svg"),
-        vector: asset("visual/diagrams/diagram-rag-architecture.svg"),
-        downloadName: "visual-diagram-rag.svg",
+        preview: asset("visual/previews/diagram-addie-flow.webp"),
+        original: asset("visual/diagrams/diagram-addie-flow.svg"),
+        vector: asset("visual/diagrams/diagram-addie-flow.svg"),
+        downloadName: "visual-diagram-addie.svg",
         width: 1600,
         height: 1000,
       },

@@ -368,7 +368,7 @@ export function VisualCard({
           {localized(item.description, locale)}
         </p>
         <div className="text-muted-foreground text-[10.5px]">
-          {item.width} × {item.height} · {localized(item.styleLabel, locale)}
+          {item.width} × {item.height} · {localized(item.formatLabel, locale)}
         </div>
         <div className="mt-auto pt-1 [&_[data-showcase-prompt]]:w-full">
           <PromptButton
