@@ -114,7 +114,7 @@ export type MockAPIOptions = {
    * `/SKILL.md` 再请求。
    */
   artifacts?: Record<string, string>;
-  /** 批量作品摘要；未播种的线程默认 not_delivered。 */
+  /** 批量作品摘要；未播种的线程默认 unknown（无 checkpoint）。 */
   artifactSummaries?: MockArtifactSummary[];
 };
 
@@ -247,7 +247,7 @@ export function mockLangGraphAPI(
       const seeded = artifactSummaries.get(threadId);
       return {
         thread_id: threadId,
-        delivery_state: seeded?.delivery_state ?? "not_delivered",
+        delivery_state: seeded?.delivery_state ?? "unknown",
         files: (seeded?.files ?? []).map((file) => ({
           path: file.path,
           name: file.name ?? file.path.split("/").pop() ?? file.path,

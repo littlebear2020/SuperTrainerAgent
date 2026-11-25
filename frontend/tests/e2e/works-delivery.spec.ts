@@ -96,6 +96,7 @@ test.describe("works delivery center", () => {
           agent_name: "podcast-studio",
         },
       ],
+      artifactSummaries: [summary("empty-podcast", "not_delivered")],
     });
 
     await page.goto("/workspace/video-gen?tab=works&capability=podcast-studio");
@@ -163,7 +164,6 @@ test.describe("works delivery center", () => {
             modified_at: null,
           }),
         ]),
-        summary("unknown-agent", "unknown"),
       ],
     });
 
