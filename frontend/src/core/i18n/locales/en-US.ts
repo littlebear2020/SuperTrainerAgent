@@ -824,7 +824,6 @@ export const enUS: Translations = {
     },
     works: {
       tabsLabel: "Work type",
-      history: " conversation history",
       searchLabel: "Search work titles and file names",
       loading: "Loading works…",
       loadError: "Could not load works. Please try again.",
@@ -833,7 +832,6 @@ export const enUS: Translations = {
       noResults: "No matching works",
       open: "Continue",
       openProject: "Open project",
-      turns: (count: number) => `${count} turns`,
       updated: "Updated",
       updatedUnknown: "Update time unknown",
       description:

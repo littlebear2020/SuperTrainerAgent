@@ -6,10 +6,10 @@ const h = vi.hoisted(() => ({
   search: "",
   push: vi.fn(),
   replace: vi.fn(),
-  tasksCalls: 0,
-  workType: undefined as string | undefined,
-  agentName: undefined as string | undefined,
-  agentLabel: undefined as string | undefined,
+  refetch: vi.fn(),
+  deleteTask: vi.fn(),
+  worksCalls: [] as string[],
+  gridCapabilities: [] as string[],
 }));
 
 vi.mock("next/navigation", () => ({
@@ -22,40 +22,31 @@ vi.mock("@/core/i18n/hooks", async () => {
   return { useI18n: () => ({ t: translations["zh-CN"] }) };
 });
 
-vi.mock("@/core/video-gen/hooks", async () => {
-  const actual = await vi.importActual<Record<string, unknown>>(
-    "@/core/video-gen/hooks",
-  );
-  return {
-    ...actual,
-    useVideoTasks: () => {
-      h.tasksCalls += 1;
-      return { data: [], isLoading: false, isError: false };
-    },
-    useDeleteVideoTask: () => ({ mutate: vi.fn() }),
-  };
-});
-
-vi.mock("@/components/workspace/video-gen/completed-video-grid", () => ({
-  CompletedVideoGrid: ({ workType }: { workType: string }) => {
-    h.workType = workType;
-    return <div data-testid="works-panel">{workType}</div>;
+vi.mock("@/core/works/hooks", () => ({
+  useWorks: (capability: string) => {
+    h.worksCalls.push(capability);
+    return {
+      works: [],
+      isLoading: false,
+      isError: false,
+      refetch: h.refetch,
+    };
   },
 }));
 
-vi.mock("@/components/workspace/video-gen/agent-conversation-grid", () => ({
-  AgentConversationGrid: ({
-    agentName,
-    label,
-  }: {
-    agentName: string;
-    label: string;
-  }) => {
-    h.agentName = agentName;
-    h.agentLabel = label;
+vi.mock("@/core/video-gen/hooks", () => ({
+  useVideoTasks: () => ({ data: [], isLoading: false, isError: false }),
+  useDeleteVideoTask: () => ({ mutate: h.deleteTask }),
+  useRecomposeTask: () => ({ mutate: vi.fn(), isPending: false }),
+  getStallWarning: () => null,
+}));
+
+vi.mock("@/components/workspace/video-gen/work-grid", () => ({
+  WorkGrid: ({ capability }: { capability: string }) => {
+    h.gridCapabilities.push(capability);
     return (
-      <div data-testid="agent-panel">
-        {agentName}:{label}
+      <div data-testid="works-panel" data-capability={capability}>
+        <div data-testid="work-card">{capability}</div>
       </div>
     );
   },
@@ -107,10 +98,10 @@ describe("VideoGenPage URL routing", () => {
     h.search = "";
     h.push.mockReset();
     h.replace.mockReset();
-    h.tasksCalls = 0;
-    h.workType = undefined;
-    h.agentName = undefined;
-    h.agentLabel = undefined;
+    h.refetch.mockReset();
+    h.deleteTask.mockReset();
+    h.worksCalls = [];
+    h.gridCapabilities = [];
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -150,25 +141,21 @@ describe("VideoGenPage URL routing", () => {
     element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
   }
 
-  it("derives a single heading and capability content from the URL without outer tabs", async () => {
+  it("derives one heading, delivery description, and unified works content from the URL", async () => {
     h.search = "tab=works&capability=ai_image";
     await renderPage();
-    expect(
-      container.querySelector("[data-testid='works-panel']"),
-    ).not.toBeNull();
+    const panel = container.querySelector("[data-testid='works-panel']");
+    expect(panel?.getAttribute("data-capability")).toBe("ai_image");
     expect(container.querySelector("h1")?.textContent).toBe("我的作品");
     expect(container.querySelectorAll("h1")).toHaveLength(1);
+    expect(container.textContent).toContain(
+      "查看、下载交付文件，或回到原对话继续创作",
+    );
     expect(container.querySelector("[id^='video-assets-tab-']")).toBeNull();
     expect(container.querySelector("[id^='video-assets-panel-']")).toBeNull();
-    expect(
-      container.querySelector(
-        "[role='tabpanel'][aria-labelledby^='video-assets-tab-']",
-      ),
-    ).toBeNull();
-    expect(h.workType).toBe("ai_image");
-    expect(h.tasksCalls).toBeGreaterThan(0);
+    expect(h.worksCalls).toContain("ai_image");
 
-    const beforeAssets = h.tasksCalls;
+    const beforeAssets = h.worksCalls.length;
     h.search = "tab=assets&capability=ai_video";
     await renderPage();
     expect(
@@ -176,18 +163,16 @@ describe("VideoGenPage URL routing", () => {
     ).not.toBeNull();
     expect(container.querySelector("h1")?.textContent).toBe("我的资产");
     expect(container.querySelectorAll("h1")).toHaveLength(1);
-    expect(h.tasksCalls).toBe(beforeAssets);
+    expect(h.worksCalls).toHaveLength(beforeAssets);
 
     h.search = "";
-    h.agentName = undefined;
     await renderPage();
     expect(
-      container.querySelector("[data-testid='agent-panel']"),
-    ).not.toBeNull();
-    expect(container.querySelector("[data-testid='works-panel']")).toBeNull();
-    expect(container.querySelector("h1")?.textContent).toBe("我的作品");
-    expect(h.agentName).toBe("course-video");
-    expect(h.tasksCalls).toBe(beforeAssets);
+      container
+        .querySelector("[data-testid='works-panel']")
+        ?.getAttribute("data-capability"),
+    ).toBe("course-video");
+    expect(h.worksCalls.at(-1)).toBe("course-video");
   });
 
   it("preserves tracking params while replacing invalid values without a loop", async () => {
@@ -197,7 +182,7 @@ describe("VideoGenPage URL routing", () => {
     expect(h.replace).toHaveBeenCalledExactlyOnceWith(
       "/workspace/video-gen?foo=1&utm_source=review",
     );
-    expect(h.agentName).toBe("course-video");
+    expect(h.gridCapabilities.at(-1)).toBe("course-video");
 
     h.replace.mockClear();
     h.search = "foo=1&utm_source=review";
@@ -219,7 +204,7 @@ describe("VideoGenPage URL routing", () => {
     await renderPage();
 
     expect(h.replace).toHaveBeenCalledWith("/workspace/video-gen");
-    expect(h.agentName).toBe("course-video");
+    expect(h.gridCapabilities.at(-1)).toBe("course-video");
   });
 
   it("controls asset open create back and resets selection after leaving assets", async () => {
@@ -300,7 +285,7 @@ describe("VideoGenPage URL routing", () => {
     );
     h.search = "tab=works&capability=ai_image";
     await renderPage();
-    expect(h.workType).toBe("ai_image");
+    expect(h.gridCapabilities.at(-1)).toBe("ai_image");
     expect(capabilityTab("ai_image").getAttribute("tabindex")).toBe("0");
   });
 
@@ -321,7 +306,6 @@ describe("VideoGenPage URL routing", () => {
     expect(h.push).toHaveBeenLastCalledWith(
       "/workspace/video-gen?tab=works&capability=ppt-master",
     );
-    expect(h.agentName).toBe("podcast-studio");
-    expect(h.tasksCalls).toBe(0);
+    expect(h.worksCalls.at(-1)).toBe("podcast-studio");
   });
 });

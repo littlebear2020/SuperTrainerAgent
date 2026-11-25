@@ -488,7 +488,6 @@ export interface Translations {
     };
     works: {
       tabsLabel: string;
-      history: string;
       searchLabel: string;
       loading: string;
       loadError: string;
@@ -497,7 +496,6 @@ export interface Translations {
       noResults: string;
       open: string;
       openProject: string;
-      turns: (count: number) => string;
       updated: string;
       updatedUnknown: string;
       description: string;

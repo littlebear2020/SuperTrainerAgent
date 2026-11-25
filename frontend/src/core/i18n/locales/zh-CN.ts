@@ -763,7 +763,6 @@ export const zhCN: Translations = {
     },
     works: {
       tabsLabel: "作品类型",
-      history: "对话历史",
       searchLabel: "搜索作品标题与文件名",
       loading: "正在加载作品…",
       loadError: "作品加载失败，请稍后重试",
@@ -772,7 +771,6 @@ export const zhCN: Translations = {
       noResults: "没有匹配的作品",
       open: "继续对话",
       openProject: "打开项目",
-      turns: (count: number) => `${count} 轮`,
       updated: "最近更新",
       updatedUnknown: "更新时间未知",
       description: "查看、下载交付文件，或回到原对话继续创作。",

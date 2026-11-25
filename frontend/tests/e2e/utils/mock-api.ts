@@ -32,6 +32,26 @@ export type MockThread = {
   project_type?: string;
 };
 
+export type MockArtifactFile = {
+  path: string;
+  name?: string;
+  media_kind?: "video" | "image" | "audio" | "document" | "other";
+  size?: number | null;
+  modified_at?: string | null;
+  exists?: boolean;
+};
+
+export type MockArtifactSummary = {
+  thread_id: string;
+  delivery_state:
+    | "delivered"
+    | "not_delivered"
+    | "partial"
+    | "missing"
+    | "unknown";
+  files?: MockArtifactFile[];
+};
+
 export type MockAgent = {
   name: string;
   description?: string;
@@ -94,6 +114,8 @@ export type MockAPIOptions = {
    * `/SKILL.md` 再请求。
    */
   artifacts?: Record<string, string>;
+  /** 批量作品摘要；未播种的线程默认 not_delivered。 */
+  artifactSummaries?: MockArtifactSummary[];
 };
 
 export interface MockLangGraphAPI {
@@ -103,6 +125,10 @@ export interface MockLangGraphAPI {
    * 不再依赖固定的 MOCK_THREAD_ID。
    */
   readonly createdThreadIds: string[];
+  readonly artifactSummaryRequests: string[][];
+  seedArtifactSummary(summary: MockArtifactSummary): void;
+  failArtifactSummaries(status?: number): void;
+  clearArtifactSummaryFailure(): void;
 }
 
 /** 路径里 `/threads/{id}` 的线程 id，取不到时回落固定值。 */
@@ -154,6 +180,14 @@ export function mockLangGraphAPI(
   const skills = options?.skills ?? [];
   const tokenUsageEnabled = options?.tokenUsageEnabled ?? false;
   const createdThreadIds: string[] = [];
+  const artifactSummaryRequests: string[][] = [];
+  const artifactSummaries = new Map(
+    (options?.artifactSummaries ?? []).map((summary) => [
+      summary.thread_id,
+      summary,
+    ]),
+  );
+  let failArtifactSummariesStatus: number | undefined;
 
   // Thread search — sidebar thread list & chats list page
   void page.route("**/api/langgraph/threads/search", (route) => {
@@ -175,6 +209,43 @@ export function mockLangGraphAPI(
       values: { title: t.title ?? "Untitled" },
     }));
     const body = allThreads.slice(offset, offset + Math.max(0, limit));
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  });
+
+  void page.route("**/api/works/artifact-summaries", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const request = route.request().postDataJSON() as {
+      thread_ids?: string[];
+    };
+    const threadIds = [...new Set(request.thread_ids ?? [])];
+    artifactSummaryRequests.push(threadIds);
+    if (failArtifactSummariesStatus !== undefined) {
+      const status = failArtifactSummariesStatus;
+      return route.fulfill({
+        status,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Mock artifact summaries failure" }),
+      });
+    }
+    const body = threadIds.map((threadId) => {
+      const seeded = artifactSummaries.get(threadId);
+      return {
+        thread_id: threadId,
+        delivery_state: seeded?.delivery_state ?? "not_delivered",
+        files: (seeded?.files ?? []).map((file) => ({
+          path: file.path,
+          name: file.name ?? file.path.split("/").pop() ?? file.path,
+          media_kind: file.media_kind ?? "other",
+          size: file.size ?? null,
+          modified_at: file.modified_at ?? null,
+          exists: file.exists ?? true,
+        })),
+      };
+    });
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -500,6 +571,18 @@ export function mockLangGraphAPI(
   return {
     get createdThreadIds() {
       return [...createdThreadIds];
+    },
+    get artifactSummaryRequests() {
+      return artifactSummaryRequests.map((ids) => [...ids]);
+    },
+    seedArtifactSummary(summary: MockArtifactSummary) {
+      artifactSummaries.set(summary.thread_id, summary);
+    },
+    failArtifactSummaries(status = 404) {
+      failArtifactSummariesStatus = status;
+    },
+    clearArtifactSummaryFailure() {
+      failArtifactSummariesStatus = undefined;
     },
   };
 }
