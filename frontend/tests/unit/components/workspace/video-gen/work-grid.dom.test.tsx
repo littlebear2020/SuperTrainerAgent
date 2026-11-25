@@ -14,6 +14,11 @@ import type {
 } from "@/core/works/types";
 import type { WorkCapability } from "@/core/workspace/video-assets-route";
 
+const ui = vi.hoisted(() => ({
+  locale: "zh-CN" as "zh-CN" | "en-US",
+  recomposePending: false,
+}));
+
 const recompose = vi.hoisted(() => ({
   calls: [] as Array<{
     id: string;
@@ -25,13 +30,13 @@ vi.mock("@/core/video-gen/hooks", () => ({
   useRecomposeTask: (id: string) => {
     const mutate = vi.fn<() => void>();
     recompose.calls.push({ id, mutate });
-    return { mutate, isPending: false };
+    return { mutate, isPending: ui.recomposePending };
   },
 }));
 
 vi.mock("@/core/i18n/hooks", async () => {
   const { translations } = await import("@/core/i18n/translations");
-  return { useI18n: () => ({ t: translations["zh-CN"] }) };
+  return { useI18n: () => ({ t: translations[ui.locale] }) };
 });
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -166,6 +171,8 @@ describe("WorkGrid", () => {
   let root: Root;
 
   beforeEach(() => {
+    ui.locale = "zh-CN";
+    ui.recomposePending = false;
     recompose.calls.length = 0;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -537,6 +544,18 @@ describe("WorkGrid", () => {
       available.downloadUrl,
     );
     expect(cards()[0]?.textContent).toContain("部分文件可用");
+  });
+
+  it("uses English labels for cleaned artifacts and pending retry", async () => {
+    ui.locale = "en-US";
+    await render([makeTaskWork("missing", { artifact_missing: true })]);
+    expect(cards()[0]?.textContent).toContain("Artifact cleaned");
+    expect(cards()[0]?.textContent).not.toContain("产物已清理");
+
+    ui.recomposePending = true;
+    await render([makeTaskWork("failed", { status: "failed" })]);
+    expect(cards()[0]?.textContent).toContain("Retrying…");
+    expect(cards()[0]?.textContent).not.toContain("重试中…");
   });
 
   it("disables refresh while awaiting onRetry and always restores pending", async () => {

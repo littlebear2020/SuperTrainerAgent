@@ -75,7 +75,9 @@ function WorkFileSummary({ work }: { work: WorkSummary }) {
       </div>
       <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-2">
         <span>{formatFileSize(file?.size ?? null)}</span>
-        {task?.artifact_missing ? <span>产物已清理</span> : null}
+        {task?.artifact_missing ? (
+          <span>{t.workspace.works.artifactCleaned}</span>
+        ) : null}
         {!task && file && !file.exists ? (
           <span>{t.workspace.works.fileMissing}</span>
         ) : null}
@@ -181,7 +183,9 @@ export function TaskWorkActions({
           disabled={recomposeMut.isPending || retryAction.disabled}
           onClick={() => setConfirmRetry(true)}
         >
-          {recomposeMut.isPending ? "重试中…" : retryAction.label}
+          {recomposeMut.isPending
+            ? t.workspace.works.retrying
+            : retryAction.label}
         </Button>
       ) : null}
       <Button

@@ -303,6 +303,34 @@ describe("works data hooks", () => {
     ]);
   });
 
+  it("merges matching cached summaries across ID-set changes", async () => {
+    const first = makeThread("thread-1");
+    const second = makeThread("thread-2");
+    h.threads = [first];
+    h.fetchSummaries.mockResolvedValueOnce([summary("thread-1")]);
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().works).toHaveLength(1));
+
+    h.threads = [second];
+    h.fetchSummaries.mockResolvedValueOnce([summary("thread-2")]);
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() =>
+      expect(currentWorks().works.map((work) => work.id)).toEqual([
+        "thread:thread-2",
+      ]),
+    );
+
+    h.threads = [first, second];
+    h.fetchSummaries.mockRejectedValueOnce(new Error("combined batch failed"));
+    await render(<WorksProbe capability="creative-studio" />);
+    await waitForAssertion(() => expect(currentWorks().isError).toBe(true));
+
+    expect(currentWorks().works.map((work) => work.id)).toEqual([
+      "thread:thread-1",
+      "thread:thread-2",
+    ]);
+  });
+
   it("refetches summaries for the ID set returned by the thread refresh", async () => {
     const first = makeThread("thread-1");
     const second = makeThread("thread-2");

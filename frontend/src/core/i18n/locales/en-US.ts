@@ -839,6 +839,7 @@ export const enUS: Translations = {
       searchPlaceholder: "Search works or file names",
       refresh: "Refresh",
       refreshing: "Refreshing…",
+      retrying: "Retrying…",
       count: (count: number) => `${count} creation records`,
       clearSearch: "Clear search",
       view: "View",
@@ -854,6 +855,7 @@ export const enUS: Translations = {
       notDeliveredState: "Not delivered",
       fileInfoUnavailable: "File information unavailable",
       fileMissing: "This file is currently unavailable",
+      artifactCleaned: "Artifact cleaned",
       byDownloadResponse: "File name is determined by the download response",
       mediaError: "Media cannot play right now. Retry or download the file.",
       unsupportedPreview:
