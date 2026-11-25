@@ -63,6 +63,9 @@ export default function ChatPage() {
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    messageRunIds,
+    runsById,
+    activeRunId,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: settings.context,
@@ -232,6 +235,9 @@ export default function ChatPage() {
                 hasMoreHistory={hasMoreHistory}
                 loadMoreHistory={loadMoreHistory}
                 isHistoryLoading={isHistoryLoading}
+                messageRunIds={messageRunIds}
+                runsById={runsById}
+                activeRunId={activeRunId}
               />
             </div>
             <div className="absolute right-0 bottom-0 left-0 z-30 flex justify-center px-4">

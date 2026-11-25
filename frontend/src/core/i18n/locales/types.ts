@@ -604,6 +604,7 @@ export interface Translations {
     in_progress: string;
     completed: string;
     failed: string;
+    cancelled: string;
   };
 
   // Token Usage

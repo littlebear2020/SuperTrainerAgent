@@ -1,7 +1,10 @@
-import type { Message } from "@langchain/langgraph-sdk";
+import type { Message, Run } from "@langchain/langgraph-sdk";
 import { describe, expect, it } from "vitest";
 
-import { deriveSubtasks } from "@/core/tasks/subtask-status-sync";
+import {
+  deriveSubtasks,
+  deriveSubtasksByRun,
+} from "@/core/tasks/subtask-status-sync";
 
 const aiTask = (id: string, tcId: string): Message =>
   ({
@@ -76,5 +79,140 @@ describe("deriveSubtasks", () => {
       tool_calls: [{ id: "tc1", name: "bash", args: { command: "ls" } }],
     } as unknown as Message;
     expect(deriveSubtasks([ai])).toHaveLength(0);
+  });
+});
+
+describe("deriveSubtasks 按所属 run 的终态判定（PR3）", () => {
+  const clarification = (id: string, tcId: string): Message =>
+    ({
+      id,
+      type: "tool",
+      name: "ask_clarification",
+      tool_call_id: tcId,
+      content: "需要确认",
+    }) as unknown as Message;
+
+  it("无 result：success → completed，error / timeout → failed，不虚构错误详情", () => {
+    for (const [runStatus, expected] of [
+      ["success", "completed"],
+      ["error", "failed"],
+      ["timeout", "failed"],
+    ] as const) {
+      const out = deriveSubtasks([aiTask("a1", "tc1")], { runStatus });
+      expect(out[0]!.status).toBe(expected);
+      // runs API 没有 error 字段：状态级判定不带 result / error
+      expect("error" in out[0]!).toBe(false);
+      expect("result" in out[0]!).toBe(false);
+    }
+  });
+
+  it("无 result：interrupted（用户停止）→ cancelled，不是 failed", () => {
+    const out = deriveSubtasks([aiTask("a1", "tc1")], {
+      runStatus: "interrupted",
+    });
+    expect(out[0]!.status).toBe("cancelled");
+  });
+
+  it("无 result：pending / running → in_progress", () => {
+    for (const runStatus of ["pending", "running"] as const) {
+      const out = deriveSubtasks([aiTask("a1", "tc1")], { runStatus });
+      expect(out[0]!.status).toBe("in_progress");
+    }
+  });
+
+  it("有 tool result 时始终按原 parser，不被 run 终态改写", () => {
+    const out = deriveSubtasks(
+      [aiTask("a1", "tc1"), toolMsg("t1", "tc1", "Task Succeeded. Result: ok")],
+      { runStatus: "error" },
+    );
+    expect(out[0]!.status).toBe("completed");
+    expect(out[0]!.result).toBe("ok");
+  });
+
+  it("澄清不是 interrupted：success + 未回答的 ask_clarification，无 result 的任务保持 in_progress、有 result 的保持原状态", () => {
+    const out = deriveSubtasks(
+      [
+        aiTask("a1", "tc1"),
+        toolMsg("t1", "tc1", "Task Succeeded. Result: done"),
+        aiTask("a2", "tc2"),
+        clarification("c1", "ask-1"),
+      ],
+      { runStatus: "success" },
+    );
+    expect(out.map((task) => [task.id, task.status])).toEqual([
+      ["tc1", "completed"],
+      ["tc2", "in_progress"],
+    ]);
+  });
+
+  it("history loading / 断线：不判终态，也不下发会覆盖旧终态的 patch", () => {
+    for (const flag of [
+      "isHistoryLoading",
+      "isRecoverableDisconnect",
+    ] as const) {
+      const out = deriveSubtasks([aiTask("a1", "tc1")], {
+        runStatus: "interrupted",
+        [flag]: true,
+      });
+      expect(out).toEqual([]);
+    }
+  });
+
+  it("没给 runStatus（agents/new 等旧调用方）：保持原行为 in_progress", () => {
+    const out = deriveSubtasks([aiTask("a1", "tc1")]);
+    expect(out[0]!.status).toBe("in_progress");
+  });
+
+  it("扁平列表按 run 分别判定：run-1 error / interrupted 的旧任务不被 run-2 改判", () => {
+    const run = (runId: string, status: string): Run =>
+      ({ run_id: runId, status }) as unknown as Run;
+    const messageRunIds = new Map([
+      ["a-old", "run-1"],
+      ["a-new", "run-2"],
+    ]);
+    const runsById = {
+      "run-1": run("run-1", "error"),
+      "run-2": run("run-2", "running"),
+    };
+    expect(
+      deriveSubtasksByRun(
+        [aiTask("a-old", "tc-old"), aiTask("a-new", "tc-new")],
+        {
+          messageRunIds,
+          runsById,
+        },
+      ).map((task) => [task.id, task.status]),
+    ).toEqual([
+      ["tc-old", "failed"],
+      ["tc-new", "in_progress"],
+    ]);
+
+    // run-1 interrupted + run-2 success（无澄清）：各自按自己的 run 判定
+    expect(
+      deriveSubtasksByRun(
+        [aiTask("a-old", "tc-old"), aiTask("a-new", "tc-new")],
+        {
+          messageRunIds,
+          runsById: {
+            "run-1": run("run-1", "interrupted"),
+            "run-2": run("run-2", "success"),
+          },
+        },
+      ).map((task) => [task.id, task.status]),
+    ).toEqual([
+      ["tc-old", "cancelled"],
+      ["tc-new", "completed"],
+    ]);
+  });
+
+  it("不在 messageRunIds 里的消息属于当前流（activeRunId）：按该 run 的状态判定", () => {
+    const out = deriveSubtasksByRun([aiTask("a-live", "tc-live")], {
+      messageRunIds: new Map(),
+      runsById: {
+        "run-live": { run_id: "run-live", status: "running" } as Run,
+      },
+      activeRunId: "run-live",
+    });
+    expect(out.map((task) => task.status)).toEqual(["in_progress"]);
   });
 });
