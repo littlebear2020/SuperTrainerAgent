@@ -1,3 +1,4 @@
+import type { Run } from "@langchain/langgraph-sdk";
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -155,6 +156,10 @@ export function MessageList({
   hasMoreHistory,
   loadMoreHistory,
   isHistoryLoading,
+  messageRunIds,
+  runsById,
+  activeRunId,
+  isRecoverableDisconnect,
 }: {
   className?: string;
   threadId: string;
@@ -164,12 +169,22 @@ export function MessageList({
   hasMoreHistory?: boolean;
   loadMoreHistory?: () => void;
   isHistoryLoading?: boolean;
+  /** PR3：run 归属——子任务终态按所属 run 判定，旧 run 不被当前 run 改写。缺省 = 原行为。 */
+  messageRunIds?: ReadonlyMap<string, string>;
+  runsById?: Readonly<Record<string, Run>>;
+  activeRunId?: string | null;
+  isRecoverableDisconnect?: boolean;
 }) {
   const { t } = useI18n();
   const messages = thread.messages;
   // Derive subtask status from messages (post-render) + streaming custom events.
   // Replaces the old in-render updateSubtask churn that mutated state during render.
-  useSyncSubtaskStatus(messages);
+  // PR3：有 run 归属时逐 run 判定；history loading / 断线期间不下发终态。
+  useSyncSubtaskStatus(
+    messages,
+    { messageRunIds, runsById, activeRunId },
+    { isHistoryLoading, isRecoverableDisconnect },
+  );
 
   // P1-5：分组复用——内容未变的组沿用上次的 group 对象引用，使 MessageGroup 的 memo
   // 能跳过未变组。流式期末组由 reuseMessageGroups 强制换新引用（SDK 原地 mutate 追加

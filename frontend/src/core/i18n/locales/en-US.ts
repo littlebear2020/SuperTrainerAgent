@@ -937,6 +937,7 @@ export const enUS: Translations = {
     in_progress: "Running subtask",
     completed: "Subtask completed",
     failed: "Subtask failed",
+    cancelled: "Subtask cancelled",
   },
 
   // Token Usage

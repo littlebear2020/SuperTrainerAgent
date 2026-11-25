@@ -874,6 +874,7 @@ export const zhCN: Translations = {
     in_progress: "子任务运行中",
     completed: "子任务已完成",
     failed: "子任务失败",
+    cancelled: "子任务已取消",
   },
 
   // Token Usage

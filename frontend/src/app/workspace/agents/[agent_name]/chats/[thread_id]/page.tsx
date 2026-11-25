@@ -92,6 +92,9 @@ export default function AgentChatPage() {
     isHistoryLoading,
     hasMoreHistory,
     loadMoreHistory,
+    messageRunIds,
+    runsById,
+    activeRunId,
   } = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: { ...settings.context, agent_name: agent_name },
@@ -307,6 +310,9 @@ export default function AgentChatPage() {
                     hasMoreHistory={hasMoreHistory}
                     loadMoreHistory={loadMoreHistory}
                     isHistoryLoading={isHistoryLoading}
+                    messageRunIds={messageRunIds}
+                    runsById={runsById}
+                    activeRunId={activeRunId}
                   />
                 </div>
 

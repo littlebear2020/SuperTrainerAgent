@@ -21,7 +21,8 @@ vi.mock("@/core/i18n/hooks", () => ({
       subtasks: {
         in_progress: "子任务运行中",
         completed: "子任务已完成",
-        failed: "失败",
+        failed: "子任务失败",
+        cancelled: "子任务已取消",
         executing: (n: number) => `执行 ${n} 个子任务`,
       },
       toolCalls: { useTool: (n: string) => n },
@@ -146,4 +147,41 @@ test("运行中卡片：每条 task_running 事件后步骤行逐步增长（真
   // store 状态断言：steps 按 message_index 有序 3 条
   expect(task?.steps?.map((s) => s.message_index)).toEqual([1, 2, 3]);
   expect(task?.steps?.map((s) => s.kind)).toEqual(["tool", "ai", "tool"]);
+});
+
+test("终态卡片：cancelled 显示已取消而不是失败；failed 没有错误详情时显示状态级文案（PR3）", async () => {
+  const base = {
+    subagent_type: "general-purpose",
+    description: "整理资料",
+    prompt: "p",
+  };
+  await act(async () => {
+    root.render(
+      <SubtasksProvider>
+        <ContextProbe />
+        <SubtaskCard taskId="t-cancel" isLoading={false} />
+        <SubtaskCard taskId="t-fail" isLoading={false} />
+      </SubtasksProvider>,
+    );
+  });
+  await act(async () => {
+    ctx.current!.setTasks({
+      "t-cancel": { ...base, id: "t-cancel", status: "cancelled" },
+      // 所属 run 是 error：runs API 没有 error 字段，卡片上没有可显示的错误详情
+      "t-fail": { ...base, id: "t-fail", status: "failed" },
+    });
+  });
+  const [cancelCard, failCard] = [...container.children];
+  expect(cancelCard?.textContent).toContain("子任务已取消");
+  expect(cancelCard?.textContent).not.toContain("子任务失败");
+
+  // 展开两张卡：折叠时头部显示状态标签，展开后头部标签让位给终态行
+  for (const button of [...container.querySelectorAll("button")]) {
+    await act(async () => {
+      button.click();
+    });
+  }
+  expect(cancelCard?.textContent).toContain("子任务已取消");
+  // 不虚构错误详情，但要有状态级文案——不能是一行空的红字
+  expect(failCard?.textContent).toContain("子任务失败");
 });

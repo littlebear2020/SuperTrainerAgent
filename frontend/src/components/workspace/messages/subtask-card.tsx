@@ -1,4 +1,5 @@
 import {
+  BanIcon,
   CheckCircleIcon,
   ChevronUp,
   ClipboardListIcon,
@@ -63,6 +64,9 @@ export function SubtaskCard({
       return <CheckCircleIcon className="size-3" />;
     } else if (task.status === "failed") {
       return <XCircleIcon className="size-3 text-red-500" />;
+    } else if (task.status === "cancelled") {
+      // 所属 run 被停止 / 中断：不是失败，不走红叉
+      return <BanIcon className="text-muted-foreground size-3" />;
     } else if (task.status === "in_progress") {
       return <Loader2Icon className="size-3 animate-spin" />;
     }
@@ -228,8 +232,20 @@ export function SubtaskCard({
           )}
           {task.status === "failed" && (
             <ChainOfThoughtStep
-              label={<div className="text-red-500">{task.error}</div>}
+              // 按所属 run 的 error / timeout 判定的失败没有错误详情（runs API
+              // 不带 error 字段）：显示状态级文案，不虚构原因
+              label={
+                <div className="text-red-500">
+                  {task.error ?? t.subtasks.failed}
+                </div>
+              }
               icon={<XCircleIcon className="size-4 text-red-500" />}
+            ></ChainOfThoughtStep>
+          )}
+          {task.status === "cancelled" && (
+            <ChainOfThoughtStep
+              label={t.subtasks.cancelled}
+              icon={<BanIcon className="text-muted-foreground size-4" />}
             ></ChainOfThoughtStep>
           )}
         </ChainOfThoughtContent>
