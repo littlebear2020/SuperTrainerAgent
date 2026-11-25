@@ -1,6 +1,6 @@
 # 创意工作室 10 件视觉案例内容优化实施计划
 
-> **状态**：已执行（2026-11-25 定稿并当日执行；范围 = Task 1 与 Task 2.1–2.8，实现及离线验收全绿；2.9 PR/OCR 为交付步骤，完成后勾选；无拆出部分）。changelog：`docs/changelog/changelog-2026-11-25-creative-studio-showcase-content-optimization.md`。
+> **状态**：已执行（2026-11-25 定稿并当日执行完成；范围 = 全部任务；PR #61 评审与 CI 全绿，按约定 rebase merge 交付；无拆出部分）。changelog：`docs/changelog/changelog-2026-11-25-creative-studio-showcase-content-optimization.md`。
 > **基准 commit**：`e8803fe5832ba3da3715698c07ccfe9c370f0b43`（定稿时 `origin/main`；执行前先运行 `git diff e8803fe5832ba3da3715698c07ccfe9c370f0b43 --stat`）。
 > **TL;DR**：按已审 Demo 一次性更新 `creative-studio` 的 10 件案例——替换 7 件素材、保留 3 件，文案、素材、尺寸、格式和提示词在同一任务变绿后提交，杜绝中间错位。卡片统一为“内容类型 + 使用场景”；四分类、顺序、布局与只填不发交互不变。仅影响 frontend showcase、素材和测试，不改 backend、skills、config、docker 或部署。
 
@@ -150,7 +150,7 @@ formatLabel 固定映射：`PNG 图片 / PNG image`、`JPG 图片 / JPG image`�
 - [x] **2.6 四视口验收【行为级】**：1440 / 1280 / 1024 / 390 检查首屏、瀑布流与筛选 grid；缩略图可辨识，弹窗中文清晰，无横向溢出；截图放 temp，不入库。
 - [x] **2.7 全量门禁**：后台运行 `cd frontend && pnpm test` 与 `pnpm check`；仓库根运行 `python3 scripts/check_docs_convention.py`。相关失败不得通过缩小断言解决。
 - [x] **2.8 文档**：计划移回 `docs/plans/` 并勾选实际完成项；changelog 含 TL;DR、「验收记录」（命令 → 实际关键行）、首屏 bytes 与全目录 bytes。全绿后把唯一状态头改为已执行并链接 changelog；提交 `docs(showcase): 记录十件视觉案例优化验收`。
-- [ ] **2.9 PR/OCR**：从最新 main 推送，`GH_REPO=littlebear2020/SuperTrainerAgent gh pr create`；无 Critical/Important 且 CI 绿后 rebase merge。部署不在范围。
+- [x] **2.9 PR/OCR**：从最新 main 推送，`GH_REPO=littlebear2020/SuperTrainerAgent gh pr create`；无 Critical/Important 且 CI 绿后 rebase merge。部署不在范围。
 
 ## 完成定义
 
