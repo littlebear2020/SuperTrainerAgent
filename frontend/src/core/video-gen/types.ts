@@ -2,6 +2,15 @@
  * Video generation module types.
  */
 
+/** Safe current-output metadata projected by the gateway for ready tasks. */
+export interface TaskDeliveryMetadata {
+  file_name: string;
+  file_size: number | null;
+  file_updated_at: string | null;
+  media_kind: "video" | "image" | "audio" | "document" | "other";
+  exists: boolean;
+}
+
 /** Task status from unified_tasks. */
 export interface VideoTaskBrief {
   id: string;
@@ -26,6 +35,8 @@ export interface VideoTaskBrief {
   /** 2026-09-13 死链修复：产物缺失派生标注（后端响应层计算不落库，仅 video_gen
    *  ready 态按 output_path 存在性赋值；缺省 = 后端未标注/其他域，恒 false）。 */
   artifact_missing?: boolean;
+  /** Optional for backward compatibility with gateways that predate delivery metadata. */
+  delivery?: TaskDeliveryMetadata | null;
   /** 批次 C (2026-08-13)：每任务花费（后端 task_cost 计算，null=无法计价）。 */
   cost: number | null;
   currency: string | null;
