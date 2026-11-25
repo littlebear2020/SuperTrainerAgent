@@ -11,6 +11,7 @@ import unicodedata
 import uuid
 from collections import OrderedDict
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -20,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.gateway._shared.llm_usage_sink import set_llm_accounting_context
 from app.gateway._shared.safe_download import safe_download
-from app.gateway._shared.task_framework.schemas import DRAFT, TERMINAL_STATUSES, TaskBrief, TaskDetail
+from app.gateway._shared.task_framework.schemas import DRAFT, TERMINAL_STATUSES, TaskBrief, TaskDeliveryMetadata, TaskDetail
 from app.gateway.video_gen.degradations import KIND_MODEL_ROSTER_MISS, record_degradation
 from app.gateway.video_gen.schemas import (
     CreateVideoRequest,
@@ -37,6 +38,7 @@ from app.gateway.video_gen.service import (
     validate_frame_previewable,
 )
 from app.gateway.video_gen.storyboard import REMOTION_LAYOUTS, Storyboard
+from app.gateway.works.service import media_kind_for_path
 from deerflow.config.paths import get_paths
 from deerflow.runtime.user_context import get_effective_user_id
 
@@ -248,9 +250,31 @@ def _task_with_thumbnail(
         brief.thumbnail_url = None
     # 假就绪可见化（2026-09-13）：仅 ready 态按 result.output_path 存在性标注
     # 产物缺失（与 download 端点 L408 的存在性判定同口径）；非 ready 恒 False。
+    brief.artifact_missing = False
+    brief.delivery = None
     if brief.status == "ready":
         out = result.get("output_path", "")
-        brief.artifact_missing = not (out and Path(out).exists())
+        if isinstance(out, str) and out:
+            output_path = Path(out)
+            try:
+                output_stat = output_path.stat()
+            except OSError:
+                brief.artifact_missing = True
+                brief.delivery = TaskDeliveryMetadata(
+                    file_name=output_path.name,
+                    media_kind=media_kind_for_path(out),
+                    exists=False,
+                )
+            else:
+                brief.delivery = TaskDeliveryMetadata(
+                    file_name=output_path.name,
+                    file_size=output_stat.st_size,
+                    file_updated_at=datetime.fromtimestamp(output_stat.st_mtime, UTC),
+                    media_kind=media_kind_for_path(out),
+                    exists=True,
+                )
+        else:
+            brief.artifact_missing = True
 
     # Task 18-20: 失败态可见——从 task_dir 读 subtitle_status + duration 校验
     if storage_dir and user_id and isinstance(result, dict):

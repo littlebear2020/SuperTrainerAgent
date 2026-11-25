@@ -111,13 +111,17 @@ def test_task_with_thumbnail_router_logic():
     task.amount_source = None  # 2026-08-27 字段：mock 未跟上过不了 str 校验（既有红修复）
     task.queue_position = None  # 2026-09-08 字段：同上（int 校验）
     task.artifact_missing = False  # 响应层派生字段（2026-09-13）：函数内覆写
+    task.delivery = None  # 响应层派生字段：MagicMock auto-attr 不能作为 DTO 输入
     task.cost = None  # not set on TaskRow (批次 C：端点事后赋值)
     task.currency = None
     task.payload = None  # _task_with_thumbnail does json.loads(task.payload or "{}")
     task.result = json.dumps({"thumbnail_path": "/tmp/fake_thumb.jpg", "output_path": "/tmp/fake_out.mp4"})
 
     # 文件在 → 缩略图 URL 下发；ready + output 在 → artifact_missing False
-    with patch("pathlib.Path.exists", return_value=True):
+    with patch("pathlib.Path.exists", return_value=True), patch(
+        "pathlib.Path.stat",
+        return_value=MagicMock(st_size=4, st_mtime=1_700_000_000),
+    ):
         brief = _task_with_thumbnail(task)
         assert brief.thumbnail_url == "/api/video/tasks/vg_test123/thumbnail"
         assert brief.artifact_missing is False
