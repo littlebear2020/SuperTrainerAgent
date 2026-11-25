@@ -22,7 +22,7 @@ export function useArtifactContent({
     if (isWriteFile) {
       return loadArtifactContentFromToolCall({ url: filepath, thread });
     }
-    return null;
+    return undefined;
   }, [filepath, isWriteFile, thread]);
 
   const { data, isLoading, error } = useQuery({

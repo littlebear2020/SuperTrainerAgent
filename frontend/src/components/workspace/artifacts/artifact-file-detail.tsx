@@ -53,6 +53,7 @@ import {
   getTabularDelimiter,
 } from "@/core/artifacts/preview";
 import { urlOfArtifact } from "@/core/artifacts/utils";
+import { parseWriteFileRef } from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 import { installSkill } from "@/core/skills/api";
 import { streamdownPlugins } from "@/core/streamdown";
@@ -110,16 +111,14 @@ export function ArtifactFileDetail({
     setEditingPath,
   } = useArtifacts();
   const { thread } = useThread();
-  const isWriteFile = useMemo(() => {
-    return filepathFromProps.startsWith("write-file:");
-  }, [filepathFromProps]);
-  const filepath = useMemo(() => {
-    if (isWriteFile) {
-      const url = new URL(filepathFromProps);
-      return decodeURIComponent(url.pathname);
-    }
-    return filepathFromProps;
-  }, [filepathFromProps, isWriteFile]);
+  // PR4：write-file 引用由单一 parser 读取（path 是独立 query 参数；旧格式只解码一次），
+  // 不再 decodeURIComponent(url.pathname)——那正是 `%` / `#` / `?` 被截断或抛错的地方
+  const writeFileRef = useMemo(
+    () => parseWriteFileRef(filepathFromProps),
+    [filepathFromProps],
+  );
+  const isWriteFile = writeFileRef !== null;
+  const filepath = writeFileRef?.path ?? filepathFromProps;
   const isSkillFile = useMemo(() => {
     return filepath.endsWith(".skill");
   }, [filepath]);
