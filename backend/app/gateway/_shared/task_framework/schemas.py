@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, field_validator
 
+from app.gateway.works.schemas import MediaKind
+
 # ── Status constants ────────────────────────────────────────────────
 # Terminal statuses
 READY = "ready"
@@ -73,6 +75,14 @@ def ensure_utc(dt: datetime | str | None) -> datetime | None:
 # ── Shared response models ─────────────────────────────────────────
 
 
+class TaskDeliveryMetadata(BaseModel):
+    file_name: str
+    file_size: int | None = None
+    file_updated_at: datetime | None = None
+    media_kind: MediaKind
+    exists: bool
+
+
 class TaskBrief(BaseModel):
     """Brief task info for list endpoints (no payload/result)."""
 
@@ -93,6 +103,7 @@ class TaskBrief(BaseModel):
     # 的 _task_with_thumbnail 在 status=="ready" 时按 result.output_path 存在性赋值；
     # 其他域（voice_twin/writer）共享本模型但永不赋值，恒 False。
     artifact_missing: bool = False
+    delivery: TaskDeliveryMetadata | None = None
     # 批次 C (2026-08-13)：每任务花费。TaskRow 无 cost 列——由端点事后赋值
     # （task_cost.attach_task_costs），None = 无法计价（前端显示 "—"）。
     cost: float | None = None
