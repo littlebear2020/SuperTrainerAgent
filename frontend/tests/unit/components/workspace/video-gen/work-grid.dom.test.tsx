@@ -579,4 +579,17 @@ describe("WorkGrid", () => {
     });
     expect(button("刷新").disabled).toBe(false);
   });
+
+  it("contains rejected refreshes and restores pending without losing works", async () => {
+    const onRetry = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValue(new Error("refresh rejected"));
+    await render([makeTaskWork("kept-after-rejection")], { onRetry });
+
+    await act(async () => button("刷新").click());
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(button("刷新").disabled).toBe(false);
+    expect(cards()).toHaveLength(1);
+  });
 });

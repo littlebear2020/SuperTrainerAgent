@@ -72,30 +72,33 @@ export function useWorks(capability: WorkCapability): {
     [capability, hasAgentSource, threads],
   );
   const summariesQuery = useArtifactSummaries(threadIds);
-  const currentThreadIds = new Set(threadIds);
-  const cachedByThread = new Map<string, ThreadArtifactSummary>();
-  const cachedQueries = queryClient
-    .getQueryCache()
-    .findAll({ queryKey: ["works", "artifact-summaries"] })
-    .filter(
-      (query) =>
-        query.state.status === "success" && Array.isArray(query.state.data),
-    )
-    .sort(
-      (left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt,
-    );
-  for (const query of cachedQueries) {
-    for (const summary of query.state.data as ThreadArtifactSummary[]) {
-      if (
-        currentThreadIds.has(summary.thread_id) &&
-        !cachedByThread.has(summary.thread_id)
-      ) {
-        cachedByThread.set(summary.thread_id, summary);
+  const cachedSummaries = useMemo(() => {
+    const currentThreadIds = new Set(threadIds);
+    const cachedByThread = new Map<string, ThreadArtifactSummary>();
+    const cachedQueries = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: ["works", "artifact-summaries"] })
+      .filter(
+        (query) =>
+          query.state.status === "success" && Array.isArray(query.state.data),
+      )
+      .sort(
+        (left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt,
+      );
+    for (const query of cachedQueries) {
+      for (const summary of query.state.data as ThreadArtifactSummary[]) {
+        if (
+          currentThreadIds.has(summary.thread_id) &&
+          !cachedByThread.has(summary.thread_id)
+        ) {
+          cachedByThread.set(summary.thread_id, summary);
+        }
       }
     }
-  }
-  const cachedSummaries =
-    cachedByThread.size > 0 ? Array.from(cachedByThread.values()) : undefined;
+    return cachedByThread.size > 0
+      ? Array.from(cachedByThread.values())
+      : undefined;
+  }, [queryClient, threadIds]);
   const usingCachedFallback =
     summariesQuery.data === undefined && cachedSummaries !== undefined;
   const summaries = summariesQuery.data ?? cachedSummaries;
@@ -151,12 +154,10 @@ export function useWorks(capability: WorkCapability): {
           .map((thread) => thread.thread_id);
         const normalizedIds = chunkThreadIds(nextIds).flat();
         if (normalizedIds.length > 0) {
-          await queryClient
-            .fetchQuery({
-              queryKey: artifactSummariesKey(normalizedIds),
-              queryFn: () => loadArtifactSummaries(normalizedIds),
-            })
-            .catch(() => undefined);
+          await queryClient.fetchQuery({
+            queryKey: artifactSummariesKey(normalizedIds),
+            queryFn: () => loadArtifactSummaries(normalizedIds),
+          });
         }
       }
       if (tasksRequest) await tasksRequest;

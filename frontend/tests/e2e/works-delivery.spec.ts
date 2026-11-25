@@ -616,6 +616,29 @@ test.describe("works delivery center", () => {
     expect(requests).toEqual([]);
   });
 
+  test("rejects invalid summary batches like the backend", async ({ page }) => {
+    mockLangGraphAPI(page);
+    await page.goto("/");
+    const statuses = await page.evaluate(async () => {
+      const post = async (threadIds: string[]) =>
+        (
+          await fetch("/api/works/artifact-summaries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ thread_ids: threadIds }),
+          })
+        ).status;
+      return Promise.all([
+        post([]),
+        post(Array.from({ length: 51 }, (_, index) => `id-${index}`)),
+        post(["  "]),
+        post(["x".repeat(129)]),
+      ]);
+    });
+
+    expect(statuses).toEqual([422, 422, 422, 422]);
+  });
+
   test("keeps capability tabs keyboard accessible", async ({ page }) => {
     mockLangGraphAPI(page, { threads: [] });
     await page.goto("/workspace/video-gen");
