@@ -346,6 +346,36 @@ describe("目标 call 或 result 缺失时才看加载状态", () => {
     });
   });
 
+  test("chunk 还在、tool_calls 里已有宽松解析出的半截条目：仍是 pending，不是 invalid", async () => {
+    // SDK 的部分 JSON 解析会把半截 path 以完整对象的形态放进 tool_calls；原始串还没拼完
+    const halfParsed = {
+      id: "msg-1",
+      type: "ai",
+      content: "",
+      tool_calls: [
+        {
+          id: "call-1",
+          name: "write_file",
+          args: { description: "d", path: "/mnt/data/repo" },
+        },
+      ],
+      tool_call_chunks: [
+        {
+          id: "call-1",
+          name: "write_file",
+          args: '{"description":"d","path":"/mnt/data/repo',
+        },
+      ],
+    } as unknown as Message;
+    await expect(load(ref(), thread([halfParsed], true))).resolves.toEqual({
+      status: "pending",
+    });
+
+    // 原始串拼完了就不再算「未完整」：目标在、result 没到
+    const parsed = thread([ai("msg-1", [write("call-1", PATH, "正文")])], true);
+    await expect(load(ref(), parsed)).resolves.toEqual({ status: "pending" });
+  });
+
   test("全部 settled 且 hasMoreHistory=false 后仍缺失 → not_found", async () => {
     const settled = thread([ai("msg-other", [write("x", PATH, "别的")])]);
     await expect(load(ref(), settled)).resolves.toEqual({

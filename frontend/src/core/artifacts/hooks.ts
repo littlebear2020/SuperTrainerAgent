@@ -54,7 +54,9 @@ export function useArtifactContent({
         isHistoryLoading,
         hasMoreHistory,
       }),
-    enabled: isWriteFile,
+    // `enabled` 对两类查询同义：调用方说「暂不加载内容」时，write-file 引用也不判定
+    // （append / str_replace 成功后会真实 GET 文件）
+    enabled: enabled !== false && isWriteFile,
     // 每次归属信号变化都是新 key；同一 key 内不做缓存（流式中的 pending 要能翻）
     staleTime: 0,
     gcTime: 0,
@@ -74,7 +76,17 @@ export function useArtifactContent({
     staleTime: 5 * 1000,
   });
   const writeFileState: WriteFileContentState | undefined = isWriteFile
-    ? (writeFileQuery.data ?? { status: "pending" })
+    ? writeFileQuery.isError
+      ? {
+          status: "failed",
+          // loader 自己把 GET 失败收敛成 failed；这里只兜底查询本身的意外错误，
+          // 不让它回退成永久的 pending
+          message:
+            writeFileQuery.error instanceof Error
+              ? writeFileQuery.error.message
+              : String(writeFileQuery.error),
+        }
+      : (writeFileQuery.data ?? { status: "pending" })
     : undefined;
   return {
     content:

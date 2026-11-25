@@ -160,7 +160,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
       <WriteFileToolCall
         id="call-1"
         messageId="msg-1"
-        name="write_file"
         args={PARTIAL}
         rawArgs={rawArgs(cutInsidePath)}
         isLoading
@@ -183,7 +182,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
       <WriteFileToolCall
         id="call-1"
         messageId="msg-1"
-        name="write_file"
         args={COMPLETE}
         rawArgs={rawArgs()}
         isLoading
@@ -216,7 +214,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
         <WriteFileToolCall
           id="call-1"
           messageId="msg-1"
-          name="write_file"
           args={COMPLETE}
           isLoading
           isLast
@@ -234,7 +231,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
       <WriteFileToolCall
         id="call-1"
         messageId="msg-1"
-        name="write_file"
         args={COMPLETE}
         isLoading
         isLast
@@ -248,7 +244,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
         <WriteFileToolCall
           id="call-1"
           messageId="msg-1"
-          name="write_file"
           args={COMPLETE}
           isLoading
           isLast
@@ -267,7 +262,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
       <WriteFileToolCall
         id="call-1"
         messageId="msg-1"
-        name="write_file"
         args={COMPLETE}
         isLoading
         isLast
@@ -292,7 +286,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
         <WriteFileToolCall
           id=""
           messageId="msg-1"
-          name="write_file"
           args={COMPLETE}
           isLoading
           isLast
@@ -300,7 +293,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
         <WriteFileToolCall
           id="call-2"
           messageId=""
-          name="write_file"
           args={COMPLETE}
           isLoading
           isLast
@@ -324,7 +316,6 @@ describe("WriteFileToolCall：完整参数前不选中、不 auto-open", () => {
       <WriteFileToolCall
         id="call-1"
         messageId="msg-1"
-        name="write_file"
         args={COMPLETE}
         isLoading={false}
         isLast
@@ -428,6 +419,61 @@ describe("MessageGroup：tool_call_chunks 的原始串交给 write-file 步骤",
     expect(url.searchParams.get("tool_call_id")).toBe("call-1");
     expect(url.searchParams.get("message_id")).toBe("msg-1");
   });
+
+  test("第二个片段不带 id / name（模型服务端的流就是这样）：SDK 按 index 归并，参数完整后照常可点", async () => {
+    const cutInsidePath = rawArgs().indexOf("100% final") + 5;
+    const full = rawArgs();
+    const merged = new AIMessageChunk({
+      id: "msg-1",
+      content: "",
+      tool_call_chunks: [
+        {
+          id: "call-1",
+          name: "write_file",
+          args: full.slice(0, cutInsidePath),
+          index: 0,
+          type: "tool_call_chunk",
+        },
+      ],
+    }).concat(
+      new AIMessageChunk({
+        content: "",
+        tool_call_chunks: [
+          {
+            args: full.slice(cutInsidePath),
+            index: 0,
+            type: "tool_call_chunk",
+          },
+        ],
+      }),
+    );
+    const message = {
+      ...merged.toDict().data,
+      type: "ai",
+    } as unknown as Message;
+    // 前提：归并后的那一条 chunk 带着 id 与完整的原始串（不靠后续片段回填 id）
+    const chunks = (
+      message as unknown as {
+        tool_call_chunks: { id?: string; args: string }[];
+      }
+    ).tool_call_chunks;
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]!.id).toBe("call-1");
+    expect((JSON.parse(chunks[0]!.args) as { path: string }).path).toBe(
+      "/mnt/data/100% final#1?.md",
+    );
+    root = renderInto(
+      <MessageGroup messages={[message]} isLoading />,
+      container,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    container.querySelector<HTMLButtonElement>("[data-testid='step']")!.click();
+    expect(h.artifacts.select).toHaveBeenCalledTimes(1);
+    const url = new URL(h.artifacts.select.mock.calls[0]![0] as string);
+    expect(url.searchParams.get("path")).toBe("/mnt/data/100% final#1?.md");
+  });
 });
 
 describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / failed", () => {
@@ -437,10 +483,11 @@ describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / faile
   const seen: string[] = [];
   const fetchMock = vi.fn<typeof fetch>();
 
-  function Probe({ url }: { url: string }) {
+  function Probe({ url, enabled }: { url: string; enabled?: boolean }) {
     const { writeFileState } = useArtifactContentForTest({
       filepath: url,
       threadId: "thread-1",
+      enabled,
     });
     useEffect(() => {
       if (writeFileState) seen.push(writeFileState.status);
@@ -551,5 +598,90 @@ describe("useArtifactContent：run 尚未 onFinish 时 pending → ready / faile
     await streamUpdates([CALL, ERROR_RESULT]);
     expect(container.textContent).toContain("failed");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("enabled: false 时 write-file 引用也不加载（str_replace 成功后的 GET 不发）", async () => {
+    const replaceRef =
+      "write-file:?path=%2Fmnt%2Fdata%2Fa.md&message_id=msg-2&tool_call_id=call-2";
+    h.thread = {
+      messages: [
+        {
+          id: "msg-2",
+          type: "ai",
+          content: "",
+          tool_calls: [
+            {
+              id: "call-2",
+              name: "str_replace",
+              args: { path: "/mnt/data/a.md", old_str: "a", new_str: "b" },
+            },
+          ],
+        },
+        {
+          id: "tool-2",
+          type: "tool",
+          tool_call_id: "call-2",
+          name: "str_replace",
+          content: "OK",
+        },
+      ] as unknown as Message[],
+      isThreadLoading: false,
+      isLoading: false,
+    };
+    const render = (enabled: boolean) => (
+      <QueryClientProvider client={client}>
+        <Probe url={replaceRef} enabled={enabled} />
+      </QueryClientProvider>
+    );
+    await act(async () => {
+      root!.render(render(false));
+    });
+    await settle();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // 放开之后才读当前文件
+    fetchMock.mockResolvedValue(
+      new Response("当前文件", { status: 200 }) as unknown as Response,
+    );
+    await act(async () => {
+      root!.render(render(true));
+    });
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("ready");
+  });
+
+  test("查询本身出错：显示 failed，不是一直 pending", async () => {
+    h.thread = {
+      messages: [CALL, RESULT] as unknown as Message[],
+      isThreadLoading: false,
+      isLoading: false,
+    };
+    await act(async () => {
+      root!.render(
+        <QueryClientProvider client={client}>
+          <Probe url={REF} />
+        </QueryClientProvider>,
+      );
+    });
+    await settle();
+    expect(container.textContent).toContain("ready");
+
+    // loader 不该抛，但真抛了（或缓存里是错误态）不能被回退成永久的 pending
+    const found = client
+      .getQueryCache()
+      .findAll({ queryKey: ["artifact", "write-file", REF] });
+    expect(found).toHaveLength(1);
+    await act(async () => {
+      found[0]!.setState({
+        ...found[0]!.state,
+        status: "error",
+        data: undefined,
+        error: new Error("boom"),
+        fetchStatus: "idle",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(container.textContent).toContain("failed");
   });
 });

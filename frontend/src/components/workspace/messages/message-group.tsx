@@ -389,7 +389,6 @@ function ToolCall({
       <WriteFileToolCall
         id={id}
         messageId={messageId}
-        name={name}
         args={args}
         rawArgs={rawArgs}
         result={result}

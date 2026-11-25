@@ -15,7 +15,7 @@ import {
   XIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -54,7 +54,10 @@ import {
   getTabularDelimiter,
 } from "@/core/artifacts/preview";
 import { urlOfArtifact } from "@/core/artifacts/utils";
-import { parseWriteFileRef } from "@/core/artifacts/write-file-ref";
+import {
+  parseWriteFileRef,
+  WRITE_FILE_REF_PREFIX,
+} from "@/core/artifacts/write-file-ref";
 import { useI18n } from "@/core/i18n/hooks";
 import { installSkill } from "@/core/skills/api";
 import { streamdownPlugins } from "@/core/streamdown";
@@ -118,7 +121,9 @@ export function ArtifactFileDetail({
     () => parseWriteFileRef(filepathFromProps),
     [filepathFromProps],
   );
-  const isWriteFile = writeFileRef !== null;
+  // 按前缀判定，与 useArtifactContent 一致：解析失败的引用（截断的旧格式等）也是
+  // write-file，不能当成普通文件路径流向下拉 / 打开 / 下载 / iframe 这些链路
+  const isWriteFile = filepathFromProps.startsWith(WRITE_FILE_REF_PREFIX);
   const filepath = writeFileRef?.path ?? filepathFromProps;
   const isSkillFile = useMemo(() => {
     return filepath.endsWith(".skill");
@@ -156,13 +161,22 @@ export function ArtifactFileDetail({
   } = useArtifactContent({
     threadId,
     filepath: filepathFromProps,
-    enabled: isCodeFile && !isWriteFile,
+    // write-file 引用不走普通文件的查询，这在 hook 里按前缀挡掉了；这里只表达「要不要加载内容」
+    enabled: isCodeFile,
   });
 
   const displayContent = content ?? "";
   // PR4：write-file 引用按五态渲染——ready 才显示正文；其余四态在正文区给出说明，
   // 目标缺失时按能力提供「加载完整历史 / 重试」（都真实调用 refetchHistory）
   const [isRefetchingHistory, setIsRefetchingHistory] = useState(false);
+  const refetchingRef = useRef(false);
+  /** 目标缺失时的动作：有 refetchHistory 才提供——仍有未加载的旧 run 就加载完整历史，否则重试。 */
+  const noticeAction = useMemo(() => {
+    if (writeFileState?.status !== "not_found" || !refetchHistory) return null;
+    return hasMoreHistory
+      ? t.writeFileRef.loadFullHistory
+      : t.writeFileRef.retry;
+  }, [writeFileState?.status, refetchHistory, hasMoreHistory, t.writeFileRef]);
   const writeFileNotice = useMemo(() => {
     if (!writeFileState || writeFileState.status === "ready") return null;
     switch (writeFileState.status) {
@@ -176,25 +190,25 @@ export function ArtifactFileDetail({
           action: null,
         };
       case "not_found":
-        return {
-          text: t.writeFileRef.notFound,
-          action: refetchHistory
-            ? hasMoreHistory
-              ? t.writeFileRef.loadFullHistory
-              : t.writeFileRef.retry
-            : null,
-        };
+        return { text: t.writeFileRef.notFound, action: noticeAction };
     }
-  }, [writeFileState, t.writeFileRef, hasMoreHistory, refetchHistory]);
+  }, [writeFileState, t.writeFileRef, noticeAction]);
   const refetchHistoryAction = useCallback(async () => {
-    if (!refetchHistory || isRefetchingHistory) return;
+    if (!refetchHistory || refetchingRef.current) return;
+    refetchingRef.current = true;
     setIsRefetchingHistory(true);
     try {
       await refetchHistory();
+    } catch (error) {
+      // 任一 run 的分片加载失败时 refetchHistory 会 reject（旧分片保留）：提示一次，
+      // 不让 `void` 调用变成未处理拒绝；重试入口还在
+      console.error("Failed to refetch thread history", error);
+      toast.error(t.writeFileRef.refetchFailed);
     } finally {
+      refetchingRef.current = false;
       setIsRefetchingHistory(false);
     }
-  }, [refetchHistory, isRefetchingHistory]);
+  }, [refetchHistory, t.writeFileRef]);
 
   const [isSaving, setIsSaving] = useState(false);
   const activeDraft = drafts[filepath] ?? createArtifactDraft(filepath);
@@ -601,9 +615,12 @@ export function ArtifactFileDetail({
               active={!contentLoading}
             />
           )}
+        {/* 非 ready 的 write-file 只显示下面的说明：预览（哪怕内容为空）不挂载。表格 / 二进制 /
+            iframe 三条分支对 write-file 本就不可达（isCodeFile 恒为 true） */}
         {isSupportPreview &&
           viewMode === "preview" &&
-          (language === "markdown" || language === "html") && (
+          (language === "markdown" || language === "html") &&
+          !writeFileNotice && (
             <ArtifactFilePreview
               content={editorContent}
               language={language ?? "text"}
@@ -720,7 +737,7 @@ export function ArtifactFilePreview({
 
   if (language === "markdown") {
     return (
-      <div className="size-full px-4">
+      <div className="size-full px-4" data-testid="artifact-file-preview">
         {/* PR-2 3.6：换 SafeStreamdown 系（防崩安全壳 + 深嵌套封顶预处理）。 */}
         <SafeStreamdown
           className="size-full"

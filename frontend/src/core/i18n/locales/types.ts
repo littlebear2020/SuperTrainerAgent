@@ -102,6 +102,7 @@ export interface Translations {
     retry: string;
     invalid: string;
     failed: string;
+    refetchFailed: string;
   };
 
   // Input Box

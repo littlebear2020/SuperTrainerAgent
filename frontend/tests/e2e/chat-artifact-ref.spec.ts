@@ -247,7 +247,7 @@ test.describe("write-file references", () => {
               name: "write_file",
               args: {
                 description: "追加写入",
-                path: "/mnt/data/report.md",
+                path: "/mnt/outputs/artifacts/report.md",
                 content: "追加的片段",
                 append: true,
               },
@@ -260,7 +260,7 @@ test.describe("write-file references", () => {
               name: "str_replace",
               args: {
                 description: "替换段落",
-                path: "/mnt/data/report.md",
+                path: "/mnt/outputs/artifacts/report.md",
                 old_str: "旧段落",
                 new_str: "新段落",
               },
@@ -282,7 +282,8 @@ test.describe("write-file references", () => {
         ] as never[],
       },
       artifacts: {
-        "/mnt/data/report.md": "CURRENT-FILE-9c2d 这是文件现在的内容",
+        "/mnt/outputs/artifacts/report.md":
+          "CURRENT-FILE-9c2d 这是文件现在的内容",
       },
     });
     await pinEnglishLocale(page);
@@ -307,8 +308,11 @@ test.describe("write-file references", () => {
     // str_replace：同样读当前文件
     await page.getByText("替换段落", { exact: true }).click();
     await expect(page.getByText("CURRENT-FILE-9c2d")).toBeVisible();
+    // 路径里再带一段「/artifacts」：mock 只切掉端点前缀，不会把它当成路径的一部分丢掉
     expect(
-      gets.filter((path) => path.endsWith("/artifacts/mnt/data/report.md")),
+      gets.filter((path) =>
+        path.endsWith("/artifacts/mnt/outputs/artifacts/report.md"),
+      ),
     ).toHaveLength(2);
 
     // 工具失败：显示错误，不当成空文件，也不读文件

@@ -84,22 +84,41 @@ function toolCallsOf(message: Message): ToolCallLike[] {
   return (message.tool_calls ?? []) as unknown as ToolCallLike[];
 }
 
-/** 流式中的半截参数：tool_call_chunks 里有这个 id，但 tool_calls 里还没有完整参数。 */
-function hasIncompleteChunk(message: Message, toolCallId: string): boolean {
-  if (message.type !== "ai") return false;
+/**
+ * 流式中的工具参数原始串：`tool_call_chunks` 里这个 id 的 args 片段拼起来（SDK 已按
+ * index 归并，后续片段不带 id 也并进了同一条）。没有 chunk 的历史消息返回 undefined。
+ */
+function rawArgsOfChunk(
+  message: Message,
+  toolCallId: string,
+): string | undefined {
+  if (message.type !== "ai") return undefined;
   const chunks = (
     message as unknown as {
       tool_call_chunks?: Array<{ id?: string; args?: string }>;
     }
   ).tool_call_chunks;
-  return (
-    Array.isArray(chunks) && chunks.some((chunk) => chunk.id === toolCallId)
-  );
+  if (!Array.isArray(chunks)) return undefined;
+  let raw: string | undefined;
+  for (const chunk of chunks) {
+    if (chunk.id === toolCallId) raw = (raw ?? "") + (chunk.args ?? "");
+  }
+  return raw;
+}
+
+/** 参数是否已完整：原始串能被严格解析成 JSON 对象（流式中的半截串解析失败）。 */
+function isCompleteToolArgs(raw: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === "object";
+  } catch {
+    return false;
+  }
 }
 
 /**
  * 定位目标：以 toolCallId 为主键扫描所有同 messageId 的消息，并校验 path / 工具类型。
- * 不在任何消息里 → missing；只有半截参数 → incomplete。
+ * 不在任何消息里 → missing；原始参数串还没拼完 → incomplete。
  */
 function probeWriteFileTarget(
   ref: WriteFileRef,
@@ -114,11 +133,11 @@ function probeWriteFileTarget(
   let toolCall: ToolCallLike | undefined;
   for (const message of thread.messages) {
     if (message.id !== ref.messageId) continue;
-    if (hasIncompleteChunk(message, ref.toolCallId) && !toolCall) {
-      toolCall = toolCallsOf(message).find(
-        (call) => call.id === ref.toolCallId,
-      );
-      if (!toolCall) return { probe: { phase: "incomplete" } };
+    // 参数还在流式：SDK 的宽松解析已经把半截 path 放进了 tool_calls，不能拿它去校验
+    // path（那会闪现「引用无效」）；原始串能严格解析了才算到齐
+    const raw = rawArgsOfChunk(message, ref.toolCallId);
+    if (raw !== undefined && !isCompleteToolArgs(raw)) {
+      return { probe: { phase: "incomplete" } };
     }
     const call = toolCallsOf(message).find(
       (call) => call.id === ref.toolCallId,
@@ -171,11 +190,19 @@ function resultTextOf(result: Extract<Message, { type: "tool" }>): string {
   return "";
 }
 
-/** 工具失败：ToolMessage.status === "error"，或结果文本以 Error: 开头（含 ToolErrorHandlingMiddleware 包装）。 */
+/**
+ * 工具失败的结果文本前缀。后端的 ToolErrorHandlingMiddleware 把工具异常包成
+ * `Error: …` 的 ToolMessage 并置 `status="error"`
+ * （backend/packages/harness/deerflow/agents/middlewares/tool_error_handling_middleware.py）；
+ * 这里两个信号任一成立即判失败——历史消息里 status 可能已经丢了。后端改包装格式时同步。
+ */
+const TOOL_ERROR_PREFIX = "Error:";
+
+/** 工具失败：ToolMessage.status === "error"，或结果文本以工具错误前缀开头。 */
 function isToolFailure(result: Extract<Message, { type: "tool" }>): boolean {
   return (
     result.status === "error" ||
-    resultTextOf(result).trimStart().startsWith("Error:")
+    resultTextOf(result).trimStart().startsWith(TOOL_ERROR_PREFIX)
   );
 }
 
