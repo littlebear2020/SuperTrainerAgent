@@ -149,6 +149,20 @@ test("超过 500 页的安全上限：抛错而不是静默截断或无限翻页
   expect(fetchImpl).toHaveBeenCalledTimes(500);
 });
 
+test("AbortSignal 原样交给请求：已中止的信号不再发请求", async () => {
+  const controller = new AbortController();
+  const fetchImpl = fetchReturning([page(range(1, 3), false)]);
+  await fetchAllRunMessages("t1", "r1", fetchImpl as never, controller.signal);
+  expect(fetchImpl.mock.calls[0]![1]?.signal).toBe(controller.signal);
+
+  controller.abort();
+  const abortedFetch = fetchReturning([page(range(1, 3), false)]);
+  await expect(
+    fetchAllRunMessages("t1", "r1", abortedFetch as never, controller.signal),
+  ).rejects.toThrow();
+  expect(abortedFetch).not.toHaveBeenCalled();
+});
+
 test("fetchAllRunMessages filters middleware-caller messages", async () => {
   const mixed = page(
     [{ seq: 1 }, { seq: 2, caller: "middleware:summarization" }],

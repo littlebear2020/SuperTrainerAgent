@@ -260,14 +260,29 @@ export const VirtualMessageList = forwardRef<
           ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
       if (!editable && NAVIGATION_KEYS.has(event.key)) mark();
     };
-    viewport.addEventListener("wheel", mark, { passive: true });
+    // 消息里的按钮（复制、打开工件、展开卡片）也落在视口里：点击本身不是滚动意图，
+    // 只有按在滚动条上才算用户接手
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY !== 0) mark();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const rect = viewport.getBoundingClientRect();
+      const SCROLLBAR = 16;
+      if (
+        event.clientX >= rect.right - SCROLLBAR ||
+        event.clientY >= rect.bottom - SCROLLBAR
+      ) {
+        mark();
+      }
+    };
+    viewport.addEventListener("wheel", onWheel, { passive: true });
     viewport.addEventListener("touchmove", mark, { passive: true });
-    viewport.addEventListener("pointerdown", mark);
+    viewport.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKey);
     return () => {
-      viewport.removeEventListener("wheel", mark);
+      viewport.removeEventListener("wheel", onWheel);
       viewport.removeEventListener("touchmove", mark);
-      viewport.removeEventListener("pointerdown", mark);
+      viewport.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKey);
     };
   }, [scrollRef]);
@@ -409,9 +424,13 @@ export const VirtualMessageList = forwardRef<
           if (Math.abs(delta) > 1) viewport.scrollTop += delta;
         }
       }
-      staticAnchorRef.current = viewport
-        ? firstVisibleStaticAnchor(viewport)
-        : undefined;
+      // 流式追加期间每个 chunk 都换引用：首个可见行只可能被 prepend / 行数变化移动，
+      // 不必每帧重量（修前静态分支是零 DOM 读写）
+      if (prepended || viewCount !== previousCountRef.current) {
+        staticAnchorRef.current = viewport
+          ? firstVisibleStaticAnchor(viewport)
+          : undefined;
+      }
       return;
     }
 
@@ -442,9 +461,9 @@ export const VirtualMessageList = forwardRef<
         awaitingRender: true,
       };
       userScrolledRef.current = false;
-      forcedRenderIndexRef.current = viewIndexForKey(anchor.key);
       // 先按估计高度把锚点行拉回渲染窗口；实测高度到位后由下面的校正按 DOM 修正
       const anchorViewIndex = viewIndexForKey(anchor.key);
+      forcedRenderIndexRef.current = anchorViewIndex;
       const estimated =
         anchorViewIndex >= 0
           ? virtualizer.getOffsetForIndex(anchorViewIndex, "start")?.[0]
@@ -507,6 +526,7 @@ export const VirtualMessageList = forwardRef<
     rowForView,
     scrollRef,
     shouldVirtualize,
+    viewCount,
     viewIndexForKey,
     virtualItems,
     virtualizer,

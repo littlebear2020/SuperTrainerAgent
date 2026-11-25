@@ -317,11 +317,16 @@ export function useThreadStream({
       !current || !runId || current.runId === runId ? null : current,
     );
   }, []);
+  /** stale_run 分支清掉 reconnect key 后递增：runs 列表深度相等时引用不换，光靠它不会重读。 */
+  const [rejoinVersion, setRejoinVersion] = useState(0);
+  // reconnect key 里的 run：只在挂载 / 切线程 / runs 列表刷新 / stale 清 key 时读——
+  // 流正常收尾后 SDK 清 key，runs 列表随之刷新，这里重新读到 null
   const rejoinRunId = useMemo(
     () => readRejoinRunId(threadId),
-    // runsById：流收尾后 SDK 清 key 的同时 runs 列表会被失效刷新，借它重新读一次
+    // runsById：流收尾后 SDK 清 key 的同时 runs 列表会被失效刷新，借它重新读一次；
+    // rejoinVersion：stale_run 清 key 后显式触发（runs 列表深度相等时引用不换）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [threadId, runsById],
+    [threadId, runsById, rejoinVersion],
   );
   const activeRunId =
     activeRun &&
@@ -529,6 +534,10 @@ export function useThreadStream({
           window.sessionStorage.removeItem(
             `${STREAM_REJOIN_KEY_PREFIX}${keyThreadId}`,
           );
+        }
+        // 清的是当前线程的 key 才需要重读；旧线程的迟到回调不触发多余渲染
+        if (onCurrentThread) {
+          setRejoinVersion((version) => version + 1);
         }
         // 没有可重连的 run：放掉「当前 run」，并失效 runs 与历史分片（PR3）
         if (onCurrentThread) {
@@ -977,7 +986,11 @@ export function useThreadStream({
         outcome = await withTimeout(
           cancelRun(threadId, runId),
           CANCEL_WAIT_LIMIT_MS,
-          () => new Error(t.recovery.stopTimeout(CANCEL_WAIT_LIMIT_MS / 1000)),
+          () =>
+            Object.assign(
+              new Error(t.recovery.stopTimeout(CANCEL_WAIT_LIMIT_MS / 1000)),
+              { name: "CancelTimeoutError" },
+            ),
         );
       } catch (error) {
         outcome = { status: "failed", error };
@@ -985,8 +998,15 @@ export function useThreadStream({
         setIsCancelling(false);
       }
       if (outcome.status === "failed") {
+        // 超时提示是完整的一句，不再被「停止失败」包一层
+        const timedOut =
+          typeof outcome.error === "object" &&
+          outcome.error !== null &&
+          Reflect.get(outcome.error, "name") === "CancelTimeoutError";
         toast.error(
-          t.recovery.stopFailed(getStreamErrorMessage(outcome.error)),
+          timedOut
+            ? getStreamErrorMessage(outcome.error)
+            : t.recovery.stopFailed(getStreamErrorMessage(outcome.error)),
         );
         setCancelFailure({ threadId, runId });
       } else {
@@ -1027,7 +1047,6 @@ export function useThreadStream({
     [applyCancelOutcome, completeSubmission],
   );
 
-  /** 恢复入口的「重试停止」：再次调用同一 cancel（PR3）。 */
   /**
    * 停止当前 run（PR2）：受理前的 submission 由这里直接以 stopped reject（中止上传，
    * 不依赖 SDK 的 onStop 是否触发；此时服务端尚无 runId，不发 cancel）；再中断 SDK 的
@@ -1118,6 +1137,9 @@ export function useThreadStream({
         toast.error(getStreamErrorMessage(error));
       }
     } finally {
+      // join 排队后没有让 SDK 进入 loading（被拒绝 / 立即失败）时记录也要释放，
+      // 否则之后再点「重新连接」都会在这里静默返回
+      reconnectInFlightRef.current.delete(key);
       setIsReconnecting(false);
     }
   }, [activeRunId]);
@@ -1236,7 +1258,13 @@ export async function fetchAllRunMessages(
   threadId: string,
   runId: string,
   fetchImpl: FetchLike = fetch,
+  signal?: AbortSignal,
 ): Promise<RunMessage[]> {
+  if (signal?.aborted) {
+    throw Object.assign(new Error("Run messages fetch aborted"), {
+      name: "AbortError",
+    });
+  }
   const collected = new Map<number, RunMessage>();
   let beforeSeq: number | undefined;
   for (let pageNum = 0; ; pageNum += 1) {
@@ -1257,6 +1285,7 @@ export async function fetchAllRunMessages(
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal,
       },
     ).then(async (res) => {
       // 非 2xx 的错误响应体不是「空历史」：显式失败，走保留旧分片的路径
@@ -1375,6 +1404,8 @@ export function useThreadHistory(threadId: string) {
     new Map<string, Promise<HistoryShard | undefined>>(),
   );
   const runsRef = useRef(runs.data);
+  /** 当前线程的在途分页请求：切线程 / 卸载时中止（500 页 × 100 run 的重载不能拖住旧线程）。 */
+  const abortRef = useRef<AbortController | null>(null);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -1426,7 +1457,13 @@ export function useThreadHistory(threadId: string) {
         if (currentThreadIdRef.current !== threadId) return undefined;
         updateState((prev) => ({ ...prev, loading: true }));
         try {
-          const all = await fetchAllRunMessages(threadId, runId);
+          abortRef.current ??= new AbortController();
+          const all = await fetchAllRunMessages(
+            threadId,
+            runId,
+            fetch,
+            abortRef.current.signal,
+          );
           if (
             generationRef.current !== generation ||
             requestEpochRef.current.get(runId) !== epoch
@@ -1483,7 +1520,19 @@ export function useThreadHistory(threadId: string) {
     currentThreadIdRef.current = threadId;
     requestEpochRef.current.clear();
     inFlightRef.current.clear();
+    abortRef.current?.abort();
+    abortRef.current = null;
   }, [threadId]);
+  // 卸载：同样换代并中止在途分页——被中止的请求走「已被取代」的路径静默退出，
+  // 既不写已卸载组件的状态，也不会被调用方当成加载失败记下来
+  useEffect(
+    () => () => {
+      generationRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   /** 当前线程的历史快照（上一线程的残留视为空）。 */
   const snapshot = useCallback(
@@ -1532,11 +1581,6 @@ export function useThreadHistory(threadId: string) {
     return shard !== undefined && isShardCurrent(shard, run);
   }, []);
 
-  /**
-   * 强制重取指定 run（onFinish 用 meta.run_id 定位）：不等待、直接取代该 run 的在途请求
-   * （同 run 的慢旧请求不得覆盖它）。先登记、再刷新 runs 列表——runs 更新会触发「加载最新
-   * run」的 effect，它看到登记就不再重复请求；列表里没有这个 run 时也靠刷新把它找回来。
-   */
   /** runs 列表以 query cache 为准（刷新后 runsRef 要到下一次渲染才更新，可能已过期）。 */
   const latestRuns = useCallback(
     () =>
@@ -1545,6 +1589,11 @@ export function useThreadHistory(threadId: string) {
       [],
     [queryClient, threadId],
   );
+  /**
+   * 强制重取指定 run（onFinish 用 meta.run_id 定位）：不等待、直接取代该 run 的在途请求
+   * （同 run 的慢旧请求不得覆盖它）。先登记、再刷新 runs 列表——runs 更新会触发「加载最新
+   * run」的 effect，它看到登记就不再重复请求；列表里没有这个 run 时也靠刷新把它找回来。
+   */
   const refetchRun = useCallback(
     async (runId: string): Promise<void> => {
       pendingForcedRef.current.add(runId);

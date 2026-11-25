@@ -388,7 +388,8 @@ describe("停止后的同步（CancelOutcome）", () => {
 
       expect(api().cancelFailed).toBe(true);
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toastErrorText(0)).toMatch(/stop timed out/);
+      // 超时提示不再被「停止失败」包一层
+      expect(toastErrorText(0)).toBe("stop timed out after 30s");
       // busy 已释放：SDK 流早已收尾，下一次发送照常入队，不再被判 busy
       let rejected: unknown = null;
       await act(async () => {
@@ -745,5 +746,36 @@ describe("断线后的恢复 owner", () => {
     expect(window.sessionStorage.getItem("lg:stream:t-1")).toBeNull();
     expect(h.listCalls).toBe(listCallsBefore + 1);
     expect(toast.error).not.toHaveBeenCalled();
+    // key 已清：即便 runs 列表深度相等（structural sharing 不会换引用），也不再是当前 run
+    expect(api().activeRunId).toBeNull();
+  });
+
+  test("join 立即失败也会释放单飞记录：再次重连照常发起", async () => {
+    h.runs = [run("run-1", "running")];
+    await mount();
+    await acceptRun("run-1");
+    await act(async () => {
+      h.thread.error = new TypeError("Failed to fetch");
+      h.thread.isLoading = false;
+    });
+    await rerender();
+    expect(api().isRecoverableDisconnect).toBe(true);
+
+    h.thread.joinStream.mockImplementation(async () => {
+      throw new Error("HTTP 409: run is not joinable");
+    });
+    await act(async () => {
+      await api().reconnectActiveRun();
+    });
+    expect(h.thread.joinStream).toHaveBeenCalledTimes(1);
+    expect(toastErrorText(0)).toContain("not joinable");
+
+    h.thread.joinStream.mockImplementation(async () => {
+      h.thread.isLoading = true;
+    });
+    await act(async () => {
+      await api().reconnectActiveRun();
+    });
+    expect(h.thread.joinStream).toHaveBeenCalledTimes(2);
   });
 });

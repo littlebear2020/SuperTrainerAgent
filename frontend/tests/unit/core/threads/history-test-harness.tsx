@@ -32,8 +32,38 @@ const history = vi.hoisted(() => ({
   runsByThread: new Map<string, Run[]>(),
   listCalls: [] as Array<[string, unknown]>,
   messageCalls: [] as Array<{ threadId: string; runId: string; query: string }>,
+  /** 每次 run messages 请求收到的 AbortSignal（与 messageCalls 一一对应）。 */
+  signals: [] as Array<AbortSignal | null | undefined>,
   responder: null as MessageResponder | null,
 }));
+
+/** 请求尚未结束时 signal 被中止 → 以 AbortError 拒绝（真实 fetch 的行为）。 */
+function abortable<T>(
+  request: Promise<T>,
+  signal: AbortSignal | null | undefined,
+): Promise<T> {
+  if (!signal) return request;
+  if (signal.aborted) {
+    return Promise.reject(
+      Object.assign(new Error("The operation was aborted"), {
+        name: "AbortError",
+      }),
+    );
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(
+        Object.assign(new Error("The operation was aborted"), {
+          name: "AbortError",
+        }),
+      );
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    request.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
 
 vi.mock("@/core/api", () => ({
   getAPIClient: () => ({
@@ -46,7 +76,7 @@ vi.mock("@/core/api", () => ({
   }),
 }));
 vi.mock("@/core/api/fetcher", () => ({
-  fetch: (input: string) => {
+  fetch: (input: string, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
     const match = /\/threads\/([^/]+)\/runs\/([^/]+)\/messages/.exec(
       url.pathname,
@@ -58,11 +88,12 @@ vi.mock("@/core/api/fetcher", () => ({
       runId,
       query: url.search.replace(/^\?/, ""),
     });
+    history.signals.push(init?.signal);
     const responder = history.responder;
     if (!responder)
       return Promise.reject(new Error("history responder not installed"));
     // responder 抛错 / 返回被拒绝的 Promise = 网络失败（fetch reject）
-    return Promise.resolve()
+    const request = Promise.resolve()
       .then(() => responder(runId, url.searchParams))
       .then((pages) => {
         // 返回 { status, detail }（不是页面数组）= 非 2xx 响应
@@ -83,6 +114,8 @@ vi.mock("@/core/api/fetcher", () => ({
           },
         };
       });
+    // 与真实 fetch 一致：signal 中止即以 AbortError 拒绝，不再等 responder
+    return abortable(request, init?.signal);
   },
 }));
 vi.mock("@/core/config", () => ({
@@ -104,6 +137,9 @@ function Probe({ threadId }: { threadId: string }) {
   // 渲染期不改外部变量：提交后由 effect 发布给用例
   useEffect(() => {
     captured.api = api;
+    return () => {
+      captured.api = null;
+    };
   });
   return null;
 }
@@ -153,6 +189,7 @@ export function resetHistoryHarness() {
   history.runsByThread.clear();
   history.listCalls.length = 0;
   history.messageCalls.length = 0;
+  history.signals.length = 0;
   history.responder = null;
   captured.api = null;
 }

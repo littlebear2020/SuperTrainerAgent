@@ -47,6 +47,8 @@ export type MockSkill = {
 /** 一个 run 的最小描述（`runs` 选项按 newest-first 给出，与真实 API 一致）。 */
 export type MockRun = {
   run_id: string;
+  /** 归属线程；缺省对全部线程可见。 */
+  thread_id?: string;
   status?: RunStatus;
   created_at?: string;
   updated_at?: string;
@@ -293,10 +295,12 @@ export function mockLangGraphAPI(
   // followed by `?` or end-of-string.  This must NOT match `/runs/stream`.
   void page.route(/\/api\/langgraph\/threads\/[^/]+\/runs(\?|$)/, (route) => {
     if (route.request().method() === "GET") {
+      const threadId = threadIdFromUrl(route.request().url());
+      // 与真实 API 一致：按线程返回。未声明 thread_id 的 run 对全部线程可见
       const list = options?.runs
-        ? options.runs.map((run) =>
-            toRunResponse(run, threadIdFromUrl(route.request().url())),
-          )
+        ? options.runs
+            .filter((run) => !run.thread_id || run.thread_id === threadId)
+            .map((run) => toRunResponse(run, run.thread_id ?? threadId))
         : [];
       return route.fulfill({
         status: 200,
@@ -316,7 +320,8 @@ export function mockLangGraphAPI(
       const runId = url.pathname.split("/")[5] ?? "";
       const messages = options?.runMessages?.[runId];
       if (!messages) return route.fallback();
-      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const rawLimit = Number(url.searchParams.get("limit") ?? "50");
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 50;
       const beforeSeq = Number(url.searchParams.get("before_seq"));
       const ceiling =
         url.searchParams.has("before_seq") && Number.isFinite(beforeSeq)
