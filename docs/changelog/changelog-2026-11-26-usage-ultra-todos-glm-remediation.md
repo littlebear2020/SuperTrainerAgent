@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派
 
-> **状态**：执行中（用量快照）。计划：`docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md`；执行基线 commit `2d89bae7`（计划入库）。
+> **状态**：执行中（To-dos）。计划：`docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md`；执行基线 commit `2d89bae7`（计划入库）。
 > **TL;DR**：四个串行 PR——① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ `TodoMiddleware` 在停滞 K 轮后注入一条不上屏的提醒（只提醒、不改状态）；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落 `run_mode`，文案删除「更长执行预算」。影响面 = backend 用量/删除/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署。
 
 ## 执行基线与本机环境
@@ -28,7 +28,11 @@
 
 ## PR 3：To-dos 停滞时提醒模型（BUG-03）
 
-待执行。
+- **`TodoMiddleware` 运行中提醒：** `write_todos` 仍在上下文里、有 `in_progress` 的项、且最后一次 `write_todos` 之后已有 K（本批取 6）轮含工具调用的回复时，注入一条不上屏的 `todo_progress_reminder`（`hide_from_ui`，前端不改）。每个停滞窗口一次，再次 `write_todos` 后重新就绪；**只注入文字，不返回 `todos` 键，绝不改任何状态**。此前唯一的强制手段是收尾提醒，要求模型「调用 `write_todos` 标完成」，正好诱发收尾时批量补写。
+- **新分支写在「`write_todos` 仍可见」的早返回处**（原先该处直接 `return None`）：写在它后面就是死代码。上下文丢失提醒与收尾提醒的逻辑不变。
+- **K = 6 是启发值，不是校准值：** 测试服取证未能执行（见「证据摘要」），按计划取 K = 6 照常实施；提醒不改状态，K 偏差只多或少一条提醒。
+- **真实验证（本机隔离栈、标准档默认模型，1 次，上限 3 次）：** 步骤密集的 11 步场景，第 1 项跨 9 步。提醒在第 6 步之后（恰好 6 轮）出现；模型随后继续做完第 7–9 步，第 9 步写入成功**之后**才调用 `write_todos` 把第 1 项标完成、第 2 项标进行中——提醒没有诱发提前完成。状态序列 `[] → [进行中, 待办] → [完成, 进行中]`，任何快照里 `in_progress` 都不超过 1 个。判定：通过（提醒出现，且其后、最终回复前有一次 `write_todos`，没有伪报完成）。
+- **场景的一个副作用：** 该场景要求对同一文件反复读取（参数相同），触发既有的重复调用检测（先警告、后硬停），硬停让第 10–12 步没有执行、第 2 项在 run 结束时仍为进行中。这是既有循环检测的行为，与本批提醒无关；已登记 backlog。模型对提醒的第一反应是文字回复（同时受重复调用警告影响），随后被既有的收尾提醒拉回继续执行。
 
 ## PR 4：Ultra 场景化委派与 run 执行模式（BUG-02）
 
@@ -54,9 +58,14 @@
 - PR 2 探针 2b：`RUN_LIVE=1 pytest tests/test_model_roster_live.py -k "glm and not thinking" -v -s` → `6 passed, 1 failed`：文本、流式（首字 2.77s）、工具调用 + 续答、视觉、首字探针（2.46s）、长上下文口令通过；`test_live_glm_5_4_error_shape`（传 `max_tokens=-1` 期望带状态码的异常）`DID NOT RAISE`——360 容忍该参数，探针前提不成立，已从测试文件移除并列入未验证清单
 - PR 2 先红后绿：`pytest tests/test_model_modes_config.py -q`（示例模板未加时）→ `2 failed, 16 passed`（`test_example_contains_mode_model_templates`、`test_example_glm_5_4_template_pins_pricing`）；补模板后 `pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py tests/test_config_example_parity.py -q` → `43 passed`
 - PR 2 真实对话：本机隔离栈标准档 glm-5.4 → run 模型 `bigmodel/z-ai/glm-5.4`、`write_todos` 成功、`_run_cost` = 0.288324 = 手算（85334 输入含 72384 缓存读取、1427 输出，按 8/28/2）；证据文件 `glm-run-final.json`
+- PR 3 先红后绿：`pytest tests/test_todo_middleware.py -q`（实现前）→ `ImportError: cannot import name '_progress_reminder_after_last_update'`；真实图用例对着未改动的中间件 → `GraphRecursionError: Recursion limit of 200 reached`（提醒没送达，脚本模型一直不推进清单）；实现后 `pytest tests/test_todo_middleware.py tests/test_todo_progress_graph.py -q` → `41 passed`
+- PR 3 回归：`pytest tests/test_loop_detection_middleware.py tests/test_terminal_response_middleware.py tests/test_tool_call_protocol_middleware.py tests/test_lead_agent_prompt.py -q`（补占位密钥）→ `173 passed`；前端 `pnpm exec vitest run tests/unit/components/workspace/todo-list.dom.test.tsx` → `1 passed`（界面本批不改，预期直接通过）
+- PR 3 全量门禁：`make check` → exit 0；`cd backend && make test` → `10506 passed, 30 skipped`；`cd frontend && pnpm test` → `Test Files 307 passed, Tests 2172 passed`
+- PR 3 真实验证：`todos_live_probe.py`（本机隔离栈、标准档默认模型、`recursion_limit: 2500`、1 次）→ run `success`；消息序列里 `todo_progress_reminder` 出现在第 6 轮工具调用之后，其后有 `write_todos`（第 9 步写入成功之后），状态序列 `[] → [in_progress, pending] → [completed, in_progress]`；证据文件 `todos-live.json`
 
 ## 未验证清单
 
 - 测试服只读取证：`SERVER_EVIDENCE_NOT_VERIFIED`（见上）。
 - GLM 5.4：超时形态不另测（与其他 360 模型共用 `request_timeout` / `stream_chunk_timeout`）；错误形态探针（`max_tokens=-1`）360 不报错，未验证带状态码的异常形态；真实对话的 run 因探针脚本漏带 `recursion_limit: 2500` 以 `recursion_limit` 结束，未复跑，故「run 成功收尾」未在 live 验证（模型记录、工具调用、计价均已验证）；关思考被拒对建议追问的实际影响（返回空列表）未在 live 验证。
+- To-dos 提醒：K = 6 未经生产数据校准；live 只跑了 1 次（首次即触发提醒并通过判定，没有再跑）；场景里第 10–12 步因既有的重复调用硬停没有执行，「提醒之后整条清单走到全部完成」未在 live 观察到；界面实时刷新只由图级测试与 `TodoList` 重渲染用例覆盖，未做浏览器实测。
 - 部署侧各项（gateway/前端发布、`usage_tombstones` 迁移上线、服务器 config 与价目录入、部署后行为验收）：未部署，需用户另行下达指令。
