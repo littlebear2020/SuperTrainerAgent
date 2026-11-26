@@ -265,6 +265,38 @@ models:
   #       thinking:
   #         type: disabled
   #     reasoning_effort: minimal
+  # ── 2026-11-26 模型模板：GLM 5.4 始终思考——关思考请求会被 360 以 400 拒绝（只影响以关思考调用的内部
+  #    请求，目前仅建议追问，失败时返回空列表）；标准/Ultra 档开思考 + high，不受影响。价目为兜底，运行时以库为准。──
+  # - name: glm-5.4
+  #   display_name: 360·GLM 5.4
+  #   description: 支持深度思考，首字约 2–3 秒
+  #   use: deerflow.models.patched_openai:PatchedChatOpenAI
+  #   model: z-ai/glm-5.4
+  #   modes: [standard, ultra]
+  #   api_key: $QIHU_API_KEY
+  #   base_url: https://api.360.cn/v1
+  #   request_timeout: 180.0
+  #   max_retries: 2
+  #   max_tokens: 32768
+  #   temperature: 0.7
+  #   stream_chunk_timeout: 240
+  #   supports_vision: true
+  #   supports_thinking: true
+  #   supports_reasoning_effort: true
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+  #     reasoning_effort: minimal
+  #   pricing:
+  #     currency: CNY
+  #     input_per_million: 8
+  #     output_per_million: 28
+  #     input_cache_hit_per_million: 2
   # ── 2026-11-11 模型模板：Terra 的内部 name 是旧线程兼容别名，不是上游 ID；
   #    红图视觉探针通过；360 通道拒绝顶层 thinking 字段，保持 thinking 关闭。──
   # - name: gpt-5.6-terra
