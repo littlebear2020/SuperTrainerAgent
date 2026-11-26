@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from datetime import datetime
+from typing import Any, cast
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import aliased
 
 from app.gateway._shared.media_pricing_resolver import _load_media_pricing
+from app.gateway._shared.personal_usage.tombstones import load_tombstones
 from app.gateway._shared.personal_usage.types import (
     UsageCapability,
     UsageCostSource,
     UsageModel,
+    UsageStatus,
     UsageTask,
     UsageTaskEntry,
     UsageWindow,
@@ -244,11 +247,29 @@ def _combine_costs(
     return sum(cost for cost, _ in known if cost is not None), next(iter(currencies), None)
 
 
+@dataclass
+class _AgentSubject:
+    """现存会话或删除快照的统一视图：后面的计价与聚合不区分来源。"""
+
+    id: str
+    capability: UsageCapability
+    title: str | None
+    status: UsageStatus
+    created_at: datetime
+    updated_at: datetime | None
+    deleted: bool
+
+
 async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, capability: UsageCapability | str) -> list[UsageTask]:
-    threads = (await session.execute(select(ThreadMetaRow).where(ThreadMetaRow.user_id == user_id))).scalars().all()
-    if not threads or capability in {"ai_image", "ai_video"}:
+    if capability in {"ai_image", "ai_video"}:
         return []
-    thread_ids = [thread.thread_id for thread in threads]
+    threads = (await session.execute(select(ThreadMetaRow).where(ThreadMetaRow.user_id == user_id))).scalars().all()
+    # 删除快照只补「没有现存线程」的会话（现存行优先）；能力筛选按快照里记的能力。
+    live_ids = {thread.thread_id for thread in threads}
+    orphans = [row for row in await load_tombstones(session, user_id=user_id, kind="agent", capabilities=None if capability == "all" else [capability]) if row.subject_id not in live_ids]
+    if not threads and not orphans:
+        return []
+    thread_ids = [*live_ids, *(row.subject_id for row in orphans)]
     run_user_filter = or_(RunRow.user_id == user_id, RunRow.user_id.is_(None))
     window_runs = (
         (
@@ -288,28 +309,31 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
             media_by_thread[row.task_id].append(row)
 
     included = {thread.thread_id for thread in threads if (window.start_utc <= (_as_utc(thread.created_at) or thread.created_at) < window.end_utc) or runs_by_thread.get(thread.thread_id) or media_by_thread.get(thread.thread_id)}
-    if not included:
+    # 快照对象没有「窗口内创建」这条入口：只有窗口内确有账本行才列出。
+    included_orphans = [row for row in orphans if runs_by_thread.get(row.subject_id) or media_by_thread.get(row.subject_id)]
+    if not included and not included_orphans:
         return []
 
-    latest_ranked = (
-        select(
-            RunRow,
-            func.row_number().over(partition_by=RunRow.thread_id, order_by=(RunRow.created_at.desc(), RunRow.run_id.desc())).label("usage_run_rank"),
-        )
-        .where(
-            RunRow.thread_id.in_(included),
-            RunRow.operation_kind == "run",
-            run_user_filter,
-        )
-        .subquery()
-    )
-    latest_run = aliased(RunRow, latest_ranked)
-    latest_candidates = (await session.execute(select(latest_run).where(latest_ranked.c.usage_run_rank == 1).order_by(latest_ranked.c.created_at.desc(), latest_ranked.c.run_id.desc()))).scalars().all()
     all_runs_by_thread: dict[str, list[RunRow]] = defaultdict(list)
-    for row in latest_candidates:
-        all_runs_by_thread[row.thread_id].append(row)
+    if included:
+        latest_ranked = (
+            select(
+                RunRow,
+                func.row_number().over(partition_by=RunRow.thread_id, order_by=(RunRow.created_at.desc(), RunRow.run_id.desc())).label("usage_run_rank"),
+            )
+            .where(
+                RunRow.thread_id.in_(included),
+                RunRow.operation_kind == "run",
+                run_user_filter,
+            )
+            .subquery()
+        )
+        latest_run = aliased(RunRow, latest_ranked)
+        latest_candidates = (await session.execute(select(latest_run).where(latest_ranked.c.usage_run_rank == 1).order_by(latest_ranked.c.created_at.desc(), latest_ranked.c.run_id.desc()))).scalars().all()
+        for row in latest_candidates:
+            all_runs_by_thread[row.thread_id].append(row)
 
-    selected_threads = []
+    subjects: list[_AgentSubject] = []
     for thread in threads:
         if thread.thread_id not in included:
             continue
@@ -318,8 +342,32 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
             continue
         if capability != "all" and task_capability != capability:
             continue
-        selected_threads.append((thread, task_capability))
-    if not selected_threads:
+        latest = all_runs_by_thread[thread.thread_id][0] if all_runs_by_thread[thread.thread_id] else None
+        display_name = thread.display_name if thread.display_name and thread.display_name != thread.thread_id else None
+        subjects.append(
+            _AgentSubject(
+                id=thread.thread_id,
+                capability=task_capability,
+                title=display_name or (latest.first_human_message if latest else None),
+                status=normalize_usage_status(latest.status if latest else thread.status),
+                created_at=thread.created_at,
+                updated_at=_as_utc(latest.updated_at if latest else thread.updated_at),
+                deleted=False,
+            )
+        )
+    subjects.extend(
+        _AgentSubject(
+            id=row.subject_id,
+            capability=cast(UsageCapability, row.capability),
+            title=row.title,
+            status=normalize_usage_status(row.status),
+            created_at=row.subject_created_at,
+            updated_at=_as_utc(row.deleted_at),
+            deleted=True,
+        )
+        for row in included_orphans
+    )
+    if not subjects:
         return []
 
     pricing = await _build_pricing_map(get_session_factory())
@@ -327,24 +375,21 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
         await _load_media_pricing()
 
     tasks: list[UsageTaskEntry] = []
-    for thread, task_capability in selected_threads:
-        llm = _aggregate_llm_rows(runs_by_thread[thread.thread_id], pricing)
-        media_cost, media_currency, media_source, media_mixed, unpriced_media = _aggregate_media_rows(media_by_thread[thread.thread_id])
+    for subject in subjects:
+        llm = _aggregate_llm_rows(runs_by_thread[subject.id], pricing)
+        media_cost, media_currency, media_source, media_mixed, unpriced_media = _aggregate_media_rows(media_by_thread[subject.id])
         cost, currency = _combine_costs(llm.cost, llm.currency, media_cost, media_currency, media_mixed)
-        latest_run = all_runs_by_thread[thread.thread_id][0] if all_runs_by_thread[thread.thread_id] else None
-        activity_candidates = [thread.created_at]
-        activity_candidates.extend(row.created_at for row in runs_by_thread[thread.thread_id])
-        activity_candidates.extend(row.created_at for row in media_by_thread[thread.thread_id])
+        activity_candidates = [subject.created_at]
+        activity_candidates.extend(row.created_at for row in runs_by_thread[subject.id])
+        activity_candidates.extend(row.created_at for row in media_by_thread[subject.id])
         activity_at = max(_as_utc(value) or value for value in activity_candidates)
-        display_name = thread.display_name if thread.display_name and thread.display_name != thread.thread_id else None
-        title = display_name or (latest_run.first_human_message if latest_run else None)
         tasks.append(
             UsageTaskEntry(
-                task_key=f"agent:{thread.thread_id}",
-                source_id=thread.thread_id,
-                capability=task_capability,
-                title=title,
-                status=normalize_usage_status(latest_run.status if latest_run else thread.status),
+                task_key=f"agent:{subject.id}",
+                source_id=subject.id,
+                capability=subject.capability,
+                title=subject.title,
+                status=subject.status,
                 cost=cost,
                 llm_cost=llm.cost,
                 media_cost=media_cost,
@@ -353,7 +398,8 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
                 cost_source=merge_cost_source(llm.cost_source, media_source),
                 total_tokens=llm.total_tokens,
                 models=llm.models,
-                updated_at=_as_utc(latest_run.updated_at if latest_run else thread.updated_at),
+                updated_at=subject.updated_at,
+                deleted=subject.deleted,
                 activity_at=activity_at,
             )
         )

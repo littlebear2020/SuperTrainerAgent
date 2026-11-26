@@ -54,6 +54,7 @@ class UsageTaskResponse(BaseModel):
     total_tokens: int | None
     models: list[UsageModelResponse]
     updated_at: datetime | None
+    deleted: bool = Field(description="作品或会话已删除：历史费用与 Token 仍计入，原任务不可再打开。")
 
 
 class PersonalUsageResponse(BaseModel):
@@ -91,6 +92,7 @@ def _task_response(task: UsageTask) -> UsageTaskResponse:
             for model in task.models
         ],
         updated_at=task.updated_at,
+        deleted=task.deleted,
     )
 
 

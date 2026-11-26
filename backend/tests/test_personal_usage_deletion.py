@@ -8,8 +8,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from app.gateway._shared.personal_usage.service import get_personal_usage
 from app.gateway._shared.personal_usage.tombstones import UsageTombstoneRow, record_task_tombstone, record_thread_tombstone
 from app.gateway._shared.personal_usage.types import make_usage_window
 from app.gateway._shared.task_framework.models import TaskRow
@@ -18,6 +19,8 @@ from app.gateway._shared.task_framework.service import BaseTaskService
 from app.gateway.routers import threads as threads_router
 from app.gateway.routers.console import invalidate_media_pricing_cache
 from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
+from deerflow.persistence.external_api_calls.model import ExternalApiCallRow
+from deerflow.persistence.model_pricing.model import ModelPricingRow
 from deerflow.persistence.run.model import RunRow
 from deerflow.persistence.thread_meta.model import ThreadMetaRow
 from deerflow.persistence.thread_meta.sql import ThreadMetaRepository
@@ -238,3 +241,238 @@ async def test_tombstone_failure_aborts_thread_deletion(db, monkeypatch, no_loca
     event_store.delete_by_thread.assert_not_awaited()
     async with db() as session:
         assert await session.get(ThreadMetaRow, "thread-1") is not None
+
+
+# ── 统计口径：删除后费用与 Token 不变 ─────────────────────────────────────────
+
+
+def task_row(task_id: str, task_type: str = "ai_image", *, status: str = "ready", title: str | None = None) -> TaskRow:
+    return TaskRow(
+        id=task_id,
+        user_id=USER,
+        domain="video_gen",
+        task_type=task_type,
+        status=status,
+        title=title or task_id,
+        payload="{}",
+        result="{}",
+        created_at=IN_WINDOW,
+        updated_at=IN_WINDOW,
+    )
+
+
+def llm_ledger(run_id: str, task_id: str, *, input_tokens: int = 120, output_tokens: int = 80) -> RunRow:
+    usage = {"input_tokens": input_tokens, "output_tokens": output_tokens, "total_tokens": input_tokens + output_tokens}
+    return RunRow(
+        run_id=run_id,
+        thread_id=task_id,
+        user_id=USER,
+        status="success",
+        operation_kind="llm_bookkeeping",
+        model_name="priced-model",
+        total_input_tokens=input_tokens,
+        total_output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+        token_usage_by_model={"priced-model": usage},
+        metadata_json={"domain": "video_gen"},
+        created_at=IN_WINDOW,
+        updated_at=IN_WINDOW,
+    )
+
+
+def media_ledger(call_id: str, task_id: str, *, amount: float = 0.5) -> ExternalApiCallRow:
+    return ExternalApiCallRow(
+        call_id=call_id,
+        user_id=USER,
+        task_id=task_id,
+        provider="media-provider",
+        method="generate_image",
+        status="ok",
+        metadata_json={"amount": amount},
+        created_at=IN_WINDOW,
+    )
+
+
+def priced_model() -> ModelPricingRow:
+    return ModelPricingRow(model_name="priced-model", currency="CNY", input_per_million=10, output_per_million=30)
+
+
+def video_tombstone(subject_id: str, *, title: str = "快照标题", status: str = "incomplete") -> UsageTombstoneRow:
+    return UsageTombstoneRow(
+        kind="video",
+        subject_id=subject_id,
+        user_id=USER,
+        capability="ai_image",
+        title=title,
+        status=status,
+        subject_created_at=IN_WINDOW,
+        deleted_at=IN_WINDOW,
+    )
+
+
+async def usage(session_factory, **kwargs):
+    return await get_personal_usage(session_factory, user_id=USER, days=7, tz_offset_minutes=0, **kwargs)
+
+
+async def ledger_row_counts(session_factory, subject_id: str) -> tuple[int, int]:
+    async with session_factory() as session:
+        llm = (await session.execute(select(func.count()).select_from(RunRow).where(RunRow.thread_id == subject_id, RunRow.operation_kind == "llm_bookkeeping"))).scalar_one()
+        media = (await session.execute(select(func.count()).select_from(ExternalApiCallRow).where(ExternalApiCallRow.task_id == subject_id))).scalar_one()
+    return llm, media
+
+
+@pytest.mark.anyio
+async def test_deleting_ai_image_task_keeps_usage_totals(db, tmp_path):
+    async with db() as session:
+        session.add_all(
+            [
+                priced_model(),
+                task_row("vg-img", status="pending", title="删除前标题"),
+                llm_ledger("vg-img-llm", "vg-img"),
+                media_ledger("vg-img-media", "vg-img"),
+            ]
+        )
+        await session.commit()
+    service = _VideoTaskService(TaskRepository(db), storage_dir=str(tmp_path))
+
+    before = await usage(db)
+    assert await service.delete_task("vg-img", USER) is True
+    after = await usage(db)
+
+    assert before.summary.cost is not None
+    assert after.summary.cost == pytest.approx(before.summary.cost)
+    assert after.summary.total_tokens == before.summary.total_tokens
+    assert after.total_tasks == before.total_tasks == 1
+    assert before.tasks[0].deleted is False
+    assert before.tasks[0].status == "running"
+    entry = after.tasks[0]
+    assert (entry.deleted, entry.capability, entry.title, entry.status) == (True, "ai_image", "删除前标题", "incomplete")
+    async with db() as session:
+        assert await session.get(TaskRow, "vg-img") is None
+    assert await ledger_row_counts(db, "vg-img") == (1, 1)
+
+
+@pytest.mark.anyio
+async def test_deleted_ai_video_task_stays_in_its_capability_filter(db, tmp_path):
+    async with db() as session:
+        session.add_all([priced_model(), task_row("vg-vid", "ai_video"), llm_ledger("vg-vid-llm", "vg-vid"), media_ledger("vg-vid-media", "vg-vid")])
+        await session.commit()
+    service = _VideoTaskService(TaskRepository(db), storage_dir=str(tmp_path))
+
+    before = await usage(db)
+    assert await service.delete_task("vg-vid", USER) is True
+    after = await usage(db)
+
+    assert after.summary.cost == pytest.approx(before.summary.cost)
+    assert after.summary.total_tokens == before.summary.total_tokens
+    assert (await usage(db, capability="ai_video")).total_tasks == 1
+    assert (await usage(db, capability="ai_image")).total_tasks == 0
+
+
+@pytest.mark.anyio
+async def test_deleting_agent_thread_keeps_usage_totals(db, no_local_thread_dir):
+    async with db() as session:
+        session.add_all(
+            [
+                priced_model(),
+                course_video_thread("thread-1", display_name="课程视频草稿"),
+                agent_run("run-1", "thread-1"),
+                media_ledger("thread-1-media", "thread-1", amount=0.25),
+            ]
+        )
+        await session.commit()
+
+    before = await usage(db)
+    with acting_as(USER):
+        await threads_router.delete_thread_data.__wrapped__("thread-1", delete_request(ThreadMetaRepository(db)))
+    after = await usage(db)
+
+    assert before.summary.cost is not None
+    assert after.summary.cost == pytest.approx(before.summary.cost)
+    assert after.summary.total_tokens == before.summary.total_tokens
+    assert after.total_tasks == before.total_tasks == 1
+    entry = after.tasks[0]
+    assert (entry.deleted, entry.capability, entry.title) == (True, "course-video", "课程视频草稿")
+    async with db() as session:
+        assert await session.get(ThreadMetaRow, "thread-1") is None
+
+
+@pytest.mark.anyio
+async def test_late_ledger_rows_after_deletion_are_counted(db, tmp_path):
+    async with db() as session:
+        session.add_all([priced_model(), task_row("vg-img"), llm_ledger("vg-img-llm", "vg-img"), media_ledger("vg-img-media", "vg-img")])
+        await session.commit()
+    service = _VideoTaskService(TaskRepository(db), storage_dir=str(tmp_path))
+
+    before = await usage(db)
+    assert await service.delete_task("vg-img", USER) is True
+    async with db() as session:  # 删除时仍在途的供应商调用，删除后才落账
+        session.add(media_ledger("vg-img-late", "vg-img", amount=0.75))
+        await session.commit()
+    after = await usage(db)
+
+    assert after.summary.cost == pytest.approx(before.summary.cost + 0.75)
+    assert after.total_tasks == 1
+
+
+@pytest.mark.anyio
+async def test_deleted_task_without_usage_is_not_listed(db, tmp_path):
+    async with db() as session:
+        session.add(task_row("vg-empty", title="没有任何账本行"))
+        await session.commit()
+    service = _VideoTaskService(TaskRepository(db), storage_dir=str(tmp_path))
+
+    assert (await usage(db)).total_tasks == 1  # 窗口内创建的现存任务照常列出（现存规则不变）
+    assert await service.delete_task("vg-empty", USER) is True
+    after = await usage(db)
+
+    assert after.total_tasks == 0
+    assert after.tasks == []
+
+
+@pytest.mark.anyio
+async def test_live_row_wins_over_stale_tombstone(db):
+    """快照已写入但删除失败（任务仍在）：只列现存的一条，费用不翻倍。"""
+    async with db() as session:
+        session.add_all(
+            [
+                priced_model(),
+                task_row("vg-live", title="现存标题"),
+                llm_ledger("vg-live-llm", "vg-live"),
+                media_ledger("vg-live-media", "vg-live"),
+                video_tombstone("vg-live"),
+            ]
+        )
+        await session.commit()
+
+    result = await usage(db)
+
+    assert result.total_tasks == 1
+    assert (result.tasks[0].deleted, result.tasks[0].title) == (False, "现存标题")
+    assert result.summary.cost == pytest.approx(0.5036)
+
+
+@pytest.mark.anyio
+async def test_summary_with_deleted_subjects_reconciles_across_pagination(db):
+    async with db() as session:
+        session.add_all(
+            [
+                priced_model(),
+                task_row("vg-a"),
+                llm_ledger("vg-a-llm", "vg-a", input_tokens=100, output_tokens=0),
+                task_row("vg-b"),
+                llm_ledger("vg-b-llm", "vg-b", input_tokens=200, output_tokens=0),
+                llm_ledger("vg-gone-llm", "vg-gone", input_tokens=300, output_tokens=0),
+                video_tombstone("vg-gone"),
+            ]
+        )
+        await session.commit()
+
+    full = await usage(db)
+    pages = [await usage(db, offset=index, limit=1) for index in range(3)]
+
+    assert full.total_tasks == 3
+    assert [page.total_tasks for page in pages] == [3, 3, 3]
+    assert {page.tasks[0].source_id for page in pages} == {"vg-a", "vg-b", "vg-gone"}
+    assert sum(page.tasks[0].cost for page in pages) == pytest.approx(full.summary.cost)
+    assert all(page.summary.cost == pytest.approx(full.summary.cost) for page in pages)
