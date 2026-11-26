@@ -390,7 +390,13 @@ def _capture_start_run_config(monkeypatch):
 
     record = SimpleNamespace(run_id="r1", status="pending")
     run_mgr = MagicMock()
-    run_mgr.create_or_reject = AsyncMock(return_value=record)
+    captured: dict = {}
+
+    async def _create_or_reject(*args, **kwargs):
+        captured["create_kwargs"] = kwargs
+        return record
+
+    run_mgr.create_or_reject = _create_or_reject
     run_mgr.set_status = AsyncMock()
 
     async def _thread_get(thread_id, user_id=None):
@@ -399,8 +405,6 @@ def _capture_start_run_config(monkeypatch):
     thread_store = MagicMock()
     thread_store.get = _thread_get
     thread_store.update_status = AsyncMock()
-
-    captured: dict = {}
 
     def _fake_run_agent(*args, **kwargs):
         captured["config"] = kwargs["config"]
@@ -524,6 +528,66 @@ async def test_context_does_not_override_existing_configurable(monkeypatch):
     assert configurable["is_plan_mode"] is False
     # New allowlisted values should be added
     assert configurable["subagent_enabled"] is True
+
+
+@pytest.mark.asyncio
+async def test_start_run_records_server_owned_run_mode(monkeypatch):
+    """BUG-02: run metadata carries a server-computed run_mode; a client-forged key is overwritten."""
+    import app.gateway.services as services
+
+    record, captured = _capture_start_run_config(monkeypatch)
+    body = _run_create_body(
+        metadata={"run_mode": "forged", "keep": 1},
+        context={"mode": "ultra", "subagent_enabled": True, "is_plan_mode": True},
+    )
+    await services.start_run(body, "thread-1", _start_run_request())
+    await record.task
+
+    assert captured["create_kwargs"]["metadata"] == {
+        "keep": 1,
+        "run_mode": {"mode": "ultra", "subagent_enabled": True, "is_plan_mode": True},
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_run_without_context_records_null_mode(monkeypatch):
+    import app.gateway.services as services
+
+    record, captured = _capture_start_run_config(monkeypatch)
+    await services.start_run(_run_create_body(), "thread-1", _start_run_request())
+    await record.task
+
+    assert captured["create_kwargs"]["metadata"]["run_mode"] == {"mode": None, "subagent_enabled": False, "is_plan_mode": False}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("config", "expected_subagent"),
+    [
+        ({"configurable": {"subagent_enabled": False}}, False),
+        ({"context": {"subagent_enabled": True}}, True),
+    ],
+)
+async def test_start_run_run_mode_follows_runtime_precedence(monkeypatch, config, expected_subagent):
+    """run_mode reads the runtime view (context beats configurable; top-level body.context only fills gaps)."""
+    import app.gateway.services as services
+
+    record, captured = _capture_start_run_config(monkeypatch)
+    body = _run_create_body(
+        config=config,
+        context={"mode": "ultra", "subagent_enabled": not expected_subagent, "is_plan_mode": True},
+    )
+    original_metadata = dict(body.metadata)
+    await services.start_run(body, "thread-1", _start_run_request())
+    await record.task
+
+    run_mode = captured["create_kwargs"]["metadata"]["run_mode"]
+    runtime_view = {**captured["config"].get("configurable", {}), **(captured["config"].get("context") or {})}
+    assert run_mode["subagent_enabled"] is expected_subagent
+    for key in ("mode", "subagent_enabled", "is_plan_mode"):
+        assert run_mode[key] == runtime_view[key]
+    assert body.metadata == original_metadata
+    assert "run_mode" not in body.metadata
 
 
 # ---------------------------------------------------------------------------
