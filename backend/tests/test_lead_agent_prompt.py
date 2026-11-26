@@ -248,10 +248,7 @@ def test_subagent_description_is_escaped_in_prompt(monkeypatch):
     assert "&lt;/subagent_system&gt;" in section
 
 
-def test_subagent_section_defaults_to_direct_execution(monkeypatch):
-    """T21 (C-04, 2026-08-13): the subagent prompt must teach "default to
-    direct execution + net-benefit delegation check" — NOT the old
-    decompose-and-parallelize-by-default orchestrator philosophy."""
+def _prep_subagent_prompt(monkeypatch):
     config = SimpleNamespace(sandbox=SimpleNamespace(mounts=[]))
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
     monkeypatch.setattr(
@@ -260,38 +257,64 @@ def test_subagent_section_defaults_to_direct_execution(monkeypatch):
     )
     _set_skills_cache_state()
 
+
+def test_subagent_section_delegates_independent_workstreams(monkeypatch):
+    """BUG-02 (2026-11-26): with n > 1 independent workstreams are delegated in parallel;
+    the net-benefit check only covers cases the routing rules do not settle."""
+    _prep_subagent_prompt(monkeypatch)
+
     section = prompt_module._build_subagent_section(3, 12)
 
-    assert "Default to direct execution" in section
-    assert "DELEGATION CHECK" in section
+    assert "two or more independent workstreams" in section
+    assert "parallel `task` calls in the same response" in section
+    assert "Agent or skill instructions that forbid delegation always take precedence" in section
+    assert "DELEGATION CHECK (for cases the routing rules above do not settle)" in section
+    assert "Split the request into workstreams" in section
     assert "expected benefit is clearly greater than the expected cost" in section
     assert "MAXIMUM 3 `task` CALLS PER RESPONSE" in section
     assert "MAXIMUM 12 `task` CALLS PER RUN" in section
-    # The old philosophy must be gone.
+    assert "Default to direct execution" not in section
+    assert "required before every `task` call" not in section
+    assert "Establish the cheapest credible direct-execution path" not in section
+    assert "Launch only the smallest useful batch" not in section
     assert "DECOMPOSE, DELEGATE, SYNTHESIZE" not in section
     assert "Complex tasks should be decomposed" not in section
 
 
-def test_subagent_reminders_aligned_with_direct_execution(monkeypatch):
-    """The critical_reminders/thinking_style snippets must not contradict the
-    new philosophy."""
-    config = SimpleNamespace(sandbox=SimpleNamespace(mounts=[]))
-    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
-    monkeypatch.setattr(
-        "deerflow.config.subagents_config.get_subagents_app_config",
-        lambda: SimpleNamespace(max_total=12, custom_agents={}),
-    )
-    _set_skills_cache_state()
+def _allow_single_slot(monkeypatch):
+    """The production clamp floor is 2, so a single-slot prompt is unreachable today; lower the floor so
+    the original net-benefit wording stays pinned in case it is ever lowered."""
+    monkeypatch.setattr("deerflow.agents.middlewares.subagent_limit_middleware.MIN_SUBAGENT_LIMIT", 1)
+
+
+def test_single_slot_subagent_section_keeps_net_benefit_rule(monkeypatch):
+    """n == 1 has no parallel benefit: the original net-benefit wording stays."""
+    _prep_subagent_prompt(monkeypatch)
+    _allow_single_slot(monkeypatch)
+
+    section = prompt_module._build_subagent_section(1, 12)
+
+    assert "Default to direct execution" in section
+    assert "required before every `task` call" in section
+    assert "Establish the cheapest credible direct-execution path" in section
+    assert "independent workstreams" not in section
+
+
+def test_subagent_reminders_follow_routing_rule(monkeypatch):
+    """The critical_reminders/thinking_style snippets must not contradict the routing rule."""
+    _prep_subagent_prompt(monkeypatch)
 
     prompt = prompt_module.apply_prompt_template(subagent_enabled=True, max_concurrent_subagents=3)
 
-    # P2-3 (2026-09-29, user-approved copy change): the old "Default to direct
-    # execution" framing is retired — the reminder now states the criterion
-    # neutrally instead of defaulting to "don't".
-    assert "Subagent Mode**: Delegate when the net benefit is clear; otherwise execute directly." in prompt
-    assert "Before delegating**: confirm the subagent's deliverable, completion criteria, and that no simpler direct path exists" in prompt
+    assert "Subagent Mode**: When the request has two or more independent workstreams, delegate them as parallel `task` calls in the same response." in prompt
+    assert "Before delegating**: identify the independent workstreams" in prompt
+    assert "Delegate when the net benefit is clear; otherwise execute directly" not in prompt
+    assert "no simpler direct path exists" not in prompt
     assert "Subagent Mode**: Default to direct execution" not in prompt
     assert "DECOMPOSITION CHECK" not in prompt
-    # The main section's DELEGATION CHECK framework stays (only the triple
-    # dissuasion was collapsed, not the net-benefit check itself).
     assert "DELEGATION CHECK" in prompt
+
+    _allow_single_slot(monkeypatch)
+    single = prompt_module.apply_prompt_template(subagent_enabled=True, max_concurrent_subagents=1)
+    assert "Delegate when the net benefit is clear; otherwise execute directly" in single
+    assert "no simpler direct path exists" in single
