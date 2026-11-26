@@ -123,13 +123,14 @@ EXPECTED_MODES = {
     "claude-sonnet-5-5": ["standard", "ultra"],
     "qwen4-max": ["ultra"],
     "kimi-k3.1-pro": ["ultra"],
+    "glm-5.4": ["standard", "ultra"],
 }
 EXPECTED_MODE_DEFAULTS = {
     "flash": "qwen3.8-flash",
     "standard": "claude-sonnet-5-5",
     "ultra": "qwen4-max",
 }
-THINKING_MODELS = {"qwen3.8-flash", "deepseek-v4.1-flash", "qwen4-max", "kimi-k3.1-pro"}
+THINKING_MODELS = {"qwen3.8-flash", "deepseek-v4.1-flash", "qwen4-max", "kimi-k3.1-pro", "glm-5.4"}
 
 
 @pytest.fixture()
@@ -213,3 +214,58 @@ def test_example_contains_mode_model_templates() -> None:
         assert f"# - name: {name}" in text
     assert "#   model: deepseek/deepseek-v4.1-flash@360-latency" in text
     assert "#   standard: claude-sonnet-5-5" in text
+
+
+def test_example_glm_5_4_template_pins_pricing() -> None:
+    """只读示例，CI 也跑：价目写在示例里，部署侧复制模板时不会漏掉（运行时以库为准，兜底价首次调用即有价）。"""
+    text = (REPO_ROOT / "config.example.yaml").read_text(encoding="utf-8")
+    start = text.index("# - name: glm-5.4")
+    end = text.find("# - name:", start + 1)
+    block = text[start : end if end != -1 else len(text)]
+
+    assert "#     currency: CNY\n" in block
+    assert "#     input_per_million: 8\n" in block
+    assert "#     output_per_million: 28\n" in block
+    assert "#     input_cache_hit_per_million: 2\n" in block
+
+
+def test_glm_5_4_roster_contract(real_config: AppConfig) -> None:
+    model = real_config.get_model_config("glm-5.4")
+
+    assert model is not None
+    assert model.use == "deerflow.models.patched_openai:PatchedChatOpenAI"
+    assert model.model == "z-ai/glm-5.4"
+    assert model.model_extra["base_url"] == "https://api.360.cn/v1"
+    assert model.model_extra["max_tokens"] == 32768
+    # 2026-11-26 探针实测：开思考 + high 正常、有推理 token；视觉与工具调用通过。
+    assert model.supports_thinking is True
+    assert model.supports_reasoning_effort is True
+    assert model.supports_vision is True
+    assert "glm-5.4" not in real_config.mode_defaults.values()
+    assert model.model_extra["pricing"] == {
+        "currency": "CNY",
+        "input_per_million": 8,
+        "output_per_million": 28,
+        "input_cache_hit_per_million": 2,
+    }
+
+
+def test_glm_5_4_pricing_resolves_upstream_id(real_config: AppConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.gateway.routers import console
+
+    monkeypatch.setattr(console, "get_app_config", lambda: real_config)
+
+    price = console._lookup_pricing(console._build_yaml_pricing_map(), "z-ai/glm-5.4")
+
+    assert price is not None
+    # 750k 未命中缓存输入 × 8 + 250k 命中缓存 × 2 + 100k 输出 × 28（每百万 token）
+    assert console._token_cost(1_000_000, 100_000, price, cache_read_tokens=250_000) == pytest.approx(9.3)
+
+
+@pytest.mark.asyncio
+async def test_models_api_lists_glm_5_4_in_standard_and_ultra(real_config: AppConfig) -> None:
+    listed = (await list_models(config=real_config)).model_dump()
+    by_name = {item["name"]: item for item in listed["models"]}
+
+    assert by_name["glm-5.4"]["modes"] == ["standard", "ultra"]
+    assert listed["mode_defaults"] == EXPECTED_MODE_DEFAULTS

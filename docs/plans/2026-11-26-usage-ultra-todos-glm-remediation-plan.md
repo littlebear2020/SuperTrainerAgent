@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派实施计划
 
-> **状态**：未执行（执行中：用量快照；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
+> **状态**：未执行（执行中：GLM 5.4；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
 > **TL;DR**：诊断报告的四项拆成四个串行 PR：① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ 先只读取证，证据不否定「模型批量补写」就在 `TodoMiddleware` 加运行中提醒；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落执行模式，文案同步并删除「更长执行预算」口径。影响面 = backend 用量/删除路径/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署，付费验证按 Q10 封顶。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按 Task 0→5 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，任务之间不停下等评审（评审在各 PR 内完成），只在五处停下：Task 0 漂移需要改计划、本机基线全量测试不绿、某 PR 的 OCR 3 轮后仍有 Critical/Important、To-dos 真实 run 在提醒后把没做完的项标成 completed、Ultra 默认模型改一轮提示词后仍不达标。状态只改顶部原行，依次写 `未执行（执行中：用量快照）` → `未执行（执行中：GLM 5.4）` → `未执行（执行中：To-dos）` → `未执行（执行中：Ultra）`，Task 5 完成后改为 `已执行（…）`，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -189,26 +189,26 @@
 
 位置：本机 `config.yaml` 放在 `kimi-k3.1-pro` 条目之后（`models[0]`、`models[1]` 不动，花名册测试钉着）；`config.example.yaml` 放在 `# - name: kimi-k3.1-pro` 模板块之后、`# ── 2026-11-11 模型模板` 注释之前，逐行加 `  # ` 前缀。
 
-- [ ] **Step 1：先以不可见状态加本机条目。** 本机 `config.yaml` 按上方加入条目，但 `modes: []`，description 暂写 `支持深度思考`。
-- [ ] **Step 2：live 探针（付费，≤10 次调用，分两段）。** `backend/tests/test_model_roster_live.py` 的 `_create_probe_model` 增加可选 `reasoning_effort` 透传。
+- [x] **Step 1：先以不可见状态加本机条目。** 本机 `config.yaml` 按上方加入条目，但 `modes: []`，description 暂写 `支持深度思考`。
+- [x] **Step 2：live 探针（付费，≤10 次调用，分两段）。** `backend/tests/test_model_roster_live.py` 的 `_create_probe_model` 增加可选 `reasoning_effort` 透传。
   - **2a 思考契约（2 次，先单独跑）：** 新增 `test_live_glm_5_4_thinking_contract`：开思考 + `reasoning_effort="high"` 1 次（记录是否报错、有无推理内容、`reasoning` token 数）；关思考 1 次（记录是否报错、推理 token 是否为 0、答案是否非空）。按 Step 3 定下 `supports_thinking` 后再跑 2b。
   - **2b 其余 8 次（按产品路径：glm-5.4 一律以 `thinking_enabled=<条目的 supports_thinking>`、`reasoning_effort="high"` 调用，其他模型不变）：** `TARGET_MODEL_NAMES` 追加 `"glm-5.4"`（文本、流式、工具调用 + 工具结果续答，共 4 次；这几个共享用例原本一律关思考，glm-5.4 若也关思考，关思考参数被拒会被误判成工具调用不通过）；`test_live_glm_5_4_vision_identifies_red_image`（复用 `_red_image_data_url`，1 次）、`test_live_glm_5_4_first_token_latency`（1 次流式，记录首个非空 chunk 的耗时；`test_live_streaming_response` 同样打印首字耗时）、`test_live_glm_5_4_long_context_needle`（1 次：约 5 万字符的填充文本中藏一句口令，要求原样答出口令）、`test_live_glm_5_4_error_shape`（1 次：传 `max_tokens=-1`，断言抛出带状态码的异常而不是空回复，记录异常类型）。
   - 超时形态不另测（与其他 360 模型共用 `request_timeout`/`stream_chunk_timeout`），列入「未验证清单」。在同一条命令内加载密钥后，先跑 `RUN_LIVE=1 PYTHONPATH=. uv run pytest tests/test_model_roster_live.py -k "glm and thinking" -v -s`（2a），定完能力位再跑 `-k "glm and not thinking"`（2b），输出都存证据目录 `glm-probe.txt`。
-- [ ] **Step 3：按探针结论定能力位。**
+- [x] **Step 3：按探针结论定能力位。**
   - 工具调用或工具结果续答失败（2b，按产品路径开思考）→ **取消 PR 2**：删除本机条目、撤回 Step 2 的改动、backlog 登记「GLM 5.4 工具调用不通过」并附探针输出，直接进入 Task 3。
   - 开思考请求报错：错误指向 `reasoning_effort` → `supports_reasoning_effort: false`，思考位不动；其他报错 → `supports_thinking: false`，删除两段 `when_thinking_*`，不加入 `THINKING_MODELS`。
   - 开思考请求成功 → 保留 `supports_thinking: true` 与两段配置：标准、Ultra 都开思考，前端只在非闪速且 `supports_thinking` 为真时开思考（`frontend/src/core/threads/hooks.ts:927`），置 false 会让两档全程不思考。关思考的结果只影响以关思考调用所选模型的内部请求，目前只有建议追问（`backend/app/gateway/routers/suggestions.py:132`，失败时返回空列表）：关思考报错 → backlog 登记「GLM 5.4 关思考被拒，建议追问为空」并写进 changelog 已知限制；关思考后仍有推理 → changelog 记录。删除 `when_thinking_disabled` 绕不开报错：工厂会从 `when_thinking_enabled` 推导出同样的关思考参数（`deerflow/models/factory.py:148-158`）。
   - 视觉失败 → `supports_vision: false`。
   - `test_live_glm_5_4_thinking_contract` 的断言按实测契约写（例如关思考被拒时，该半段改为断言报错并注明原因），不为此复跑付费探针。
   - 然后把 `modes` 改为 `[standard, ultra]`，description 按 2b 两次实测首字耗时填写。
-- [ ] **Step 4：写花名册失败测试**（依赖本机 config，CI 没有 config 时按现有口径 skip）。`backend/tests/test_model_modes_config.py`：
+- [x] **Step 4：写花名册失败测试**（依赖本机 config，CI 没有 config 时按现有口径 skip）。`backend/tests/test_model_modes_config.py`：
   - `EXPECTED_MODES["glm-5.4"] = ["standard", "ultra"]`；`supports_thinking` 保持 true 时 `THINKING_MODELS` 加 `"glm-5.4"`（自动纳入两态 factory 形态测试；该测试只看工厂参数形态，不受关思考实测结果影响）；`test_example_contains_mode_model_templates` 随之要求示例里有 `# - name: glm-5.4`。
   - `test_glm_5_4_roster_contract`：`model == "z-ai/glm-5.4"`；`use` 为 PatchedChatOpenAI；`base_url` 为 360；`max_tokens == 32768`；能力位与 Step 3 结论一致；`"glm-5.4" not in real_config.mode_defaults.values()`；`model_extra["pricing"] == {"currency": "CNY", "input_per_million": 8, "output_per_million": 28, "input_cache_hit_per_million": 2}`。
   - `test_glm_5_4_pricing_resolves_upstream_id`：monkeypatch `app.gateway.routers.console.get_app_config` 返回 `real_config`；`price = _lookup_pricing(_build_yaml_pricing_map(), "z-ai/glm-5.4")` 非 None；`_token_cost(1_000_000, 100_000, price, cache_read_tokens=250_000) == pytest.approx(9.3)`（750k × 8 + 250k × 2 + 100k × 28，单位为每百万 token）。
   - `test_models_api_lists_glm_5_4_in_standard_and_ultra`：仿 `test_models_api_returns_modes_and_defaults_without_credentials` 调 `list_models(config=real_config)`：glm-5.4 的 `modes == ["standard", "ultra"]`，`mode_defaults` 仍等于 `EXPECTED_MODE_DEFAULTS`。
   - `test_example_glm_5_4_template_pins_pricing`（只读 `config.example.yaml`，CI 也跑；上面三条依赖本机 config，CI 会跳过）：取示例中 `# - name: glm-5.4` 到下一个 `# - name:` 之间的文本，断言含 `#     currency: CNY\n`、`#     input_per_million: 8\n`、`#     output_per_million: 28\n`、`#     input_cache_hit_per_million: 2\n`。
   - 运行 `PYTHONPATH=. uv run pytest tests/test_model_modes_config.py -q` → 示例模板相关用例失败。
-- [ ] **Step 5：补示例模板并确认通过。** `config.example.yaml` 加注释模板；`PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` → 全部 passed。前端按 `modes` 过滤，「标准↔Ultra 切档保留、切到闪速回落默认」与 claude-sonnet-5-5 同形，由现有 `input-box-mode-models.dom.test.tsx` 覆盖，不新增前端测试。
+- [x] **Step 5：补示例模板并确认通过。** `config.example.yaml` 加注释模板；`PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` → 全部 passed。前端按 `modes` 过滤，「标准↔Ultra 切档保留、切到闪速回落默认」与 claude-sonnet-5-5 同形，由现有 `input-box-mode-models.dom.test.tsx` 覆盖，不新增前端测试。
 - [ ] **Step 6：真实对话一次（付费，1 次）。** 本机隔离栈（只起 gateway），API 级：`POST /api/threads/{id}/runs/stream`，context = 标准档（`mode: "standard"`、`model_name: "glm-5.4"`、`is_plan_mode: true`、`subagent_enabled: false`、`thinking_enabled` 按能力位、`reasoning_effort: "high"`），输入 `请先用任务列表规划三个步骤，再逐步写出一份三段式周报模板。`。断言：run 状态 success；本机库里该 run 的 `model_name` 含 `glm-5.4`（没有静默回退）；`token_usage_by_model` 有 glm-5.4 桶，`_build_pricing_map` + `_run_cost` 算出的费用非 None，且与按 8/28/2 手算一致；至少一次 `write_todos` 原生工具调用成功；`GET /api/models` 中 glm-5.4 的 `modes` 为 `["standard", "ultra"]`。结果写入证据目录 `glm-run.json`。
 - [ ] **Step 7：提交并走 PR。** `git commit -m "feat(models): 接入 360 GLM 5.4（标准/Ultra 可选）"`（`config.example.yaml`、`test_model_modes_config.py`、`test_model_roster_live.py`；本机 `config.yaml` 不入库）。`config.example.yaml` 属核心路径，必须走 PR；PR 正文写明部署侧要按「六」同步服务器 config 与价目。合入后状态行改为 `未执行（执行中：To-dos）`。
 
