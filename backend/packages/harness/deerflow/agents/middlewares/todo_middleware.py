@@ -47,6 +47,37 @@ def _completion_reminder_count(messages: list[Any]) -> int:
     return sum(1 for msg in messages if isinstance(msg, HumanMessage) and getattr(msg, "name", None) == "todo_completion_reminder")
 
 
+def _calls_write_todos(msg: Any) -> bool:
+    return isinstance(msg, AIMessage) and any(tc.get("name") == "write_todos" for tc in (msg.tool_calls or []))
+
+
+def _tool_rounds_since_last_todo_update(messages: list[Any]) -> int | None:
+    """Count tool-calling replies after the last ``write_todos`` reply.
+
+    A round is one AIMessage with at least one tool call (parallel calls in a single
+    reply are one round); replies without tool calls do not count. Returns ``None``
+    when no ``write_todos`` call is visible in *messages* — that case belongs to the
+    context-loss reminder, not to this counter.
+    """
+    rounds = 0
+    for msg in reversed(messages):
+        if _calls_write_todos(msg):
+            return rounds
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            rounds += 1
+    return None
+
+
+def _progress_reminder_after_last_update(messages: list[Any]) -> bool:
+    """Return True if a todo_progress_reminder already follows the last ``write_todos`` reply."""
+    for msg in reversed(messages):
+        if _calls_write_todos(msg):
+            return False
+        if isinstance(msg, HumanMessage) and getattr(msg, "name", None) == "todo_progress_reminder":
+            return True
+    return False
+
+
 def _format_todos(todos: list[Todo]) -> str:
     """Format a list of Todo items into a human-readable string."""
     lines: list[str] = []
@@ -72,21 +103,32 @@ class TodoMiddleware(TodoListMiddleware):
     # the base class's parallel-guard behavior.
     state_schema = ThreadState  # type: ignore[assignment]
 
+    # BUG-03 (2026-11-26): once ``write_todos`` has been visible for this many tool-calling
+    # rounds without another update while an item is ``in_progress``, nudge the model once
+    # per stale window. The only enforcement we had was the completion reminder at exit,
+    # which asks the model to mark everything done in one batch — exactly the behaviour
+    # users saw (list frozen until the run ends). K is a heuristic (6 when the evidence
+    # query could not be run); the nudge never touches state, so a wrong K only costs a
+    # reminder. 6 rounds is also short enough to fire inside a single list item.
+    _PROGRESS_STALE_TOOL_ROUNDS = 6
+
     @override
     def before_model(
         self,
         state: PlanningState,
         runtime: Runtime,
     ) -> dict[str, Any] | None:
-        """Inject a todo-list reminder when write_todos has left the context window."""
+        """Inject a todo-list reminder when write_todos has left the context window,
+        or a progress nudge when the visible list has gone stale mid-run."""
         todos: list[Todo] = state.get("todos") or []  # type: ignore[assignment]
         if not todos:
             return None
 
         messages = state.get("messages") or []
         if _todos_in_messages(messages):
-            # write_todos is still visible in context — nothing to do.
-            return None
+            # write_todos is still visible in context — the list is not lost, but it may
+            # have gone stale: check the in-run progress nudge before returning.
+            return self._progress_reminder(messages, todos)
 
         if _reminder_in_messages(messages):
             # A reminder was already injected and hasn't been truncated yet.
@@ -109,6 +151,39 @@ class TodoMiddleware(TodoListMiddleware):
                 f"{formatted}\n\n"
                 "Continue tracking and updating this todo list as you work. "
                 "Call `write_todos` whenever the status of any item changes.\n"
+                "</system_reminder>"
+            ),
+        )
+        return {"messages": [reminder]}
+
+    def _progress_reminder(self, messages: list[Any], todos: list[Todo]) -> dict[str, Any] | None:
+        """Return the stale-list nudge, or ``None`` when it is not due.
+
+        Due when an item is ``in_progress``, at least ``_PROGRESS_STALE_TOOL_ROUNDS``
+        tool-calling rounds have passed since the last ``write_todos`` reply, and no nudge
+        has been sent since that reply (one per stale window; a new ``write_todos`` re-arms
+        it). Only a message is returned — never a ``todos`` key — so the nudge cannot
+        fabricate progress.
+        """
+        if not any(t.get("status") == "in_progress" for t in todos):
+            return None
+        rounds = _tool_rounds_since_last_todo_update(messages)
+        if rounds is None or rounds < self._PROGRESS_STALE_TOOL_ROUNDS:
+            return None
+        if _progress_reminder_after_last_update(messages):
+            return None
+        reminder = HumanMessage(
+            name="todo_progress_reminder",
+            # Same hide_from_ui contract as the other internal reminders: not shown in the
+            # chat, recognisable to data-layer consumers as non-user input.
+            additional_kwargs={"hide_from_ui": True},
+            content=(
+                "<system_reminder>\n"
+                f"You have made {rounds} rounds of tool calls since your last `write_todos` update.\n"
+                "If the step you were working on is finished, call `write_todos` now: "
+                "mark it `completed` and mark the next step `in_progress`.\n"
+                "Do not mark a step `completed` unless it is fully done. "
+                "If the current step is still in progress, keep working without changing the list.\n"
                 "</system_reminder>"
             ),
         )

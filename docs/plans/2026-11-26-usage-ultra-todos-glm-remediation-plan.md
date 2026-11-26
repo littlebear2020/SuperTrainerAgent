@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派实施计划
 
-> **状态**：未执行（执行中：GLM 5.4；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
+> **状态**：未执行（执行中：To-dos；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
 > **TL;DR**：诊断报告的四项拆成四个串行 PR：① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ 先只读取证，证据不否定「模型批量补写」就在 `TodoMiddleware` 加运行中提醒；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落执行模式，文案同步并删除「更长执行预算」口径。影响面 = backend 用量/删除路径/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署，付费验证按 Q10 封顶。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按 Task 0→5 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，任务之间不停下等评审（评审在各 PR 内完成），只在五处停下：Task 0 漂移需要改计划、本机基线全量测试不绿、某 PR 的 OCR 3 轮后仍有 Critical/Important、To-dos 真实 run 在提醒后把没做完的项标成 completed、Ultra 默认模型改一轮提示词后仍不达标。状态只改顶部原行，依次写 `未执行（执行中：用量快照）` → `未执行（执行中：GLM 5.4）` → `未执行（执行中：To-dos）` → `未执行（执行中：Ultra）`，Task 5 完成后改为 `已执行（…）`，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -210,7 +210,7 @@
   - 运行 `PYTHONPATH=. uv run pytest tests/test_model_modes_config.py -q` → 示例模板相关用例失败。
 - [x] **Step 5：补示例模板并确认通过。** `config.example.yaml` 加注释模板；`PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` → 全部 passed。前端按 `modes` 过滤，「标准↔Ultra 切档保留、切到闪速回落默认」与 claude-sonnet-5-5 同形，由现有 `input-box-mode-models.dom.test.tsx` 覆盖，不新增前端测试。
 - [x] **Step 6：真实对话一次（付费，1 次）。** 本机隔离栈（只起 gateway），API 级：`POST /api/threads/{id}/runs/stream`，context = 标准档（`mode: "standard"`、`model_name: "glm-5.4"`、`is_plan_mode: true`、`subagent_enabled: false`、`thinking_enabled` 按能力位、`reasoning_effort: "high"`），输入 `请先用任务列表规划三个步骤，再逐步写出一份三段式周报模板。`。断言：run 状态 success；本机库里该 run 的 `model_name` 含 `glm-5.4`（没有静默回退）；`token_usage_by_model` 有 glm-5.4 桶，`_build_pricing_map` + `_run_cost` 算出的费用非 None，且与按 8/28/2 手算一致；至少一次 `write_todos` 原生工具调用成功；`GET /api/models` 中 glm-5.4 的 `modes` 为 `["standard", "ultra"]`。结果写入证据目录 `glm-run.json`。
-- [ ] **Step 7：提交并走 PR。** `git commit -m "feat(models): 接入 360 GLM 5.4（标准/Ultra 可选）"`（`config.example.yaml`、`test_model_modes_config.py`、`test_model_roster_live.py`；本机 `config.yaml` 不入库）。`config.example.yaml` 属核心路径，必须走 PR；PR 正文写明部署侧要按「六」同步服务器 config 与价目。合入后状态行改为 `未执行（执行中：To-dos）`。
+- [x] **Step 7：提交并走 PR。** `git commit -m "feat(models): 接入 360 GLM 5.4（标准/Ultra 可选）"`（`config.example.yaml`、`test_model_modes_config.py`、`test_model_roster_live.py`；本机 `config.yaml` 不入库）。`config.example.yaml` 属核心路径，必须走 PR；PR 正文写明部署侧要按「六」同步服务器 config 与价目。合入后状态行改为 `未执行（执行中：To-dos）`。
 
 ### Task 3 / PR 3：To-dos 停滞时提醒模型（BUG-03）
 
@@ -233,8 +233,8 @@ Do not mark a step `completed` unless it is fully done. If the current step is s
 </system_reminder>
 ```
 
-- [ ] **Step 1：确认走向与 K。** 按 Task 0 Step 4 的判定：实施 → `_PROGRESS_STALE_TOOL_ROUNDS = K`，继续 Step 2；拆 pending → 直接 Step 8。证据不足（`SERVER_EVIDENCE_NOT_VERIFIED`）时 K = 6，照常实施，不补本机基线。
-- [ ] **Step 2：写单元失败测试。** `backend/tests/test_todo_middleware.py` 新增 `class TestProgressReminder`（K 用类属性 monkeypatch 为 6）：
+- [x] **Step 1：确认走向与 K。** 按 Task 0 Step 4 的判定：实施 → `_PROGRESS_STALE_TOOL_ROUNDS = K`，继续 Step 2；拆 pending → 直接 Step 8。证据不足（`SERVER_EVIDENCE_NOT_VERIFIED`）时 K = 6，照常实施，不补本机基线。
+- [x] **Step 2：写单元失败测试。** `backend/tests/test_todo_middleware.py` 新增 `class TestProgressReminder`（K 用类属性 monkeypatch 为 6）：
   - `test_counts_tool_rounds_since_last_write_todos`：write_todos 之后 2 轮业务工具（其中一轮有两个并行调用）→ 2。
   - `test_rounds_none_without_write_todos`。
   - `test_injects_progress_reminder_after_k_rounds`：todos `[in_progress, pending]` + 6 轮 → `name == "todo_progress_reminder"`、`additional_kwargs["hide_from_ui"] is True`、内容含 `6 rounds` 与 ``Do not mark a step `completed` unless it is fully done``、返回值里没有 `todos` 键。
@@ -243,10 +243,10 @@ Do not mark a step `completed` unless it is fully done. If the current step is s
   - `test_progress_reminder_rearms_after_write_todos`：提醒 → write_todos → 6 轮 → 再次提醒。
   - `test_no_progress_reminder_without_in_progress_item`：全 pending、全 completed 各一例 → None。
   - `test_context_loss_reminder_unchanged`：消息里没有 write_todos 时仍注入 `todo_reminder`。
-- [ ] **Step 3：写真实图失败测试。** 新建 `backend/tests/test_todo_progress_graph.py::test_todos_advance_mid_run_after_progress_reminder`：真实 `create_agent` + `TodoMiddleware` + `ThreadState` + 业务桩工具 `do_step`；脚本模型仿 `test_subagent_turn_budget.py::_ScriptedModel`：第 1 轮 `write_todos([A in_progress, B pending])`，之后每轮调 `do_step`；看到最后一条消息是 `todo_progress_reminder` 时调 `write_todos([A completed, B in_progress])`；再 2 轮 `do_step` 后 `write_todos([A completed, B completed])`；最后给出无工具调用的回复。用 `stream_mode="values"` 收集快照，断言：出现 `[completed, in_progress]` 快照，且早于最后一条无工具调用 AIMessage 所在的快照；消息中恰有 1 条 `todo_progress_reminder`。
-- [ ] **Step 4：确认失败。** `PYTHONPATH=. uv run pytest tests/test_todo_middleware.py tests/test_todo_progress_graph.py -q` → 新用例失败。
-- [ ] **Step 5：实现。** 按 Interfaces 改 `todo_middleware.py`（`abefore_model` 仍委托同步实现）。
-- [ ] **Step 6：确认通过并回归。** Step 4 的命令全绿；`PYTHONPATH=. uv run pytest tests/test_loop_detection_middleware.py tests/test_terminal_response_middleware.py tests/test_tool_call_protocol_middleware.py tests/test_lead_agent_prompt.py -q` → 全部 passed。前端新增回归钉 `frontend/tests/unit/components/workspace/todo-list.dom.test.tsx::rerenders status changes between snapshots`：`<TodoList todos={[A in_progress, B pending]} collapsed={false} />` 重渲染为 `[A completed, B in_progress]` 后，A 的内容节点带完成态（`QueueItemContent completed` 渲染出的样式），B 的内容节点带 `text-primary/70`。界面本批不改，此用例预期直接通过；`pnpm exec vitest run tests/unit/components/workspace/todo-list.dom.test.tsx` 通过。
+- [x] **Step 3：写真实图失败测试。** 新建 `backend/tests/test_todo_progress_graph.py::test_todos_advance_mid_run_after_progress_reminder`：真实 `create_agent` + `TodoMiddleware` + `ThreadState` + 业务桩工具 `do_step`；脚本模型仿 `test_subagent_turn_budget.py::_ScriptedModel`：第 1 轮 `write_todos([A in_progress, B pending])`，之后每轮调 `do_step`；看到最后一条消息是 `todo_progress_reminder` 时调 `write_todos([A completed, B in_progress])`；再 2 轮 `do_step` 后 `write_todos([A completed, B completed])`；最后给出无工具调用的回复。用 `stream_mode="values"` 收集快照，断言：出现 `[completed, in_progress]` 快照，且早于最后一条无工具调用 AIMessage 所在的快照；消息中恰有 1 条 `todo_progress_reminder`。
+- [x] **Step 4：确认失败。** `PYTHONPATH=. uv run pytest tests/test_todo_middleware.py tests/test_todo_progress_graph.py -q` → 新用例失败。
+- [x] **Step 5：实现。** 按 Interfaces 改 `todo_middleware.py`（`abefore_model` 仍委托同步实现）。
+- [x] **Step 6：确认通过并回归。** Step 4 的命令全绿；`PYTHONPATH=. uv run pytest tests/test_loop_detection_middleware.py tests/test_terminal_response_middleware.py tests/test_tool_call_protocol_middleware.py tests/test_lead_agent_prompt.py -q` → 全部 passed。前端新增回归钉 `frontend/tests/unit/components/workspace/todo-list.dom.test.tsx::rerenders status changes between snapshots`：`<TodoList todos={[A in_progress, B pending]} collapsed={false} />` 重渲染为 `[A completed, B in_progress]` 后，A 的内容节点带完成态（`QueueItemContent completed` 渲染出的样式），B 的内容节点带 `text-primary/70`。界面本批不改，此用例预期直接通过；`pnpm exec vitest run tests/unit/components/workspace/todo-list.dom.test.tsx` 通过。
 - [ ] **Step 7：本机真实验证（付费，≤3 次）。** 本机隔离栈（只起 gateway），标准档默认模型，API 级：`POST /api/threads/{id}/runs/stream`，`stream_mode: ["values"]`，context 同前端标准档（`mode: "standard"`、`is_plan_mode: true`、`subagent_enabled: false`、`thinking_enabled: false`、`reasoning_effort: "high"`）。输入逐字如下，共 11 个必须逐次执行的工具步骤；「整理学习目标」一项跨 8–9 轮，K ≤ 8 时足以触发提醒：`请先用任务列表列出两项：「整理学习目标」（第 1–9 步）和「检查并总结」（第 10–12 步），再严格按顺序执行。每一步单独调用一次工具，等上一步的结果出来再做下一步，不要合并步骤：1) 新建 notes.md，只写一行「学习目标」；2) 读取 notes.md；3) 在末尾追加第 1 条学习目标；4) 读取 notes.md；5) 追加第 2 条学习目标；6) 读取 notes.md；7) 追加第 3 条学习目标；8) 读取 notes.md；9) 给每条目标补一句完成标准；10) 读取 notes.md；11) 列出工作区文件，确认 notes.md 在其中；12) 用一段话总结 notes.md 的内容。` 探针脚本 `todos_live_probe.py` 放证据目录，逐个 values 事件记录接收时间、todos 状态序列与消息序列，写入 `todos-live.json`。先跑 1 次，提醒没触发再跑，最多 3 次。判定：
   - **通过：** 消息里出现 `todo_progress_reminder`，且在它之后、最终回复之前有一次 `write_todos`。
   - **停下交用户：** 提醒之后的 `write_todos` 把对应工具步骤还没执行的项标成 completed（例如第 9 步执行前就把「整理学习目标」标完成）。
