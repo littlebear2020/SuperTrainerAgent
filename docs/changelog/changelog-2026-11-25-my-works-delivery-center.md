@@ -63,6 +63,8 @@
 
 - 第六轮 OCR 1 条 high（按 Important 阻塞处理）+ 4 条 medium：有效 checkpoint 缺少从未写入的 `artifacts` channel 时改为 `not_delivered`，仅缺失 channel 使用空数组默认值，显式非法 `artifacts: null` 仍为 `unknown`；新增用例先 RED（实际 `unknown` + warning），修复后 artifact 服务 `25 passed`、服务 + 路由 `38 passed`。legacy 已存在但名称未知的文件在封面和摘要中统一显示「文件名由下载响应确定」，不再同时出现「尚未交付文件」；测试修正为实际 locale 文案后先 RED，再修复，grid + viewer **33 passed**。后端全量 `uv run pytest tests/ -q` → **10415 passed, 91 skipped, 421 warnings in 357.39s**（仅测试进程离线代理，无 live 用例）。前端首次组合运行在 Vitest 汇总前超时，无断言失败名单且残留进程已退出；独立 `pnpm test` 重跑 → **306 files / 2168 tests passed in 26.02s**；全量 Playwright → **193 passed / 5 failed / 3 skipped**，仍仅为同一组 main 对照 `networkidle` 失败。选中作品消失后的 stale ID 仍按独立评审 Minor 延后；QueryCache 回退是此前 Important 要求的最近成功结果保护，按当前 threadIds 过滤且 inactive key 有 gcTime，不采纳删除回退或清理旧 key 的建议。最终 `pnpm perf:check` → exit 0，`/workspace/video-gen` **JS 3,596,234 B / CSS 255,242 B**；根 `make check` 与独立文档约定检查均通过。
 
+- 最终合入：`b59e7e6b` 七项 PR CI 全绿（E2E `7m42s`），最新 OCR 仅 3 条 medium 可读性建议，无 Critical/Important/high，[处置记录](https://github.com/littlebear2020/SuperTrainerAgent/pull/63#issuecomment-7179643605)。[PR #63](https://github.com/littlebear2020/SuperTrainerAgent/pull/63) 于 2026-11-26 rebase 合入，merge commit `cfbd120b`。执行 worktree、临时日志/截图/测试输出与远程分支已清理；主工作区既有改动保持不动，未部署。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。

@@ -1,6 +1,6 @@
 # 我的作品真实交付文件中心实施计划
 
-> **状态**：已执行（2026-11-25；Task 0–9 实现、行为验收与全量门禁完成，评审/合入/清理按 Task 9 收口；执行记录见 [changelog-2026-11-25-my-works-delivery-center.md](../changelog/changelog-2026-11-25-my-works-delivery-center.md)；定稿基准 `ab92a527`，执行基线 `64ef5b52`）。
+> **状态**：已执行（2026-11-25 实现，2026-11-26 [PR #63](https://github.com/littlebear2020/SuperTrainerAgent/pull/63) rebase 合入 main，merge commit `cfbd120b`；Task 0–9、行为验收、OCR/CI、合入与清理全部完成；执行记录见 [changelog-2026-11-25-my-works-delivery-center.md](../changelog/changelog-2026-11-25-my-works-delivery-center.md)；定稿基准 `ab92a527`，执行基线 `64ef5b52`）。
 > **TL;DR**：把四类 Agent 的对话历史升级为真实交付文件卡，并统一六类作品的文件信息、搜索与查看器；保留现有任务状态、详情、分镜、重试、删除、URL 深链和可访问性；不改数据库、Agent runtime、技能、媒体管线或部署配置。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `subagent-driven-development`（推荐）或 `executing-plans` 逐项实施；所有步骤使用 checkbox 跟踪，先 RED 后 GREEN。执行指令一经下达即端到端完成全部勾选项，任务之间不停下等待评审——评审移入 PR（见任务 9）；勾选框之外的小节是不可执行的说明，不构成待办。
 
@@ -445,8 +445,8 @@ type WorkSummary = {
 - [x] **Step 7：按仓库门禁后台运行全量验证。**依次运行 `cd backend && uv run pytest tests/ -q`、`cd frontend && pnpm check && pnpm test`、`cd frontend && pnpm test:e2e`、`cd frontend && pnpm perf:check`、根 `make check`、`python3 scripts/check_docs_convention.py`。预计 >120s 的命令后台化，冻结被测输入，不并行共享 `.next`、端口或数据库。根 `make check` 已含 ruff format、knip 与 i18n key 检查，不另跑。`/workspace/video-gen` 是 `perf:check` 的受测路由，新 Dialog 会增加该路由 JS：超出 `performance-budgets.json` 预算时，在 PR 说明写归因并随 PR 评审调整预算表，不得无声抬线，也不得为此删减功能。
 - [x] **Step 8：处理既有失败边界。**若命中 backlog 已登记的 video-gen `networkidle` 等基线问题，保留原始失败与 main 对照，不顺手修无关模块；本计划自身测试未绿不得交付。
 - [x] **Step 9：写 changelog 并回填状态头。**changelog 必须含 TL;DR 与「验收记录」，逐行记录 `命令 → 实际关键输出`，并写入任务 7 的迁移条数与不再适用条数、Step 5 的 50 线程批次耗时；回填本计划原状态头（执行范围 + changelog 链接），不新增第二状态行。保留用户原有改动。随后提交本任务产物，`git add` 只写明确路径（`works-delivery.spec.ts`、changelog、本计划、Step 8 的必要修复）：`git commit -m "test(works): 交付中心行为验收与发布收口"`。
-- [ ] **Step 10：分支、PR 与评审。**使用 `my-works-delivery-center` 分支；因跨 backend/frontend 且触碰 `video_gen.py`，必须 PR + OCR，不能直推 main。`gh` 调用设 `GH_REPO` 防解析到 upstream；PR 标题 = 批次摘要，正文带 plan／changelog 链接与需要人工看的截图路径。评审与 CI 以完成通知驱动，不轮询。每轮发现先对照推送的文件核实再处置：真实问题修复后重推；误报、低优先、延后项用一条 PR 评论记录处置，不为让评审安静而反复推送（每次 push 都重跑评审，发现也不单调）。轮次上限以用户下达执行指令时给的为准，未给则 3 轮后带回拍板。无 Critical/Important 发现且 CI 绿才可 `gh pr merge --rebase`。
-- [ ] **Step 11：清理。**PR 合入后删除本次生成的日志、临时截图和不需要交付的测试输出；按根 AGENTS.md 的 worktree 卫生移除执行 worktree 与远程分支。移除前先盘点 worktree 内被忽略的文件（截图、测试输出、证据），需要留档的先改名归档，不静默删除。
+- [x] **Step 10：分支、PR 与评审。**使用 `my-works-delivery-center` 分支；因跨 backend/frontend 且触碰 `video_gen.py`，必须 PR + OCR，不能直推 main。`gh` 调用设 `GH_REPO` 防解析到 upstream；PR 标题 = 批次摘要，正文带 plan／changelog 链接与需要人工看的截图路径。评审与 CI 以完成通知驱动，不轮询。每轮发现先对照推送的文件核实再处置：真实问题修复后重推；误报、低优先、延后项用一条 PR 评论记录处置，不为让评审安静而反复推送（每次 push 都重跑评审，发现也不单调）。轮次上限以用户下达执行指令时给的为准，未给则 3 轮后带回拍板。无 Critical/Important 发现且 CI 绿才可 `gh pr merge --rebase`。
+- [x] **Step 11：清理。**PR 合入后删除本次生成的日志、临时截图和不需要交付的测试输出；按根 AGENTS.md 的 worktree 卫生移除执行 worktree 与远程分支。移除前先盘点 worktree 内被忽略的文件（截图、测试输出、证据），需要留档的先改名归档，不静默删除。
 
 **发布说明（不可勾选，不属自动执行范围；部署须用户另行下达指令，操作以仓库外的 ops 记录为准）：**先发 additive backend，再发 frontend（Q12）；仅 gateway 与 frontend 需要发布，无 DB 迁移，worker／remotion-worker／sandbox 不重建。回滚先 frontend 后 backend，通过 revert PR 完成，不删除任何用户 outputs 或 checkpoint。
 
