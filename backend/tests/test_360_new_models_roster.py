@@ -328,4 +328,4 @@ def test_user_config_version_bumped(example_yaml: dict) -> None:
 
     with open(config_path, encoding="utf-8") as f:
         user_version = _yaml.safe_load(f).get("config_version")
-    assert user_version == example_yaml.get("config_version") == 32
+    assert user_version == example_yaml.get("config_version") == 33
