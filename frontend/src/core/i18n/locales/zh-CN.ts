@@ -714,7 +714,7 @@ export const zhCN: Translations = {
       playbackUnavailable: "预览暂不可用，仍可开始创作",
       groups: {
         video: { title: "视频课", kicker: "VIDEO CREATION" },
-        studio: { title: "图文音频课", kicker: "DESIGN & AUDIO" },
+        studio: { title: "图文&音频课程素材", kicker: "DESIGN & AUDIO" },
       },
       courseItems: {
         "course-video": {

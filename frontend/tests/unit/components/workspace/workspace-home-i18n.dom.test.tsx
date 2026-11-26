@@ -111,7 +111,7 @@ describe("workspace-home final i18n and teacher hero", () => {
     expect(text).toContain("Great content starts with one idea.");
     expect(text).toContain("Video courses");
     expect(text).toContain("VIDEO CREATION");
-    expect(text).toContain("Design & audio courses");
+    expect(text).toContain("Design & audio course materials");
     expect(text).toContain("DESIGN & AUDIO");
     expect(text).not.toContain("Your AI creative assistant");
     const teacherAlt =
@@ -143,7 +143,7 @@ describe("workspace-home final i18n and teacher hero", () => {
     expect(text).toContain("让好内容，从一个想法开始");
     expect(text).toContain("视频课");
     expect(text).toContain("VIDEO CREATION");
-    expect(text).toContain("图文音频课");
+    expect(text).toContain("图文&音频课程素材");
     expect(text).toContain("DESIGN & AUDIO");
     expect(text).not.toContain("你的 AI 创作助教");
     const teacherAlt = "手持书本和教鞭、面带微笑的卡通亚洲年轻男老师";

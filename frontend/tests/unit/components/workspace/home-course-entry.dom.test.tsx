@@ -84,7 +84,7 @@ describe("HomeCourseEntry", () => {
     for (const copy of [
       "视频课",
       "VIDEO CREATION",
-      "图文音频课",
+      "图文&音频课程素材",
       "DESIGN & AUDIO",
     ]) {
       expect(text).toContain(copy);

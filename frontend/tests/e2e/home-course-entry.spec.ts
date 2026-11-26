@@ -111,7 +111,7 @@ test.describe("home course entries", () => {
     for (const copy of [
       "视频课",
       "VIDEO CREATION",
-      "图文音频课",
+      "图文&音频课程素材",
       "DESIGN & AUDIO",
     ]) {
       await expect(page.getByText(copy, { exact: true })).toBeVisible();

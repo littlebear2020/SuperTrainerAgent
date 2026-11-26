@@ -62,7 +62,7 @@ test.describe("L1 冒烟", () => {
     await expect(page.getByText("让好内容，从一个想法开始")).toBeVisible();
 
     await expect(page.getByText("视频课").first()).toBeVisible();
-    await expect(page.getByText("图文音频课").first()).toBeVisible();
+    await expect(page.getByText("图文&音频课程素材").first()).toBeVisible();
 
     for (const card of HOME_CARDS) {
       await expect(

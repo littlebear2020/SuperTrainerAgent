@@ -395,7 +395,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "大模型为什么会产生幻觉？",
           "Why do large language models hallucinate?",
         ),
-        tag: text("上传讲稿 · 深色科技风", "Supplied script · Dark tech"),
+        tag: text(
+          "完整讲稿 · 原文成片",
+          "Full script · Video from a verbatim script",
+        ),
         description: text(
           "从“预测下一个词”讲起，解释幻觉的三个来源，以及检索增强、引用约束和结果核验三种工程手段。",
           "Explain three sources of hallucination and three engineering mitigations, starting from next-token prediction.",
@@ -422,8 +425,8 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "The Feynman technique: explain it to anyone",
         ),
         tag: text(
-          "上传讲稿 · 明亮纸感风",
-          "Supplied script · Bright editorial",
+          "完整讲稿 · 原文成片",
+          "Full script · Video from a verbatim script",
         ),
         description: text(
           "四个步骤讲清费曼学习法，用暖白纸感、衬线标题和手绘线条呈现。",
@@ -450,7 +453,10 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
           "AI Agent 为什么开始接管完整工作流",
           "Why AI agents are taking over complete workflows",
         ),
-        tag: text("深度调研 · 调研纪实风", "Deep research · Documentary"),
+        tag: text(
+          "提供主题 · 联网调研成片",
+          "Topic · Online research to video",
+        ),
         description: text(
           "先读公开来源、整理证据链，再用调研结论组织讲稿和画面；数字都能对应到来源。",
           "Build an evidence chain from public sources, then turn it into narration and visuals with traceable figures.",
@@ -960,7 +966,7 @@ const showcases: Record<ShowcaseAgentId, ShowcaseAgent> = {
       ],
     },
     character: asset("hero/creative-studio.webp"),
-    howTitle: text("如何生成视觉作品", "How to create visual assets"),
+    howTitle: text("如何生成图文素材", "How to create visual assets"),
     howDescription: text(
       "先理解用途和内容，再决定生成或排版方式，最后审校导出。",
       "Understand the purpose and content, choose generation or layout, then review and export.",

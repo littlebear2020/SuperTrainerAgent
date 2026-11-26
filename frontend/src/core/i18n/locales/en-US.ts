@@ -753,7 +753,10 @@ export const enUS: Translations = {
       playbackUnavailable: "Preview unavailable. You can still start creating.",
       groups: {
         video: { title: "Video courses", kicker: "VIDEO CREATION" },
-        studio: { title: "Design & audio courses", kicker: "DESIGN & AUDIO" },
+        studio: {
+          title: "Design & audio course materials",
+          kicker: "DESIGN & AUDIO",
+        },
       },
       courseItems: {
         "course-video": {
