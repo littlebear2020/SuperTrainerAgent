@@ -116,7 +116,7 @@ export const enUS: Translations = {
       "Default: planning and fast responses, with optional deep-thinking models",
     ultraMode: "Ultra",
     ultraModeDescription:
-      "Strongest mode: multi-subagent collaboration for complex multi-step tasks; takes longer",
+      "Strongest mode: independent subtasks run in parallel on subagents, simple tasks are done directly; takes longer",
     searchModels: "Search models...",
     defaultModelBadge: "Default",
     surpriseMe: "Surprise",
