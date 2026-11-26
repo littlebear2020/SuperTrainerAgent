@@ -131,7 +131,7 @@
   - `BaseTaskService.delete_task` 在归属校验通过后、取消与清理之前 `await record_task_tombstone(task)`；`delete_thread_data` 的第一条语句 `await record_thread_tombstone(thread_id)`。两处都不吞异常：快照写失败，本次删除即失败。
 - [x] **Step 4：确认通过并回归。** Step 2 的命令全绿；再跑 `PYTHONPATH=. uv run pytest tests/test_task_framework*.py tests/test_thread_delete_event_store.py tests/test_content_tasks_delete.py tests/test_voice_twin_production.py tests/test_persistence_bootstrap.py tests/test_persistence_bootstrap_legacy_columns.py tests/test_harness_boundary.py tests/test_personal_usage_agent.py -q` → 全部 passed。
 - [x] **Step 5：提交。** 手动 pre-commit 后 `git commit -m "feat(usage): 删除作品与会话前写入用量快照"`（`tombstones.py`、`types.py`、`agent.py`、revision、`env.py`、`deps.py`、`task_framework/service.py`、`routers/threads.py`、两个新测试文件、changelog）。
-- [ ] **Step 6：写统计口径的失败测试**（同一新文件）：
+- [x] **Step 6：写统计口径的失败测试**（同一新文件）：
   - `test_deleting_ai_image_task_keeps_usage_totals`：已计价模型 + ai_image 任务（标题 `删除前标题`）+ 窗口内 1 条 `llm_bookkeeping` 行 + 1 条可计价媒体行；`before = await get_personal_usage(...)`；`await service.delete_task(task_id, USER)` 返回 True；断言 `before.summary.cost is not None`、`after.summary.cost == pytest.approx(before.summary.cost)`、`after.summary.total_tokens == before.summary.total_tokens`、`after.total_tasks == before.total_tasks == 1`、`after.tasks[0].deleted is True`、`capability == "ai_image"`、`title == "删除前标题"`、`before.tasks[0].status == "running"`（未启动任务为 pending）且 `after.tasks[0].status == "incomplete"`；`unified_tasks` 已无该行，两条账本行仍在。
   - `test_deleted_ai_video_task_stays_in_its_capability_filter`：ai_video 任务（LLM + 媒体各 1 行）删除前后，`capability="all"` 的总费用与 Token 不变；删除后 `capability="ai_video"` 返回 1 条，`"ai_image"` 返回 0 条。
   - `test_deleting_agent_thread_keeps_usage_totals`：course-video 线程（`assistant_id="lead_agent"`、`metadata={"agent_name": "course-video"}`）+ 1 条带 token 的 `run` 行 + 1 条媒体行；经 `delete_thread_data.__wrapped__` 删除（`app.state.thread_store = ThreadMetaRepository(get_session_factory())`，其余 fakes 同 Step 1）；总费用与 Token 不变，条目 `deleted is True`、`capability == "course-video"`。
@@ -139,10 +139,10 @@
   - `test_deleted_task_without_usage_is_not_listed`：窗口内创建、没有任何账本行的 ai_image 任务：删除前列出（现存规则不变），删除后不列出、`total_tasks == 0`。
   - `test_live_row_wins_over_stale_tombstone`：同一 id 既有快照又有现存任务（模拟快照写入后删除失败）→ 只列 1 条，`deleted is False`，费用不翻倍。
   - `test_summary_with_deleted_subjects_reconciles_across_pagination`：3 个对象（1 个已删除）、`limit=1` 逐页取：各页费用之和 == `summary.cost`，`total_tasks == 3`。
-- [ ] **Step 7：确认失败。** `PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py -q` → Step 6 新增用例失败（删除后费用为 None、没有 `deleted` 字段）。
-- [ ] **Step 8：实现聚合。** 按「聚合规则」改 `video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`。
-- [ ] **Step 9：确认通过并回归。** `PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py tests/test_personal_usage.py tests/test_personal_usage_agent.py tests/test_personal_usage_router.py tests/test_personal_usage_video.py tests/test_core_media_usage_e2e.py -q` → 全部 passed。
-- [ ] **Step 10：提交。** `git commit -m "fix(usage): 删除作品后用量统计保留历史费用与 Token"`（`video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`、`test_personal_usage_deletion.py`）。
+- [x] **Step 7：确认失败。** `PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py -q` → Step 6 新增用例失败（删除后费用为 None、没有 `deleted` 字段）。
+- [x] **Step 8：实现聚合。** 按「聚合规则」改 `video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`。
+- [x] **Step 9：确认通过并回归。** `PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py tests/test_personal_usage.py tests/test_personal_usage_agent.py tests/test_personal_usage_router.py tests/test_personal_usage_video.py tests/test_core_media_usage_e2e.py -q` → 全部 passed。
+- [x] **Step 10：提交。** `git commit -m "fix(usage): 删除作品后用量统计保留历史费用与 Token"`（`video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`、`test_personal_usage_deletion.py`）。
 - [ ] **Step 11：写前端失败测试。** `usage-task-list.dom.test.tsx` 新增 `it("marks deleted works and hides the open-original link")`：渲染 `{deleted: true, title: null}` 的任务并展开 → `getByTestId("task-deleted-<id>")` 文本为「作品已删除」，标题为「已删除的作品」，`queryByTestId("open-original-<id>")` 为 null；同列表里未删除的任务仍有 `open-original-<id>`。`cd frontend && pnpm exec vitest run tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx` → 该用例失败。
 - [ ] **Step 12：实现前端。** `core/usage/types.ts` 加 `deleted?: boolean`；`usage-task-list.tsx`：`task.deleted` 时标题回落 `c.deletedTitle`（未删除仍回落「标题生成中」），状态胶囊后渲染 `<span data-testid={`task-deleted-${id}`}>{c.deletedBadge}</span>`（样式同 `task-running-note`），展开区不渲染「打开原任务」；i18n 三个文件补两个键。
 - [ ] **Step 13：确认通过。** Step 11 的命令通过；`pnpm check` 通过。

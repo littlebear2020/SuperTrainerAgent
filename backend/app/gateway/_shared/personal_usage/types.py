@@ -62,6 +62,9 @@ class UsageTask:
     total_tokens: int | None
     models: list[UsageModel]
     updated_at: datetime | None
+    #: 作品/会话已删除：费用与 Token 仍按账本计入，条目来自删除快照。必填（无默认值），
+    #: 否则子类 ``UsageTaskEntry`` 的 ``activity_at`` 会因「无默认值字段排在有默认值字段之后」报错。
+    deleted: bool
 
 
 @dataclass
