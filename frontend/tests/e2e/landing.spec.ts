@@ -49,7 +49,9 @@ test.describe("Landing page", () => {
     await expect(page).toHaveURL("/workspace");
     await expect(page.getByText("让好内容，从一个想法开始")).toBeVisible();
     await expect(page.getByText("视频课", { exact: true })).toBeVisible();
-    await expect(page.getByText("图文音频课", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("图文&音频课程素材", { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByAltText("手持书本和教鞭、面带微笑的卡通亚洲年轻男老师"),
     ).toBeVisible();

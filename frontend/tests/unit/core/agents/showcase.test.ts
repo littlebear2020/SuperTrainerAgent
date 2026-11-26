@@ -572,6 +572,37 @@ describe("Agent showcase data and assets", () => {
     }
   });
 
+  it("labels the creative-studio workflow as visual material creation", () => {
+    expect(agent("creative-studio").howTitle).toEqual(
+      copy("如何生成图文素材", "How to create visual assets"),
+    );
+  });
+
+  it("labels all three course-video cases by their actual input and output workflow", () => {
+    expect(
+      agent("course-video").cases.map((item) => [item.id, item.tag]),
+    ).toEqual([
+      [
+        "video-hallucination",
+        copy(
+          "完整讲稿 · 原文成片",
+          "Full script · Video from a verbatim script",
+        ),
+      ],
+      [
+        "video-feynman",
+        copy(
+          "完整讲稿 · 原文成片",
+          "Full script · Video from a verbatim script",
+        ),
+      ],
+      [
+        "video-agent-research",
+        copy("提供主题 · 联网调研成片", "Topic · Online research to video"),
+      ],
+    ]);
+  });
+
   it("keeps the course-video review step logic explicit", () => {
     const step = agent("course-video").steps[1]!;
     expect(step.description.zh).toContain("若你提供讲稿");
