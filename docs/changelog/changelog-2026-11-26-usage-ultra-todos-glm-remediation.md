@@ -21,7 +21,10 @@
 
 ## PR 2：接入 360 GLM 5.4（FEAT-01）
 
-待执行。
+- **花名册新增 `glm-5.4`**（`z-ai/glm-5.4`，标准 + Ultra 可选，均非默认，不进闪速；不改 schema、不递增 `config_version`）。示例模板带兜底价目 ¥8 输入 / ¥28 输出 / ¥2 缓存读取（每百万 token）；运行时价目以数据库为准，部署时需按发布清单录入。
+- **能力位按探针实测定下（10 次直连调用，用满）：** 开思考 + `reasoning_effort=high` 正常且有推理 token；工具调用与工具结果续答、视觉（红图）、约 5 万字符长上下文口令、流式均通过；首字约 2.5–2.8 秒，description 写「首字约 2–3 秒」。因此保留 `supports_thinking: true`、`supports_reasoning_effort: true`、`supports_vision: true` 与两段 `when_thinking_*`。
+- **已知限制：该模型始终思考，关思考请求会被 360 以 400 拒绝**（「该模型始终思考，不支持关闭思考；请使用 low、high 或 max」）。标准与 Ultra 档都是开思考 + high，不受影响；受影响的只有以关思考调用所选模型的内部请求，目前只有建议追问（`suggestions.py`，失败时返回空列表）。已写进示例模板注释；工厂会从 `when_thinking_enabled` 推导同样的关思考参数，删除 `when_thinking_disabled` 绕不开，所以没有改配置形态。
+- **一次真实对话（标准档、`glm-5.4`、开思考 + high、规划模式）：** run 记录的模型为 `bigmodel/z-ai/glm-5.4`，没有静默回退；原生 `write_todos` 调用成功，三项任务清单最终全部完成；token 桶含缓存读取，按 8 / 28 / 2 手算与 `_run_cost` 一致（0.288324 元）；`GET /api/models` 里 glm-5.4 的 `modes == ["standard", "ultra"]`。**探针脚本的疏漏：** 本次调用没带前端提交的 `recursion_limit: 2500`，run 因默认 100 步预算耗尽而以 `recursion_limit` 结束（`status=error`）；与模型无关，已记入未验证清单，不为此复跑付费对话。
 
 ## PR 3：To-dos 停滞时提醒模型（BUG-03）
 
@@ -46,9 +49,14 @@
 - PR 1 定向：`pytest tests/test_personal_usage_deletion.py tests/test_usage_tombstones_migration.py -q` → 全部通过（快照写入与迁移 9 例，统计口径 7 例）
 - PR 1 回归：`pytest tests/test_task_framework*.py tests/test_thread_delete_event_store.py tests/test_content_tasks_delete.py tests/test_voice_twin_production.py tests/test_persistence_bootstrap.py tests/test_persistence_bootstrap_legacy_columns.py tests/test_harness_boundary.py tests/test_personal_usage_agent.py -q` → `243 passed`；`pytest tests/test_personal_usage_deletion.py tests/test_personal_usage.py tests/test_personal_usage_agent.py tests/test_personal_usage_router.py tests/test_personal_usage_video.py tests/test_core_media_usage_e2e.py -q` → `124 passed`
 - PR 1 前端：`pnpm exec vitest run tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx` → 先 `1 failed | 5 passed`，实现后 `6 passed`
-- PR 1 全量门禁：`make check` → exit 0（eslint 0 errors、tsc、prettier、knip、`i18n key 存活检测通过：711 个叶子全活`、`OK 仓库治理约定全过`）；`cd backend && make test` → `10492 passed, 30 skipped`；`cd frontend && pnpm test` → `Test Files 306 passed, Tests 2171 passed`
+- PR 1 全量门禁：`make check` → exit 0（eslint 0 errors、tsc、prettier、knip、`i18n key 存活检测通过：711 个叶子全活`、`OK 仓库治理约定全过`）；`cd backend && make test` → `10492 passed, 30 skipped`；`cd frontend && pnpm test` → `Test Files 306 passed, Tests 2171 passed`；PR #65 的 7 项 CI 全绿，AI 评审 4 条 low、无 Critical/Important，处置已写成 PR 评论，rebase 合入 `8b5f0930`
+- PR 2 探针 2a：`RUN_LIVE=1 pytest tests/test_model_roster_live.py -k "glm and thinking" -v -s` → `1 passed`；输出 `thinking_on: error None, reasoning_tokens 38`、`thinking_off: BadRequestError 400 … 该模型始终思考，不支持关闭思考`
+- PR 2 探针 2b：`RUN_LIVE=1 pytest tests/test_model_roster_live.py -k "glm and not thinking" -v -s` → `6 passed, 1 failed`：文本、流式（首字 2.77s）、工具调用 + 续答、视觉、首字探针（2.46s）、长上下文口令通过；`test_live_glm_5_4_error_shape`（传 `max_tokens=-1` 期望带状态码的异常）`DID NOT RAISE`——360 容忍该参数，探针前提不成立，已从测试文件移除并列入未验证清单
+- PR 2 先红后绿：`pytest tests/test_model_modes_config.py -q`（示例模板未加时）→ `2 failed, 16 passed`（`test_example_contains_mode_model_templates`、`test_example_glm_5_4_template_pins_pricing`）；补模板后 `pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py tests/test_config_example_parity.py -q` → `43 passed`
+- PR 2 真实对话：本机隔离栈标准档 glm-5.4 → run 模型 `bigmodel/z-ai/glm-5.4`、`write_todos` 成功、`_run_cost` = 0.288324 = 手算（85334 输入含 72384 缓存读取、1427 输出，按 8/28/2）；证据文件 `glm-run-final.json`
 
 ## 未验证清单
 
 - 测试服只读取证：`SERVER_EVIDENCE_NOT_VERIFIED`（见上）。
+- GLM 5.4：超时形态不另测（与其他 360 模型共用 `request_timeout` / `stream_chunk_timeout`）；错误形态探针（`max_tokens=-1`）360 不报错，未验证带状态码的异常形态；真实对话的 run 因探针脚本漏带 `recursion_limit: 2500` 以 `recursion_limit` 结束，未复跑，故「run 成功收尾」未在 live 验证（模型记录、工具调用、计价均已验证）；关思考被拒对建议追问的实际影响（返回空列表）未在 live 验证。
 - 部署侧各项（gateway/前端发布、`usage_tombstones` 迁移上线、服务器 config 与价目录入、部署后行为验收）：未部署，需用户另行下达指令。

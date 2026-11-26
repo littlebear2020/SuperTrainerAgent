@@ -146,7 +146,7 @@
 - [x] **Step 11：写前端失败测试。** `usage-task-list.dom.test.tsx` 新增 `it("marks deleted works and hides the open-original link")`：渲染 `{deleted: true, title: null}` 的任务并展开 → `getByTestId("task-deleted-<id>")` 文本为「作品已删除」，标题为「已删除的作品」，`queryByTestId("open-original-<id>")` 为 null；同列表里未删除的任务仍有 `open-original-<id>`。`cd frontend && pnpm exec vitest run tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx` → 该用例失败。
 - [x] **Step 12：实现前端。** `core/usage/types.ts` 加 `deleted?: boolean`；`usage-task-list.tsx`：`task.deleted` 时标题回落 `c.deletedTitle`（未删除仍回落「标题生成中」），状态胶囊后渲染 `<span data-testid={`task-deleted-${id}`}>{c.deletedBadge}</span>`（样式同 `task-running-note`），展开区不渲染「打开原任务」；i18n 三个文件补两个键。
 - [x] **Step 13：确认通过。** Step 11 的命令通过；`pnpm check` 通过。
-- [ ] **Step 14：提交并走 PR。** `git commit -m "feat(usage): 用量明细标记已删除作品"`（`types.ts`、`usage-task-list.tsx`、i18n 三个文件、前端测试）；按「PR 门禁」开 PR（标题 `fix(usage): 删除作品后保留历史用量`），合入后状态行改为 `未执行（执行中：GLM 5.4）`。
+- [x] **Step 14：提交并走 PR。** `git commit -m "feat(usage): 用量明细标记已删除作品"`（`types.ts`、`usage-task-list.tsx`、i18n 三个文件、前端测试）；按「PR 门禁」开 PR（标题 `fix(usage): 删除作品后保留历史用量`），合入后状态行改为 `未执行（执行中：GLM 5.4）`。
 
 ### Task 2 / PR 2：接入 360 GLM 5.4（FEAT-01）
 
@@ -209,7 +209,7 @@
   - `test_example_glm_5_4_template_pins_pricing`（只读 `config.example.yaml`，CI 也跑；上面三条依赖本机 config，CI 会跳过）：取示例中 `# - name: glm-5.4` 到下一个 `# - name:` 之间的文本，断言含 `#     currency: CNY\n`、`#     input_per_million: 8\n`、`#     output_per_million: 28\n`、`#     input_cache_hit_per_million: 2\n`。
   - 运行 `PYTHONPATH=. uv run pytest tests/test_model_modes_config.py -q` → 示例模板相关用例失败。
 - [x] **Step 5：补示例模板并确认通过。** `config.example.yaml` 加注释模板；`PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py -q` → 全部 passed。前端按 `modes` 过滤，「标准↔Ultra 切档保留、切到闪速回落默认」与 claude-sonnet-5-5 同形，由现有 `input-box-mode-models.dom.test.tsx` 覆盖，不新增前端测试。
-- [ ] **Step 6：真实对话一次（付费，1 次）。** 本机隔离栈（只起 gateway），API 级：`POST /api/threads/{id}/runs/stream`，context = 标准档（`mode: "standard"`、`model_name: "glm-5.4"`、`is_plan_mode: true`、`subagent_enabled: false`、`thinking_enabled` 按能力位、`reasoning_effort: "high"`），输入 `请先用任务列表规划三个步骤，再逐步写出一份三段式周报模板。`。断言：run 状态 success；本机库里该 run 的 `model_name` 含 `glm-5.4`（没有静默回退）；`token_usage_by_model` 有 glm-5.4 桶，`_build_pricing_map` + `_run_cost` 算出的费用非 None，且与按 8/28/2 手算一致；至少一次 `write_todos` 原生工具调用成功；`GET /api/models` 中 glm-5.4 的 `modes` 为 `["standard", "ultra"]`。结果写入证据目录 `glm-run.json`。
+- [x] **Step 6：真实对话一次（付费，1 次）。** 本机隔离栈（只起 gateway），API 级：`POST /api/threads/{id}/runs/stream`，context = 标准档（`mode: "standard"`、`model_name: "glm-5.4"`、`is_plan_mode: true`、`subagent_enabled: false`、`thinking_enabled` 按能力位、`reasoning_effort: "high"`），输入 `请先用任务列表规划三个步骤，再逐步写出一份三段式周报模板。`。断言：run 状态 success；本机库里该 run 的 `model_name` 含 `glm-5.4`（没有静默回退）；`token_usage_by_model` 有 glm-5.4 桶，`_build_pricing_map` + `_run_cost` 算出的费用非 None，且与按 8/28/2 手算一致；至少一次 `write_todos` 原生工具调用成功；`GET /api/models` 中 glm-5.4 的 `modes` 为 `["standard", "ultra"]`。结果写入证据目录 `glm-run.json`。
 - [ ] **Step 7：提交并走 PR。** `git commit -m "feat(models): 接入 360 GLM 5.4（标准/Ultra 可选）"`（`config.example.yaml`、`test_model_modes_config.py`、`test_model_roster_live.py`；本机 `config.yaml` 不入库）。`config.example.yaml` 属核心路径，必须走 PR；PR 正文写明部署侧要按「六」同步服务器 config 与价目。合入后状态行改为 `未执行（执行中：To-dos）`。
 
 ### Task 3 / PR 3：To-dos 停滞时提醒模型（BUG-03）
