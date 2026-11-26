@@ -552,6 +552,27 @@ async def _assert_assistant_runnable(body: Any, request: Request) -> None:
         await _gate_agent_runnable(name, request)
 
 
+def _run_mode_metadata(config: dict[str, Any]) -> dict[str, Any]:
+    """Server-owned execution mode recorded in run metadata (BUG-02, 2026-11-26).
+
+    Reads the runtime view ``{**configurable, **context}`` — the same precedence as
+    ``lead_agent/agent.py::_get_runtime_config`` (``config["context"]`` beats
+    ``config["configurable"]``; a top-level ``body.context`` only fills gaps, see the merge in
+    :func:`start_run`) — so the recorded mode is what the agent actually runs with, and is not
+    taken from client-supplied metadata.
+    """
+    context = config.get("context")
+    view = {**(config.get("configurable") or {}), **(context if isinstance(context, Mapping) else {})}
+    mode = view.get("mode")
+    return {
+        "run_mode": {
+            "mode": mode if isinstance(mode, str) else None,
+            "subagent_enabled": bool(view.get("subagent_enabled", False)),
+            "is_plan_mode": bool(view.get("is_plan_mode", False)),
+        }
+    }
+
+
 async def start_run(
     body: Any,
     thread_id: str,
@@ -581,12 +602,41 @@ async def start_run(
 
     disconnect = DisconnectMode.cancel if body.on_disconnect == "cancel" else DisconnectMode.continue_
 
+    # The run config (and the context merge into it) does not depend on the run record, and the
+    # run-mode metadata below needs the merged result, so build both before create_or_reject. A
+    # ValueError from build_run_config now surfaces before any run record exists.
+    config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
+
+    # Merge DeerFlow-specific context overrides into configurable.
+    # The ``context`` field is a custom extension for the langgraph-compat layer
+    # that carries agent configuration (model_name, thinking_enabled, etc.).
+    # Only agent-relevant keys are forwarded; unknown keys (e.g. thread_id) are ignored.
+    context = getattr(body, "context", None)
+    if context:
+        _CONTEXT_CONFIGURABLE_KEYS = {
+            "model_name",
+            "mode",
+            "thinking_enabled",
+            "reasoning_effort",
+            "is_plan_mode",
+            "subagent_enabled",
+            "max_concurrent_subagents",
+            "agent_name",
+            "is_bootstrap",
+        }
+        configurable = config.setdefault("configurable", {})
+        for key in _CONTEXT_CONFIGURABLE_KEYS:
+            if key in context:
+                configurable.setdefault(key, context[key])
+
     try:
         record = await run_mgr.create_or_reject(
             thread_id,
             body.assistant_id,
             on_disconnect=disconnect,
-            metadata=body.metadata or {},
+            # Server values win over a client-supplied key of the same name; the merged dict is not written
+            # back to body.metadata, so threads_meta (which reads body.metadata) is unchanged.
+            metadata={**(body.metadata or {}), **_run_mode_metadata(config)},
             kwargs={"input": body.input, "config": body.config},
             multitask_strategy=body.multitask_strategy,
         )
@@ -745,29 +795,6 @@ async def start_run(
 
     agent_factory = resolve_agent_factory(body.assistant_id)
     graph_input = normalize_input(body.input)
-    config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
-
-    # Merge DeerFlow-specific context overrides into configurable.
-    # The ``context`` field is a custom extension for the langgraph-compat layer
-    # that carries agent configuration (model_name, thinking_enabled, etc.).
-    # Only agent-relevant keys are forwarded; unknown keys (e.g. thread_id) are ignored.
-    context = getattr(body, "context", None)
-    if context:
-        _CONTEXT_CONFIGURABLE_KEYS = {
-            "model_name",
-            "mode",
-            "thinking_enabled",
-            "reasoning_effort",
-            "is_plan_mode",
-            "subagent_enabled",
-            "max_concurrent_subagents",
-            "agent_name",
-            "is_bootstrap",
-        }
-        configurable = config.setdefault("configurable", {})
-        for key in _CONTEXT_CONFIGURABLE_KEYS:
-            if key in context:
-                configurable.setdefault(key, context[key])
 
     # SEC-H8 二轮复核修复（2026-09-04）：原先在此处对合并后 agent_name 过门禁
     # ——但 (a) 读取顺序 configurable→context 与运行时 _get_runtime_config 的
