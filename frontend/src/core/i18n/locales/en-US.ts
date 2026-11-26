@@ -417,6 +417,8 @@ export const enUS: Translations = {
     modelTotalTokens: "Total tokens",
     modelCost: "Cost",
     openOriginal: "Open original task",
+    deletedBadge: "Deleted",
+    deletedTitle: "Deleted work",
     previous: "Previous",
     next: "Next",
     pageInfo: (from, to, total) => `${from}–${to} / ${total} tasks`,

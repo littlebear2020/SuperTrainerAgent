@@ -401,6 +401,8 @@ export const zhCN: Translations = {
     modelTotalTokens: "总 Token",
     modelCost: "费用",
     openOriginal: "打开原任务",
+    deletedBadge: "作品已删除",
+    deletedTitle: "已删除的作品",
     previous: "上一页",
     next: "下一页",
     pageInfo: (from, to, total) => `${from}–${to} / ${total} 项`,

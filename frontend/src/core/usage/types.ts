@@ -30,6 +30,8 @@ export interface UsageTask {
   total_tokens: number | null;
   models: UsageModel[];
   updated_at: string | null;
+  /** 作品/会话已删除：历史费用仍计入、原任务不可再打开。旧后端不带此字段，按 false 处理。 */
+  deleted?: boolean;
 }
 
 export interface PersonalUsageResponse {

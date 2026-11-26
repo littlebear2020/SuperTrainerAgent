@@ -366,6 +366,8 @@ export interface Translations {
     modelTotalTokens: string;
     modelCost: string;
     openOriginal: string;
+    deletedBadge: string;
+    deletedTitle: string;
     previous: string;
     next: string;
     pageInfo: (from: number, to: number, total: number) => string;

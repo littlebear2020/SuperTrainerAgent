@@ -77,7 +77,8 @@ export function UsageTaskList({
             task.llm_cost !== null &&
             task.media_cost !== null &&
             task.cost !== null;
-          const title = task.title ?? "标题生成中";
+          const title =
+            task.title ?? (task.deleted ? c.deletedTitle : "标题生成中");
           return (
             <article
               key={task.task_key}
@@ -128,6 +129,14 @@ export function UsageTaskList({
                     />
                     {statusLabels[task.status]}
                   </span>
+                  {task.deleted ? (
+                    <span
+                      data-testid={`task-deleted-${id}`}
+                      className="text-muted-foreground text-xs"
+                    >
+                      {c.deletedBadge}
+                    </span>
+                  ) : null}
                   {task.status === "running" ? (
                     <span
                       data-testid={`task-running-note-${id}`}
@@ -232,30 +241,32 @@ export function UsageTaskList({
                     models={task.models}
                     currency={task.currency}
                   />
-                  <div>
-                    <Button
-                      asChild
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="focus-visible:ring-indigo-500"
-                    >
-                      <a
-                        data-testid={`open-original-${id}`}
-                        href={usageTaskHref(task)}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => {
-                          event.stopPropagation();
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            event.currentTarget.click();
-                          }
-                        }}
+                  {task.deleted ? null : (
+                    <div>
+                      <Button
+                        asChild
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="focus-visible:ring-indigo-500"
                       >
-                        {c.openOriginal}
-                      </a>
-                    </Button>
-                  </div>
+                        <a
+                          data-testid={`open-original-${id}`}
+                          href={usageTaskHref(task)}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.currentTarget.click();
+                            }
+                          }}
+                        >
+                          {c.openOriginal}
+                        </a>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </article>
