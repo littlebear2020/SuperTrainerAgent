@@ -14,6 +14,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from app.gateway._shared.personal_usage.tombstones import record_task_tombstone
+
 from .error_messages import to_user_message
 from .metrics import metrics
 from .models import TaskRow
@@ -338,6 +340,8 @@ class BaseTaskService(ABC):
         task = await self.repo.get(task_id, user_id=user_id)
         if task is None:
             return False
+        # 用量快照先于一切删除动作：写失败直接抛出，此时任务行、产物目录与在途 asyncio 任务都还没动。
+        await record_task_tombstone(task)
         self._deleting.add(task_id)  # signal _wrap_pipeline: this cancel is explicit — don't reschedule
         try:
             async_task = self._active_tasks.pop(task_id, None)

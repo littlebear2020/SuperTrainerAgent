@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, timezone
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from app.gateway._shared.retired_agents import resolve_retired_agent
+
+if TYPE_CHECKING:
+    from deerflow.persistence.run.model import RunRow
+    from deerflow.persistence.thread_meta.model import ThreadMetaRow
 
 UsageCapability = Literal[
     "course-video",
@@ -108,6 +113,21 @@ def canonical_agent_capability(*candidates: str | None) -> UsageCapability | Non
         if resolved in supported:
             return cast(UsageCapability, resolved)
     return None
+
+
+def resolve_agent_capability(thread: ThreadMetaRow, runs: Iterable[RunRow]) -> UsageCapability | None:
+    """Agent 会话的能力归属：聚合与删除快照共用，保证两处口径一致。
+
+    候选顺序：线程的 ``assistant_id``、``metadata.agent_name``、``metadata.assistant_id``，
+    再按传入顺序取各 run 的 ``assistant_id``；``ai_image`` / ``ai_video`` 走任务口径，不属于会话。
+    """
+    metadata = thread.metadata_json if isinstance(thread.metadata_json, dict) else {}
+    candidates = [thread.assistant_id, metadata.get("agent_name"), metadata.get("assistant_id")]
+    candidates.extend(run.assistant_id for run in runs)
+    capability = canonical_agent_capability(*candidates)
+    if capability is None or capability in {"ai_image", "ai_video"}:
+        return None
+    return capability
 
 
 def normalize_usage_status(raw_status: str | None) -> UsageStatus:

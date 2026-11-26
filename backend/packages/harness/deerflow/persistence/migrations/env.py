@@ -33,6 +33,7 @@ try:
 
     importlib.import_module("app.gateway.voice_twin.models")
     importlib.import_module("app.gateway._shared.task_framework.models")
+    importlib.import_module("app.gateway._shared.personal_usage.tombstones")
     importlib.import_module("app.gateway.content.models")
     importlib.import_module("app.gateway.content.models_version")
     importlib.import_module("app.gateway.content.models_share")
