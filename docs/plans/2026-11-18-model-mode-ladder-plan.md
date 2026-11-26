@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **闪速** | `qwen3.8-flash`、`deepseek-v4.1-flash` | `qwen3.8-flash` | 关思考（`thinking: disabled` + `reasoning_effort: minimal`）、不规划、不调子代理 |
 | **标准** | `deepseek-v4.1-flash`、`claude-sonnet-5-5` | `claude-sonnet-5-5`（2026-11-20 修订） | 规划开、不调子代理；Claude 无思考、响应快；DeepSeek 手动选择时开思考（`thinking: enabled` + `reasoning_effort: high`） |
-| **Ultra** | `qwen4-max`、`kimi-k3.1-pro`、`claude-sonnet-5-5` | `qwen4-max` | 最大思考（`thinking: enabled` + `reasoning_effort: high`）、规划 + 子代理 + 更长执行预算；Kimi 标注长文档/慢，Claude 无思考 |
+| **Ultra** | `qwen4-max`、`kimi-k3.1-pro`、`claude-sonnet-5-5` | `qwen4-max` | 最大思考（`thinking: enabled` + `reasoning_effort: high`）、规划 + 子代理（2026-11-26 勘误：三档同受服务端 `max_recursion_limit: 2500`，不再承诺更长执行预算）；Kimi 标注长文档/慢，Claude 无思考 |
 
 ### 1.2 模式 → 请求参数
 
@@ -31,7 +31,7 @@
 - `reasoning_effort` 只有模型声明 `supports_reasoning_effort: true` 才转发；Claude 声明 false，参数被 factory 丢弃，不报错。
 - 前端按当前 `model_name` 查 `supports_thinking`，Claude 在标准/Ultra 发 `thinking_enabled: false`；后端现有 warning 保留作防线，不降低级别。
 - `reasoning_effort` 完全由模式派生，**不再允许 localStorage 或旧 thread context 的显式值压过模式矩阵**。
-- 「标准 / Ultra 最大思考」= `thinking enabled + effort high`；Ultra 与标准的差异是规划、子代理与执行预算，不是更高思考强度。
+- 「标准 / Ultra 最大思考」= `thinking enabled + effort high`；Ultra 与标准的执行差异只有子代理（两档都开规划；执行预算口径已于 2026-11-26 删除），不是更高思考强度。
 
 ### 1.3 模型能力配置
 
@@ -79,7 +79,7 @@
 |---|---|---|
 | `flash` | 闪速 | 最快响应，适合改写、抽取、标题等轻量任务 |
 | `standard` | 标准 | 默认档：规划开、响应快，可手动切换深度思考模型 |
-| `ultra` | Ultra | 最强档：多子代理协作，适合复杂多步骤任务，耗时更长 |
+| `ultra` | Ultra | 最强档：相互独立的子任务会并行交给子代理，简单任务直接完成，耗时更长（2026-11-26 更新） |
 
 模型描述与模式解耦：
 - `deepseek-v4.1-flash`：支持深度思考，速度均衡（不再作为任何档位默认，仅在手动选择时使用）。

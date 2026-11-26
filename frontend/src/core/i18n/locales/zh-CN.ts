@@ -111,7 +111,8 @@ export const zhCN: Translations = {
     standardMode: "标准",
     standardModeDescription: "默认档：规划开、响应快，可手动切换深度思考模型",
     ultraMode: "Ultra",
-    ultraModeDescription: "最强档：多子代理协作，适合复杂多步骤任务，耗时更长",
+    ultraModeDescription:
+      "最强档：相互独立的子任务会并行交给子代理，简单任务直接完成，耗时更长",
     searchModels: "搜索模型...",
     defaultModelBadge: "默认",
     surpriseMe: "小惊喜",
