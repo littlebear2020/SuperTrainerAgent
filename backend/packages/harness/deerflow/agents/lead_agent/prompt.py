@@ -300,6 +300,12 @@ def _build_subagent_section(max_concurrent: int, max_total: int = 12) -> str:
         else '# User asks: "Read the README"\n# Thinking: Single straightforward file read\n# \u2192 Execute directly\n\nread_file("/mnt/user-data/workspace/README.md")  # Direct execution, not task()'
     )
     if n == 1:
+        routing_opening = """## Subagent Routing: Delegate Only for Clear Net Benefit
+
+Subagents are optional. **Default to direct execution.** Do not delegate merely because a task is complex, has many steps, produces verbose output, or touches a large repository.
+
+"""
+        delegation_check_heading = "**DELEGATION CHECK (required before every `task` call):**"
         expected_benefit = "specialist capability + context isolation"
         parallel_dispatch_guidance = ""
         valid_benefits = """- **Specialist capability**: A subagent has tools, skills, a model, or domain instructions that materially improve the result.
@@ -319,6 +325,28 @@ With a per-response limit of 1, delegate only for material specialist or context
 - Run a routine test, build, or git command directly. Use one Bash subagent only when a bounded shell workflow has material context-isolation benefit."""
         multi_batch_example = ""
     else:
+        # BUG-02 (2026-11-26): with a per-response limit above 1, two or more independent workstreams are
+        # delegated in parallel (single-thread work, dependent chains and confirmation-gated workflows stay
+        # direct, and Agent/skill rules that forbid delegation win). The net-benefit check below now only
+        # covers cases these routing rules do not settle. n == 1 keeps the original wording: no parallel benefit.
+        routing_opening = """## Subagent Routing: Run Independent Workstreams in Parallel
+
+Subagents are enabled for this run.
+
+**Delegate when the request contains two or more independent workstreams**, for example:
+- researching several subjects, sources, or options that do not depend on each other;
+- producing several deliverables that do not need each other's results;
+- a bounded, context-heavy investigation that would otherwise crowd out important lead-agent context.
+
+Launch independent workstreams as parallel `task` calls in the same response, then verify and synthesize the results.
+
+**Execute directly** when the work is a single thread, a chain where each step needs the previous step's result, a workflow with user confirmation gates, or a small request you can finish with one or two tool calls in total.
+Agent or skill instructions that forbid delegation always take precedence.
+
+For cases the rules above do not settle, run the delegation check below.
+
+"""
+        delegation_check_heading = "**DELEGATION CHECK (for cases the routing rules above do not settle):**"
         expected_benefit = "parallel latency + specialist capability + context isolation"
         parallel_dispatch_guidance = """- **Only truly independent scopes count as parallel benefit.** If one sub-task's output feeds another's input, run them sequentially yourself or as a single bounded delegation.
 - **A bounded sequential chain may still be delegated to one subagent** when specialist capability or context isolation clearly outweighs delegation overhead.
@@ -333,12 +361,11 @@ A single subagent is justified only by material specialist or context-isolation 
             "- **Re-evaluate the remaining work after every batch.** Later batches cannot overlap earlier batches, but can still deliver "
             "material within-batch parallel savings. Recompute benefit and cost instead of automatically continuing or stopping."
         )
-        workflow = f"""1. Establish the cheapest credible direct-execution path.
-2. Apply the parallel-dispatch hard vetoes and include all negative signals in expected cost.
-3. Compare expected benefit with all listed costs.
-4. If delegation wins clearly, give each subagent a bounded, non-overlapping scope, relevant known context and paths, an expected output, and explicit side-effect ownership.
-5. Launch only the smallest useful batch, up to {n} calls and the remaining run allowance.
-6. Verify and synthesize returned results. Resolve contradictions against primary evidence instead of forwarding incompatible conclusions."""
+        workflow = f"""1. Split the request into workstreams and note which ones need another's output.
+2. If two or more workstreams are independent, delegate them. Otherwise apply the delegation check above, including every negative signal, and delegate only if it wins clearly.
+3. Give each subagent a bounded, non-overlapping scope, relevant known context and paths, an expected output, and explicit side-effect ownership.
+4. Launch the independent workstreams together, up to {n} calls and the remaining run allowance.
+5. Verify and synthesize returned results. Resolve contradictions against primary evidence instead of forwarding incompatible conclusions."""
         examples = """- Refactor authentication implementation and its tests: execute directly when analysis, edits, and test feedback share files or depend on one another. Complexity alone does not justify delegation.
 - Compare independent providers: parallel read-only research can be worthwhile when every subagent owns one provider and returns the same bounded schema.
 - Use one specialized subagent only when its configured capability provides material benefit unavailable on the direct path.
@@ -350,11 +377,7 @@ A single subagent is justified only by material specialist or context-isolation 
 - **Synthesize all retained results** at the end.
 """
     return f"""<subagent_system>
-## Subagent Routing: Delegate Only for Clear Net Benefit
-
-Subagents are optional. **Default to direct execution.** Do not delegate merely because a task is complex, has many steps, produces verbose output, or touches a large repository.
-
-**DELEGATION CHECK (required before every `task` call):**
+{routing_opening}{delegation_check_heading}
 
 Expected benefit = {expected_benefit}
 
@@ -855,11 +878,23 @@ def apply_prompt_template(
         subagent_max_total = 12
     subagent_section = _build_subagent_section(n, subagent_max_total) if subagent_enabled else ""
 
-    # Add subagent reminder to critical_reminders if enabled
-    subagent_reminder = f"- **Subagent Mode**: Delegate when the net benefit is clear; otherwise execute directly. **HARD LIMIT: max {n} `task` calls per response.**\n" if subagent_enabled else ""
+    # Add subagent reminder to critical_reminders if enabled. A single slot keeps the net-benefit wording
+    # (no parallel benefit); otherwise the reminders follow the routing rule in _build_subagent_section
+    # (BUG-02, 2026-11-26). The branch uses the same clamped limit as the section so the two never disagree.
+    from deerflow.agents.middlewares.subagent_limit_middleware import _clamp_subagent_limit
 
-    # Add subagent thinking guidance if enabled
-    subagent_thinking = f"- **Before delegating**: confirm the subagent's deliverable, completion criteria, and that no simpler direct path exists. Max {n} `task` calls per response.\n" if subagent_enabled else ""
+    if _clamp_subagent_limit(n) == 1:
+        subagent_reminder = f"- **Subagent Mode**: Delegate when the net benefit is clear; otherwise execute directly. **HARD LIMIT: max {n} `task` calls per response.**\n" if subagent_enabled else ""
+        subagent_thinking = f"- **Before delegating**: confirm the subagent's deliverable, completion criteria, and that no simpler direct path exists. Max {n} `task` calls per response.\n" if subagent_enabled else ""
+    else:
+        subagent_reminder = (
+            "- **Subagent Mode**: When the request has two or more independent workstreams, delegate them as parallel `task` calls in the same response. "
+            "Execute directly for single-thread work, dependent chains, confirmation-gated workflows, or when agent or skill instructions forbid delegation. "
+            f"**HARD LIMIT: max {n} `task` calls per response.**\n"
+            if subagent_enabled
+            else ""
+        )
+        subagent_thinking = f"- **Before delegating**: identify the independent workstreams and confirm each subagent's deliverable and completion criteria. Max {n} `task` calls per response.\n" if subagent_enabled else ""
 
     # Get skills section
     skills_section = get_skills_prompt_section(available_skills, app_config=app_config)
