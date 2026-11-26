@@ -143,9 +143,9 @@
 - [x] **Step 8：实现聚合。** 按「聚合规则」改 `video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`。
 - [x] **Step 9：确认通过并回归。** `PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py tests/test_personal_usage.py tests/test_personal_usage_agent.py tests/test_personal_usage_router.py tests/test_personal_usage_video.py tests/test_core_media_usage_e2e.py -q` → 全部 passed。
 - [x] **Step 10：提交。** `git commit -m "fix(usage): 删除作品后用量统计保留历史费用与 Token"`（`video.py`、`agent.py`、`types.py`、`routers/personal_usage.py`、`test_personal_usage_deletion.py`）。
-- [ ] **Step 11：写前端失败测试。** `usage-task-list.dom.test.tsx` 新增 `it("marks deleted works and hides the open-original link")`：渲染 `{deleted: true, title: null}` 的任务并展开 → `getByTestId("task-deleted-<id>")` 文本为「作品已删除」，标题为「已删除的作品」，`queryByTestId("open-original-<id>")` 为 null；同列表里未删除的任务仍有 `open-original-<id>`。`cd frontend && pnpm exec vitest run tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx` → 该用例失败。
-- [ ] **Step 12：实现前端。** `core/usage/types.ts` 加 `deleted?: boolean`；`usage-task-list.tsx`：`task.deleted` 时标题回落 `c.deletedTitle`（未删除仍回落「标题生成中」），状态胶囊后渲染 `<span data-testid={`task-deleted-${id}`}>{c.deletedBadge}</span>`（样式同 `task-running-note`），展开区不渲染「打开原任务」；i18n 三个文件补两个键。
-- [ ] **Step 13：确认通过。** Step 11 的命令通过；`pnpm check` 通过。
+- [x] **Step 11：写前端失败测试。** `usage-task-list.dom.test.tsx` 新增 `it("marks deleted works and hides the open-original link")`：渲染 `{deleted: true, title: null}` 的任务并展开 → `getByTestId("task-deleted-<id>")` 文本为「作品已删除」，标题为「已删除的作品」，`queryByTestId("open-original-<id>")` 为 null；同列表里未删除的任务仍有 `open-original-<id>`。`cd frontend && pnpm exec vitest run tests/unit/components/workspace/usage/usage-task-list.dom.test.tsx` → 该用例失败。
+- [x] **Step 12：实现前端。** `core/usage/types.ts` 加 `deleted?: boolean`；`usage-task-list.tsx`：`task.deleted` 时标题回落 `c.deletedTitle`（未删除仍回落「标题生成中」），状态胶囊后渲染 `<span data-testid={`task-deleted-${id}`}>{c.deletedBadge}</span>`（样式同 `task-running-note`），展开区不渲染「打开原任务」；i18n 三个文件补两个键。
+- [x] **Step 13：确认通过。** Step 11 的命令通过；`pnpm check` 通过。
 - [ ] **Step 14：提交并走 PR。** `git commit -m "feat(usage): 用量明细标记已删除作品"`（`types.ts`、`usage-task-list.tsx`、i18n 三个文件、前端测试）；按「PR 门禁」开 PR（标题 `fix(usage): 删除作品后保留历史用量`），合入后状态行改为 `未执行（执行中：GLM 5.4）`。
 
 ### Task 2 / PR 2：接入 360 GLM 5.4（FEAT-01）

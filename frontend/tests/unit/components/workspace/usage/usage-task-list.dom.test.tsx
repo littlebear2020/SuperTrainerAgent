@@ -248,6 +248,34 @@ describe("UsageTaskList", () => {
     expect(normalRow.textContent).not.toContain("标题生成中");
   });
 
+  it("marks deleted works and hides the open-original link", async () => {
+    await render(
+      [
+        task("gone", { title: null, deleted: true }),
+        task("alive", { title: "现存课程" }),
+      ],
+      true,
+    );
+    const badge = container.querySelector("[data-testid='task-deleted-gone']");
+    expect(badge?.textContent).toBe("作品已删除");
+    const goneRow = container.querySelector("[data-testid='task-row-gone']")!;
+    expect(goneRow.textContent).toContain("已删除的作品");
+    expect(goneRow.textContent).not.toContain("标题生成中");
+    expect(
+      container.querySelector("[data-testid='task-details-gone']"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid='open-original-gone']"),
+    ).toBeNull();
+
+    expect(
+      container.querySelector("[data-testid='task-deleted-alive']"),
+    ).toBeNull();
+    expect(
+      container.querySelector("[data-testid='open-original-alive']"),
+    ).not.toBeNull();
+  });
+
   it("keeps titles, numbers and status pills readable in the responsive row", async () => {
     const longTitle = `超长任务标题${"很长的标题片段".repeat(12)}结束`;
     await render([
