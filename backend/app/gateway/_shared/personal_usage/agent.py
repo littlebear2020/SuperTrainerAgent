@@ -15,9 +15,9 @@ from app.gateway._shared.personal_usage.types import (
     UsageTask,
     UsageTaskEntry,
     UsageWindow,
-    canonical_agent_capability,
     merge_cost_source,
     normalize_usage_status,
+    resolve_agent_capability,
 )
 from app.gateway._shared.task_cost import evaluate_media_call
 from app.gateway.routers.console import _as_utc, _build_pricing_map, _lookup_pricing, _pricing_currency, _run_cost, _token_cost
@@ -313,12 +313,8 @@ async def aggregate_agent_usage(session, *, user_id: str, window: UsageWindow, c
     for thread in threads:
         if thread.thread_id not in included:
             continue
-        metadata = thread.metadata_json if isinstance(thread.metadata_json, dict) else {}
-        candidates = [thread.assistant_id, metadata.get("agent_name"), metadata.get("assistant_id")]
-        candidates.extend(row.assistant_id for row in all_runs_by_thread[thread.thread_id])
-        candidates.extend(row.assistant_id for row in runs_by_thread[thread.thread_id])
-        task_capability = canonical_agent_capability(*candidates)
-        if task_capability is None or task_capability in {"ai_image", "ai_video"}:
+        task_capability = resolve_agent_capability(thread, [*all_runs_by_thread[thread.thread_id], *runs_by_thread[thread.thread_id]])
+        if task_capability is None:
             continue
         if capability != "all" and task_capability != capability:
             continue

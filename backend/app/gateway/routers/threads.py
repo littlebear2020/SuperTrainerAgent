@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
+from app.gateway._shared.personal_usage.tombstones import record_thread_tombstone
 from app.gateway.authz import require_permission
 from app.gateway.deps import get_checkpointer
 from app.gateway.utils import sanitize_log_param
@@ -225,6 +226,10 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     (sqlite or memory).
     """
     from app.gateway.deps import get_feedback_repo, get_run_event_store, get_thread_store
+
+    # 用量快照先于一切删除动作：写失败直接抛出，文件、检查点、事件与线程元数据此时都还没动，
+    # 用户重试即可（宁可这次删除失败，也不让已发生的费用从「我的用量」里消失）。
+    await record_thread_tombstone(thread_id)
 
     # Clean local filesystem
     response = _delete_thread_data(thread_id, user_id=get_effective_user_id())

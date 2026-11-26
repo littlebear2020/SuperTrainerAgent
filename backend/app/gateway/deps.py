@@ -212,6 +212,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
 
         importlib.import_module("app.gateway.voice_twin.models")
         importlib.import_module("app.gateway._shared.task_framework.models")
+        importlib.import_module("app.gateway._shared.personal_usage.tombstones")
         importlib.import_module("app.gateway.content.models")
 
         # Initialize persistence engine BEFORE checkpointer so that

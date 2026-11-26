@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派实施计划
 
-> **状态**：未执行（定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
+> **状态**：未执行（执行中：用量快照；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
 > **TL;DR**：诊断报告的四项拆成四个串行 PR：① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ 先只读取证，证据不否定「模型批量补写」就在 `TodoMiddleware` 加运行中提醒；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落执行模式，文案同步并删除「更长执行预算」口径。影响面 = backend 用量/删除路径/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署，付费验证按 Q10 封顶。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按 Task 0→5 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，任务之间不停下等评审（评审在各 PR 内完成），只在五处停下：Task 0 漂移需要改计划、本机基线全量测试不绿、某 PR 的 OCR 3 轮后仍有 Critical/Important、To-dos 真实 run 在提醒后把没做完的项标成 completed、Ultra 默认模型改一轮提示词后仍不达标。状态只改顶部原行，依次写 `未执行（执行中：用量快照）` → `未执行（执行中：GLM 5.4）` → `未执行（执行中：To-dos）` → `未执行（执行中：Ultra）`，Task 5 完成后改为 `已执行（…）`，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -66,18 +66,18 @@
 ### Task 0：基线、文档入库、执行环境与只读取证
 
 - [x] **Step 1：漂移检查。** `git fetch origin main`，再 `git diff --stat 7e73faf5..origin/main -- backend/app/gateway/_shared/personal_usage backend/app/gateway/_shared/task_framework/service.py backend/app/gateway/routers/threads.py backend/app/gateway/routers/personal_usage.py backend/app/gateway/deps.py backend/app/gateway/services.py backend/packages/harness/deerflow/persistence/migrations backend/packages/harness/deerflow/agents/middlewares/todo_middleware.py backend/packages/harness/deerflow/agents/lead_agent/prompt.py frontend/src/components/workspace/usage frontend/src/core/usage frontend/src/core/i18n/locales config.example.yaml backend/tests/test_model_modes_config.py backend/tests/test_model_roster_live.py backend/tests/test_lead_agent_prompt.py backend/tests/test_todo_middleware.py backend/tests/test_gateway_services.py`。输出为空 → 继续；非空 → 逐文件核对本文引用的函数与行为，需要时先改计划。另确认 alembic 头仍是 `p9c0d1e2f3a4`（`versions/` 中没有别的文件以它为 `down_revision`）；已有新头时，Task 1 的 `down_revision` 改指新头。
-- [ ] **Step 2：文档入库（纯 docs，直推 main）。**
+- [x] **Step 2：文档入库（纯 docs，直推 main）。**
   - `docs/findings-backlog.md` 四条 2026-11-26 条目末尾各追加 `；并入 docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md`。
   - 新增一条：`- [ ] 2026-11-26 静态走读：useDeleteThread 对同一线程连发两次 DELETE（SDK threads.delete 经 nginx 改写与直连 fetch 落到同一路由），第一次已删 threads_meta，第二次会被 require_existing 判 404，删除可能误报失败；用量快照批不夹带，待运行时确认；指针：frontend/src/core/threads/hooks.ts（useDeleteThread）、backend/app/gateway/authz.py（require_existing）。`
   - `python3 scripts/check_docs_convention.py` 通过；`pre-commit run --files docs/2026-11-26-usage-ultra-todos-glm-diagnosis.md docs/findings-backlog.md docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md` 通过。
   - 只 `git add` 这三个文件（工作区其他未跟踪文件不属于本批，不得带入），提交 `docs(plans): 用量快照与 Ultra/To-dos/GLM 5.4 实施计划入库`，推 main；记下该提交的短 hash 作为执行基线，写入 changelog。
-- [ ] **Step 3：执行 worktree 与本机环境。**
+- [x] **Step 3：执行 worktree 与本机环境。**
   - `git worktree add ../SuperTrainerAgent-exec-usage-ultra -b usage-deletion-snapshot origin/main`（主 clone 恒停 main）；worktree 内 `cd backend && uv sync --frozen --offline`、`cd frontend && pnpm install --frozen-lockfile --offline`，不复用主 clone 的 venv。
   - worktree 根目录建符号链接 `config.yaml` → 主 clone 的 `config.yaml`。本机 config 仍是 v32（v33 = `88c1485a`：示例只改了版本号与 TTS 注释，本机没有 `voice_twin` 段，无键可迁）：先备份到证据目录 `config.yaml.v32.bak`，再只把 `config_version: 32` 改为 `33`（不用 `make config-upgrade`，它会整文件 YAML 重写）。
   - 在 PR 1 分支先提交 `test(models): 本机 config 版本断言对齐 v33`：`backend/tests/test_360_new_models_roster.py:331` 的 `== 32` 改为 `== 33`，只改这一处。该断言要求「本机 == 示例 == 32」，而示例已是 33，本机有 config 时改不改版本号都红（CI 没有 config，跳过）；不改，PR 1 的全量门禁从第一天就是红的。验证：`cd backend && PYTHONPATH=. uv run pytest tests/test_model_modes_config.py tests/test_360_new_models_roster.py tests/test_config_example_parity.py -q` → 全部 passed。
   - 基线：后台跑一次 `cd backend && make test`，等完成通知。全绿才进入 Task 1；有失败先排查本机环境（venv、config 链接），仍红则停下交用户，不在本批修。
   - 按执行日新建 `docs/changelog/changelog-<执行日>-usage-ultra-todos-glm-remediation.md`（状态头之后 ≤5 行 TL;DR、每个 PR 一节、「验收记录」、「未验证清单」），随 PR 1 提交；状态行改为 `未执行（执行中：用量快照）`。
-- [ ] **Step 4：测试服只读取证（Q6）。**
+- [x] **Step 4：测试服只读取证（Q6）。**
   - 按仓库外的测试服 ops 记录登录（本文不写主机、路径与账号）；统计脚本写在证据目录 `server_evidence.py`，拷到服务器临时目录执行后删除；SQLite 一律以只读 URI（`file:<db>?mode=ro`）打开，只 SELECT，不重启服务、不改数据。
   - **To-dos 统计（近 14 天）：**
     - 数据：`run_events` 中 `event_type='llm.ai.response'` 且 `event_metadata` 的 `caller` 为 `lead_agent` 的行，按 `run_id`、`seq` 排序。工具调用只在 `content`（`AIMessage.model_dump()` 的 JSON；该事件属 message 类，不截断）的 `tool_calls[].name` / `tool_calls[].args` 里，`event_metadata` 只有 `caller`、`usage`、`latency_ms`、`llm_call_index`。
@@ -117,20 +117,20 @@
 - 账本仍按 subject id 归组：删除后才落库的晚到行照常计入。`summary` 与 `total_tasks` 仍在分页前对全量计算。
 - `aggregate_agent_usage` 里「没有现存线程就直接返回」改为「现存线程与快照都为空才返回」。
 
-- [ ] **Step 1：写快照与迁移的失败测试。** 新建 `backend/tests/test_personal_usage_deletion.py`：`db` fixture 同 `test_personal_usage_video.py::db`；`_VideoTaskService(BaseTaskService)` 仿 `test_task_framework.py::_FakeService`（`domain="video_gen"`、`id_prefix="vg"`、submit 关 auto_start），repo = `TaskRepository(get_session_factory())`。
+- [x] **Step 1：写快照与迁移的失败测试。** 新建 `backend/tests/test_personal_usage_deletion.py`：`db` fixture 同 `test_personal_usage_video.py::db`；`_VideoTaskService(BaseTaskService)` 仿 `test_task_framework.py::_FakeService`（`domain="video_gen"`、`id_prefix="vg"`、submit 关 auto_start），repo = `TaskRepository(get_session_factory())`。
   - `test_thread_outside_usage_records_no_tombstone`（参数化两例）：普通对话（`assistant_id="lead_agent"`、metadata 无 `agent_name`）；`user_id` 为空的 course-video 线程。两例 `record_thread_tombstone` 都返回 False，表内 0 行。
   - `test_repeated_thread_delete_keeps_first_tombstone`：course-video 线程首次调用 → True；删掉 `threads_meta` 行后再调 → False，快照的 capability 与 title 不变（钉住 `useDeleteThread` 双 DELETE）。
   - `test_tombstone_failure_aborts_task_deletion`：monkeypatch `app.gateway._shared.task_framework.service.record_task_tombstone` 抛 `RuntimeError` → `delete_task` 抛出；`unified_tasks` 行与任务目录都还在。
   - `test_tombstone_failure_aborts_thread_deletion`：monkeypatch `app.gateway.routers.threads.record_thread_tombstone` 抛错 → `delete_thread_data.__wrapped__` 抛出；`threads_meta` 行还在，假 event store 的 `delete_by_thread` 未被调用（fakes 装配仿 `test_thread_delete_event_store.py`）。
   - 新建 `backend/tests/test_usage_tombstones_migration.py`：仿 `test_persistence_bootstrap.py::test_baseline_table_names_constant_matches_baseline` 的临时库装配。`test_usage_tombstones_revision_upgrades_previous_head`：先 `_upgrade(cfg, "p9c0d1e2f3a4")` 再 `_upgrade(cfg, "head")`，断言有表 `usage_tombstones` 与索引 `ix_usage_tombstones_user_id`，且 `_get_head_revision() == "q0d1e2f3a4b5"`。`test_usage_tombstones_revision_downgrades_cleanly`：升到头后 `alembic.command.downgrade(cfg, "p9c0d1e2f3a4")`，表消失（回滚路径，见「六」）。
-- [ ] **Step 2：确认失败。** `cd backend && PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py tests/test_usage_tombstones_migration.py -q` → 因 `tombstones` 模块与 revision 不存在而失败。
-- [ ] **Step 3：实现快照写入。**
+- [x] **Step 2：确认失败。** `cd backend && PYTHONPATH=. uv run pytest tests/test_personal_usage_deletion.py tests/test_usage_tombstones_migration.py -q` → 因 `tombstones` 模块与 revision 不存在而失败。
+- [x] **Step 3：实现快照写入。**
   - 新增 `tombstones.py`；在 `types.py` 新增 `resolve_agent_capability`，`agent.py` 改为调用它（行为不变）。`task_framework/service.py` 与 `routers/threads.py` 在模块顶层 import 两个写入函数（测试按模块属性 monkeypatch）。
   - 新增 revision `backend/packages/harness/deerflow/persistence/migrations/versions/q0d1e2f3a4b5_add_usage_tombstones_table.py`：`down_revision="p9c0d1e2f3a4"`，表已存在即跳过（写法同 `f8b2c4d6e1f3_add_external_api_calls_table.py`），downgrade 删表。
   - `migrations/env.py` 与 `deps.py` 的 app 模型 importlib 清单各加 `app.gateway._shared.personal_usage.tombstones`（后者保证空库走 `create_all` 时建表）。
   - `BaseTaskService.delete_task` 在归属校验通过后、取消与清理之前 `await record_task_tombstone(task)`；`delete_thread_data` 的第一条语句 `await record_thread_tombstone(thread_id)`。两处都不吞异常：快照写失败，本次删除即失败。
-- [ ] **Step 4：确认通过并回归。** Step 2 的命令全绿；再跑 `PYTHONPATH=. uv run pytest tests/test_task_framework*.py tests/test_thread_delete_event_store.py tests/test_content_tasks_delete.py tests/test_voice_twin_production.py tests/test_persistence_bootstrap.py tests/test_persistence_bootstrap_legacy_columns.py tests/test_harness_boundary.py tests/test_personal_usage_agent.py -q` → 全部 passed。
-- [ ] **Step 5：提交。** 手动 pre-commit 后 `git commit -m "feat(usage): 删除作品与会话前写入用量快照"`（`tombstones.py`、`types.py`、`agent.py`、revision、`env.py`、`deps.py`、`task_framework/service.py`、`routers/threads.py`、两个新测试文件、changelog）。
+- [x] **Step 4：确认通过并回归。** Step 2 的命令全绿；再跑 `PYTHONPATH=. uv run pytest tests/test_task_framework*.py tests/test_thread_delete_event_store.py tests/test_content_tasks_delete.py tests/test_voice_twin_production.py tests/test_persistence_bootstrap.py tests/test_persistence_bootstrap_legacy_columns.py tests/test_harness_boundary.py tests/test_personal_usage_agent.py -q` → 全部 passed。
+- [x] **Step 5：提交。** 手动 pre-commit 后 `git commit -m "feat(usage): 删除作品与会话前写入用量快照"`（`tombstones.py`、`types.py`、`agent.py`、revision、`env.py`、`deps.py`、`task_framework/service.py`、`routers/threads.py`、两个新测试文件、changelog）。
 - [ ] **Step 6：写统计口径的失败测试**（同一新文件）：
   - `test_deleting_ai_image_task_keeps_usage_totals`：已计价模型 + ai_image 任务（标题 `删除前标题`）+ 窗口内 1 条 `llm_bookkeeping` 行 + 1 条可计价媒体行；`before = await get_personal_usage(...)`；`await service.delete_task(task_id, USER)` 返回 True；断言 `before.summary.cost is not None`、`after.summary.cost == pytest.approx(before.summary.cost)`、`after.summary.total_tokens == before.summary.total_tokens`、`after.total_tasks == before.total_tasks == 1`、`after.tasks[0].deleted is True`、`capability == "ai_image"`、`title == "删除前标题"`、`before.tasks[0].status == "running"`（未启动任务为 pending）且 `after.tasks[0].status == "incomplete"`；`unified_tasks` 已无该行，两条账本行仍在。
   - `test_deleted_ai_video_task_stays_in_its_capability_filter`：ai_video 任务（LLM + 媒体各 1 行）删除前后，`capability="all"` 的总费用与 Token 不变；删除后 `capability="ai_video"` 返回 1 条，`"ai_image"` 返回 0 条。
