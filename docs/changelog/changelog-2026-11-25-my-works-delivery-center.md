@@ -61,6 +61,8 @@
 
 - 第五轮 OCR 1 条 medium：修复线程/摘要与任务同时刷新失败时次要任务错误覆盖主错误的问题；任务 Promise 立即挂 rejection handler，主请求失败时仍在 `finally` 等待任务但保留主错误，任务单独失败仍正常传播。初始与手动刷新共用 `threadIdsForAgents`，避免 Agent 过滤规则漂移。双失败新增用例先 RED（实际收到 task refresh failed），修复后 hooks **16 passed**。`pnpm check && pnpm test` → exit 0，Vitest **306 files / 2167 tests passed**；全量 Playwright 仍为 **193 passed / 5 failed / 3 skipped**，仅含同一组既有 `networkidle` 失败。最终 `pnpm perf:check` → exit 0，`/workspace/video-gen` **JS 3,596,238 B / CSS 255,242 B**；根 `make check` 与独立文档约定检查均通过。
 
+- 第六轮 OCR 1 条 high（按 Important 阻塞处理）+ 4 条 medium：有效 checkpoint 缺少从未写入的 `artifacts` channel 时改为 `not_delivered`，仅缺失 channel 使用空数组默认值，显式非法 `artifacts: null` 仍为 `unknown`；新增用例先 RED（实际 `unknown` + warning），修复后 artifact 服务 `25 passed`、服务 + 路由 `38 passed`。legacy 已存在但名称未知的文件在封面和摘要中统一显示「文件名由下载响应确定」，不再同时出现「尚未交付文件」；测试修正为实际 locale 文案后先 RED，再修复，grid + viewer **33 passed**。后端全量 `uv run pytest tests/ -q` → **10415 passed, 91 skipped, 421 warnings in 357.39s**（仅测试进程离线代理，无 live 用例）。前端首次组合运行在 Vitest 汇总前超时，无断言失败名单且残留进程已退出；独立 `pnpm test` 重跑 → **306 files / 2168 tests passed in 26.02s**；全量 Playwright → **193 passed / 5 failed / 3 skipped**，仍仅为同一组 main 对照 `networkidle` 失败。选中作品消失后的 stale ID 仍按独立评审 Minor 延后；QueryCache 回退是此前 Important 要求的最近成功结果保护，按当前 threadIds 过滤且 inactive key 有 gcTime，不采纳删除回退或清理旧 key 的建议。最终 `pnpm perf:check` → exit 0，`/workspace/video-gen` **JS 3,596,234 B / CSS 255,242 B**；根 `make check` 与独立文档约定检查均通过。
+
 ## 发布与回滚
 
 - 发布顺序：先 additive backend，再 frontend；仅 gateway/frontend 涉及，无 DB migration，worker/remotion-worker/sandbox 不重建。本批未部署。

@@ -353,6 +353,14 @@ describe("WorkGrid", () => {
     ).toContain("auto-rows-fr");
   });
 
+  it("uses the download-response label for an existing unnamed legacy file", async () => {
+    await render([makeTaskWork("legacy", { thumbnail_url: null })]);
+
+    const text = cards()[0]?.textContent ?? "";
+    expect(text).toContain("文件名由下载响应确定");
+    expect(text).not.toContain("尚未交付文件");
+  });
+
   it("opens only the selected work in a dialog without inline player growth", async () => {
     const works = [makeTaskWork("one"), makeTaskWork("two")];
     await render(works);

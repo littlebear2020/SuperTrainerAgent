@@ -69,9 +69,11 @@ function WorkFileSummary({ work }: { work: WorkSummary }) {
     <div className="bg-muted min-w-0 rounded-lg px-3 py-2 text-xs">
       <div className="truncate font-medium" title={file?.name ?? undefined}>
         {file?.name ??
-          (task?.artifact_missing
-            ? t.workspace.works.fileMissing
-            : t.workspace.works.emptyFiles)}
+          (file?.exists
+            ? t.workspace.works.byDownloadResponse
+            : task?.artifact_missing
+              ? t.workspace.works.fileMissing
+              : t.workspace.works.emptyFiles)}
       </div>
       <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-2">
         <span>{formatFileSize(file?.size ?? null)}</span>
@@ -83,9 +85,6 @@ function WorkFileSummary({ work }: { work: WorkSummary }) {
         ) : null}
         {work.files.length > 1 ? (
           <span>{t.workspace.works.filesCount(work.files.length)}</span>
-        ) : null}
-        {!file?.name && work.primaryFile ? (
-          <span>{t.workspace.works.byDownloadResponse}</span>
         ) : null}
       </div>
     </div>

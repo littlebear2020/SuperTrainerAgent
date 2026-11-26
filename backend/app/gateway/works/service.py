@@ -108,4 +108,4 @@ async def load_thread_artifact_summary(thread_id: str, checkpointer: Any) -> Thr
     if not isinstance(channel_values, dict):
         _log_rejection(thread_id, "invalid_channel_values")
         return _unknown_summary(thread_id)
-    return await asyncio.to_thread(build_thread_artifact_summary, thread_id, channel_values.get("artifacts"))
+    return await asyncio.to_thread(build_thread_artifact_summary, thread_id, channel_values.get("artifacts", []))
