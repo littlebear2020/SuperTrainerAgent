@@ -61,6 +61,9 @@ export function WorkMedia({
       : missing
         ? t.workspace.works.fileMissing
         : t.workspace.works.emptyFiles;
+  const placeholderLabel =
+    file?.name ??
+    (file?.exists ? t.workspace.works.byDownloadResponse : emptyLabel);
   const Icon = missing
     ? FileWarning
     : file
@@ -84,11 +87,8 @@ export function WorkMedia({
   ) : (
     <div className="flex min-w-0 flex-col items-center justify-center gap-3 px-4 text-center">
       <Icon className="h-9 w-9" aria-hidden="true" />
-      <span
-        className="max-w-full truncate text-xs"
-        title={file?.name ?? emptyLabel}
-      >
-        {file?.name ?? emptyLabel}
+      <span className="max-w-full truncate text-xs" title={placeholderLabel}>
+        {placeholderLabel}
       </span>
     </div>
   );

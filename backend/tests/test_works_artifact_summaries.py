@@ -208,6 +208,17 @@ async def test_checkpoint_missing_is_unknown(output_root: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_checkpoint_without_artifacts_channel_is_not_delivered(output_root: Path) -> None:
+    checkpoint_tuple = SimpleNamespace(checkpoint={"channel_values": {"messages": []}})
+    checkpointer = SimpleNamespace(aget_tuple=AsyncMock(return_value=checkpoint_tuple))
+
+    summary = await load_thread_artifact_summary("thread-1", checkpointer)
+
+    assert summary.delivery_state == "not_delivered"
+    assert summary.files == []
+
+
+@pytest.mark.asyncio
 async def test_checkpoint_artifacts_are_projected_without_returning_messages(output_root: Path) -> None:
     write_output(output_root, "deck.pptx", b"deck")
     checkpoint_tuple = SimpleNamespace(
