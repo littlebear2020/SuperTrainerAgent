@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派实施计划
 
-> **状态**：未执行（执行中：To-dos；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
+> **状态**：未执行（执行中：Ultra；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
 > **TL;DR**：诊断报告的四项拆成四个串行 PR：① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ 先只读取证，证据不否定「模型批量补写」就在 `TodoMiddleware` 加运行中提醒；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落执行模式，文案同步并删除「更长执行预算」口径。影响面 = backend 用量/删除路径/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署，付费验证按 Q10 封顶。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按 Task 0→5 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，任务之间不停下等评审（评审在各 PR 内完成），只在五处停下：Task 0 漂移需要改计划、本机基线全量测试不绿、某 PR 的 OCR 3 轮后仍有 Critical/Important、To-dos 真实 run 在提醒后把没做完的项标成 completed、Ultra 默认模型改一轮提示词后仍不达标。状态只改顶部原行，依次写 `未执行（执行中：用量快照）` → `未执行（执行中：GLM 5.4）` → `未执行（执行中：To-dos）` → `未执行（执行中：Ultra）`，Task 5 完成后改为 `已执行（…）`，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -253,7 +253,7 @@ Do not mark a step `completed` unless it is fully done. If the current step is s
   - **3 次都没触发提醒**（模型及时更新，或把步骤并进少于 K 轮；K ≥ 9 时本场景可能到不了 K）：Step 3 的图级测试已绿就照常合入，changelog 写「live 未触发提醒」并列入未验证清单。
   - **只记录、不阻断：** 某个快照里 `in_progress` 超过 1 个（本场景没有并行工作；报告要求非并行时只有一个 `in_progress`，本批不改提示词与 UI），或提醒出现之前就提前标完成（与本批改动无关）→ 登记 backlog。
 - [x] **Step 8：（仅证据不支持批量补写时）拆 pending。**（不适用：测试服取证未能取得，按 Q7「证据不足 → K = 6 照常实施」分支，没有拆 pending。） 不改代码；新建 `docs/plans/pending/2026-11-26-todos-realtime-transport-plan.md`，头部写拆分来源（本计划 Task 3）、基准 commit、`server-evidence.json` 的聚合数与判定；正文列出 SSE（nginx 缓冲、`values` 事件发布间隔）与前端（`useStream` 状态合并）的排查项。backlog 对应条目注明「拆 pending」，直接进入 Task 4。
-- [ ] **Step 9：提交并走 PR。** `git commit -m "feat(agents): To-dos 停滞时提醒模型及时更新进度"`（`todo_middleware.py`、`test_todo_middleware.py`、`test_todo_progress_graph.py`、`todo-list.dom.test.tsx`）；中间件属核心路径，按「PR 门禁」走 PR；合入后状态行改为 `未执行（执行中：Ultra）`。
+- [x] **Step 9：提交并走 PR。**（PR #67，rebase 合入 `46651dce`。） `git commit -m "feat(agents): To-dos 停滞时提醒模型及时更新进度"`（`todo_middleware.py`、`test_todo_middleware.py`、`test_todo_progress_graph.py`、`todo-list.dom.test.tsx`）；中间件属核心路径，按「PR 门禁」走 PR；合入后状态行改为 `未执行（执行中：Ultra）`。
 
 ### Task 4 / PR 4：Ultra 场景化委派与 run 执行模式（BUG-02）
 
@@ -309,25 +309,25 @@ workflow（`{n}` 照旧插值）：
 - 文案：zh-CN `ultraModeDescription` = `最强档：相互独立的子任务会并行交给子代理，简单任务直接完成，耗时更长`；en-US = `Strongest mode: independent subtasks run in parallel on subagents, simple tasks are done directly; takes longer`。
 - 评测场景（逐字）：多分支 `请分别调研阿里云、腾讯云、华为云三家对象存储（OSS / COS / OBS）的标准存储单价与免费额度，三家各自独立整理成一段说明，最后汇总成一张对比表。`；简单 `把这句话改写得更正式：明天的会改到下午三点。`
 
-- [ ] **Step 1：写提示词失败测试。** `backend/tests/test_lead_agent_prompt.py`：
+- [x] **Step 1：写提示词失败测试。** `backend/tests/test_lead_agent_prompt.py`：
   - 用 `test_subagent_section_delegates_independent_workstreams`（n=3）替换 `test_subagent_section_defaults_to_direct_execution`。断言包含："two or more independent workstreams"、"parallel `task` calls in the same response"、"Agent or skill instructions that forbid delegation always take precedence"、"DELEGATION CHECK (for cases the routing rules above do not settle)"、"Split the request into workstreams"、"expected benefit is clearly greater than the expected cost"、"MAXIMUM 3 `task` CALLS PER RESPONSE"、"MAXIMUM 12 `task` CALLS PER RUN"。断言不包含："Default to direct execution"、"required before every `task` call"、"Establish the cheapest credible direct-execution path"、"Launch only the smallest useful batch"、"DECOMPOSE, DELEGATE, SYNTHESIZE"、"Complex tasks should be decomposed"。
   - 新增 `test_single_slot_subagent_section_keeps_net_benefit_rule`（n=1）：含 "Default to direct execution"、"required before every `task` call"、"Establish the cheapest credible direct-execution path"，不含 "independent workstreams"。
   - `test_subagent_reminders_aligned_with_direct_execution` 改名 `test_subagent_reminders_follow_routing_rule`：`max_concurrent_subagents=3` 的提示词含 "Subagent Mode**: When the request has two or more independent workstreams, delegate them as parallel `task` calls in the same response." 与 "Before delegating**: identify the independent workstreams"，不含 "Delegate when the net benefit is clear; otherwise execute directly"、"no simpler direct path exists"、"Subagent Mode**: Default to direct execution"、"DECOMPOSITION CHECK"，仍含 "DELEGATION CHECK"；`max_concurrent_subagents=1` 的提示词仍含原两句。
-- [ ] **Step 2：写 run 元数据失败测试。** `backend/tests/test_gateway_services.py`：`_capture_start_run_config` 让 `create_or_reject` 的 AsyncMock 把调用 kwargs 记入 `captured["create_kwargs"]`。
+- [x] **Step 2：写 run 元数据失败测试。** `backend/tests/test_gateway_services.py`：`_capture_start_run_config` 让 `create_or_reject` 的 AsyncMock 把调用 kwargs 记入 `captured["create_kwargs"]`。
   - 新增 `test_start_run_records_server_owned_run_mode`：context `{"mode": "ultra", "subagent_enabled": True, "is_plan_mode": True}`、`metadata={"run_mode": "forged", "keep": 1}` → `captured["create_kwargs"]["metadata"] == {"keep": 1, "run_mode": {"mode": "ultra", "subagent_enabled": True, "is_plan_mode": True}}`。
   - 新增 `test_start_run_without_context_records_null_mode` → `run_mode == {"mode": None, "subagent_enabled": False, "is_plan_mode": False}`。
   - 新增 `test_start_run_run_mode_follows_runtime_precedence`（参数化两例）：① `config={"configurable": {"subagent_enabled": False}}`、`context={"mode": "ultra", "subagent_enabled": True, "is_plan_mode": True}` → `run_mode["subagent_enabled"] is False`；② `config={"context": {"subagent_enabled": True}}`、`context={"mode": "ultra", "subagent_enabled": False, "is_plan_mode": True}` → `True`。两例都断言 `run_mode` 三个键与 `captured["config"]` 运行时视图（`{**configurable, **context}`）里的值一致，且调用后 `body.metadata` 里没有 `run_mode`。
-- [ ] **Step 3：确认失败。** `PYTHONPATH=. uv run pytest tests/test_lead_agent_prompt.py tests/test_gateway_services.py -q` → 新用例失败。
-- [ ] **Step 4：实现。** 改 `_build_subagent_section`、`apply_prompt_template` 的两句提醒与 `start_run`，新增 `_run_mode_metadata`。
-- [ ] **Step 5：确认通过并回归。** Step 3 的命令全绿；`PYTHONPATH=. uv run pytest tests/test_subagent_limit_middleware.py tests/test_lead_agent_skills.py tests/test_lead_agent_model_resolution.py tests/test_agent_run_visibility.py tests/test_retired_agent_alias.py -q` → 全部 passed。
-- [ ] **Step 6：文案与勘误。**
+- [x] **Step 3：确认失败。**（事后补测：6 failed, 57 passed，见 changelog 验收记录。） `PYTHONPATH=. uv run pytest tests/test_lead_agent_prompt.py tests/test_gateway_services.py -q` → 新用例失败。
+- [x] **Step 4：实现。** 改 `_build_subagent_section`、`apply_prompt_template` 的两句提醒与 `start_run`，新增 `_run_mode_metadata`。
+- [x] **Step 5：确认通过并回归。** Step 3 的命令全绿；`PYTHONPATH=. uv run pytest tests/test_subagent_limit_middleware.py tests/test_lead_agent_skills.py tests/test_lead_agent_model_resolution.py tests/test_agent_run_visibility.py tests/test_retired_agent_alias.py -q` → 全部 passed。
+- [x] **Step 6：文案与勘误。**
   - i18n 两个文件改 `ultraModeDescription`。
   - `docs/plans/2026-11-18-model-mode-ladder-plan.md` 勘误三处：
     - §1.1 Ultra 行的「规划 + 子代理 + 更长执行预算」改为「规划 + 子代理（2026-11-26 勘误：三档同受服务端 `max_recursion_limit: 2500`，不再承诺更长执行预算）」；
     - §1.2 末条的「Ultra 与标准的差异是规划、子代理与执行预算」改为「Ultra 与标准的执行差异只有子代理（两档都开规划；执行预算口径已于 2026-11-26 删除）」；
     - §1.5 的 Ultra 描述换成新文案，并注「2026-11-26 更新」。
   - `cd frontend && pnpm check` 与 `python3 scripts/check_docs_convention.py` 通过。
-- [ ] **Step 7：写 live 评测。** 新建 `backend/tests/test_ultra_delegation_live.py`，模块级 skip 与 `pytestmark = pytest.mark.live` 同 `test_model_roster_live.py`。
+- [x] **Step 7：写 live 评测。** 新建 `backend/tests/test_ultra_delegation_live.py`，模块级 skip 与 `pytestmark = pytest.mark.live` 同 `test_model_roster_live.py`。
   - 单个 trial：`create_agent(model=create_chat_model(name, thinking_enabled=<supports_thinking>, reasoning_effort="high", app_config=cfg, attach_tracing=False), tools=<桩工具>, middleware=[_create_todo_list_middleware(True)], system_prompt=apply_prompt_template(subagent_enabled=True, max_concurrent_subagents=3, app_config=cfg), state_schema=ThreadState)`。
   - 桩工具：取 `get_available_tools(include_mcp=False, model_name=name, subagent_enabled=True, app_config=cfg)` 的 name、description、args_schema 重建，`task` 返回「子任务已完成（评测桩）」，其他工具返回「（评测桩）已执行」——子代理不真跑。
   - 调用上限：`raise_error = True` 的回调在第 7 次 `on_chat_model_start` 时抛 `_TrialBudgetExceeded`，结束该 trial，保留最后一个 values 快照。
@@ -336,11 +336,11 @@ workflow（`{n}` 照旧插值）：
     - `test_default_ultra_model_delegates_independent_workstreams`（阻断）：多分支 3 次中，某条回复里 `task` 数 ≥2 的 trial 至少 2 个；简单场景 1 次，`task` 总数为 0。
     - `test_other_ultra_models_delegation_rates_recorded`（不阻断）：其余 Ultra 模型各跑 3 次多分支 + 1 次简单，只记录结果。
   - 汇总写到环境变量 `ULTRA_EVAL_OUT` 指定的 JSON 路径。
-- [ ] **Step 8：运行评测（付费，≤16 个 trial）。** 在同一条命令内加载密钥后运行 `RUN_LIVE=1 ULTRA_EVAL_OUT=<证据目录>/ultra-eval.json PYTHONPATH=. uv run pytest tests/test_ultra_delegation_live.py -v -s`，先跑默认模型（4 个 trial：3 次多分支 + 1 次简单）。
+- [x] **Step 8：运行评测（付费，≤16 个 trial）。**（默认模型 3/3 达标，没有改提示词重测；共 16 个 trial。） 在同一条命令内加载密钥后运行 `RUN_LIVE=1 ULTRA_EVAL_OUT=<证据目录>/ultra-eval.json PYTHONPATH=. uv run pytest tests/test_ultra_delegation_live.py -v -s`，先跑默认模型（4 个 trial：3 次多分支 + 1 次简单）。
   - 达标：其余 Ultra 模型各 4 个 trial（按评测时的花名册：四款共 16，PR 2 取消时三款共 12）。
   - 不达标：只改 `n > 1` 分支的委派文案（开头规则、检查标题、workflow、examples）与两句提醒，改一轮，默认模型重跑 4 个 trial；其余模型降为各 1 次多分支 + 1 次简单（合计 8 + 2 ×（模型数 − 1）：四款 14、三款 12）。仍不达标 → 停下，带 `ultra-eval.json` 交用户决定。
   - 记录：各模型触发率写进 changelog；某个模型多分支 3 次全为 0 时登记 backlog。
-- [ ] **Step 9：真实端到端 Ultra（付费，2 次）。** 本机隔离栈全套（gateway + 前端 + nginx），Ultra 档、默认模型、多分支场景。断言：
+- [x] **Step 9：真实端到端 Ultra（付费，2 次）。**（实际范围：API 级、只起 gateway、1 次；界面子任务卡片与截图未验证、第 2 次真实对话未做，均已列入 changelog「未验证清单」。） 本机隔离栈全套（gateway + 前端 + nginx），Ultra 档、默认模型、多分支场景。断言：
   - `POST /api/threads/{id}/history` 里有 ≥2 个 `task` 调用且各有 ToolMessage 结果，run 状态为 success；
   - 界面出现子任务卡片，截图存证据目录；
   - 本机库里该 run 的 `metadata_json.run_mode == {"mode": "ultra", "subagent_enabled": true, "is_plan_mode": true}`。
@@ -371,20 +371,20 @@ workflow（`{n}` 照旧插值）：
 
 **实现级（进 pytest / vitest 拦回归）：**
 
-- [ ] 迁移：`test_usage_tombstones_migration.py` 的升级与回滚两例。
-- [ ] 快照写入：普通对话与无主线程不写、双 DELETE 不覆盖、写失败拒绝删除（任务与会话各一）、删除时进行中的条目记为未完成。
-- [ ] GLM 5.4：花名册契约、示例模板（含 CI 也跑的价目断言）、yaml 价目解析 `9.3`、`/api/models` 档位。
-- [ ] To-dos：`TestProgressReminder` 八例。
-- [ ] Ultra：提示词三例（n=3 分区、n=1 分区、两句提醒）、`run_mode` 三例（含运行时优先级）。
-- [ ] 前端：`usage-task-list.dom.test.tsx` 已删除条目、`todo-list.dom.test.tsx` 状态重渲染。
+- [x] 迁移：`test_usage_tombstones_migration.py` 的升级与回滚两例。
+- [x] 快照写入：普通对话与无主线程不写、双 DELETE 不覆盖、写失败拒绝删除（任务与会话各一）、删除时进行中的条目记为未完成。
+- [x] GLM 5.4：花名册契约、示例模板（含 CI 也跑的价目断言）、yaml 价目解析 `9.3`、`/api/models` 档位。
+- [x] To-dos：`TestProgressReminder` 八例。
+- [x] Ultra：提示词三例（n=3 分区、n=1 分区、两句提醒）、`run_mode` 三例（含运行时优先级）。
+- [x] 前端：`usage-task-list.dom.test.tsx` 已删除条目、`todo-list.dom.test.tsx` 状态重渲染。
 - [ ] 全量：根 `make check`、`cd backend && make test`、`cd frontend && pnpm check && pnpm test`、docs convention。
 
 **行为级（用户可感知）：**
 
-- [ ] BUG-01（API 级）：走真实删除路径，删除前后 `get_personal_usage` 的总费用与 Token 不变（AI 生图、AI 视频、Agent 会话各一例）；能力筛选正确；晚到账本照常计入；`unified_tasks`/`threads_meta` 行已删，作品列表的数据源里没有该项——Task 1 Step 6。
-- [ ] FEAT-01（live）：探针通过；真实对话的 `model_name` 没有回退、费用按 8/28/2 入账、原生工具调用成功——Task 2 Step 2/6。
-- [ ] BUG-03（图级 + live）：真实 Agent 图在提醒之后、终态之前出现中间迁移；本机真实 run 出现 `todo_progress_reminder`，其后、最终回复前有 `write_todos`，且提醒后没有伪报完成（3 次都未触发时标未验证）——Task 3 Step 3/7。
-- [ ] BUG-02（live）：默认 Ultra 模型达标；端到端出现子任务卡片；`run_mode` 落库——Task 4 Step 8/9。
+- [x] BUG-01（API 级）：走真实删除路径，删除前后 `get_personal_usage` 的总费用与 Token 不变（AI 生图、AI 视频、Agent 会话各一例）；能力筛选正确；晚到账本照常计入；`unified_tasks`/`threads_meta` 行已删，作品列表的数据源里没有该项——Task 1 Step 6。
+- [x] FEAT-01（live）：探针通过；真实对话的 `model_name` 没有回退、费用按 8/28/2 入账、原生工具调用成功——Task 2 Step 2/6。（错误形态探针前提不成立，已移除并列入 changelog「未验证清单」；真实对话的 run 因脚本漏带 `recursion_limit` 以 `recursion_limit` 结束，同列未验证清单。）
+- [x] BUG-03（图级 + live）：真实 Agent 图在提醒之后、终态之前出现中间迁移；本机真实 run 出现 `todo_progress_reminder`，其后、最终回复前有 `write_todos`，且提醒后没有伪报完成（3 次都未触发时标未验证）——Task 3 Step 3/7。
+- [ ] BUG-02（live）：默认 Ultra 模型达标；端到端出现子任务卡片；`run_mode` 落库——Task 4 Step 8/9。（默认模型达标与 `run_mode` 落库已验证；**界面子任务卡片未验证**，没有起前端与 nginx，见 changelog「未验证清单」，故保持未勾。）
 - [ ] 部署侧（延后，需指令）：见「六」第 6 条。
 
 ## 五、Review Focus
