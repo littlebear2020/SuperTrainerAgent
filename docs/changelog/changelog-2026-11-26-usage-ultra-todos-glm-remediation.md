@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派
 
-> **状态**：执行中（Ultra）。计划：`docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md`；执行基线 commit `2d89bae7`（计划入库）。
+> **状态**：已执行（2026-11-26～27；PR #65 → #66 → #67 → #68 串行合入 main，最后一笔 `ca49692b`；未部署）。计划：`docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md`；执行基线 commit `2d89bae7`（计划入库）。
 > **TL;DR**：四个串行 PR——① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ `TodoMiddleware` 在停滞 K 轮后注入一条不上屏的提醒（只提醒、不改状态）；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落 `run_mode`，文案删除「更长执行预算」。影响面 = backend 用量/删除/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署。
 
 ## 执行基线与本机环境
@@ -40,12 +40,15 @@
 - **run 元数据落 `run_mode`：** `start_run` 把 `build_run_config` 与 context 合并移到 `create_or_reject` 之前（两者不依赖 run 记录，顺带让 `build_run_config` 的 `ValueError` 在建 run 之前抛出），新增 `_run_mode_metadata` 按**运行时视图**（`config.context` 优先于 `config.configurable`，顶层 `body.context` 只补缺，与 `lead_agent/agent.py::_get_runtime_config` 同口径）写入 `{mode, subagent_enabled, is_plan_mode}`；服务端值覆盖客户端同名键，且不写回 `body.metadata`，`threads_meta` 的 metadata 不变。
 - **文案：** `ultraModeDescription` 改为「相互独立的子任务会并行交给子代理，简单任务直接完成，耗时更长」，不再承诺「更长执行预算」；`docs/plans/2026-11-18-model-mode-ladder-plan.md` 勘误三处（三档同受服务端 `max_recursion_limit: 2500`，从未实现过更长预算）。
 - **付费评测（`test_ultra_delegation_live.py`，真实提示词 + 真实模型 + 真实 `TodoMiddleware`，工具为桩、子代理不真跑，单 trial ≤6 次模型调用）：** 默认模型 `qwen4-max` 多分支场景 3 次中 3 次在同一条回复里并行派出 3 个 `task`，简单场景 0 次 `task`——**达标，没有改提示词重测**。其余 Ultra 模型只记录：`kimi-k3.1-pro` 1/3、`glm-5.4` 2/3、`claude-sonnet-5-5` 3/3，简单场景均为 0，没有「3 次全为 0」的模型，不登记 backlog。共 16 个 trial，用满上限。
-- **真实端到端（本机隔离栈只起 gateway，API 级；Ultra 档、默认模型，1 次，上限 2 次）：** run `success`，模型记录为 `alibaba/qwen/qwen4-max`；一条回复同时派出 3 个 `task`，3 个调用都有按 `tool_call_id` 配对的 `llm.tool.result`（以本机库 `run_events` 核对，未走 `/history` 接口），另有 3 条 `subagent.task.completed`；run 元数据 `run_mode == {"mode": "ultra", "subagent_enabled": true, "is_plan_mode": true}`。**没有起前端与 nginx：界面子任务卡片与截图未验证，第 2 次真实对话未做**（见「未验证清单」）。
+- **真实端到端 ①（本机隔离栈只起 gateway，API 级；Ultra 档、默认模型，1 次）：** run `success`，模型记录为 `alibaba/qwen/qwen4-max`；一条回复同时派出 3 个 `task`，3 个调用都有按 `tool_call_id` 配对的 `llm.tool.result`（以本机库 `run_events` 核对，未走 `/history` 接口），另有 3 条 `subagent.task.completed`；run 元数据 `run_mode == {"mode": "ultra", "subagent_enabled": true, "is_plan_mode": true}`。
+- **真实端到端 ②（界面；本机隔离栈 gateway + 前端 + nginx，Playwright 走真实界面，1 次；至此付费端到端对话共 2 次，用满上限）：** 从「标准」切到 Ultra 时模型沿用 `claude-sonnet-5-5`（它两档都可选，属「切档保留」的设计），所以在模型选择器里显式选了 Ultra 默认模型 `qwen4-max`；发送前脚本校验本地上下文为 `ultra` + `qwen4-max`，否则不发送；提示词同 ①。界面：消息区出现「并行执行 3 个子任务」与三张子任务卡片（阿里云 OSS / 腾讯云 COS / 华为云 OBS 定价），运行中三张都是「子任务运行中」，run 结束后三张都是「子任务已完成」（进行中 0 张），刷新页面后三张卡片仍在，报告正文正常渲染（截图只覆盖前两段）。库里该 run：`status=success`、`model_name=alibaba/qwen/qwen4-max`、`run_mode == {"mode": "ultra", "subagent_enabled": true, "is_plan_mode": true}`；一条回复同时派出 3 个 `task`，都有配对的工具结果，3 条 `subagent.task.started` / `completed`；耗时约 579 秒。截图与汇总在证据目录（`ultra-ui-*.png`、`ultra-ui.json`、`ultra-runs-db-summary.json`）。
+- **本批发现（不是回归，未改行为）：Ultra 一次多分支调研的 token 规模大且波动。** 本次 6,592,357 token（输入 6,540,781，其中 `qwen4-max` 的缓存读取 6,276,864；输出 51,576），子代理占 6,460,289（98%）；上一次 API 级同一提示词为 2,021,424（子代理 1,980,358），相差 3.3 倍，耗时 470 秒对 579 秒。费用未折算：本机 config 与全新本机库的 `model_pricing`（0 行）都没有 `qwen4-max` 价目。已登记 backlog，本批不加上限、不改提示词。
 
 ## 证据摘要
 
 - **测试服只读取证（Q6）：`SERVER_EVIDENCE_NOT_VERIFIED`。** 执行环境的权限分类器拒绝了在测试服上运行只读统计脚本（`ssh` + 脚本经 stdin 执行），按计划「服务器不可达或样本不足」分支处理：K = 6，PR 3 照常实施；提醒只注入文字、不改任何状态。没有更换通道重试。可在用户放行后补跑，若 `batch_share < 20%` 则按计划改拆 pending。
 - Ultra 基线计数（按 Agent 分组的 `task` 调用 run 数）同样未取得，仅作背景信息，不影响达标判定。
+- **证据目录**（主 clone 的 `temp/2026-11-26-usage-ultra-todos-glm/`，gitignored、不入库）：`glm-probe-2a.txt` / `glm-probe-2b.txt`（GLM 探针输出）、`glm-run-final.json`（GLM 真实对话）、`todos-live.json`（To-dos 真实验证的状态序列与消息序列）、`ultra-eval.json` + `ultra-eval-run1.txt` / `ultra-eval-run2.txt`（Ultra 评测）、`ultra-e2e.json`（API 级端到端）、`ultra-ui.json` + `ultra-ui-0-ready.png` / `ultra-ui-1-running.png` / `ultra-ui-2-final.png` / `ultra-ui-3-reloaded.png`（界面验收）、`ultra-runs-db-summary.json`（两次 Ultra 真实对话在本机库里的聚合：状态、`run_mode`、token 拆分、`task` 调用配对）、`config.yaml.v32.bak`（本机 config 对齐 v33 前的原件）与各探针脚本。测试服取证没有执行，所以没有 `server-evidence.json`。
 
 ## 验收记录
 
@@ -73,12 +76,18 @@
 - PR 4 live 评测（付费，16 个 trial，分两次各选 1 个用例）：`RUN_LIVE=1 ULTRA_EVAL_OUT=<证据目录>/ultra-eval.json PYTHONPATH=. uv run pytest tests/test_ultra_delegation_live.py -v -s` → 默认模型用例 `1 passed in 229.27s`，`[ultra-eval] qwen4-max: {'branching_parallel_trials': 3, 'simple_task_total': 0, …}`；其余模型用例 `1 passed in 453.65s`，`branching_parallel_trials`：`kimi-k3.1-pro` 1、`glm-5.4` 2、`claude-sonnet-5-5` 3，三者 `simple_task_total` 均为 0；证据文件 `ultra-eval.json`
 - PR 4 真实端到端：`ultra_e2e.py`（本机隔离栈只起 gateway、Ultra 档、默认模型、`recursion_limit: 2500`，1 次，470.5s）→ `run_status: success`、`run_model_name: alibaba/qwen/qwen4-max`、`task_calls: 3`、`max_parallel_task_calls_in_one_reply: 3`、`tool_result_events: 3`、`subagent_completed_events: 3`、`run_metadata_run_mode: {mode: ultra, subagent_enabled: true, is_plan_mode: true}`；本批另以只读 SQLite 复核本机库 `run_events`：3 个 `task` 调用的 id 都有对应的 `llm.tool.result`；证据文件 `ultra-e2e.json`
 - PR 4 全量门禁：`make check` → exit 0（eslint 0 errors、prettier 通过、knip 通过、`i18n key 存活检测通过：711 个叶子全活`、`OK 仓库治理约定全过`）；`cd backend && make test`（补占位密钥）→ `10511 passed, 31 skipped`（比 PR 3 多 5 个通过 = 提示词净增 1 例 + `run_mode` 4 例；多 1 个 skip = 本批 live 评测文件的模块级 skip）；`cd frontend && pnpm test` → `Test Files 307 passed, Tests 2172 passed`（本 PR 不新增前端用例，文案由 `pnpm check` 的类型与 i18n 检测兜底）
+- PR 4 合入：`gh pr checks 68` → `backend-unit-tests`、`e2e-tests`、`frontend-unit-tests`、`lint-frontend`、`perf-budgets`、`quick-checks`、`review` 7 项 pass；AI 评审 1 条 high（`prompt.py` 提醒分支的钳制口径），核实前提不成立（`_build_subagent_section` 先钳制再判断，段落与提醒口径一致；评审建议的改法反而会让 `max_concurrent_subagents=1` 时提醒与段落自相矛盾），处置写成 PR 评论、未改代码；`gh pr merge` 被执行环境的权限分类器拒绝、未换通道，由用户在 GitHub 上 Rebase and merge 合入，4 笔提交 `fe2201fa`..`ca49692b`（PR #68）
+- PR 4 界面验收：`SEND=1 node ultra_ui.mjs`（Playwright 走真实界面；本机隔离栈 gateway + 前端 + nginx，Ultra 档 + `qwen4-max`）→ `context_before_send: {mode: ultra, model_name: qwen4-max}`、`run_status_via_api: success`、`elapsed_s: 579`、`max_cards_seen_during_run: 3`、`cards_final: 3`、`cards_in_progress_final: 0`、`cards_after_reload: 3`；三张截图见证据目录。库内核对 `python3 -I ultra_db_summary.py`（sqlite `mode=ro`，只写聚合数）→ 界面 run：`status: success`、`model_name: alibaba/qwen/qwen4-max`、`run_mode: {mode: ultra, subagent_enabled: true, is_plan_mode: true}`、`task_calls_per_ai_reply: [3, 0, 0, 0]`、`every_task_call_has_tool_result: true`、`subagent_task_started_events: 3`、`subagent_task_completed_events: 3`、`total_tokens: 6592357`、`subagent_share_of_total: 0.98`；API 级 run 同口径：`total_tokens: 2021424`、`task_calls_per_ai_reply: [3, 0, 0]`
+- Task 5 Step 1（最终门禁；worktree 切到 `origin/main` = `ca49692b`，PR 1–4 全部合入后，三项依次后台运行）：`make check` → exit 0（eslint `0 errors, 120 warnings`、prettier 通过、knip 通过、`i18n key 存活检测通过：711 个叶子全活`、`OK 仓库治理约定全过`）；`cd backend && make test`（补占位密钥）→ `10511 passed, 31 skipped in 154.47s`；`cd frontend && pnpm test` → `Test Files 307 passed (307)`、`Tests 2172 passed (2172)`
+- Task 5 Step 2–4（收尾 docs 提交前，在最终内容上）：`python3 scripts/check_docs_convention.py` → `OK 仓库治理约定全过`；`pre-commit run --files docs/changelog/changelog-2026-11-26-usage-ultra-todos-glm-remediation.md docs/plans/2026-11-26-usage-ultra-todos-glm-remediation-plan.md docs/findings-backlog.md` → `gitleaks (secret scan) Passed`、`docs convention check Passed`
 
 ## 未验证清单
 
 - 测试服只读取证：`SERVER_EVIDENCE_NOT_VERIFIED`（见上）。
 - GLM 5.4：超时形态不另测（与其他 360 模型共用 `request_timeout` / `stream_chunk_timeout`）；错误形态探针（`max_tokens=-1`）360 不报错，未验证带状态码的异常形态；真实对话的 run 因探针脚本漏带 `recursion_limit: 2500` 以 `recursion_limit` 结束，未复跑，故「run 成功收尾」未在 live 验证（模型记录、工具调用、计价均已验证）；关思考被拒对建议追问的实际影响（返回空列表）未在 live 验证。
 - To-dos 提醒：K = 6 未经生产数据校准；live 只跑了 1 次（首次即触发提醒并通过判定，没有再跑）；场景里第 10–12 步因既有的重复调用硬停没有执行，「提醒之后整条清单走到全部完成」未在 live 观察到；界面实时刷新只由图级测试与 `TodoList` 重渲染用例覆盖，未做浏览器实测。
-- Ultra 端到端：只在本机隔离栈起了 gateway，API 级跑 1 次（上限 2 次）。**界面是否出现子任务卡片、对应截图未验证**（没有起前端与 nginx），**第 2 次真实对话未做**；`task` 调用与结果的配对以本机库 `run_events` 核对，没有走 `/history` 接口。
+- Ultra 端到端：付费真实对话共 2 次（API 级 1 次、界面 1 次，用满上限），界面子任务卡片与截图已验证；`task` 调用与结果的配对两次都以本机库 `run_events` 核对，没有走 `/history` 接口；两次都只用默认模型 `qwen4-max` 与多分支提示词——其他 Ultra 模型只有桩工具评测、没有真实子代理执行，简单场景与带 Agent 的 Ultra 对话没有走真实端到端。
+- Ultra 的 token 规模与费用：同一条提示词两次真实对话相差 3.3 倍（2.02M / 6.59M token，子代理约占 98%），费用未折算（本机无 `qwen4-max` 价目）；没有评估 token 维度的上限或界面成本提示，已登记 backlog。
+- 界面最终态截图（`ultra-ui-2-final.png`）里报告正文的 `citation:` 链接仍显示为带下划线的原文，刷新后（`ultra-ui-3-reloaded.png`）才渲染成引用胶囊；本批未改引用渲染，根因未确认，已登记 backlog。
 - Ultra 委派评测：每个模型多分支场景只有 3 个样本（`kimi-k3.1-pro` 1/3、`glm-5.4` 2/3 是小样本触发率，不是稳定估计）；工具与子代理都是桩，子代理真实执行的质量未评；默认模型之外只记录、不设阻断线；course-video、ppt-master 等工作流在 Ultra 下的实际行为未测。
 - 部署侧各项（gateway/前端发布、`usage_tombstones` 迁移上线、服务器 config 与价目录入、部署后行为验收）：未部署，需用户另行下达指令。

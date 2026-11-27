@@ -1,6 +1,6 @@
 # 用量删除快照、GLM 5.4 接入、To-dos 运行中提醒与 Ultra 场景化委派实施计划
 
-> **状态**：未执行（执行中：Ultra；定稿 2026-11-26；基准 commit `7e73faf5`；评审决策 Q1–Q14 经两轮 grill 由用户确认；同日按外部评审修订）。
+> **状态**：已执行（2026-11-27；PR #65 → #66 → #67 → #68 串行合入 main `ca49692b`；执行记录见 `docs/changelog/changelog-2026-11-26-usage-ultra-todos-glm-remediation.md`；未部署，发布见「六」；Task 5 Step 5 清理（移除 worktree、删远程分支）按用户指示留待后续；定稿 2026-11-26，基准 commit `7e73faf5`，评审决策 Q1–Q14 经两轮 grill 由用户确认，同日按外部评审修订）。
 > **TL;DR**：诊断报告的四项拆成四个串行 PR：① 删除作品/会话前写用量快照（新表 `usage_tombstones`），「我的用量」继续计入并标「作品已删除」；② 接入 360 `z-ai/glm-5.4`（标准 + Ultra 可选、非默认，¥8 / ¥28 / ¥2 每百万 token）；③ 先只读取证，证据不否定「模型批量补写」就在 `TodoMiddleware` 加运行中提醒；④ Ultra 提示词改为「≥2 条相互独立的工作即并行委派」，run 元数据落执行模式，文案同步并删除「更长执行预算」口径。影响面 = backend 用量/删除路径/中间件/提示词/run 元数据 + 1 个 alembic 迁移 + 前端用量页与文案 + `config.example.yaml`；不部署，付费验证按 Q10 封顶。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 按 Task 0→5 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，任务之间不停下等评审（评审在各 PR 内完成），只在五处停下：Task 0 漂移需要改计划、本机基线全量测试不绿、某 PR 的 OCR 3 轮后仍有 Critical/Important、To-dos 真实 run 在提醒后把没做完的项标成 completed、Ultra 默认模型改一轮提示词后仍不达标。状态只改顶部原行，依次写 `未执行（执行中：用量快照）` → `未执行（执行中：GLM 5.4）` → `未执行（执行中：To-dos）` → `未执行（执行中：Ultra）`，Task 5 完成后改为 `已执行（…）`，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -340,11 +340,11 @@ workflow（`{n}` 照旧插值）：
   - 达标：其余 Ultra 模型各 4 个 trial（按评测时的花名册：四款共 16，PR 2 取消时三款共 12）。
   - 不达标：只改 `n > 1` 分支的委派文案（开头规则、检查标题、workflow、examples）与两句提醒，改一轮，默认模型重跑 4 个 trial；其余模型降为各 1 次多分支 + 1 次简单（合计 8 + 2 ×（模型数 − 1）：四款 14、三款 12）。仍不达标 → 停下，带 `ultra-eval.json` 交用户决定。
   - 记录：各模型触发率写进 changelog；某个模型多分支 3 次全为 0 时登记 backlog。
-- [x] **Step 9：真实端到端 Ultra（付费，2 次）。**（实际范围：API 级、只起 gateway、1 次；界面子任务卡片与截图未验证、第 2 次真实对话未做，均已列入 changelog「未验证清单」。） 本机隔离栈全套（gateway + 前端 + nginx），Ultra 档、默认模型、多分支场景。断言：
+- [x] **Step 9：真实端到端 Ultra（付费，2 次）。**（实际范围：API 级 1 次 + 界面 1 次，共 2 次，用满上限；界面出现三张子任务卡片并有截图，两次都核对了 `run_mode` 落库，见 changelog「PR 4」与验收记录。） 本机隔离栈全套（gateway + 前端 + nginx），Ultra 档、默认模型、多分支场景。断言：
   - `POST /api/threads/{id}/history` 里有 ≥2 个 `task` 调用且各有 ToolMessage 结果，run 状态为 success；
   - 界面出现子任务卡片，截图存证据目录；
   - 本机库里该 run 的 `metadata_json.run_mode == {"mode": "ultra", "subagent_enabled": true, "is_plan_mode": true}`。
-- [ ] **Step 10：提交并走 PR。** 分三笔提交：
+- [x] **Step 10：提交并走 PR。**（PR #68：三笔功能提交 + 一笔 changelog，Rebase and merge 合入 `ca49692b`。） 分三笔提交：
   - `feat(agents): Ultra 对相互独立的工作并行委派子代理`（`prompt.py`、`test_lead_agent_prompt.py`、`test_ultra_delegation_live.py`）；
   - `feat(runs): run 元数据记录执行模式`（`services.py`、`test_gateway_services.py`）；
   - `docs(modes): Ultra 文案与模式阶梯勘误`（i18n 两个文件、模式阶梯计划）。
@@ -352,18 +352,18 @@ workflow（`{n}` 照旧插值）：
 
 ### Task 5：收尾
 
-- [ ] **Step 1：最终门禁。** 四个 PR 合入后，在 worktree `git fetch origin && git switch --detach origin/main`，跑根 `make check`、`cd backend && make test`（后台）、`cd frontend && pnpm check && pnpm test`、`python3 scripts/check_docs_convention.py`，全部通过。
-- [ ] **Step 2：完成 changelog。**
+- [x] **Step 1：最终门禁。**（`origin/main` = `ca49692b`：`make check` exit 0；backend `10511 passed, 31 skipped`；frontend `307 files / 2172 tests passed`；docs convention 通过。） 四个 PR 合入后，在 worktree `git fetch origin && git switch --detach origin/main`，跑根 `make check`、`cd backend && make test`（后台）、`cd frontend && pnpm check && pnpm test`、`python3 scripts/check_docs_convention.py`，全部通过。
+- [x] **Step 2：完成 changelog。**（验收记录、证据摘要、未验证清单已补全，见 changelog。）
   - 「验收记录」逐行写「命令 → 实际关键输出」（每个 PR 的定向测试、全量门禁、PR 与合入 hash）。
   - 证据摘要：`server-evidence.json` 聚合数、GLM 探针结论、各 Ultra 模型触发率、To-dos 实测快照序列。
   - 「未验证清单」：部署侧各项、超限或跳过的付费项、`SERVER_EVIDENCE_NOT_VERIFIED`（如有）。
   - 写明「修复前已删除的作品不回填」与「删除快照写失败会让删除失败」。
-- [ ] **Step 3：更新 backlog。**
+- [x] **Step 3：更新 backlog。**（四条 2026-11-26 条目已勾，BUG-03 因 PR #67 合入而勾；补登 8 条 2026-11-27 条目，含 PR #67 漏登的重复调用硬停与提醒上限数字的钳制残留；双 DELETE 条目保持未勾。）
   - 勾掉四条 2026-11-26 条目；BUG-03 只有 PR 3 合入才勾，否则注明「拆 pending」。
   - 补登：Ultra 非默认模型 0/3 的情况、GLM 取消（如有）。
   - 双 DELETE 条目保持未勾。
-- [ ] **Step 4：回填状态头。** 状态行改为 `已执行（<日期>；PR #… → #… → #… → #… 串行合入 main <hash>；changelog：<链接>；未部署，发布见「六」）`，以纯 docs 提交推 main。
-- [ ] **Step 5：清理。**
+- [x] **Step 4：回填状态头。**（顶部状态行已改为 `已执行（2026-11-27；…）`，含 PR 串行合入、changelog 链接与「Task 5 Step 5 留待后续」。） 状态行改为 `已执行（<日期>；PR #… → #… → #… → #… 串行合入 main <hash>；changelog：<链接>；未部署，发布见「六」）`，以纯 docs 提交推 main。
+- [ ] **Step 5：清理。**（按用户指示本轮不做，留待后续：移除 worktree、删除四条远程分支；其中「停掉本机栈端口」已在界面验收后完成，没有在途的后台任务。）
   - `git worktree list`；在 worktree 里 `git status --ignored --short`，确认没有未转移的证据后再 `git worktree remove`；删除四条远程分支。
   - 停掉本机栈端口，确认没有在途的后台任务。
 
@@ -377,14 +377,14 @@ workflow（`{n}` 照旧插值）：
 - [x] To-dos：`TestProgressReminder` 八例。
 - [x] Ultra：提示词三例（n=3 分区、n=1 分区、两句提醒）、`run_mode` 三例（含运行时优先级）。
 - [x] 前端：`usage-task-list.dom.test.tsx` 已删除条目、`todo-list.dom.test.tsx` 状态重渲染。
-- [ ] 全量：根 `make check`、`cd backend && make test`、`cd frontend && pnpm check && pnpm test`、docs convention。
+- [x] 全量：根 `make check`、`cd backend && make test`、`cd frontend && pnpm check && pnpm test`、docs convention。（`origin/main` = `ca49692b` 上全部通过，数字见 changelog 验收记录。）
 
 **行为级（用户可感知）：**
 
 - [x] BUG-01（API 级）：走真实删除路径，删除前后 `get_personal_usage` 的总费用与 Token 不变（AI 生图、AI 视频、Agent 会话各一例）；能力筛选正确；晚到账本照常计入；`unified_tasks`/`threads_meta` 行已删，作品列表的数据源里没有该项——Task 1 Step 6。
 - [x] FEAT-01（live）：探针通过；真实对话的 `model_name` 没有回退、费用按 8/28/2 入账、原生工具调用成功——Task 2 Step 2/6。（错误形态探针前提不成立，已移除并列入 changelog「未验证清单」；真实对话的 run 因脚本漏带 `recursion_limit` 以 `recursion_limit` 结束，同列未验证清单。）
 - [x] BUG-03（图级 + live）：真实 Agent 图在提醒之后、终态之前出现中间迁移；本机真实 run 出现 `todo_progress_reminder`，其后、最终回复前有 `write_todos`，且提醒后没有伪报完成（3 次都未触发时标未验证）——Task 3 Step 3/7。
-- [ ] BUG-02（live）：默认 Ultra 模型达标；端到端出现子任务卡片；`run_mode` 落库——Task 4 Step 8/9。（默认模型达标与 `run_mode` 落库已验证；**界面子任务卡片未验证**，没有起前端与 nginx，见 changelog「未验证清单」，故保持未勾。）
+- [x] BUG-02（live）：默认 Ultra 模型达标；端到端出现子任务卡片；`run_mode` 落库——Task 4 Step 8/9。（默认模型评测 3/3 达标、简单场景 0 次；API 级与界面各一次真实对话：一条回复并行 3 个 `task`、界面出现三张子任务卡片并有截图、`run_mode` 落库，见 changelog。）
 - [ ] 部署侧（延后，需指令）：见「六」第 6 条。
 
 ## 五、Review Focus
