@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileText, Files } from "lucide-react";
+import { Download, Files } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,39 +16,60 @@ import { useI18n } from "@/core/i18n/hooks";
 import { formatDateTime } from "@/core/utils/datetime";
 import type { VideoTaskBrief } from "@/core/video-gen/types";
 import type { WorkFile, WorkSummary } from "@/core/works/types";
+import type { WorkCapability } from "@/core/workspace/video-assets-route";
 import { cn } from "@/lib/utils";
 
-import { formatFileSize } from "./work-media";
+import { formatFileSize, MEDIA_ICONS } from "./work-media";
+import { WorkTypeCover, type WorkCoverState } from "./work-type-cover";
 
-function FileDetails({ file }: { file: WorkFile }) {
+const DETAILS_SURFACE =
+  "bg-muted/30 flex min-h-56 flex-col items-center justify-center gap-4 rounded-xl border px-6 py-8 text-center";
+
+function FileDetails({
+  file,
+  capability,
+  state,
+}: {
+  file: WorkFile;
+  capability: WorkCapability;
+  state: WorkCoverState;
+}) {
   const { t } = useI18n();
   const lowerName = file.name?.toLocaleLowerCase() ?? "";
   const isPresentation =
     lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt");
   return (
-    <div className="bg-muted flex min-h-56 flex-col items-center justify-center rounded-xl border px-6 py-10 text-center">
-      <FileText
-        className="text-muted-foreground h-10 w-10"
-        aria-hidden="true"
-      />
-      <p className="mt-4 max-w-full text-sm font-medium break-all">
-        {file.name ?? t.workspace.works.byDownloadResponse}
-      </p>
-      <p className="text-muted-foreground mt-2 text-sm">
-        {isPresentation
-          ? t.workspace.works.powerPointHint
-          : t.workspace.works.unsupportedPreview}
-      </p>
+    <div className={DETAILS_SURFACE}>
+      <div className="w-full max-w-md">
+        <WorkTypeCover
+          capability={capability}
+          file={file}
+          state={state}
+          className="rounded-xl"
+        />
+      </div>
+      <div>
+        <p className="max-w-full text-sm font-medium break-all">
+          {file.name ?? t.workspace.works.byDownloadResponse}
+        </p>
+        <p className="text-muted-foreground mt-2 text-sm">
+          {isPresentation
+            ? t.workspace.works.powerPointHint
+            : t.workspace.works.unsupportedPreview}
+        </p>
+      </div>
     </div>
   );
 }
 
 function CurrentFileMedia({
   file,
+  capability,
   failed,
   onError,
 }: {
   file: WorkFile;
+  capability: WorkCapability;
   failed: boolean;
   onError: () => void;
 }) {
@@ -56,21 +77,32 @@ function CurrentFileMedia({
   const [legacyImageFallback, setLegacyImageFallback] = useState(false);
   if (!file.exists) {
     return (
-      <div
-        role="status"
-        className="bg-muted rounded-xl border p-10 text-center text-sm"
-      >
-        {t.workspace.works.fileMissing}
+      <div role="status" className={DETAILS_SURFACE}>
+        <div className="w-full max-w-md">
+          <WorkTypeCover
+            capability={capability}
+            file={file}
+            state="missing"
+            className="rounded-xl"
+          />
+        </div>
       </div>
     );
   }
   if (failed) {
     return (
-      <div
-        role="status"
-        className="bg-muted rounded-xl border p-10 text-center text-sm"
-      >
-        {t.workspace.works.mediaError}
+      <div role="status" className={DETAILS_SURFACE}>
+        <div className="w-full max-w-md">
+          <WorkTypeCover
+            capability={capability}
+            file={file}
+            state="default"
+            className="rounded-xl"
+          />
+        </div>
+        <p className="text-sm text-amber-700 dark:text-amber-400">
+          {t.workspace.works.mediaError}
+        </p>
       </div>
     );
   }
@@ -108,14 +140,24 @@ function CurrentFileMedia({
   }
   if (file.mediaKind === "audio" && file.previewUrl) {
     return (
-      <audio
-        key={file.id}
-        src={file.previewUrl}
-        controls
-        preload="metadata"
-        onError={onError}
-        className="w-full"
-      />
+      <div className="flex flex-col gap-4">
+        <div className="mx-auto w-full max-w-md">
+          <WorkTypeCover
+            capability={capability}
+            file={file}
+            state="default"
+            className="rounded-xl"
+          />
+        </div>
+        <audio
+          key={file.id}
+          src={file.previewUrl}
+          controls
+          preload="metadata"
+          onError={onError}
+          className="w-full"
+        />
+      </div>
     );
   }
   if (file.mediaKind === "image" && file.previewUrl) {
@@ -131,7 +173,7 @@ function CurrentFileMedia({
       </div>
     );
   }
-  return <FileDetails file={file} />;
+  return <FileDetails file={file} capability={capability} state="default" />;
 }
 
 function WorkViewerContent({
@@ -169,12 +211,23 @@ function WorkViewerContent({
         <CurrentFileMedia
           key={currentFile.id}
           file={currentFile}
+          capability={work.capability}
           failed={failedFileId === currentFile.id}
           onError={() => setFailedFileId(currentFile.id)}
         />
       ) : (
-        <div className="bg-muted rounded-xl border border-dashed p-10 text-center text-sm">
-          {t.workspace.works.emptyFiles}
+        <div className="bg-muted/30 rounded-xl border border-dashed p-6 text-center text-sm">
+          <div className="mx-auto w-full max-w-md">
+            <WorkTypeCover
+              capability={work.capability}
+              file={null}
+              state="empty"
+              className="rounded-xl"
+            />
+          </div>
+          <p className="text-muted-foreground mt-3">
+            {t.workspace.works.emptyFiles}
+          </p>
         </div>
       )}
 
@@ -188,30 +241,34 @@ function WorkViewerContent({
             </span>
           </div>
           <div className="space-y-1">
-            {work.files.map((file) => (
-              <button
-                key={file.id}
-                type="button"
-                aria-pressed={currentFile?.id === file.id}
-                onClick={() => setSelectedFileId(file.id)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm",
-                  currentFile?.id === file.id
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50",
-                )}
-              >
-                <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate">
-                  {file.name ?? t.workspace.works.byDownloadResponse}
-                </span>
-                <span className="shrink-0 text-xs">
-                  {file.modifiedAt
-                    ? formatDateTime(file.modifiedAt)
-                    : t.workspace.works.updatedUnknown}
-                </span>
-              </button>
-            ))}
+            {work.files.map((file) => {
+              // 按 mediaKind 取图标：按扩展名猜会把 SVG 显示成图片图标。
+              const FileIcon = MEDIA_ICONS[file.mediaKind];
+              return (
+                <button
+                  key={file.id}
+                  type="button"
+                  aria-pressed={currentFile?.id === file.id}
+                  onClick={() => setSelectedFileId(file.id)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm",
+                    currentFile?.id === file.id
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  <FileIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {file.name ?? t.workspace.works.byDownloadResponse}
+                  </span>
+                  <span className="shrink-0 text-xs">
+                    {file.modifiedAt
+                      ? formatDateTime(file.modifiedAt)
+                      : t.workspace.works.updatedUnknown}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}

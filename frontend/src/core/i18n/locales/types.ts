@@ -529,6 +529,14 @@ export interface Translations {
       downloadCurrent: string;
       deleteConfirmTitle: string;
       deleteConfirmDescription: string;
+      /** 类型封面：Agent 作品图片封面的 alt（文件名缺失时）。 */
+      coverImageAlt: (title: string) => string;
+      /** 类型封面：文件名缺失时按 mediaKind 显示的通用标签。 */
+      coverVideo: string;
+      coverAudio: string;
+      coverDocument: string;
+      coverImage: string;
+      coverOther: string;
     };
   };
 
