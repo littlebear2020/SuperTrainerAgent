@@ -293,3 +293,22 @@ def test_helper_falls_back_to_first_frame_when_representative_seek_times_out(tmp
     assert mod._ffmpeg_extract_thumbnail(video, thumb) is True
     assert thumb.read_bytes()[:3] == b"\xff\xd8\xff"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["output.mp4", "thumbnail.jpg"]
+
+
+def test_helper_failure_to_remove_stale_thumbnail_does_not_raise(tmp_path, monkeypatch):
+    """删除旧图时 OSError（权限/目录不存在）不得向外抛：调用方裸调用，契约是失败返回 False。"""
+    mod = _load_ffmpeg_helpers()
+    stale = tmp_path / "thumbnail.jpg"
+    stale.write_bytes(b"old frame")
+    broken = tmp_path / "broken.mp4"
+    broken.write_bytes(b"not a video")
+    real_unlink = Path.unlink
+
+    def stubborn_unlink(self, *args, **kwargs):
+        if self == stale:
+            raise PermissionError("read-only file system")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", stubborn_unlink)
+
+    assert mod._ffmpeg_extract_thumbnail(broken, stale) is False

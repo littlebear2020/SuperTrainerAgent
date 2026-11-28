@@ -258,8 +258,9 @@ def test_multiple_task_types_filter_before_limit(seeded, capsys):
     code = mod.main(["--db-path", str(db), "--apply", "--task-type", "ai_visual", "--task-type", "remotion_course", "--limit", "1"])
 
     assert code == 0
-    # LIMIT 1 落在目标类型里最早的一行（vg_has，已有缩略图），而不是其他类型（ai_video）更早的行
-    assert "scanned=1 generated=0 skipped=1 failed=0" in capsys.readouterr().out
+    # LIMIT 1 落在目标类型里（跳过 vg_has 后取 vg_stale），而不是被其他类型（ai_video）更早的行占掉
+    assert "scanned=2 generated=1 skipped=1 failed=0" in capsys.readouterr().out
+    assert json.loads(_result(conn, "vg_stale"))["thumbnail_path"] == str(store / "thumbnail.jpg")
     assert "thumbnail_path" not in json.loads(_result(conn, "vg_needs"))
 
 
@@ -290,3 +291,41 @@ def test_limit_reports_truncation(seeded, capsys):
     out = capsys.readouterr().out
     assert "scanned=1 " in out
     assert "[limit]" in out
+
+
+def test_limit_counts_candidates_and_batch_advances(seeded, capsys):
+    """`--limit N` = 最多处理 N 个候选：已补图的任务不再占额度，分批重跑能推进到后面的任务。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+
+    code = mod.main(["--db-path", str(db), "--apply", "--limit", "1"])
+    assert code == 0
+    first = capsys.readouterr().out
+    assert "scanned=1 generated=1 skipped=0 failed=0" in first
+    assert "[limit]" in first  # 后面还有候选
+
+    code = mod.main(["--db-path", str(db), "--apply", "--limit", "1"])
+    assert code == 1
+    # 第二批：vg_needs 已有图被跳过（不计额度），候选是下一个 vg_broken（成片损坏）
+    assert "scanned=2 generated=0 skipped=1 failed=1" in capsys.readouterr().out
+
+
+def test_limit_rejects_non_positive_values(seeded):
+    mod = _load_module()
+    conn, db, store, good = seeded
+    with pytest.raises(SystemExit):
+        mod.main(["--db-path", str(db), "--limit", "0"])
+
+
+def test_write_back_affecting_zero_rows_is_skipped_and_reclaimed(seeded, monkeypatch, capsys):
+    """UPDATE 命中 0 行（状态已被并发改掉）按 skipped 处理，并回收本次新建的缩略图。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+    monkeypatch.setattr(mod, "_write_thumbnail_path", lambda *a, **k: 0)
+
+    code = mod.main(["--db-path", str(db), "--apply", "--task-id", "vg_needs"])
+
+    assert code == 0
+    assert not (store / "thumbnail.jpg").exists()
+    assert "thumbnail_path" not in json.loads(_result(conn, "vg_needs"))
+    assert "scanned=1 generated=0 skipped=1 failed=0" in capsys.readouterr().out

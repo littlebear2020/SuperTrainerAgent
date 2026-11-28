@@ -1032,7 +1032,11 @@ def _ffmpeg_extract_thumbnail(
         logger.warning("Thumbnail extraction failed for %s", video_path, exc_info=True)
     finally:
         tmp_path.unlink(missing_ok=True)
-    output_path.unlink(missing_ok=True)
+    try:
+        output_path.unlink(missing_ok=True)
+    except OSError:
+        # 调用方裸调用、契约是失败返回 False：删不掉旧图也不能让已成功渲染的管线崩掉
+        logger.warning("Failed to remove stale thumbnail %s", output_path)
     return False
 
 
