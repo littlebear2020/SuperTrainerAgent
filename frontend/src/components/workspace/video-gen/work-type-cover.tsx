@@ -71,15 +71,27 @@ const NEUTRAL_MEDALLION = "bg-muted text-muted-foreground";
 const MISSING_MEDALLION =
   "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400";
 
+/** 扩展名：1–8 位字母数字；以点开头的隐藏文件（`.env`）不算扩展名。 */
+const FILE_EXTENSION = /\.([A-Za-z0-9]{1,8})$/;
+
 /** 格式徽标：有文件名取扩展名（MP4/PPTX/HTML…），没有文件名按 mediaKind 给通用标签。 */
 function coverFormatLabel(
   file: WorkFile | null,
   labels: Record<WorkMediaKind, string>,
 ): string | null {
-  const extension = file?.name?.match(/\.([A-Za-z0-9]+)$/)?.[1];
+  const name = file?.name ?? "";
+  const extension = name.includes(".", 1)
+    ? FILE_EXTENSION.exec(name)?.[1]
+    : undefined;
   if (extension) return extension.toUpperCase();
   if (!file) return null;
   return labels[file.mediaKind];
+}
+
+function medallionFor(state: WorkCoverState, fallback: string): string {
+  if (state === "missing") return MISSING_MEDALLION;
+  if (state === "default") return fallback;
+  return NEUTRAL_MEDALLION;
 }
 
 /**
@@ -102,20 +114,12 @@ export function WorkTypeCover({
   const { t } = useI18n();
   const appearance = COVER_APPEARANCE[capability];
   const Icon = state === "missing" ? FileWarning : appearance.icon;
-  const medallion =
-    state === "missing"
-      ? MISSING_MEDALLION
-      : state === "default"
-        ? appearance.medallion
-        : NEUTRAL_MEDALLION;
-  const statusText =
-    state === "missing"
-      ? t.workspace.works.fileMissing
-      : state === "empty"
-        ? t.workspace.works.emptyFiles
-        : state === "unknown"
-          ? t.workspace.works.fileInfoUnavailable
-          : null;
+  const medallion = medallionFor(state, appearance.medallion);
+  let statusText: string | null = null;
+  if (state === "missing") statusText = t.workspace.works.fileMissing;
+  else if (state === "empty") statusText = t.workspace.works.emptyFiles;
+  else if (state === "unknown")
+    statusText = t.workspace.works.fileInfoUnavailable;
   const format = coverFormatLabel(file, {
     video: t.workspace.works.coverVideo,
     audio: t.workspace.works.coverAudio,
