@@ -871,6 +871,12 @@ export const enUS: Translations = {
       deleteConfirmTitle: "Confirm deletion",
       deleteConfirmDescription:
         "Delete this video task? This action cannot be undone.",
+      coverImageAlt: (title: string) => `${title}: delivered image preview`,
+      coverVideo: "Video",
+      coverAudio: "Audio",
+      coverDocument: "Document",
+      coverImage: "Image",
+      coverOther: "File",
     },
   },
 

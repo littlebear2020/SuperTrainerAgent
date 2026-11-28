@@ -805,6 +805,12 @@ export const zhCN: Translations = {
       downloadCurrent: "下载当前文件",
       deleteConfirmTitle: "确认删除",
       deleteConfirmDescription: "确定要删除这个视频任务吗？此操作无法撤销。",
+      coverImageAlt: (title: string) => `${title}：交付图片预览`,
+      coverVideo: "视频",
+      coverAudio: "音频",
+      coverDocument: "文档",
+      coverImage: "图片",
+      coverOther: "文件",
     },
   },
 
