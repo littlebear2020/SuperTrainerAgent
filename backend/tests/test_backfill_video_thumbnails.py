@@ -5,7 +5,8 @@ remotion_course/remotion/ai_image/ai_visual/ai_video 五种类型；只处理 re
 且 result.thumbnail_path 缺失或其文件不存在的任务；只写 thumbnail_path 一个键；重复执行幂等；
 单任务失败不中断批次；输出 scanned/generated/skipped/failed 计数；真实小 MP4 生成有效 JPEG。
 
-全部用临时目录 + 临时 SQLite，不碰开发库。
+Task 7 Step 1 的 API 级行为验收也在这里：回填 ``--apply`` 后，``_task_with_thumbnail`` 下发
+``thumbnail_url``，缩略图 GET 端点返回可解码的 JPEG。全部用临时目录 + 临时 SQLite，不碰开发库。
 """
 
 from __future__ import annotations
@@ -16,8 +17,11 @@ import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi.responses import FileResponse
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "backfill_video_thumbnails.py"
 FFMPEG = shutil.which("ffmpeg")
@@ -194,3 +198,53 @@ def test_single_failure_does_not_abort_batch(seeded):
     mod.main(["--db-path", str(db), "--apply", "--task-id", "vg_broken"])
     # 成片损坏 → failed，不抛、不写；批次其他任务照常（上一个用例）
     assert "thumbnail_path" not in json.loads(_result(conn, "vg_broken"))
+
+
+def _mock_task(result: str):
+    """与 test_thumbnail.py 同形态的最小任务行。"""
+    task = MagicMock()
+    task.id = "vg_needs"
+    task.user_id = "u1"
+    task.domain = "video_gen"
+    task.task_type = "ai_video"
+    task.status = "ready"
+    task.progress = 100
+    task.error_message = None
+    task.retry_count = 0
+    task.title = None
+    task.created_at = None
+    task.updated_at = None
+    task.thumbnail_url = None
+    task.amount_source = None
+    task.queue_position = None
+    task.artifact_missing = False
+    task.delivery = None
+    task.cost = None
+    task.currency = None
+    task.payload = None
+    task.result = result
+    return task
+
+
+def test_backfill_is_visible_through_thumbnail_api(seeded):
+    """Task 7 Step 1 回填路径：临时库里 ready ai_video 任务没有缩略图，回填 --apply 后，
+    `_task_with_thumbnail` 下发 thumbnail_url，缩略图 GET 返回可解码 JPEG。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+    from app.gateway.routers.video_gen import _task_with_thumbnail, get_video_thumbnail
+
+    row = _mock_task(_result(conn, "vg_needs"))
+    assert _task_with_thumbnail(row).thumbnail_url is None
+
+    mod.main(["--db-path", str(db), "--apply", "--task-id", "vg_needs"])
+    row.result = _result(conn, "vg_needs")
+
+    assert _task_with_thumbnail(row).thumbnail_url == "/api/video/tasks/vg_needs/thumbnail"
+
+    svc = SimpleNamespace(get_task=AsyncMock(return_value=row))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(video_gen_service=svc)))
+    with patch("app.gateway.routers.video_gen.get_effective_user_id", return_value="u1"):
+        import asyncio
+
+    response = asyncio.run(get_video_thumbnail(request, "vg_needs"))
+    assert isinstance(response, FileResponse) and Path(response.path).read_bytes()[:3] == b"\xff\xd8\xff"
