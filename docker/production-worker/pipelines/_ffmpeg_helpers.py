@@ -975,22 +975,57 @@ def _finalize_output(result: Path, final_raw: Path) -> Path:
     return final_raw
 
 
-def _ffmpeg_extract_thumbnail(video_path: Path, output_path: Path, timeout: int = 30) -> bool:
+def _ffmpeg_extract_thumbnail(
+    video_path: Path,
+    output_path: Path,
+    timeout: int = 30,
+    *,
+    seek_ratio: float = 0.1,
+) -> bool:
     """Extract a JPEG thumbnail from the video.
 
-    Seeks to max(1s, duration*10%) to avoid black/transition frames.
+    Seeks to max(1s, duration*seek_ratio)（默认 10% = 既有行为）to avoid
+    black/transition frames；代表时点拿不到帧（时长 <1s、ffprobe 取不到时长）就以
+    ``-ss 0`` 重试。
+
+    先写同目录临时文件（保留 .jpg 后缀），成功才 ``os.replace`` 到 output_path；
+    最终失败时删除临时文件与 output_path 上已有的旧图——重合成场景下旧图不得冒充
+    新成片，超时被杀也不会留下半个文件。位置参数与返回值不变（多处按位置参数桩掉它）。
     Returns True on success.
     """
-    try:
-        duration = _ffprobe_duration(video_path)
-        ss = max(1.0, duration * 0.1)
+    import os
+
+    tmp_path = output_path.with_name(f"{output_path.name}.tmp{output_path.suffix}")
+
+    def _grab(ss: float) -> bool:
+        tmp_path.unlink(missing_ok=True)
         cmd = ["ffmpeg", "-y", "-ss", str(ss), "-i", str(video_path),
-               "-frames:v", "1", "-q:v", "2", str(output_path)]
+               "-frames:v", "1", "-q:v", "2", str(tmp_path)]
         proc = subprocess.run(cmd, capture_output=True, timeout=timeout)
-        return proc.returncode == 0 and output_path.exists()
+        return proc.returncode == 0 and tmp_path.exists() and tmp_path.stat().st_size > 0
+
+    try:
+        duration: float | None
+        try:
+            duration = _ffprobe_duration(video_path)
+        except Exception:
+            duration = None
+        attempts = [max(1.0, duration * seek_ratio)] if duration is not None else []
+        attempts.append(0.0)
+        for ss in attempts:
+            if _grab(ss):
+                os.replace(str(tmp_path), str(output_path))
+                return True
+        logger.warning(
+            "Thumbnail extraction failed for %s (no frame at seek positions %s)",
+            video_path, attempts,
+        )
     except Exception:
-        logger.warning("Thumbnail extraction failed for %s", video_path)
-        return False
+        logger.warning("Thumbnail extraction failed for %s", video_path, exc_info=True)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    output_path.unlink(missing_ok=True)
+    return False
 
 
 def _probe_duration(path) -> float:

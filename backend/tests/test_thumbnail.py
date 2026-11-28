@@ -153,3 +153,70 @@ def test_task_with_thumbnail_router_logic():
     with patch("pathlib.Path.exists", return_value=False):
         brief = _task_with_thumbnail(task)
         assert brief.artifact_missing is False
+
+
+# ── Batch B（2026-11-28）：共享抽帧 helper 加固 ──────────────────────────────────────
+# 真实 ffmpeg，进 CI：失败不留旧图、不留临时文件；<1s 视频回退首帧；签名兼容既有调用。
+
+
+def _load_ffmpeg_helpers():
+    """按路径加载 worker 共享 helper（同 test_ffmpeg_extract_thumbnail_helper 的写法）。"""
+    import importlib.util
+
+    helper_path = Path(__file__).resolve().parents[2] / "docker" / "production-worker" / "pipelines" / "_ffmpeg_helpers.py"
+    spec = importlib.util.spec_from_file_location("_ffmpeg_helpers", helper_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_helper_failure_removes_stale_thumbnail_and_leaves_no_temp(tmp_path):
+    """目标位置已有旧图、本次抽帧失败（输入不是视频）：返回 False 且旧图被删，无临时文件残留。"""
+    mod = _load_ffmpeg_helpers()
+    stale = tmp_path / "thumbnail.jpg"
+    stale.write_bytes(b"old frame")
+    broken = tmp_path / "broken.mp4"
+    broken.write_bytes(b"not a video")
+
+    assert mod._ffmpeg_extract_thumbnail(broken, stale) is False
+    assert not stale.exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["broken.mp4"]
+
+
+def test_helper_falls_back_to_first_frame_for_sub_second_video(tmp_path):
+    """时长 <1s 的视频在代表时点（seek 1s）拿不到帧，t=0 回退成功。"""
+    mod = _load_ffmpeg_helpers()
+    video = tmp_path / "output.mp4"
+    _make_mini_mp4(video, duration=0.5)
+    thumb = tmp_path / "thumbnail.jpg"
+
+    assert mod._ffmpeg_extract_thumbnail(video, thumb) is True
+    assert thumb.read_bytes()[:3] == b"\xff\xd8\xff"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["output.mp4", "thumbnail.jpg"]
+
+
+def test_helper_replaces_stale_thumbnail_without_temp_leftovers(video_dir):
+    """成功时目标文件是真实 JPEG（非旧的 3 字节），且没有残留的临时文件。"""
+    mod = _load_ffmpeg_helpers()
+    thumb = video_dir / "thumbnail.jpg"
+    thumb.write_bytes(b"old")
+
+    assert mod._ffmpeg_extract_thumbnail(video_dir / "output.mp4", thumb) is True
+    assert thumb.read_bytes()[:3] == b"\xff\xd8\xff"
+    assert thumb.stat().st_size > 100
+    assert sorted(p.name for p in video_dir.iterdir()) == ["output.mp4", "thumbnail.jpg"]
+
+
+def test_helper_seek_ratio_is_keyword_only_and_keeps_positional_signature(video_dir):
+    """位置参数与返回值不变（多处测试按位置参数桩掉它）；seek_ratio 仅关键字。"""
+    import inspect
+
+    mod = _load_ffmpeg_helpers()
+    parameters = inspect.signature(mod._ffmpeg_extract_thumbnail).parameters
+    assert list(parameters) == ["video_path", "output_path", "timeout", "seek_ratio"]
+    assert parameters["seek_ratio"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["seek_ratio"].default == 0.1
+
+    thumb = video_dir / "half.jpg"
+    assert mod._ffmpeg_extract_thumbnail(video_dir / "output.mp4", thumb, 30, seek_ratio=0.5) is True
+    assert thumb.exists()

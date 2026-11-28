@@ -31,6 +31,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from pipelines import net_guard
+from pipelines._ffmpeg_helpers import _ffmpeg_extract_thumbnail
 
 opener = net_guard.build_guarded_opener()  # 30x 每跳守卫（评审修复轮）
 
@@ -323,17 +324,10 @@ def _normalize_loudness_two_pass(video: Path, output: Path) -> Path:
 
 
 def _extract_thumbnail(video: Path, task_dir: Path) -> None:
+    """缩略图改调 worker 共享 helper（失败不留旧图、回退首帧）；保持 25% 取帧与 60s 超时。"""
     try:
-        probe = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
-            capture_output=True, text=True, timeout=30,
-        )
-        duration = float(probe.stdout.strip())
-        ss = max(1.0, duration * 0.25)
-        subprocess.run(
-            ["ffmpeg", "-y", "-ss", str(ss), "-i", str(video), "-frames:v", "1", "-q:v", "2",
-             str(task_dir / "thumbnail.jpg")],
-            capture_output=True, timeout=60,
+        _ffmpeg_extract_thumbnail(
+            video, task_dir / "thumbnail.jpg", timeout=60, seek_ratio=0.25
         )
     except Exception:
         logger.warning("thumbnail extraction failed", exc_info=True)
