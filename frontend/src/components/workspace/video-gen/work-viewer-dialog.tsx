@@ -225,9 +225,6 @@ function WorkViewerContent({
               className="rounded-xl"
             />
           </div>
-          <p className="text-muted-foreground mt-3">
-            {t.workspace.works.emptyFiles}
-          </p>
         </div>
       )}
 
