@@ -5,16 +5,16 @@
 
 ## Task 5：加固共享抽帧 helper，Remotion 改用它
 
-- `docker/production-worker/pipelines/_ffmpeg_helpers.py::_ffmpeg_extract_thumbnail(video_path, output_path, timeout=30, *, seek_ratio=0.1)`：位置参数与返回值不变（三条 AI 管线与多处测试按位置参数调用/桩掉它，调用点不改）；流程 = 取时长（失败视为未知）→ 代表时点 `max(1s, duration×ratio)` 抽到同目录临时文件 `thumbnail.jpg.tmp.jpg` → 校验返回码且文件非空 → 失败则 `-ss 0` 重试 → 成功 `os.replace` 到目标并返回 True；单次尝试的 `TimeoutExpired`/`OSError` 就地记日志并继续下一次尝试（代表时点超时不放弃 `-ss 0` 回退）；最终失败删除临时文件与目标上已有的旧图，打 warning（含路径），返回 False。helper 仍只依赖标准库（`test_thumbnail.py` 按文件路径加载它）。
+- `docker/production-worker/pipelines/_ffmpeg_helpers.py::_ffmpeg_extract_thumbnail(video_path, output_path, timeout=30, *, seek_ratio=0.1)`：位置参数与返回值不变（三条 AI 管线与多处测试按位置参数调用/桩掉它，调用点不改）；流程 = 取时长（失败视为未知）→ 代表时点 `max(1s, duration×ratio)` 抽到同目录临时文件 `thumbnail.jpg.tmp.jpg` → 校验返回码且文件非空 → 失败则 `-ss 0` 重试 → 成功 `os.replace` 到目标并返回 True；单次尝试的 `TimeoutExpired`/`OSError` 就地记日志并继续下一次尝试（代表时点超时不放弃 `-ss 0` 回退）；最终删除旧图时的 `OSError` 只记 warning、不外抛（调用方裸调用，契约是失败返回 False）；最终失败删除临时文件与目标上已有的旧图，打 warning（含路径），返回 False。helper 仍只依赖标准库（`test_thumbnail.py` 按文件路径加载它）。
 - `compose_remotion.py::_extract_thumbnail` 改为 `from pipelines._ffmpeg_helpers import _ffmpeg_extract_thumbnail` 后调用（同 `from pipelines import net_guard` 写法），传 `timeout=60, seek_ratio=0.25`；目标仍是 `task_dir/thumbnail.jpg`，任何失败不向外抛。`worker.py` 的完成写回与三条 AI 管线的调用点不改。
 - 边界：时长 <1s 的视频在旧实现里 seek 到 1s 拿不到帧且不出图，现在回退 t=0 成功。
 
 ## Task 6：历史任务离线回填工具（默认 dry-run）
 
-- `backend/scripts/backfill_video_thumbnails.py`，按 `reconcile_video_tasks.py` 先例写（`--db-path` 自动探测、dry-run 只读连接 `mode=ro`、`--apply` 才写）。参数：`--task-type`（`choices` 限定五种：remotion_course / remotion / ai_image / ai_visual / ai_video，可多次，多值也在 SQL 层 `IN` 过滤，`LIMIT` 作用于目标类型）、`--task-id`、`--limit`（计扫描行数而非候选数，skipped 行同样占额度，达到上限时打印 `[limit]` 提示）。
+- `backend/scripts/backfill_video_thumbnails.py`，按 `reconcile_video_tasks.py` 先例写（`--db-path` 自动探测、dry-run 只读连接 `mode=ro`、`--apply` 才写）。参数：`--task-type`（`choices` 限定五种：remotion_course / remotion / ai_image / ai_visual / ai_video，可多次，多值也在 SQL 层 `IN` 过滤，`LIMIT` 作用于目标类型）、`--task-id`、`--limit`（候选上限：最多处理多少个待补图任务，已带图/成片缺失的行不占额度，分批 `--apply --limit N` 重跑可推进；≤0 被拒；达到上限且后面还有任务时打印 `[limit]` 提示）。
 - 范围：只处理上述类型中 `status='ready'`、`result.output_path` 存在、且 `result.thumbnail_path` 缺失或其文件不存在的任务；不重新渲染、不调用 provider、不删除任务或 outputs。
 - 抽帧：直接复用 gateway 现有同步 `_extract_thumbnail(output_path, Path(output_path).parent)`，缩略图落在成片同目录的 `thumbnail.jpg`（worker 任务即 `task_dir/thumbnail.jpg`）。dry-run 连文件系统都不写：抽到一次性临时目录、在目录销毁前判定存在性再丢弃。
-- 写回：每个任务一条 `UPDATE unified_tasks SET result = json_set(COALESCE(result,'{}'), '$.thumbnail_path', ?) WHERE id = ? AND status = 'ready'`，只动这一个键；写库失败时回收本次新建的缩略图（不留「文件在、引用无」的孤儿，重跑仍能识别为候选）；单任务失败不中断批次；输出 `scanned/generated/skipped/failed` 计数；范围内有抽帧失败时退出码 1。
+- 写回：每个任务一条 `UPDATE unified_tasks SET result = json_set(COALESCE(result,'{}'), '$.thumbnail_path', ?) WHERE id = ? AND status = 'ready'`，只动这一个键；写库失败或 UPDATE 命中 0 行（状态已被并发改掉，按 skipped 计）时回收本次新建的缩略图（不留「文件在、引用无」的孤儿，重跑仍能识别为候选）；单任务失败不中断批次；输出 `scanned/generated/skipped/failed` 计数；范围内有抽帧失败时退出码 1。
 - 用法写在 `--help`：在 gateway 容器内运行（`docker exec <gateway> sh -c 'cd /app/backend && PYTHONPATH=. uv run --no-sync python scripts/backfill_video_thumbnails.py'`），写入的路径前缀与 gateway 一致、容器里有 ffmpeg。真实环境的 dry-run/apply 须用户另行授权，见计划 §九。
 
 ## 已知限制
@@ -34,6 +34,7 @@
 - Task 7 Step 1 行为验收（API 级，临时库 + 真实小 MP4）：回填路径 `test_backfill_is_visible_through_thumbnail_api` → 回填前 `_task_with_thumbnail(...).thumbnail_url is None`，`--apply` 后为 `/api/video/tasks/vg_needs/thumbnail`，`get_video_thumbnail` 端点返回 `FileResponse` 且文件头 `ff d8 ff`；旧图路径 `test_stale_thumbnail_is_not_served_after_failed_extraction` → 加固后的 helper 对损坏成片返回 False、旧 `thumbnail.jpg` 被删、`_task_with_thumbnail` 返回 `thumbnail_url=None`。变异检查：把 `_ffmpeg_helpers.py` 临时换回 `dd24a2e9` 版本再跑该用例 → `AssertionError: assert not True`（旧图仍在），换回后 `1 passed`
 - 两文件合跑 `pytest tests/test_thumbnail.py tests/test_backfill_video_thumbnails.py -q` → `17 passed`
 - PR #70 评审第 1 轮（2 条 medium + 2 条 low，无 Critical）修复先红后绿：`pytest tests/test_thumbnail.py tests/test_backfill_video_thumbnails.py -q` 新增 4 条用例 → `3 failed, 18 passed`（代表时点超时后未回退、写库失败后缩略图仍在、`[limit]` 提示缺失；多 `--task-type` 的 LIMIT 用例在旧实现下 `scanned=0`），实现后 → `21 passed`；桩掉 helper 的回归 + 两文件 → `54 passed`；worker 全量 → `359 passed`
+- PR #70 评审第 2 轮（1 条 medium 内联 + 4 条 low，无 Critical）修复先红后绿：`--limit` 改为候选上限（分批可推进；新增用例 `test_limit_counts_candidates_and_batch_advances`、`test_limit_rejects_non_positive_values`，多类型 LIMIT 用例改为按候选口径断言）、helper 删旧图的 `OSError` 不外抛（`test_helper_failure_to_remove_stale_thumbnail_does_not_raise`）、写库命中 0 行按 skipped 回收（`test_write_back_affecting_zero_rows_is_skipped_and_reclaimed`）、回收目标与 `existed_before` 统一为成片同目录 `thumbnail.jpg`；实现前 → 4 failed，实现后两文件 → `25 passed`；桩掉 helper 的回归 + 两文件 → `58 passed`；worker 全量 → `359 passed`
 - Task 7 Step 2 门禁：`pre-commit run --files <本批改动>` → ruff lint/format、gitleaks 全 Passed；`cd backend && make test`（全量）→ `10456 passed, 98 skipped, 467 warnings in 99.82s`（基线 10444 + 本批新增 12），`EXIT=0`
 - worker 独立套件全量 `cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q` → `359 passed in 74.62s`，`EXIT=0`（跑完在目录下留下 1 字节未跟踪文件 `-`，既有现象，已登记 backlog 并删除）
 - 根 `make check` → `MAKE_CHECK_EXIT=0`：`ruff check .` `All checks passed!`、eslint 0 errors（120 warnings 既有）、`i18n key 存活检测通过：711 个叶子全活`、`OK 仓库治理约定全过`
