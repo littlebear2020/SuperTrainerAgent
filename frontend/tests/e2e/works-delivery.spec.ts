@@ -1,4 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import {
   mockLangGraphAPI,
@@ -8,6 +10,9 @@ import {
 import { mockVideoAPI, type MockVideoAPI } from "./utils/mock-video-api";
 
 let videoAPI: MockVideoAPI;
+
+// 真实 PNG（1920×1080），用于「同作品交付的光栅图作封面」用例；不用营销样例图冒充用户封面。
+const PNG = readFileSync("public/remotion-layouts/full-visual-page.png");
 
 function output(
   name: string,
@@ -38,6 +43,38 @@ function summary(
 
 function taskCard(page: Page, id: string) {
   return page.locator(`[data-task-id="${id}"]`);
+}
+
+function typeCover(scope: Locator): Locator {
+  return scope.getByTestId("work-type-cover");
+}
+
+function readyDelivery(fileName: string) {
+  return {
+    file_name: fileName,
+    file_size: 100,
+    file_updated_at: "2026-11-02T09:00:00Z",
+    media_kind: "video" as const,
+    exists: true,
+  };
+}
+
+/** 只给该线程的 PNG 回真实图片，其余产物（HTML/SVG）一律 404 且记录。 */
+async function serveOnlyPng(page: Page, threadId: string): Promise<string[]> {
+  const requests: string[] = [];
+  await page.route(`**/api/threads/${threadId}/artifacts/**`, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    requests.push(path);
+    if (path.toLocaleLowerCase().endsWith(".png")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: PNG,
+      });
+    }
+    return route.fulfill({ status: 404, body: "" });
+  });
+  return requests;
 }
 
 test.describe("works delivery center", () => {
@@ -527,6 +564,10 @@ test.describe("works delivery center", () => {
         contentType: "video/mp4",
       }),
     );
+    // cover.png 回真实图片：夹具登记的文本正文会让 <img> 报错并回落到类型封面。
+    await page.route("**/api/threads/media-1/artifacts/**", (route) =>
+      route.fulfill({ status: 200, contentType: "image/png", body: PNG }),
+    );
     const agentMediaRequests: string[] = [];
     page.on("request", (request) => {
       const url = new URL(request.url());
@@ -616,6 +657,239 @@ test.describe("works delivery center", () => {
     expect(requests).toEqual([]);
   });
 
+  for (const active of ["poster.html", "poster.svg"] as const) {
+    test(`shows the delivered PNG as the cover of an ${active} work without fetching active content`, async ({
+      page,
+    }) => {
+      const threadId = `poster-${active.endsWith("svg") ? "svg" : "html"}`;
+      mockLangGraphAPI(page, {
+        threads: [
+          {
+            thread_id: threadId,
+            title: `课程海报 ${active}`,
+            agent_name: "creative-studio",
+          },
+        ],
+        artifactSummaries: [
+          summary(threadId, "delivered", [
+            output(active, { media_kind: "other" }),
+            output("poster.png"),
+          ]),
+        ],
+      });
+      const artifactRequests = await serveOnlyPng(page, threadId);
+
+      await page.goto(
+        "/workspace/video-gen?tab=works&capability=creative-studio",
+      );
+      const card = page.locator(`[data-thread-id="${threadId}"]`);
+      const cover = card.getByTestId("work-media").locator("img");
+      await expect(cover).toHaveAttribute(
+        "src",
+        new RegExp(
+          `/api/threads/${threadId}/artifacts/mnt/user-data/outputs/poster\\.png$`,
+        ),
+      );
+      await expect(cover).toHaveAttribute("loading", "lazy");
+      await expect(cover).toHaveAttribute("decoding", "async");
+      await expect
+        .poll(() =>
+          cover.evaluate(
+            (element) => (element as HTMLImageElement).naturalWidth,
+          ),
+        )
+        .toBeGreaterThan(0);
+      await expect(typeCover(card)).toHaveCount(0);
+      // 卡片文件摘要仍是主交付文件（HTML/SVG）
+      await expect(card).toContainText(active);
+
+      // 「查看」默认打开主文件（HTML/SVG）的文件详情，不嵌入主动内容；下载仍指向主文件
+      await card.getByRole("button", { name: "查看", exact: true }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(typeCover(dialog)).toHaveAttribute(
+        "data-cover-state",
+        "default",
+      );
+      await expect(typeCover(dialog).locator("[data-cover-format]")).toHaveText(
+        active.endsWith(".svg") ? "SVG" : "HTML",
+      );
+      await expect(dialog).toContainText("此文件类型暂不支持在线预览");
+      await expect(dialog.locator("img, video, audio, iframe")).toHaveCount(0);
+      await expect(
+        dialog.getByRole("link", { name: "下载当前文件" }),
+      ).toHaveAttribute("href", new RegExp(`${active}\\?download=true$`));
+
+      // 列表阶段只请求了 PNG；HTML/SVG 正文零请求
+      expect(
+        artifactRequests.filter((path) => /\.(html|svg)$/i.test(path)),
+      ).toEqual([]);
+      expect(
+        artifactRequests.filter((path) => /\.png$/i.test(path)),
+      ).toHaveLength(1);
+    });
+  }
+
+  test("falls back to type covers instead of broken images for works without a real thumbnail", async ({
+    page,
+  }) => {
+    const agentCards = [
+      ["course-video", "motion", "文字动效", "MP4", "lucide-clapperboard"],
+      ["ppt-master", "deck", "PPT 课件", "PPTX", "lucide-presentation"],
+      ["podcast-studio", "podcast", "语音播客", "MP3", "lucide-audio-lines"],
+    ] as const;
+    mockLangGraphAPI(page, {
+      threads: agentCards.map(([capability, id, title]) => ({
+        thread_id: id,
+        title,
+        agent_name: capability,
+      })),
+      artifactSummaries: [
+        summary("motion", "delivered", [output("lesson.mp4")]),
+        summary("deck", "delivered", [output("slides.pptx")]),
+        summary("podcast", "delivered", [
+          output("episode.mp3", { media_kind: "audio" }),
+        ]),
+      ],
+    });
+    videoAPI.seedTask({
+      id: "no-thumb",
+      title: "无缩略图任务",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+      thumbnail_url: null,
+      delivery: readyDelivery("no-thumb.mp4"),
+    });
+    videoAPI.seedTask({
+      id: "broken-thumb",
+      title: "缩略图损坏任务",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+      thumbnail_url: "/api/video/tasks/broken-thumb/thumbnail",
+      delivery: readyDelivery("broken.mp4"),
+    });
+    await page.route("**/api/video/tasks/broken-thumb/thumbnail", (route) =>
+      route.fulfill({ status: 404, body: "" }),
+    );
+
+    for (const [capability, id, , badge, icon] of agentCards) {
+      await page.goto(
+        `/workspace/video-gen?tab=works&capability=${capability}`,
+      );
+      const card = page.locator(`[data-thread-id="${id}"]`);
+      await expect(typeCover(card)).toHaveAttribute(
+        "data-cover-state",
+        "default",
+      );
+      await expect(typeCover(card).locator("[data-cover-format]")).toHaveText(
+        badge,
+      );
+      await expect(typeCover(card).locator(`svg.${icon}`)).toHaveCount(1);
+      await expect(card.locator("img, video, audio")).toHaveCount(0);
+      await expect(card.locator("[src]")).toHaveCount(0);
+    }
+
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    await expect(
+      typeCover(taskCard(page, "no-thumb")).locator("[data-cover-format]"),
+    ).toHaveText("MP4");
+    await expect(taskCard(page, "no-thumb").locator("img")).toHaveCount(0);
+    // 缩略图 URL 存在但 404：先尝试加载，失败后回落到类型封面，不留破图
+    const broken = taskCard(page, "broken-thumb");
+    await expect(typeCover(broken)).toHaveAttribute(
+      "data-cover-state",
+      "default",
+    );
+    await expect(broken.locator("img")).toHaveCount(0);
+    await expect(broken).toContainText("AI 生视频");
+  });
+
+  test("keeps the works list free of media, active-content and download requests", async ({
+    page,
+  }) => {
+    const threads = [
+      {
+        thread_id: "gate-motion",
+        title: "文字动效",
+        agent_name: "course-video",
+      },
+      { thread_id: "gate-deck", title: "PPT 课件", agent_name: "ppt-master" },
+      {
+        thread_id: "gate-podcast",
+        title: "语音播客",
+        agent_name: "podcast-studio",
+      },
+      {
+        thread_id: "gate-poster",
+        title: "课程海报",
+        agent_name: "creative-studio",
+      },
+    ];
+    mockLangGraphAPI(page, {
+      threads,
+      artifactSummaries: [
+        summary("gate-motion", "delivered", [output("lesson.mp4")]),
+        summary("gate-deck", "delivered", [output("slides.pptx")]),
+        summary("gate-podcast", "delivered", [
+          output("episode.mp3", { media_kind: "audio" }),
+        ]),
+        summary("gate-poster", "delivered", [
+          output("poster.html", { media_kind: "other" }),
+          output("poster.png"),
+        ]),
+      ],
+    });
+    videoAPI.seedTask({
+      id: "gate-task",
+      title: "任务视频",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+      thumbnail_url: "/api/video/tasks/gate-task/thumbnail",
+      delivery: readyDelivery("gate.mp4"),
+    });
+    const artifactRequests = await serveOnlyPng(page, "gate-poster");
+    const mediaRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      // 只看 API 请求：/images/*.svg 之类的静态资源不在门禁范围
+      if (!url.pathname.startsWith("/api/")) return;
+      if (
+        /\.(mp4|mp3|html|svg)(\?|$)/i.test(url.pathname + url.search) ||
+        url.searchParams.has("download") ||
+        /\/download(\?|$)/.test(url.pathname + url.search)
+      ) {
+        mediaRequests.push(url.pathname + url.search);
+      }
+    });
+
+    for (const capability of [
+      "course-video",
+      "ppt-master",
+      "podcast-studio",
+      "creative-studio",
+    ]) {
+      await page.goto(
+        `/workspace/video-gen?tab=works&capability=${capability}`,
+      );
+      await expect(page.getByTestId("work-card")).toHaveCount(1);
+    }
+    // 列表阶段只允许真实图片封面（PNG）与任务缩略图请求
+    await expect(
+      page.locator('[data-thread-id="gate-poster"] img'),
+    ).toHaveAttribute("loading", "lazy");
+    await expect.poll(() => artifactRequests.length).toBe(1);
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    await expect(page.locator('[data-task-id="gate-task"] img')).toHaveCount(1);
+
+    expect(mediaRequests).toEqual([]);
+    expect(artifactRequests).toEqual([
+      "/api/threads/gate-poster/artifacts/mnt/user-data/outputs/poster.png",
+    ]);
+  });
+
   test("rejects invalid summary batches like the backend", async ({ page }) => {
     mockLangGraphAPI(page);
     await page.goto("/");
@@ -671,12 +945,32 @@ test.describe("works delivery center", () => {
           title: "English deck",
           agent_name: "ppt-master",
         },
+        {
+          thread_id: "english-poster",
+          title: "English poster",
+          agent_name: "creative-studio",
+        },
       ],
       artifactSummaries: [
         summary("english-dark", "delivered", [output("english.pptx")]),
+        summary("english-poster", "delivered", [
+          output("poster.html", { media_kind: "other" }),
+          output("poster.png"),
+        ]),
       ],
     });
+    await serveOnlyPng(page, "english-poster");
+    videoAPI.seedTask({
+      id: "english-task",
+      title: "English task",
+      task_type: "ai_video",
+      status: "ready",
+      progress: 100,
+      thumbnail_url: "/api/video/tasks/english-task/thumbnail",
+      delivery: readyDelivery("english.mp4"),
+    });
 
+    // 类型封面（纯 PPTX）在深色下的观感
     await page.goto("/workspace/video-gen?tab=works&capability=ppt-master");
     await expect(
       page.getByRole("heading", { name: "My works", exact: true }),
@@ -685,14 +979,49 @@ test.describe("works delivery center", () => {
       page.getByText(/View and download delivery files/),
     ).toBeVisible();
     await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(
+      typeCover(page.getByTestId("work-card")).locator("[data-cover-format]"),
+    ).toHaveText("PPTX");
+    await page.screenshot({
+      path: test.info().outputPath("english-dark-type-cover.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
     await page.getByRole("button", { name: "View", exact: true }).click();
     await expect(
       page.getByRole("link", { name: "Download current file" }),
     ).toBeVisible();
+    await expect(typeCover(page.getByRole("dialog"))).toBeVisible();
     await page.screenshot({
       path: test.info().outputPath("english-dark.png"),
       fullPage: true,
       animations: "disabled",
     });
+
+    // 真实图片封面（同作品交付的 PNG）与任务缩略图在深色下的观感
+    await page.goto(
+      "/workspace/video-gen?tab=works&capability=creative-studio",
+    );
+    const posterCover = page
+      .locator(
+        '[data-thread-id="english-poster"] [data-testid="work-media"] img',
+      )
+      .first();
+    await expect
+      .poll(() =>
+        posterCover.evaluate(
+          (element) => (element as HTMLImageElement).naturalWidth,
+        ),
+      )
+      .toBeGreaterThan(0);
+    await page.screenshot({
+      path: test.info().outputPath("english-dark-real-cover.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
+    await page.goto("/workspace/video-gen?tab=works&capability=ai_video");
+    await expect(
+      taskCard(page, "english-task").locator("[data-testid='work-media'] img"),
+    ).toHaveCount(1);
   });
 });
