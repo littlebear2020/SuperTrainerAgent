@@ -102,7 +102,7 @@ export function CourseMedia({
       <div className="pointer-events-none absolute top-3 left-3 z-10">
         <span
           data-media-label
-          className="inline-flex rounded-full border border-indigo-100 bg-white/90 px-2.5 py-1 text-[10px] font-medium text-slate-600 shadow-sm"
+          className="border-border bg-background/90 text-foreground inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium shadow-sm"
         >
           {copy.mediaLabel}
         </span>
@@ -158,14 +158,14 @@ function CourseEntryCard({
   }, [item.id, setFailedMedia]);
 
   return (
-    <article className="group bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl">
+    <article className="group bg-background border-border relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl dark:hover:border-indigo-500/50">
       <button
         ref={cardRef}
         type="button"
         data-course-entry={item.id}
         aria-label={`${copy.title}：${copy.description}`}
         onClick={() => onSelect(item)}
-        className="flex h-full w-full flex-col text-left"
+        className="flex h-full w-full flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-indigo-500"
       >
         <CourseMedia
           item={item}
@@ -183,7 +183,7 @@ function CourseEntryCard({
             </span>
             <span
               aria-hidden="true"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition-colors group-hover:bg-violet-600 group-hover:text-white"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition-colors group-hover:bg-violet-600 group-hover:text-white dark:bg-violet-500/10 dark:text-violet-400 dark:group-hover:bg-violet-500 dark:group-hover:text-white"
             >
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
@@ -191,12 +191,12 @@ function CourseEntryCard({
           <span className="text-muted-foreground mt-2 flex-1 text-sm leading-6">
             {copy.description}
           </span>
-          <span className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
+          <span className="border-border mt-3 flex flex-wrap gap-1.5 border-t pt-3">
             {copy.tags.map((tag) => (
               <span
                 key={tag}
                 data-course-tag
-                className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-slate-500"
+                className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-violet-700 dark:bg-violet-500/10 dark:text-violet-300"
               >
                 {tag}
               </span>
@@ -213,7 +213,7 @@ function CourseEntryCard({
           <button
             type="button"
             data-course-retry={item.id}
-            className="pointer-events-auto rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-700"
+            className="pointer-events-auto rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
             onClick={onRetry}
           >
             {t.workspace.works.retry}
@@ -263,8 +263,8 @@ export function HomeCourseEntry({
                 className={cn(
                   "flex size-10 items-center justify-center rounded-xl",
                   group === "video"
-                    ? "bg-violet-100 text-violet-700"
-                    : "bg-teal-50 text-teal-700",
+                    ? "bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400"
+                    : "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
                 )}
               >
                 {group === "video" ? (
@@ -274,7 +274,7 @@ export function HomeCourseEntry({
                 )}
               </span>
               <div>
-                <div className="text-[9px] font-bold tracking-[0.13em] text-slate-400">
+                <div className="text-muted-foreground text-[9px] font-bold tracking-[0.13em]">
                   {copy.kicker}
                 </div>
                 <h2 className="text-xl font-bold tracking-tight">

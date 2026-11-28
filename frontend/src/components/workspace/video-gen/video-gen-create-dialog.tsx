@@ -1487,7 +1487,10 @@ function DialogScriptInput(
                 ? "每一句对应一个画面或镜头。例如：\n先介绍今天要解决的问题。\n再用一个具体案例说明方法。"
                 : cfg.placeholder
             }
-            className={cn(focused && "border-indigo-200/70 bg-white/80")}
+            className={cn(
+              focused &&
+                "placeholder:text-muted-foreground border-indigo-200/70 focus-visible:border-indigo-400 focus-visible:ring-indigo-500 dark:border-indigo-500/40 dark:focus-visible:border-indigo-400",
+            )}
             rows={5}
           />
           <p className="text-muted-foreground text-xs">
@@ -1728,19 +1731,23 @@ export function CreateTaskDialog({
         className={cn(
           "flex max-h-[90vh] flex-col sm:max-w-2xl",
           focused &&
-            "bg-background rounded-3xl border-indigo-200/70 shadow-2xl",
+            "bg-background rounded-3xl border-indigo-200/70 shadow-2xl dark:border-indigo-500/30",
         )}
       >
         <DialogHeader
           className={
             focused
-              ? "rounded-2xl border border-indigo-100/70 bg-white/75 p-4"
+              ? "border-border bg-card text-card-foreground rounded-2xl border p-4"
               : undefined
           }
         >
           <DialogTitle className="flex items-center gap-3">
-            <span className={cn(focused && "rounded-xl bg-indigo-100 p-2")}>
-              <Film className="h-5 w-5 text-indigo-500" />
+            <span
+              className={cn(
+                focused && "rounded-xl bg-indigo-100 p-2 dark:bg-indigo-500/10",
+              )}
+            >
+              <Film className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </span>
             {focused ? presentation.title : "创建视频任务"}
           </DialogTitle>
@@ -1793,8 +1800,8 @@ export function CreateTaskDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="留空则取脚本前 30 字"
               className={cn(
-                "border-input bg-background h-9 w-full rounded-md border px-3 text-sm",
-                focused && "border-indigo-200/70 bg-white/80",
+                "border-input bg-background text-foreground placeholder:text-muted-foreground h-9 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none",
+                focused && "border-indigo-200/70 dark:border-indigo-500/40",
               )}
             />
           </div>

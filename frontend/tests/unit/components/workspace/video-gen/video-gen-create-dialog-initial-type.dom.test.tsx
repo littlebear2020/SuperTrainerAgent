@@ -210,6 +210,46 @@ describe("CreateTaskDialog initialTaskType", () => {
     });
   });
 
+  it.each(["ai_image", "ai_video"] as const)(
+    "keeps the focused %s dialog theme-aware without fixed light surfaces",
+    async (initialTaskType) => {
+      await render(initialTaskType);
+      const dialog = document.querySelector("[role='dialog']");
+      const header = dialog?.querySelector("h2")?.parentElement;
+      const titleInput =
+        dialog?.querySelector<HTMLInputElement>("input[type='text']");
+      const script = dialog?.querySelector("textarea");
+      if (!dialog || !header || !titleInput || !script) {
+        throw new Error("focused dialog structure not found");
+      }
+
+      // 外层仍是 bg-background，且无渐变
+      expect(dialog.className).toContain("bg-background");
+      expect(dialog.className).not.toContain("bg-gradient");
+      // 头部：不再有固定白底，使用语义表面
+      expect(header.className).not.toContain("bg-white/75");
+      expect(header.className).toContain("bg-card");
+      // 标题输入：显式前景与 placeholder 色、可见焦点环，focused 不再覆盖背景
+      expect(titleInput.className).not.toContain("bg-white/80");
+      expect(titleInput.className).toContain("bg-background");
+      expect(titleInput.className).toContain("text-foreground");
+      expect(titleInput.className).toContain(
+        "placeholder:text-muted-foreground",
+      );
+      expect(titleInput.className).not.toMatch(
+        /placeholder:text-muted-foreground\/60/,
+      );
+      expect(titleInput.className).toContain("focus-visible:ring-indigo-500");
+      // 脚本 textarea：去掉固定白底，placeholder 覆盖 registry 的 /60
+      expect(script.className).not.toContain("bg-white/80");
+      expect(script.className).not.toMatch(
+        /placeholder:text-muted-foreground\/60/,
+      );
+      expect(script.className).toContain("placeholder:text-muted-foreground");
+      expect(script.className).toContain("dark:");
+    },
+  );
+
   it("keeps the legacy generic dialog and default ai_image without initialTaskType", async () => {
     await render();
     expect(document.body.textContent).toContain("创建视频任务");
