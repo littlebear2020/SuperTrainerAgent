@@ -484,8 +484,36 @@ describe("WorkMedia card cover", () => {
     const cover = container.querySelector("img");
     expect(cover?.getAttribute("src")).toBe(thumbnail);
     expect(cover?.className).toContain("object-cover");
+    expect(cover?.alt).toBe("lesson.mp4");
     expect(typeCover(container)).toBeNull();
+
+    // 作品同时带图片文件与任务缩略图时，画面是任务缩略图，alt 不得描述成图片文件
+    const video = makeFile("lesson.mp4", "video");
+    const withImage: WorkSummary = {
+      ...work,
+      files: [video, makeFile("cover.png", "image")],
+      primaryFile: video,
+    };
+    await act(async () => {
+      root.render(<WorkMedia work={withImage} onOpen={vi.fn()} />);
+    });
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(thumbnail);
+    expect(container.querySelector("img")?.alt).toBe("lesson.mp4");
   });
+
+  it.each([
+    [".env", "文件"],
+    ["clip.verylongextensionname", "文件"],
+  ] as const)(
+    "uses the generic media-kind label for %s instead of a misleading extension badge",
+    async (name, label) => {
+      const file = makeFile(name, "other", { previewUrl: null });
+      await act(async () => {
+        root.render(<WorkMedia work={makeWork([file])} onOpen={vi.fn()} />);
+      });
+      expect(formatBadge(container)).toBe(label);
+    },
+  );
 
   it("renders the missing cover without any remote source for a cleaned ready task", async () => {
     const task: VideoTaskBrief = {

@@ -14,7 +14,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import { selectWorkCoverFile } from "@/core/works/model";
 import type { WorkMediaKind, WorkSummary } from "@/core/works/types";
 
-import { WorkTypeCover } from "./work-type-cover";
+import { WorkTypeCover, type WorkCoverState } from "./work-type-cover";
 
 export const MEDIA_ICONS: Record<WorkMediaKind, LucideIcon> = {
   video: Video,
@@ -23,6 +23,16 @@ export const MEDIA_ICONS: Record<WorkMediaKind, LucideIcon> = {
   document: FileText,
   other: FileIcon,
 };
+
+function resolveCoverState(
+  missing: boolean,
+  unknown: boolean,
+  file: WorkSummary["primaryFile"],
+): WorkCoverState {
+  if (missing) return "missing";
+  if (unknown) return "unknown";
+  return file ? "default" : "empty";
+}
 
 export function formatFileSize(size: number | null): string {
   if (size === null) return "—";
@@ -65,26 +75,21 @@ export function WorkMedia({
     ? null
     : (taskThumbnail ?? coverFile?.previewUrl ?? null);
   const failed = imageUrl !== null && failedUrl === imageUrl;
-  const coverState = missing
-    ? "missing"
-    : unknown
-      ? "unknown"
-      : !file
-        ? "empty"
-        : "default";
+  const coverState = resolveCoverState(missing, unknown, file);
   const title = work.title ? work.title : t.workspace.works.unnamed;
   const className =
     "bg-muted text-muted-foreground flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-none";
+  // alt 描述画面里实际显示的那张图：任务缩略图优先于同作品的图片文件。
+  let coverAlt = file?.name ?? "";
+  if (!taskThumbnail && coverFile) {
+    coverAlt = coverFile.name ?? t.workspace.works.coverImageAlt(title);
+  }
 
   const content =
     imageUrl && !failed ? (
       <img
         src={imageUrl}
-        alt={
-          coverFile
-            ? (coverFile.name ?? t.workspace.works.coverImageAlt(title))
-            : (file?.name ?? "")
-        }
+        alt={coverAlt}
         loading="lazy"
         decoding="async"
         onError={() => setFailedUrl(imageUrl)}
