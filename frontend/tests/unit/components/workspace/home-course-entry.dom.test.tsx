@@ -30,6 +30,28 @@ const IDS = [
   "podcast-studio",
 ] as const;
 
+const PALETTE =
+  "(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)";
+const FIXED_LIGHT = new RegExp(
+  `^(bg|text|border)-${PALETTE}-?(?:\\d{2,3})?(?:/\\d+)?$`,
+);
+
+/** 固定调色板类里没有同属性 `dark:` 配对的那些（深色模式下会留白块/浅字）。 */
+function unpairedLightClasses(className: string): string[] {
+  const classes = className.split(/\s+/).filter(Boolean);
+  return classes
+    .map((cls) => [cls, FIXED_LIGHT.exec(cls)] as const)
+    .filter(
+      ([, match]) =>
+        match !== null &&
+        !classes.some(
+          (other) =>
+            other.startsWith("dark:") && other.includes(`${match[1]}-`),
+        ),
+    )
+    .map(([cls]) => cls);
+}
+
 describe("HomeCourseEntry", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -120,12 +142,21 @@ describe("HomeCourseEntry", () => {
       expect(card.querySelector("[data-media-status]")).toBeNull();
       expect(card.querySelector("[data-media-caption]")).toBeNull();
       const label = card.querySelector("[data-media-label]")!;
-      expect(label.className).toContain("bg-white/90");
-      expect(label.className).toContain("text-slate-600");
+      // 媒体徽章与标签：固定浅色类必须有 dark 配对，或改用语义 token
+      expect(label.className).not.toMatch(/\bbg-white\//);
       for (const tag of card.querySelectorAll("[data-course-tag]")) {
-        expect(tag.className).toContain("bg-violet-50");
-        expect(tag.className).toContain("text-slate-500");
+        expect(unpairedLightClasses(tag.className)).toEqual([]);
       }
+      // 整张卡片（含箭头、分隔线、描边）不留无 dark 配对的固定浅色类
+      for (const element of card.querySelectorAll("*")) {
+        expect(unpairedLightClasses(element.className)).toEqual([]);
+      }
+      expect(unpairedLightClasses(card.className)).toEqual([]);
+      expect(
+        unpairedLightClasses(card.closest("article")?.className ?? ""),
+      ).toEqual([]);
+      // 卡片按钮有显式焦点态（主题的 --ring 是 transparent，ring-ring 不可见）
+      expect(card.className).toContain("focus-visible:outline-indigo-500");
     });
   });
 
