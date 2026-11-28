@@ -334,11 +334,11 @@ selectWorkCoverFile = work.files 中按现有顺序第一个满足
 
 **Files：** 本计划（入库）；无业务代码改动。
 
-- [ ] **Step 1：基线与漂移。** 记录 `git status --short --branch`；`git fetch origin` 后执行 `git diff 10290cda..origin/main --stat`，重点看 §六 的文件。漂移使本计划的定位失效 → 停点 ①。主 clone 里他人的未跟踪文件（drama-studio、其他 pending 计划等）一律不 stash、不 clean、不覆盖。
-- [ ] **Step 2：计划入库。** 在主 clone 只 `git add docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`，提交 `docs(plans): 作品封面与创建弹窗深色优化计划入库` 并推 main（纯 docs，允许直推）；记下短 hash 作为执行基线，写入 A 的 changelog。
-- [ ] **Step 3：执行 worktree 与环境。** `git worktree add ../SuperTrainerAgent-exec-works-cover -b works-cover-create-dialog-theme origin/main`。worktree 内执行 `cd frontend && pnpm install --frozen-lockfile --offline` 和 `cd backend && uv sync --frozen --offline`，不复用主 clone 的 node_modules 与 venv。worktree 在仓库目录之外，每条命令用绝对路径或 `cd <worktree> && …`。
-- [ ] **Step 4：基线测试。** worktree 内跑 `cd frontend && pnpm test`，后台跑 `cd backend && make test`，结果写入 A 的 changelog。失败落在本批要改的文件或用例上 → 停点 ④；其他既有失败只记录，门禁时按 main 对照。
-- [ ] **Step 5：留修改前证据。** 用现有 Playwright mock 构造 HTML+PNG、纯 MP4/PPT/MP3、任务 `thumbnail_url=null`、深色 ai_image 弹窗，截图存 Playwright 输出目录或 worktree 的 `temp/`（不新建 docs 子目录），供 changelog 做前后对比。不用真实用户数据做夹具。
+- [x] **Step 1：基线与漂移。** 记录 `git status --short --branch`；`git fetch origin` 后执行 `git diff 10290cda..origin/main --stat`，重点看 §六 的文件。漂移使本计划的定位失效 → 停点 ①。主 clone 里他人的未跟踪文件（drama-studio、其他 pending 计划等）一律不 stash、不 clean、不覆盖。
+- [x] **Step 2：计划入库。** 在主 clone 只 `git add docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`，提交 `docs(plans): 作品封面与创建弹窗深色优化计划入库` 并推 main（纯 docs，允许直推）；记下短 hash 作为执行基线，写入 A 的 changelog。
+- [x] **Step 3：执行 worktree 与环境。** `git worktree add ../SuperTrainerAgent-exec-works-cover -b works-cover-create-dialog-theme origin/main`。worktree 内执行 `cd frontend && pnpm install --frozen-lockfile --offline` 和 `cd backend && uv sync --frozen --offline`，不复用主 clone 的 node_modules 与 venv。worktree 在仓库目录之外，每条命令用绝对路径或 `cd <worktree> && …`。
+- [x] **Step 4：基线测试。** worktree 内跑 `cd frontend && pnpm test`，后台跑 `cd backend && make test`，结果写入 A 的 changelog。失败落在本批要改的文件或用例上 → 停点 ④；其他既有失败只记录，门禁时按 main 对照。
+- [x] **Step 5：留修改前证据。** 用现有 Playwright mock 构造 HTML+PNG、纯 MP4/PPT/MP3、任务 `thumbnail_url=null`、深色 ai_image 弹窗，截图存 Playwright 输出目录或 worktree 的 `temp/`（不新建 docs 子目录），供 changelog 做前后对比。不用真实用户数据做夹具。
 
 ## Batch A：前端封面与深色体验（PR A）
 
@@ -346,45 +346,45 @@ selectWorkCoverFile = work.files 中按现有顺序第一个满足
 
 **Files：** `frontend/src/core/works/model.ts`、`frontend/tests/unit/core/works/model.test.ts`。
 
-- [ ] **Step 1：先写失败测试。** 覆盖：`[HTML,PNG]`、`[PNG,HTML]`、`[SVG,PNG]`、`[PNG,SVG]` 都选 PNG；`primaryFile` 和 `files` 原顺序不变；多张图稳定选第一张；跳过缺失的图；只有缺失的 PNG 加存在的 HTML 时返回 `null`；夹具里 SVG 错误地带 `previewUrl` 时仍不选；任务来源（video 文件）返回 `null`。
-- [ ] **Step 2：运行并确认 RED。** `cd frontend && pnpm exec vitest run --project node tests/unit/core/works/model.test.ts`。失败原因必须是缺少封面选择结果，而不是夹具错误。
-- [ ] **Step 3：实现最小纯函数。** 只接受 `exists && mediaKind === "image" && previewUrl !== null`；不修改输入，不改 `primaryFile`，不改 API/schema/后端排序。
-- [ ] **Step 4：GREEN 与旧契约复核。** 重跑上述测试。`model.test.ts:204-239` 的 PPTX 主文件断言保持不变，并用同一夹具新增「封面是 PNG、主文件仍是 PPTX」的双断言。
-- [ ] **Step 5：提交。** `fix(works): 封面优先使用同作品光栅图，主交付文件不变`。
+- [x] **Step 1：先写失败测试。** 覆盖：`[HTML,PNG]`、`[PNG,HTML]`、`[SVG,PNG]`、`[PNG,SVG]` 都选 PNG；`primaryFile` 和 `files` 原顺序不变；多张图稳定选第一张；跳过缺失的图；只有缺失的 PNG 加存在的 HTML 时返回 `null`；夹具里 SVG 错误地带 `previewUrl` 时仍不选；任务来源（video 文件）返回 `null`。
+- [x] **Step 2：运行并确认 RED。** `cd frontend && pnpm exec vitest run --project node tests/unit/core/works/model.test.ts`。失败原因必须是缺少封面选择结果，而不是夹具错误。
+- [x] **Step 3：实现最小纯函数。** 只接受 `exists && mediaKind === "image" && previewUrl !== null`；不修改输入，不改 `primaryFile`，不改 API/schema/后端排序。
+- [x] **Step 4：GREEN 与旧契约复核。** 重跑上述测试。`model.test.ts:204-239` 的 PPTX 主文件断言保持不变，并用同一夹具新增「封面是 PNG、主文件仍是 PPTX」的双断言。
+- [x] **Step 5：提交。** `fix(works): 封面优先使用同作品光栅图，主交付文件不变`。
 
 ### Task 2：统一类型封面、加载失败回退与查看器
 
 **Files：** `work-type-cover.tsx`（新）、`work-media.tsx`、`work-viewer-dialog.tsx`、必要的 locale；`work-viewer-dialog.dom.test.tsx`、`work-grid.dom.test.tsx`。
 
-- [ ] **Step 1：先写组件失败测试。** 覆盖：纯 PPT/MP3/Agent MP4/无 PNG 的海报显示 `[data-testid=work-type-cover]`，带格式徽标和能力名称；missing/empty/unknown 三种状态的文案；任务有 thumbnail 时真实图优先；`<img>` 触发 error 后切到类型封面，同一 URL 不再请求，URL 变化后重新出现 `<img>`；ready missing 不渲染任何 `[src]`；查看器的 document/other/audio 显示类型封面，audio 不 autoplay；文件列表图标按 mediaKind 显示，`aria-pressed` 正确。
-- [ ] **Step 2：处理既有断言。** `work-viewer-dialog.dom.test.tsx:282`、`:311` 和 `work-grid.dom.test.tsx:416` 的零 `[src]`/零 `<img>` 断言**保持不变**（类型封面不含图片）。`work-viewer-dialog.dom.test.tsx:312` 的 `toContain("lesson.mp4")` 改为断言格式徽标 `MP4`；文件名已移出封面，仍由卡片的 `WorkFileSummary` 显示，`work-grid.dom.test.tsx:322` 继续覆盖。
-- [ ] **Step 3：确认 RED。** `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/work-viewer-dialog.dom.test.tsx tests/unit/components/workspace/video-gen/work-grid.dom.test.tsx`，确保因新封面/回退尚不存在而失败。
-- [ ] **Step 4：实现 `WorkTypeCover` 并接入卡片。** 按 §5.1–5.3 落地；不改 WorkCard 操作逻辑，不新增静态假作品图，不挂 Agent MP4/MP3。
-- [ ] **Step 5：接入查看器。** document/other/audio/错误态复用同一视觉语言；文件列表使用 `MEDIA_ICONS`；当前文件、键盘、焦点和下载契约不变。
-- [ ] **Step 6：GREEN 与格式检查。** 跑相关 dom/node 测试及 Prettier；检查没有动态拼接的 Tailwind 颜色类，也没有新增 registry 修改。
-- [ ] **Step 7：提交。** `fix(works): 统一作品默认封面与加载失败回退`。
+- [x] **Step 1：先写组件失败测试。** 覆盖：纯 PPT/MP3/Agent MP4/无 PNG 的海报显示 `[data-testid=work-type-cover]`，带格式徽标和能力名称；missing/empty/unknown 三种状态的文案；任务有 thumbnail 时真实图优先；`<img>` 触发 error 后切到类型封面，同一 URL 不再请求，URL 变化后重新出现 `<img>`；ready missing 不渲染任何 `[src]`；查看器的 document/other/audio 显示类型封面，audio 不 autoplay；文件列表图标按 mediaKind 显示，`aria-pressed` 正确。
+- [x] **Step 2：处理既有断言。** `work-viewer-dialog.dom.test.tsx:282`、`:311` 和 `work-grid.dom.test.tsx:416` 的零 `[src]`/零 `<img>` 断言**保持不变**（类型封面不含图片）。`work-viewer-dialog.dom.test.tsx:312` 的 `toContain("lesson.mp4")` 改为断言格式徽标 `MP4`；文件名已移出封面，仍由卡片的 `WorkFileSummary` 显示，`work-grid.dom.test.tsx:322` 继续覆盖。
+- [x] **Step 3：确认 RED。** `cd frontend && pnpm exec vitest run --project dom tests/unit/components/workspace/video-gen/work-viewer-dialog.dom.test.tsx tests/unit/components/workspace/video-gen/work-grid.dom.test.tsx`，确保因新封面/回退尚不存在而失败。
+- [x] **Step 4：实现 `WorkTypeCover` 并接入卡片。** 按 §5.1–5.3 落地；不改 WorkCard 操作逻辑，不新增静态假作品图，不挂 Agent MP4/MP3。
+- [x] **Step 5：接入查看器。** document/other/audio/错误态复用同一视觉语言；文件列表使用 `MEDIA_ICONS`；当前文件、键盘、焦点和下载契约不变。
+- [x] **Step 6：GREEN 与格式检查。** 跑相关 dom/node 测试及 Prettier；检查没有动态拼接的 Tailwind 颜色类，也没有新增 registry 修改。
+- [x] **Step 7：提交。** `fix(works): 统一作品默认封面与加载失败回退`。
 
 ### Task 3：清理深色创作入口与专用弹窗
 
 **Files：** `video-gen-create-dialog.tsx`、`home-course-entry.tsx`、对应 DOM 测试；不改提交逻辑。
 
-- [ ] **Step 1：先更新失败测试。** `video-gen-create-dialog-initial-type.dom.test.tsx` 对 `ai_image`/`ai_video` 做参数化断言：头部、标题 input、脚本 textarea 不含 `bg-white/75`、`bg-white/80`；标题 input 含 `text-foreground` 与 `placeholder:text-muted-foreground`；外层仍是 `bg-background` 且无渐变。`home-course-entry.dom.test.tsx:122-128` 改为断言：媒体徽章与标签不含没有 dark 配对的固定浅色类（含对应 `dark:` 类或改用语义 token），卡片按钮含显式焦点类。
-- [ ] **Step 2：确认 RED 后做最小 className 修复。** 按 §5.4 改业务组件，保留 `initialTaskType`、fixed 脚本、payload、高级设置、上传、音色/语言弹层、草稿和提交跳转。
-- [ ] **Step 3：统一首页六张共享卡片。** 清理媒体徽章、箭头、分隔线、标签、分组图标、重试按钮和卡片描边的固定浅色残留；补卡片按钮的显式焦点态，不全局修改 `--ring`。
-- [ ] **Step 4：运行定向与交互回归。** `video-gen-create-dialog-initial-type.dom.test.tsx`、`home-course-entry.dom.test.tsx`、`create-dialog-honesty.dom.test.tsx`、`video-gen-create-dialog-voice.dom.test.tsx` 全绿；确认普通（非 focused）创建弹窗行为未变。
-- [ ] **Step 5：提交。** `fix(workspace): 修复深色创作入口与专用弹窗配色`。
+- [x] **Step 1：先更新失败测试。** `video-gen-create-dialog-initial-type.dom.test.tsx` 对 `ai_image`/`ai_video` 做参数化断言：头部、标题 input、脚本 textarea 不含 `bg-white/75`、`bg-white/80`；标题 input 含 `text-foreground` 与 `placeholder:text-muted-foreground`；外层仍是 `bg-background` 且无渐变。`home-course-entry.dom.test.tsx:122-128` 改为断言：媒体徽章与标签不含没有 dark 配对的固定浅色类（含对应 `dark:` 类或改用语义 token），卡片按钮含显式焦点类。
+- [x] **Step 2：确认 RED 后做最小 className 修复。** 按 §5.4 改业务组件，保留 `initialTaskType`、fixed 脚本、payload、高级设置、上传、音色/语言弹层、草稿和提交跳转。
+- [x] **Step 3：统一首页六张共享卡片。** 清理媒体徽章、箭头、分隔线、标签、分组图标、重试按钮和卡片描边的固定浅色残留；补卡片按钮的显式焦点态，不全局修改 `--ring`。
+- [x] **Step 4：运行定向与交互回归。** `video-gen-create-dialog-initial-type.dom.test.tsx`、`home-course-entry.dom.test.tsx`、`create-dialog-honesty.dom.test.tsx`、`video-gen-create-dialog-voice.dom.test.tsx` 全绿；确认普通（非 focused）创建弹窗行为未变。
+- [x] **Step 5：提交。** `fix(workspace): 修复深色创作入口与专用弹窗配色`。
 
 ### Task 4：Batch A 行为验收、门禁与 PR A
 
 **Files：** `frontend/tests/e2e/works-delivery.spec.ts`、`frontend/tests/e2e/home-course-entry.spec.ts`、A 的 changelog、本计划（A 的勾选）。
 
-- [ ] **Step 1：真实图片封面 E2E（`works-delivery.spec.ts`）。** HTML+PNG、SVG+PNG 两组用有效的 PNG Buffer 和 `image/png` 响应。断言卡片 `img` 的 `naturalWidth>0`、src 为 PNG 的 artifact URL、`loading="lazy"`；「查看」默认打开 HTML/SVG 的文件详情，下载链接仍指向主文件；HTML/SVG 的 artifact 请求为 0。现有 `output()` 把非 mp4/png 一律映射成 `document`（`works-delivery.spec.ts:19-23`），SVG/HTML 夹具须显式传 `media_kind: "other"`，MP3 传 `"audio"`。
-- [ ] **Step 2：默认封面与网络门禁。** PPT/MP3/纯 Agent MP4/任务无 thumbnail/thumbnail 404 都显示 `work-type-cover`，没有破图。在既有「avoids eager Agent media」用例（`:496`）旁新增同形态用例，不改动原用例（它固定了 6 张卡，请求监听只跟踪 mp4/mp3）。新用例的请求监听扩到 MP4/MP3/HTML/SVG/download：列表阶段只允许 PNG 与任务缩略图请求，其余为 0。
-- [ ] **Step 3：深色作品页。** 扩展既有的「renders English delivery copy in dark mode」用例（`:659`），覆盖类型封面与真实图片封面并截图。`work-capabilities.spec.ts` 的 1440/1280/390/320 几何用例（`:253`）不改，保持绿。
-- [ ] **Step 4：创建入口对比度（`home-course-entry.spec.ts`）。** 浅、深两种主题各打开一次 `ai_image` 专用弹窗：两个入口共用 focused 分支，颜色也不随视口变化，1280 一档即可。测头部标题、描述、标题输入文字和 `::placeholder` 的对比度 ≥4.5:1。实现要点：先用 1×1 canvas 把计算色解析成 sRGB（浅色 token 是 `oklch()`，计算值不是 `rgb()`），再沿祖先链做 alpha 合成（深色 `--card`/`--input` 是半透明的）。`agent-new-chat-guide.spec.ts:92` 的现成 helper 两者都不处理，在本 spec 内写局部 helper。深色下再测首页卡片标签文字的对比度 ≥4.5:1；媒体徽章压在图片上，不做机械判定，只看截图。保存六卡与弹窗的明暗截图。既有的 390/320 溢出（`:403`）和弹窗不透明（`:420`）用例保持绿。
-- [ ] **Step 5：A 的门禁。** 跑完定向 Vitest/Playwright 后，后台运行 `cd frontend && pnpm check && pnpm test` 和 `pnpm test:e2e`，再跑根 `make check` 与 `python3 scripts/check_docs_convention.py`。`pnpm perf:check` 可本地跑，也可以 PR CI 的 perf-budgets job 为准；新组件会进入作品页包体，超预算须在 PR 里写归因。冻结测试输入，不并行共享 `.next`/端口。backlog 里既有的 video-gen `networkidle` 超时保留 main 对照，不顺手修。
-- [ ] **Step 6：写 A 的 changelog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-a.md`，含 TL;DR 和「验收记录」（逐行写 命令 → 实际关键输出），包括执行基线 hash、基线测试结果、Task 1–3 的 RED 输出、对比度实测值、修改前后截图路径；A 期间的范围外发现写进「范围外发现」小节（由 B 统一登记 backlog）。
-- [ ] **Step 7：提交。** 两笔：`test(works): 补封面与深色对比度行为验收`（两个 E2E spec）、`docs(changelog): 记录作品封面与创建弹窗深色优化的验收`（A 的 changelog + 本计划中 Task 0 至 Task 4 Step 7 的勾选）。
+- [x] **Step 1：真实图片封面 E2E（`works-delivery.spec.ts`）。** HTML+PNG、SVG+PNG 两组用有效的 PNG Buffer 和 `image/png` 响应。断言卡片 `img` 的 `naturalWidth>0`、src 为 PNG 的 artifact URL、`loading="lazy"`；「查看」默认打开 HTML/SVG 的文件详情，下载链接仍指向主文件；HTML/SVG 的 artifact 请求为 0。现有 `output()` 把非 mp4/png 一律映射成 `document`（`works-delivery.spec.ts:19-23`），SVG/HTML 夹具须显式传 `media_kind: "other"`，MP3 传 `"audio"`。
+- [x] **Step 2：默认封面与网络门禁。** PPT/MP3/纯 Agent MP4/任务无 thumbnail/thumbnail 404 都显示 `work-type-cover`，没有破图。在既有「avoids eager Agent media」用例（`:496`）旁新增同形态用例，不改动原用例（它固定了 6 张卡，请求监听只跟踪 mp4/mp3）。新用例的请求监听扩到 MP4/MP3/HTML/SVG/download：列表阶段只允许 PNG 与任务缩略图请求，其余为 0。
+- [x] **Step 3：深色作品页。** 扩展既有的「renders English delivery copy in dark mode」用例（`:659`），覆盖类型封面与真实图片封面并截图。`work-capabilities.spec.ts` 的 1440/1280/390/320 几何用例（`:253`）不改，保持绿。
+- [x] **Step 4：创建入口对比度（`home-course-entry.spec.ts`）。** 浅、深两种主题各打开一次 `ai_image` 专用弹窗：两个入口共用 focused 分支，颜色也不随视口变化，1280 一档即可。测头部标题、描述、标题输入文字和 `::placeholder` 的对比度 ≥4.5:1。实现要点：先用 1×1 canvas 把计算色解析成 sRGB（浅色 token 是 `oklch()`，计算值不是 `rgb()`），再沿祖先链做 alpha 合成（深色 `--card`/`--input` 是半透明的）。`agent-new-chat-guide.spec.ts:92` 的现成 helper 两者都不处理，在本 spec 内写局部 helper。深色下再测首页卡片标签文字的对比度 ≥4.5:1；媒体徽章压在图片上，不做机械判定，只看截图。保存六卡与弹窗的明暗截图。既有的 390/320 溢出（`:403`）和弹窗不透明（`:420`）用例保持绿。
+- [x] **Step 5：A 的门禁。** 跑完定向 Vitest/Playwright 后，后台运行 `cd frontend && pnpm check && pnpm test` 和 `pnpm test:e2e`，再跑根 `make check` 与 `python3 scripts/check_docs_convention.py`。`pnpm perf:check` 可本地跑，也可以 PR CI 的 perf-budgets job 为准；新组件会进入作品页包体，超预算须在 PR 里写归因。冻结测试输入，不并行共享 `.next`/端口。backlog 里既有的 video-gen `networkidle` 超时保留 main 对照，不顺手修。
+- [x] **Step 6：写 A 的 changelog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-a.md`，含 TL;DR 和「验收记录」（逐行写 命令 → 实际关键输出），包括执行基线 hash、基线测试结果、Task 1–3 的 RED 输出、对比度实测值、修改前后截图路径；A 期间的范围外发现写进「范围外发现」小节（由 B 统一登记 backlog）。
+- [x] **Step 7：提交。** 两笔：`test(works): 补封面与深色对比度行为验收`（两个 E2E spec）、`docs(changelog): 记录作品封面与创建弹窗深色优化的验收`（A 的 changelog + 本计划中 Task 0 至 Task 4 Step 7 的勾选）。
 - [ ] **Step 8：PR A 与合入。** 按「全局约束」的 PR 门禁执行：标题为批次摘要，正文链接本计划与 A 的 changelog，并注明「只需前端发布，无后端/DB/worker 变更，部署须用户另行下达指令」。合并被拒按「全局约束」处理后继续 Task 5。本步的勾选由 Task 8 补。
 
 ## Batch B：任务型视频缩略图可靠性（PR B）
