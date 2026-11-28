@@ -130,6 +130,22 @@ export function buildTaskWorks(
   return works;
 }
 
+/**
+ * 作品卡面的真实图片封面：按后端现有文件顺序取首个可预览的光栅图。
+ *
+ * 只影响卡面，与主交付文件解耦——`primaryFile`、文件顺序、查看器默认文件与下载
+ * 都不变。封面资格只看 `mediaKind === "image"`：SVG/HTML 被后端归为 `other`，
+ * 即使夹具错误地带了 `previewUrl` 也不会被选中。
+ */
+export function selectWorkCoverFile(work: WorkSummary): WorkFile | null {
+  return (
+    work.files.find(
+      (file) =>
+        file.exists && file.mediaKind === "image" && file.previewUrl !== null,
+    ) ?? null
+  );
+}
+
 function compareIds(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;

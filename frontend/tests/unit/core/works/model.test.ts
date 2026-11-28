@@ -11,6 +11,7 @@ import {
   buildTaskWorks,
   chunkThreadIds,
   selectAndFilterWorks,
+  selectWorkCoverFile,
 } from "@/core/works/model";
 import type {
   AgentDeliveryState,
@@ -236,6 +237,8 @@ describe("buildAgentWorks", () => {
       "http://backend/api/threads/thread-1/artifacts/mnt/user-data/outputs/%E6%B5%B7%E6%8A%A5%20final.png",
     );
     expect(work?.primaryFile?.name).toBe("deck.pptx");
+    // 封面与主交付文件解耦：卡面取 PNG，主文件仍是 PPTX。
+    expect(selectWorkCoverFile(work!)).toBe(work?.files[2]);
   });
 
   it("uses unknown rather than fabricating not_delivered when a summary is absent", () => {
@@ -334,6 +337,98 @@ describe("buildTaskWorks", () => {
       previewUrl: null,
       downloadUrl: null,
     });
+  });
+});
+
+describe("selectWorkCoverFile", () => {
+  const html = (name = "poster.html") =>
+    makeFile(`/mnt/user-data/outputs/${name}`, { media_kind: "other" });
+  const svg = (name = "poster.svg") =>
+    makeFile(`/mnt/user-data/outputs/${name}`, { media_kind: "other" });
+  const png = (name = "poster.png") =>
+    makeFile(`/mnt/user-data/outputs/${name}`, { media_kind: "image" });
+
+  function agentWork(files: ArtifactFileSummary[]) {
+    const [work] = buildAgentWorks(
+      [makeThread("thread-1", { agentName: "creative-studio" })],
+      [makeSummary("thread-1", "delivered", files)],
+      "creative-studio",
+    );
+    if (!work) throw new Error("work not built");
+    return work;
+  }
+
+  it.each([
+    ["HTML then PNG", () => [html(), png()]],
+    ["PNG then HTML", () => [png(), html()]],
+    ["SVG then PNG", () => [svg(), png("cover.png")]],
+    ["PNG then SVG", () => [png("cover.png"), svg()]],
+  ])("picks the PNG when files are %s", (_label, makeFiles) => {
+    const files = makeFiles();
+    const work = agentWork(files);
+
+    expect(selectWorkCoverFile(work)?.name).toMatch(/\.png$/);
+    expect(work.primaryFile?.name).toBe(files[0]!.name);
+    expect(work.files.map((file) => file.name)).toEqual(
+      files.map((file) => file.name),
+    );
+  });
+
+  it("keeps the first image in backend order when several images exist", () => {
+    const work = agentWork([html(), png("second.png"), png("third.png")]);
+
+    expect(selectWorkCoverFile(work)?.name).toBe("second.png");
+  });
+
+  it("skips a missing image and uses the next existing one", () => {
+    const work = agentWork([
+      makeFile("/mnt/user-data/outputs/missing.png", {
+        media_kind: "image",
+        exists: false,
+        size: null,
+        modified_at: null,
+      }),
+      png("present.png"),
+    ]);
+
+    expect(selectWorkCoverFile(work)?.name).toBe("present.png");
+  });
+
+  it("returns null when the only image is missing", () => {
+    const work = agentWork([
+      makeFile("/mnt/user-data/outputs/missing.png", {
+        media_kind: "image",
+        exists: false,
+        size: null,
+        modified_at: null,
+      }),
+      html(),
+    ]);
+
+    expect(selectWorkCoverFile(work)).toBeNull();
+  });
+
+  it("never selects SVG/HTML even when a fixture wrongly attaches a previewUrl", () => {
+    const work = agentWork([svg()]);
+    const rogue = {
+      ...work,
+      files: work.files.map((file) => ({
+        ...file,
+        previewUrl: "https://media.test/active.svg",
+      })),
+    };
+
+    expect(selectWorkCoverFile(rogue)).toBeNull();
+  });
+
+  it("returns null for task works whose only file is the video", () => {
+    const [work] = buildTaskWorks(
+      [makeTask("task-1", { task_type: "ai_video" })],
+      "ai_video",
+    );
+
+    expect(work?.primaryFile).not.toBeNull();
+    expect(selectWorkCoverFile(work!)).toBeNull();
   });
 });
 
