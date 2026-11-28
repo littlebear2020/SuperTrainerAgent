@@ -393,31 +393,31 @@ selectWorkCoverFile = work.files 中按现有顺序第一个满足
 
 **Files：** `_ffmpeg_helpers.py`、`compose_remotion.py`、`backend/tests/test_thumbnail.py`、`docker/production-worker/tests/test_remotion_thumbnail.py`（新）。
 
-- [ ] **Step 1：切 B 分支。** 在同一 worktree 执行 `git fetch origin`，再 `git switch -c task-video-thumbnail-reliability origin/main`。A 已合入时这个 `origin/main` 包含 A；A 的合并被拒时也照样从 `origin/main` 切（两批代码路径不重叠）。
-- [ ] **Step 2：先写失败测试。** helper 用例写进 `backend/tests/test_thumbnail.py`（真实 ffmpeg，进 CI），沿用该文件按路径加载 helper 的写法。覆盖：目标位置已有旧图、本次抽帧失败（如输入不是视频）时，返回 False 且旧图被删除；时长 0.5s 的视频在代表时点失败后，t=0 回退成功（已实测：现有命令 seek 到 1s 时 ffmpeg 失败且不出图，seek 到 0 成功）；成功时目标文件非空，且没有残留的临时文件。Remotion 用例写进 worker 套件的 `test_remotion_thumbnail.py`（`import pipelines.compose_remotion as cr`，同 `test_staged_public_dir.py`）：桩掉 helper，断言以 `task_dir/thumbnail.jpg` 和 `seek_ratio=0.25` 调用，helper 返回 False 或抛异常时都不向外抛。不放进 backend/tests：那里的 `sys.modules["pipelines"]` 桩会让导入随收集顺序失败（§4.1）。
-- [ ] **Step 3：确认 RED。** `cd backend && PYTHONPATH=. uv run pytest tests/test_thumbnail.py -q`；`cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/test_remotion_thumbnail.py -q`。
-- [ ] **Step 4：实现。** 按 §5.5 加固 helper（含仅关键字参数 `seek_ratio`）；Remotion 的 `_extract_thumbnail` 改为调用 helper。两个 worker 镜像都 COPY 整个 `pipelines/`，helper 只用标准库，remotion-worker 内可直接导入。三条 AI 管线的调用点和 `worker.py` 不改。
-- [ ] **Step 5：GREEN 与回归。** 跑 `tests/test_thumbnail.py`，以及桩掉 helper 的 `tests/test_worker_ai_visual_payload.py`、`tests/test_ai_video_duration_alignment.py`、`tests/test_worker_local_visual_misalign.py`、`tests/test_worker_incremental_manifest.py`（确认签名兼容）。再跑 worker 套件：`cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q`。
-- [ ] **Step 6：提交。** `fix(video-gen): 抽帧失败不留旧图并回退首帧，Remotion 复用共享实现`。
+- [x] **Step 1：切 B 分支。** 在同一 worktree 执行 `git fetch origin`，再 `git switch -c task-video-thumbnail-reliability origin/main`。A 已合入时这个 `origin/main` 包含 A；A 的合并被拒时也照样从 `origin/main` 切（两批代码路径不重叠）。
+- [x] **Step 2：先写失败测试。** helper 用例写进 `backend/tests/test_thumbnail.py`（真实 ffmpeg，进 CI），沿用该文件按路径加载 helper 的写法。覆盖：目标位置已有旧图、本次抽帧失败（如输入不是视频）时，返回 False 且旧图被删除；时长 0.5s 的视频在代表时点失败后，t=0 回退成功（已实测：现有命令 seek 到 1s 时 ffmpeg 失败且不出图，seek 到 0 成功）；成功时目标文件非空，且没有残留的临时文件。Remotion 用例写进 worker 套件的 `test_remotion_thumbnail.py`（`import pipelines.compose_remotion as cr`，同 `test_staged_public_dir.py`）：桩掉 helper，断言以 `task_dir/thumbnail.jpg` 和 `seek_ratio=0.25` 调用，helper 返回 False 或抛异常时都不向外抛。不放进 backend/tests：那里的 `sys.modules["pipelines"]` 桩会让导入随收集顺序失败（§4.1）。
+- [x] **Step 3：确认 RED。** `cd backend && PYTHONPATH=. uv run pytest tests/test_thumbnail.py -q`；`cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/test_remotion_thumbnail.py -q`。
+- [x] **Step 4：实现。** 按 §5.5 加固 helper（含仅关键字参数 `seek_ratio`）；Remotion 的 `_extract_thumbnail` 改为调用 helper。两个 worker 镜像都 COPY 整个 `pipelines/`，helper 只用标准库，remotion-worker 内可直接导入。三条 AI 管线的调用点和 `worker.py` 不改。
+- [x] **Step 5：GREEN 与回归。** 跑 `tests/test_thumbnail.py`，以及桩掉 helper 的 `tests/test_worker_ai_visual_payload.py`、`tests/test_ai_video_duration_alignment.py`、`tests/test_worker_local_visual_misalign.py`、`tests/test_worker_incremental_manifest.py`（确认签名兼容）。再跑 worker 套件：`cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q`。
+- [x] **Step 6：提交。** `fix(video-gen): 抽帧失败不留旧图并回退首帧，Remotion 复用共享实现`。
 
 ### Task 6：历史任务离线回填工具（默认 dry-run）
 
 **Files：** `backend/scripts/backfill_video_thumbnails.py`（新）、`backend/tests/test_backfill_video_thumbnails.py`（新）。
 
-- [ ] **Step 1：先写失败测试**（临时目录 + `--db-path` 指向临时 SQLite，写法参照 `test_reconcile_video_tasks.py`，不碰开发库）。覆盖：dry-run 零写入；默认扫描和 `--apply` 只处理 §5.5 列出的五种任务类型，其他类型一律跳过，`--task-type` 传其他值被拒；只处理 ready、`output_path` 存在、且 `result.thumbnail_path` 缺失或其文件不存在的任务；只写 `thumbnail_path` 一个键，result 其余字段不变；重复执行幂等；单个任务失败不中断批次；输出 scanned/generated/skipped/failed 计数；真实小 MP4 生成有效 JPEG。
-- [ ] **Step 2：确认 RED 后实现。** 按 §5.5 的回填契约实现，复用 gateway 现有同步 `_extract_thumbnail`，不修改 gateway 生产代码。
-- [ ] **Step 3：GREEN 并提交。** `feat(video-gen): 增加历史视频缩略图离线回填工具`。真实环境的 dry-run/apply 不在本次执行内，见 §九。
+- [x] **Step 1：先写失败测试**（临时目录 + `--db-path` 指向临时 SQLite，写法参照 `test_reconcile_video_tasks.py`，不碰开发库）。覆盖：dry-run 零写入；默认扫描和 `--apply` 只处理 §5.5 列出的五种任务类型，其他类型一律跳过，`--task-type` 传其他值被拒；只处理 ready、`output_path` 存在、且 `result.thumbnail_path` 缺失或其文件不存在的任务；只写 `thumbnail_path` 一个键，result 其余字段不变；重复执行幂等；单个任务失败不中断批次；输出 scanned/generated/skipped/failed 计数；真实小 MP4 生成有效 JPEG。
+- [x] **Step 2：确认 RED 后实现。** 按 §5.5 的回填契约实现，复用 gateway 现有同步 `_extract_thumbnail`，不修改 gateway 生产代码。
+- [x] **Step 3：GREEN 并提交。** `feat(video-gen): 增加历史视频缩略图离线回填工具`。真实环境的 dry-run/apply 不在本次执行内，见 §九。
 
 ### Task 7：Batch B 行为验收、门禁与 PR B
 
 **Files：** `backend/tests/test_backfill_video_thumbnails.py`、`backend/tests/test_thumbnail.py`、B 的 changelog、`docs/findings-backlog.md`、本计划（B 的勾选）。
 
-- [ ] **Step 1：行为级验收（API 级，pytest 内完成）。** 两条，都用真实小 MP4，不调用付费生成，不修改 gateway 生产代码：
+- [x] **Step 1：行为级验收（API 级，pytest 内完成）。** 两条，都用真实小 MP4，不调用付费生成，不修改 gateway 生产代码：
   - 回填路径（写进 `test_backfill_video_thumbnails.py`）：临时库里一个 ready `ai_video` 任务没有缩略图，跑回填 `--apply` 后，`_task_with_thumbnail` 下发 `thumbnail_url`，缩略图 GET 返回可解码的 JPEG（PIL 或 ffprobe 校验）。
   - 旧图路径（写进 `test_thumbnail.py`）：任务目录有旧 `thumbnail.jpg`、result 也指向它；对损坏的成片调用加固后的 helper 失败后，旧图被删，`_task_with_thumbnail` 返回 `thumbnail_url=None`（列表不再下发旧图）。
-- [ ] **Step 2：B 的门禁。** 先 `pre-commit run --files <本批改动>`；后台 `cd backend && make test`（全量）；worker 套件全量 `cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q`；根 `make check` 与 `python3 scripts/check_docs_convention.py`。worker 套件缺依赖时修环境，不缩小验证范围。
-- [ ] **Step 3：写 B 的 changelog 与登记 backlog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-b.md`，含 TL;DR、「验收记录」（命令 → 关键输出）与发布注意项（§九）；不把夹具成功率写成线上改善比例。在 `docs/findings-backlog.md` 按格式（`- [ ] YYYY-MM-DD 一句话 + 指针`）登记 A changelog「范围外发现」与 B 期间的范围外问题，以及 Q16 的缓存候选。
-- [ ] **Step 4：提交。** 两笔：`test(video-gen): 补缩略图 API 级行为验收`（Step 1 的两个测试文件）、`docs(changelog): 记录任务视频缩略图加固的验收`（B 的 changelog + backlog + 本计划中 Task 5 至 Task 7 Step 4 的勾选）。
+- [x] **Step 2：B 的门禁。** 先 `pre-commit run --files <本批改动>`；后台 `cd backend && make test`（全量）；worker 套件全量 `cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q`；根 `make check` 与 `python3 scripts/check_docs_convention.py`。worker 套件缺依赖时修环境，不缩小验证范围。
+- [x] **Step 3：写 B 的 changelog 与登记 backlog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-b.md`，含 TL;DR、「验收记录」（命令 → 关键输出）与发布注意项（§九）；不把夹具成功率写成线上改善比例。在 `docs/findings-backlog.md` 按格式（`- [ ] YYYY-MM-DD 一句话 + 指针`）登记 A changelog「范围外发现」与 B 期间的范围外问题，以及 Q16 的缓存候选。
+- [x] **Step 4：提交。** 两笔：`test(video-gen): 补缩略图 API 级行为验收`（Step 1 的两个测试文件）、`docs(changelog): 记录任务视频缩略图加固的验收`（B 的 changelog + backlog + 本计划中 Task 5 至 Task 7 Step 4 的勾选）。
 - [ ] **Step 5：PR B 与合入。** 按「全局约束」的 PR 门禁执行（命中核心路径，不可直推），正文链接本计划与 B 的 changelog，并写明发布只需重建 production-worker 与 remotion-worker 两个镜像，不需要 gateway 部署，部署须用户另行下达指令。合并顺序在 A 之后；A 尚未合入时不合 B，按「合并被拒的处理」交接。本步的勾选由 Task 8 补。
 
 ### Task 8：收尾
