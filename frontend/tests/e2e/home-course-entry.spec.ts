@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { pinEnglishLocale } from "./utils/locale";
 import { mockLangGraphAPI } from "./utils/mock-api";
@@ -58,6 +58,72 @@ async function expectVideosPlaying(page: Page) {
 }
 
 let pageErrors: string[];
+
+/**
+ * 元素文字（或 `::placeholder`）相对实际背景的 WCAG 对比度。
+ *
+ * 浅色 token 是 `oklch()`，计算值不是 `rgb()`：先用 1×1 canvas 把计算色解析成
+ * sRGB；再沿祖先链做 alpha 合成（深色主题的 `--card`/`--input` 是半透明的）。
+ */
+async function contrastOf(
+  locator: Locator,
+  pseudo?: string,
+): Promise<{ contrast: number; backdropLuminance: number }> {
+  return locator.evaluate((element, pseudoSelector) => {
+    type Rgba = [number, number, number, number];
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const parse = (color: string): Rgba => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = "#123456";
+      ctx.fillStyle = color;
+      if (ctx.fillStyle === "#123456") {
+        throw new Error(`unparsed color: ${color}`);
+      }
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r!, g!, b!, a! / 255];
+    };
+    const over = (top: Rgba, bottom: Rgba): Rgba => {
+      const alpha = top[3] + bottom[3] * (1 - top[3]);
+      const mix = (index: number) =>
+        alpha === 0
+          ? 0
+          : (top[index]! * top[3] + bottom[index]! * bottom[3] * (1 - top[3])) /
+            alpha;
+      return [mix(0), mix(1), mix(2), alpha];
+    };
+    const luminance = ([r, g, b]: Rgba) => {
+      const channel = (value: number) => {
+        const s = value / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+
+    const ink = parse(
+      pseudoSelector
+        ? getComputedStyle(element, pseudoSelector).color
+        : getComputedStyle(element).color,
+    );
+    let backdrop: Rgba | null = null;
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      const bg = parse(getComputedStyle(node).backgroundColor);
+      if (bg[3] === 0) continue;
+      backdrop = backdrop === null ? bg : over(backdrop, bg);
+      if (bg[3] >= 1) break;
+    }
+    const base: Rgba = backdrop ?? [255, 255, 255, 1];
+    const inkL = luminance(over(ink, base));
+    const baseL = luminance(base);
+    return {
+      contrast: (Math.max(inkL, baseL) + 0.05) / (Math.min(inkL, baseL) + 0.05),
+      backdropLuminance: baseL,
+    };
+  }, pseudo ?? null);
+}
 
 test.describe("home course entries", () => {
   test.beforeEach(async ({ page }) => {
@@ -438,6 +504,142 @@ test.describe("home course entries", () => {
       )
       .toBe("1");
   });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`${theme} theme keeps home cards and the focused AI dialog readable (≥4.5:1)`, async ({
+      page,
+    }) => {
+      // 两个入口共用 focused 分支，颜色也不随视口变化：1280 一档即可。
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.addInitScript(
+        (value) => localStorage.setItem("theme", value),
+        theme,
+      );
+      await page.emulateMedia({ colorScheme: theme });
+      mockLangGraphAPI(page);
+      mockVideoAPI(page);
+      await page.goto("/workspace");
+      await expect(page.locator("[data-course-entry]")).toHaveCount(6);
+      await expect(page.locator("html")).toHaveClass(
+        theme === "dark" ? /\bdark\b/ : /^(?!.*\bdark\b)/,
+      );
+
+      // 首页六卡：标签文字对比度；媒体图片区域不参与「禁止白块」判定
+      const tag = page.locator("[data-course-tag]").first();
+      const tagContrast = await contrastOf(tag);
+      expect(tagContrast.contrast, `${theme} card tag`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      const offenders = await page.evaluate(() => {
+        const palette =
+          "(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)";
+        const fixed = new RegExp(
+          `^(bg|text|border)-${palette}-?(?:\\d{2,3})?(?:/\\d+)?$`,
+        );
+        const found: string[] = [];
+        for (const card of document.querySelectorAll<HTMLElement>(
+          "[data-course-entry]",
+        )) {
+          const elements = [
+            card,
+            card.closest("article"),
+            ...card.querySelectorAll<HTMLElement>("*"),
+          ];
+          for (const element of elements) {
+            if (!element || element.closest(".aspect-video")) continue;
+            const classes = (element.getAttribute("class") ?? "")
+              .split(/\s+/)
+              .filter(Boolean);
+            for (const cls of classes) {
+              const match = fixed.exec(cls);
+              if (!match) continue;
+              const paired = classes.some(
+                (other) =>
+                  other.startsWith("dark:") && other.includes(`${match[1]}-`),
+              );
+              if (!paired)
+                found.push(`${element.tagName.toLowerCase()}.${cls}`);
+            }
+          }
+        }
+        return found;
+      });
+      expect(offenders, `${theme} unpaired fixed light classes`).toEqual([]);
+      await page.screenshot({
+        path: test.info().outputPath(`home-cards-${theme}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+
+      // 专用弹窗：头部标题/描述、标题输入文字与 ::placeholder 的对比度
+      await page.locator("[data-course-entry='ai_image']").click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const input = dialog.getByPlaceholder("留空则取脚本前 30 字");
+      await input.fill("对比度样本");
+      const measures = {
+        title: await contrastOf(dialog.getByRole("heading")),
+        description: await contrastOf(
+          dialog.getByText("用脚本生成静态画面，再通过镜头运动串成视频"),
+        ),
+        inputText: await contrastOf(input),
+        placeholder: await contrastOf(input, "::placeholder"),
+      };
+      // 实测值进测试输出，供 changelog 的验收记录引用
+      console.log(JSON.stringify({ theme, tagContrast, measures }));
+      for (const [name, measure] of Object.entries(measures)) {
+        expect(
+          measure.contrast,
+          `${theme} dialog ${name}`,
+        ).toBeGreaterThanOrEqual(4.5);
+        if (theme === "dark") {
+          // 深色下头部/输入框不再是白块
+          expect(
+            measure.backdropLuminance,
+            `${theme} dialog ${name} backdrop`,
+          ).toBeLessThan(0.2);
+        }
+      }
+      const dialogOffenders = await dialog.evaluate((root) => {
+        const palette =
+          "(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)";
+        const fixed = new RegExp(
+          `^(bg|text|border)-${palette}-?(?:\\d{2,3})?(?:/\\d+)?$`,
+        );
+        const touched = [
+          root.querySelector("h2")?.parentElement,
+          root.querySelector<HTMLInputElement>("input[type='text']"),
+          root.querySelector("textarea"),
+        ].filter(
+          (element): element is HTMLElement =>
+            element !== null && element !== undefined,
+        );
+        const found: string[] = [];
+        for (const element of touched) {
+          const classes = (element.getAttribute("class") ?? "")
+            .split(/\s+/)
+            .filter(Boolean);
+          for (const cls of classes) {
+            const match = fixed.exec(cls);
+            if (!match) continue;
+            const paired = classes.some(
+              (other) =>
+                other.startsWith("dark:") && other.includes(`${match[1]}-`),
+            );
+            if (!paired) found.push(`${element.tagName.toLowerCase()}.${cls}`);
+          }
+        }
+        return found;
+      });
+      expect(dialogOffenders, `${theme} dialog fixed light classes`).toEqual(
+        [],
+      );
+      await page.screenshot({
+        path: test.info().outputPath(`dialog-ai_image-${theme}.png`),
+        animations: "disabled",
+      });
+    });
+  }
 
   test("desktop and mobile Chinese and English screenshots", async ({
     page,
