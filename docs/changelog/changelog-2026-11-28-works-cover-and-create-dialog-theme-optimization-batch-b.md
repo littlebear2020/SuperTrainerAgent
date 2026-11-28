@@ -1,6 +1,6 @@
 # 任务型视频缩略图可靠性（Batch B：worker 抽帧加固与离线回填）
 
-> **状态**：已执行（2026-11-28；PR #70 合入 main，合入 hash 由 Task 8 收尾补记；未部署，发布须用户另行下达指令）。计划：`docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`（Batch B = Task 5–7）；执行基线 commit `dd24a2e9`（计划入库）。
+> **状态**：已执行（2026-11-28；PR #70 合入 main `03d83be4`；未部署，发布须用户另行下达指令）。计划：`docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`（Batch B = Task 5–7）；执行基线 commit `dd24a2e9`（计划入库）。
 > **TL;DR**：worker/离线工具批，不改前端与 gateway 生产代码。① 共享抽帧 helper `_ffmpeg_extract_thumbnail` 加固：先写临时文件、成功才 `os.replace`；代表时点拿不到帧回退 `-ss 0`；最终失败删除旧图与临时文件；新增仅关键字参数 `seek_ratio`（默认 10% = 既有行为）。② Remotion 改调该 helper（`seek_ratio=0.25, timeout=60` 保持现有取帧位置与超时）。③ 新增默认 dry-run 的历史回填脚本 `backend/scripts/backfill_video_thumbnails.py`（只写 `result.thumbnail_path`）。关键决策：抽帧失败不阻断 ready、旧图不冒充新成片；回填复用 gateway 现有同步 `_extract_thumbnail` 不改它。影响面 = `docker/production-worker/pipelines/`（两个 worker 镜像都 COPY 整个 `pipelines/`）、`backend/scripts/`、测试；命中核心路径 `docker/`，走分支 + PR + OCR；不部署、不调用付费 API。
 
 ## Task 5：加固共享抽帧 helper，Remotion 改用它

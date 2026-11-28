@@ -1,6 +1,6 @@
 # 「我的作品」封面与创建弹窗深色体验优化计划
 
-> **状态**：未执行（2026-11-27 定稿；基准 commit `10290cda`；同日两轮评审优化。用户确认 Batch A、Batch B 都做：先 A 后 B，两个串行 PR，一次 `/goal` 端到端执行；ViMax 不在范围内；尚未修改业务代码）。
+> **状态**：已执行（2026-11-28；PR #69 → #70 串行合入 main `03d83be4`；changelog 见 batch-a / batch-b；未部署，发布见 §九。执行基线 commit `dd24a2e9`；ViMax 不在范围内）。
 > **TL;DR**：两批串行、一次执行。Batch A（纯前端）：独立封面选择让 HTML/SVG+PNG 作品显示 PNG；统一类型封面替换「灰底 + 图标 + 文件名」并补加载失败回退；清理首页创作卡与 AI 专用弹窗的固定浅色类。Batch B（worker/离线工具）：抽帧 helper 失败时不留旧图并回退首帧，Remotion 复用它；新增默认 dry-run 的历史回填工具。关键决策：封面与主交付文件解耦；类型封面零请求；回填只写 `result.thumbnail_path`，抽帧失败不阻断 ready。影响面：`frontend/`、`docker/production-worker/pipelines/`、新回填脚本与测试；不部署，不调用付费 API。
 > **For agentic workers：** REQUIRED SUB-SKILL：使用 `superpowers:executing-plans` 按 Task 0→8 串行执行并逐项勾选，先 RED 后 GREEN。执行指令下达后端到端完成，批次之间不停下等评审（评审在各自 PR 内完成），只在「全局约束」列出的四处停下。状态头只由 Task 8 改一次，不得另起状态头。勾选框之外的小节是说明，不构成待办。
 
@@ -385,7 +385,7 @@ selectWorkCoverFile = work.files 中按现有顺序第一个满足
 - [x] **Step 5：A 的门禁。** 跑完定向 Vitest/Playwright 后，后台运行 `cd frontend && pnpm check && pnpm test` 和 `pnpm test:e2e`，再跑根 `make check` 与 `python3 scripts/check_docs_convention.py`。`pnpm perf:check` 可本地跑，也可以 PR CI 的 perf-budgets job 为准；新组件会进入作品页包体，超预算须在 PR 里写归因。冻结测试输入，不并行共享 `.next`/端口。backlog 里既有的 video-gen `networkidle` 超时保留 main 对照，不顺手修。
 - [x] **Step 6：写 A 的 changelog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-a.md`，含 TL;DR 和「验收记录」（逐行写 命令 → 实际关键输出），包括执行基线 hash、基线测试结果、Task 1–3 的 RED 输出、对比度实测值、修改前后截图路径；A 期间的范围外发现写进「范围外发现」小节（由 B 统一登记 backlog）。
 - [x] **Step 7：提交。** 两笔：`test(works): 补封面与深色对比度行为验收`（两个 E2E spec）、`docs(changelog): 记录作品封面与创建弹窗深色优化的验收`（A 的 changelog + 本计划中 Task 0 至 Task 4 Step 7 的勾选）。
-- [ ] **Step 8：PR A 与合入。** 按「全局约束」的 PR 门禁执行：标题为批次摘要，正文链接本计划与 A 的 changelog，并注明「只需前端发布，无后端/DB/worker 变更，部署须用户另行下达指令」。合并被拒按「全局约束」处理后继续 Task 5。本步的勾选由 Task 8 补。
+- [x] **Step 8：PR A 与合入。** 按「全局约束」的 PR 门禁执行：标题为批次摘要，正文链接本计划与 A 的 changelog，并注明「只需前端发布，无后端/DB/worker 变更，部署须用户另行下达指令」。合并被拒按「全局约束」处理后继续 Task 5。本步的勾选由 Task 8 补。
 
 ## Batch B：任务型视频缩略图可靠性（PR B）
 
@@ -418,13 +418,13 @@ selectWorkCoverFile = work.files 中按现有顺序第一个满足
 - [x] **Step 2：B 的门禁。** 先 `pre-commit run --files <本批改动>`；后台 `cd backend && make test`（全量）；worker 套件全量 `cd docker/production-worker && ../../backend/.venv/bin/python -m pytest tests/ -q`；根 `make check` 与 `python3 scripts/check_docs_convention.py`。worker 套件缺依赖时修环境，不缩小验证范围。
 - [x] **Step 3：写 B 的 changelog 与登记 backlog。** 新建 `docs/changelog/changelog-<执行日>-works-cover-and-create-dialog-theme-optimization-batch-b.md`，含 TL;DR、「验收记录」（命令 → 关键输出）与发布注意项（§九）；不把夹具成功率写成线上改善比例。在 `docs/findings-backlog.md` 按格式（`- [ ] YYYY-MM-DD 一句话 + 指针`）登记 A changelog「范围外发现」与 B 期间的范围外问题，以及 Q16 的缓存候选。
 - [x] **Step 4：提交。** 两笔：`test(video-gen): 补缩略图 API 级行为验收`（Step 1 的两个测试文件）、`docs(changelog): 记录任务视频缩略图加固的验收`（B 的 changelog + backlog + 本计划中 Task 5 至 Task 7 Step 4 的勾选）。
-- [ ] **Step 5：PR B 与合入。** 按「全局约束」的 PR 门禁执行（命中核心路径，不可直推），正文链接本计划与 B 的 changelog，并写明发布只需重建 production-worker 与 remotion-worker 两个镜像，不需要 gateway 部署，部署须用户另行下达指令。合并顺序在 A 之后；A 尚未合入时不合 B，按「合并被拒的处理」交接。本步的勾选由 Task 8 补。
+- [x] **Step 5：PR B 与合入。** 按「全局约束」的 PR 门禁执行（命中核心路径，不可直推），正文链接本计划与 B 的 changelog，并写明发布只需重建 production-worker 与 remotion-worker 两个镜像，不需要 gateway 部署，部署须用户另行下达指令。合并顺序在 A 之后；A 尚未合入时不合 B，按「合并被拒的处理」交接。本步的勾选由 Task 8 补。
 
 ### Task 8：收尾
 
-- [ ] **Step 1：最终门禁。** 两个 PR 都已合入后，在 worktree 执行 `git fetch origin && git switch --detach origin/main`，跑根 `make check`、后台 `cd backend && make test`、`cd frontend && pnpm check && pnpm test`、`python3 scripts/check_docs_convention.py`，全部通过。
-- [ ] **Step 2：清理。** 确认没有在途的后台任务；本机起过的服务用 TaskStop 停掉。worktree 与两条远程分支**不移除**（移除会删掉 ignored 证据），列入最终汇报交用户决定。
-- [ ] **Step 3：回填计划状态并交接。** 回到主 clone 执行 `git pull --ff-only`；补勾 Task 4 Step 8、Task 7 Step 5 与本 Task 全部；把状态头原行改为 `已执行（<日期>；PR #A → #B 串行合入 main <hash>；changelog 见 batch-a / batch-b；未部署，发布见 §九）`；单独提交 `docs(plans): 作品封面与缩略图两批收尾` 并推 main。最终汇报：两个 PR 链接、门禁结果、worktree 与分支清单，以及交付后待用户决定的事项（§九 的部署与回填、§2.6 的取证、清理）。
+- [x] **Step 1：最终门禁。** 两个 PR 都已合入后，在 worktree 执行 `git fetch origin && git switch --detach origin/main`，跑根 `make check`、后台 `cd backend && make test`、`cd frontend && pnpm check && pnpm test`、`python3 scripts/check_docs_convention.py`，全部通过。
+- [x] **Step 2：清理。** 确认没有在途的后台任务；本机起过的服务用 TaskStop 停掉。worktree 与两条远程分支**不移除**（移除会删掉 ignored 证据），列入最终汇报交用户决定。
+- [x] **Step 3：回填计划状态并交接。** 回到主 clone 执行 `git pull --ff-only`；补勾 Task 4 Step 8、Task 7 Step 5 与本 Task 全部；把状态头原行改为 `已执行（<日期>；PR #A → #B 串行合入 main <hash>；changelog 见 batch-a / batch-b；未部署，发布见 §九）`；单独提交 `docs(plans): 作品封面与缩略图两批收尾` 并推 main。最终汇报：两个 PR 链接、门禁结果、worktree 与分支清单，以及交付后待用户决定的事项（§九 的部署与回填、§2.6 的取证、清理）。
 
 两个 PR 中任一尚未合入（例如合并被拒）时，Step 1 与 Step 3 的状态提交无法执行：Step 2 照常完成，最终汇报写明「先合 A 再合 B，合并后补做 Task 8 Step 1 与 Step 3」，Task 8 的勾选到那时一起补。
 

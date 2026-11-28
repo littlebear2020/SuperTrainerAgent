@@ -1,6 +1,6 @@
 # 作品封面与创建弹窗深色体验优化（Batch A：纯前端）
 
-> **状态**：已执行（2026-11-28；PR #69 合入 main，合入 hash 由 Task 8 收尾补记；未部署，发布须用户另行下达指令）。计划：`docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`（Batch A = Task 1–4）；执行基线 commit `dd24a2e9`（计划入库）。
+> **状态**：已执行（2026-11-28；PR #69 合入 main `ff0a2b2c`；未部署，发布须用户另行下达指令）。计划：`docs/plans/2026-11-27-works-cover-and-create-dialog-theme-optimization-plan.md`（Batch A = Task 1–4）；执行基线 commit `dd24a2e9`（计划入库）。
 > **TL;DR**：纯前端批。① 新增纯函数 `selectWorkCoverFile`：HTML/SVG+PNG 的 Agent 作品卡面显示同作品交付的光栅图，`primaryFile`、文件顺序、查看/下载不变；② 新增共享 `WorkTypeCover`（CSS + 内联 SVG，零请求）替换「灰底 + 单图标 + 长文件名」，`WorkMedia` 按 URL 记录加载失败并回落类型封面；③ 专用创建弹窗与首页六张共享卡片的固定浅色类改为语义 token / 明暗成对类，补显式焦点环。关键决策：封面与主交付文件解耦；类型封面零请求；不改 registry 与全局主题。影响面 = `frontend/`（works 模型、卡片、查看器、创建弹窗、首页卡片、三份 locale、单测与 E2E）；无后端/DB/worker 变更；不部署。
 
 ## 执行基线与本机环境
