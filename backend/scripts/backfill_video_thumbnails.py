@@ -79,11 +79,12 @@ def scan_tasks(
     task_types: tuple[str, ...] | None = None,
     task_id: str | None = None,
     limit: int | None = None,
-) -> tuple[list[dict], list[dict]]:
-    """只读扫描：返回 (candidates, skipped)。candidates = 需要补图且成片存在的任务。
+) -> tuple[list[dict], list[dict], bool]:
+    """只读扫描：返回 (candidates, skipped, truncated)。candidates = 需要补图且成片存在的任务。
 
-    类型过滤在 SQL 层完成，LIMIT 作用于目标类型；但 LIMIT 计的是扫描行数（skipped 行同样占额度），
-    文件存在性只能在 Python 侧判定。
+    类型过滤在 SQL 层完成；``limit`` 是**候选上限**（最多处理多少个待补图任务）：已带图 / 成片缺失的行
+    不占额度，所以分批 ``--apply --limit N`` 重跑能推进到后面的任务。文件存在性只能在 Python 侧判定，
+    truncated = 达到上限后还有未扫描的行。
     """
     types = list(task_types) if task_types else list(TASK_TYPES)
     where = "status = 'ready' AND task_type IN ({})".format(",".join("?" * len(types)))
@@ -92,14 +93,12 @@ def scan_tasks(
         where += " AND id = ?"
         params.append(task_id)
     sql = f"SELECT id, task_type, status, result FROM unified_tasks WHERE {where} ORDER BY created_at"
-    if limit is not None and limit > 0:
-        sql += " LIMIT ?"
-        params.append(limit)
-    rows = conn.execute(sql, params).fetchall()
+    cursor = conn.execute(sql, params)
 
     candidates: list[dict] = []
     skipped: list[dict] = []
-    for tid, ttype, status, result in rows:
+    truncated = False
+    for tid, ttype, status, result in cursor:
         info = {"id": tid, "task_type": ttype, "status": status}
         parsed = _parse_result(result)
         output_path = parsed.get("output_path") or ""
@@ -118,7 +117,10 @@ def scan_tasks(
             continue
         info["output_path"] = output_path
         candidates.append(info)
-    return candidates, skipped
+        if limit is not None and len(candidates) >= limit:
+            truncated = cursor.fetchone() is not None
+            break
+    return candidates, skipped, truncated
 
 
 def gateway_extractor() -> Callable[[str, Path], str | None]:
@@ -128,13 +130,24 @@ def gateway_extractor() -> Callable[[str, Path], str | None]:
     return _extract_thumbnail
 
 
-def _write_thumbnail_path(conn: sqlite3.Connection, task_id: str, thumb_path: str) -> None:
-    """只动 result 的 thumbnail_path 一个键；status 已不是 ready 的行不会被写。"""
-    conn.execute(
+def _write_thumbnail_path(conn: sqlite3.Connection, task_id: str, thumb_path: str) -> int:
+    """只动 result 的 thumbnail_path 一个键；status 已不是 ready 的行不会被写。返回命中行数。"""
+    cur = conn.execute(
         "UPDATE unified_tasks SET result = json_set(COALESCE(result, '{}'), '$.thumbnail_path', ?) WHERE id = ? AND status = 'ready'",
         (thumb_path, task_id),
     )
     conn.commit()
+    return cur.rowcount
+
+
+def _reclaim_fresh_thumbnail(target: Path, existed_before: bool) -> None:
+    """写库没成功时回收本次新建的缩略图，不留「文件在、引用无」的孤儿（重跑仍能识别为候选）。"""
+    if existed_before:
+        return
+    try:
+        target.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def backfill(
@@ -150,7 +163,9 @@ def backfill(
         output_path = info["output_path"]
         extracted = False
         thumb: str | None = None
-        existed_before = apply and (Path(output_path).parent / "thumbnail.jpg").exists()
+        # 抽帧落点固定为成片同目录的 thumbnail.jpg（worker 完成写回的同一位置）
+        target_thumb = Path(output_path).parent / "thumbnail.jpg"
+        existed_before = apply and target_thumb.exists()
         try:
             if apply:
                 thumb = extractor(output_path, Path(output_path).parent)
@@ -175,16 +190,17 @@ def backfill(
             print(f"  [failed] {info['id']} ({info['task_type']}): no thumbnail extracted")
             continue
         try:
-            _write_thumbnail_path(conn, info["id"], str(thumb))
+            written = _write_thumbnail_path(conn, info["id"], str(thumb))
         except sqlite3.Error as exc:
-            # 写库失败就回收本次新建的缩略图，不留「文件在、引用无」的孤儿（重跑仍能识别为候选）
-            if not existed_before:
-                try:
-                    Path(thumb).unlink(missing_ok=True)
-                except OSError:
-                    pass
+            _reclaim_fresh_thumbnail(target_thumb, existed_before)
             counts["failed"] += 1
             print(f"  [failed] {info['id']} ({info['task_type']}): write-back failed: {exc}")
+            continue
+        if not written:
+            # 状态已被并发改掉：没写进去就不算生成，同样回收
+            _reclaim_fresh_thumbnail(target_thumb, existed_before)
+            counts["skipped"] += 1
+            print(f"  [skipped] {info['id']} ({info['task_type']}): status no longer ready")
             continue
         counts["generated"] += 1
         print(f"  [backfilled] {info['id']} ({info['task_type']})")
@@ -204,8 +220,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--apply", action="store_true", help="写入 result.thumbnail_path（不传 = dry-run，只读连接）")
     parser.add_argument("--task-type", action="append", default=None, choices=TASK_TYPES, help="只处理指定任务类型（可多次；默认五种）")
     parser.add_argument("--task-id", default=None, help="只处理指定任务")
-    parser.add_argument("--limit", type=int, default=None, help="最多扫描多少行（按创建时间；作用于扫描行数而非候选数，skipped 行同样占用额度）")
+    parser.add_argument("--limit", type=int, default=None, help="最多处理多少个待补图任务（候选上限，按创建时间；已带图/成片缺失的任务不占额度，分批重跑可推进）")
     args = parser.parse_args(argv)
+    if args.limit is not None and args.limit <= 0:
+        parser.error("--limit 必须是正整数")
 
     db_path = find_db(args.db_path)
     if args.apply:
@@ -213,15 +231,15 @@ def main(argv: list[str] | None = None) -> int:
     else:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)  # dry-run 只读连接
     try:
-        candidates, skipped = scan_tasks(
+        candidates, skipped, truncated = scan_tasks(
             conn,
             task_types=tuple(args.task_type) if args.task_type else None,
             task_id=args.task_id,
             limit=args.limit,
         )
         print(f"DB: {db_path}")
-        if args.limit and len(candidates) + len(skipped) >= args.limit:
-            print(f"  [limit] 扫描行数已达到 --limit {args.limit}，可能还有未扫描的任务；LIMIT 作用于扫描行数而非候选数。")
+        if truncated:
+            print(f"  [limit] 已达到 --limit {args.limit} 个候选，后面还有未扫描的任务；再跑一次会从剩余任务继续。")
         print("[dry-run] 未写库。复核后带 --apply 执行。" if not args.apply else "[apply] 写入 result.thumbnail_path。")
         counts = backfill(conn, candidates, apply=args.apply, extractor=gateway_extractor())
         counts["skipped"] += len(skipped)
