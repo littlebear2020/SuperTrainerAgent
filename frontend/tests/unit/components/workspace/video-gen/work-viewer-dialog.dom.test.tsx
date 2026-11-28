@@ -369,7 +369,9 @@ describe("WorkViewerDialog", () => {
   it("uses the type cover for empty and missing viewer states", async () => {
     await render(makeWork([], { primaryFile: null }));
     expect(typeCover()?.getAttribute("data-cover-state")).toBe("empty");
-    expect(document.body.textContent).toContain("尚未交付文件");
+    const text = document.body.textContent ?? "";
+    // 标题区描述 + 类型封面状态文字各一次，不再在封面下方重复第三遍
+    expect(text.split("尚未交付文件").length - 1).toBe(2);
 
     const missing = makeFile("missing.mp4", "video", {
       exists: false,
@@ -499,6 +501,18 @@ describe("WorkMedia card cover", () => {
     });
     expect(container.querySelector("img")?.getAttribute("src")).toBe(thumbnail);
     expect(container.querySelector("img")?.alt).toBe("lesson.mp4");
+
+    // 旧后端任务文件没有文件名时，alt 回退到作品标题而不是空字符串
+    const unnamed = makeFile("legacy-output", "video", { name: null });
+    await act(async () => {
+      root.render(
+        <WorkMedia
+          work={{ ...work, files: [unnamed], primaryFile: unnamed }}
+          onOpen={vi.fn()}
+        />,
+      );
+    });
+    expect(container.querySelector("img")?.alt).toBe("Task work");
   });
 
   it.each([
@@ -565,6 +579,18 @@ describe("WorkMedia card cover", () => {
       "default",
     );
     expect(formatBadge(container)).toBe("PNG");
+
+    // 封面图失败后徽标描述主交付文件（HTML），而不是刚加载失败的那张 PNG
+    const html = makeFile("poster.html", "other", { previewUrl: null });
+    await act(async () => {
+      root.render(
+        <WorkMedia work={makeWork([html, image])} onOpen={vi.fn()} />,
+      );
+    });
+    await act(async () => {
+      container.querySelector("img")?.dispatchEvent(new Event("error"));
+    });
+    expect(formatBadge(container)).toBe("HTML");
 
     await act(async () => {
       root.render(<WorkMedia work={makeWork([image])} onOpen={vi.fn()} />);

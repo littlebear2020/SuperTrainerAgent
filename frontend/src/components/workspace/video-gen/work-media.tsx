@@ -80,7 +80,7 @@ export function WorkMedia({
   const className =
     "bg-muted text-muted-foreground flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-none";
   // alt 描述画面里实际显示的那张图：任务缩略图优先于同作品的图片文件。
-  let coverAlt = file?.name ?? "";
+  let coverAlt = file?.name ?? title;
   if (!taskThumbnail && coverFile) {
     coverAlt = coverFile.name ?? t.workspace.works.coverImageAlt(title);
   }
@@ -102,7 +102,8 @@ export function WorkMedia({
     ) : (
       <WorkTypeCover
         capability={work.capability}
-        file={coverFile ?? file}
+        // 封面图加载失败时徽标描述主交付文件，而不是刚失败的那张图
+        file={failed ? (file ?? coverFile) : (coverFile ?? file)}
         state={coverState}
       />
     );
