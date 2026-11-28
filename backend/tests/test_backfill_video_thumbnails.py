@@ -248,3 +248,45 @@ def test_backfill_is_visible_through_thumbnail_api(seeded):
 
     response = asyncio.run(get_video_thumbnail(request, "vg_needs"))
     assert isinstance(response, FileResponse) and Path(response.path).read_bytes()[:3] == b"\xff\xd8\xff"
+
+
+def test_multiple_task_types_filter_before_limit(seeded, capsys):
+    """`--task-type` 在 SQL 层过滤：LIMIT 作用于目标类型，不被其他类型的更早行占掉。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+
+    code = mod.main(["--db-path", str(db), "--apply", "--task-type", "ai_visual", "--task-type", "remotion_course", "--limit", "1"])
+
+    assert code == 0
+    # LIMIT 1 落在目标类型里最早的一行（vg_has，已有缩略图），而不是其他类型（ai_video）更早的行
+    assert "scanned=1 generated=0 skipped=1 failed=0" in capsys.readouterr().out
+    assert "thumbnail_path" not in json.loads(_result(conn, "vg_needs"))
+
+
+def test_write_back_failure_removes_fresh_thumbnail(seeded, monkeypatch, capsys):
+    """写库失败时不留孤儿缩略图：下次运行仍能识别为候选（幂等）。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+
+    def boom(*a, **k):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(mod, "_write_thumbnail_path", boom)
+    code = mod.main(["--db-path", str(db), "--apply", "--task-id", "vg_needs"])
+
+    assert code == 1
+    assert not (store / "thumbnail.jpg").exists()
+    assert "thumbnail_path" not in json.loads(_result(conn, "vg_needs"))
+    assert "write-back failed" in capsys.readouterr().out
+
+
+def test_limit_reports_truncation(seeded, capsys):
+    """LIMIT 作用于扫描行数而非候选数：达到上限时在报告里提示。"""
+    mod = _load_module()
+    conn, db, store, good = seeded
+
+    mod.main(["--db-path", str(db), "--limit", "1"])
+
+    out = capsys.readouterr().out
+    assert "scanned=1 " in out
+    assert "[limit]" in out
