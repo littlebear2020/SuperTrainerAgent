@@ -271,3 +271,25 @@ def test_stale_thumbnail_is_not_served_after_failed_extraction(tmp_path):
     brief = _task_with_thumbnail(task)
     assert brief.thumbnail_url is None
     assert brief.artifact_missing is False
+
+
+def test_helper_falls_back_to_first_frame_when_representative_seek_times_out(tmp_path, monkeypatch):
+    """代表时点（-ss 非 0）超时不得整体放弃：单次尝试的 TimeoutExpired 就地吞掉，仍走 -ss 0 回退。"""
+    import subprocess as _subprocess
+
+    mod = _load_ffmpeg_helpers()
+    video = tmp_path / "output.mp4"
+    _make_mini_mp4(video, duration=2.0)
+    thumb = tmp_path / "thumbnail.jpg"
+    real_run = _subprocess.run
+
+    def fake_run(cmd, *args, **kwargs):
+        if cmd[0] == "ffmpeg" and cmd[cmd.index("-ss") + 1] != "0.0":
+            raise _subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 30))
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    assert mod._ffmpeg_extract_thumbnail(video, thumb) is True
+    assert thumb.read_bytes()[:3] == b"\xff\xd8\xff"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["output.mp4", "thumbnail.jpg"]

@@ -1013,7 +1013,15 @@ def _ffmpeg_extract_thumbnail(
         attempts = [max(1.0, duration * seek_ratio)] if duration is not None else []
         attempts.append(0.0)
         for ss in attempts:
-            if _grab(ss):
+            try:
+                ok = _grab(ss)
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                # 单次尝试超时/起不来 ffmpeg：记日志后继续下一次（-ss 0 回退仍有机会）
+                logger.warning(
+                    "Thumbnail grab failed for %s at ss=%s: %s", video_path, ss, exc
+                )
+                continue
+            if ok:
                 os.replace(str(tmp_path), str(output_path))
                 return True
         logger.warning(

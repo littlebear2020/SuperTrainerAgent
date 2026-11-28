@@ -76,12 +76,16 @@ def _parse_result(raw: str | None) -> dict:
 def scan_tasks(
     conn: sqlite3.Connection,
     *,
-    task_type: str | None = None,
+    task_types: tuple[str, ...] | None = None,
     task_id: str | None = None,
     limit: int | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    """只读扫描：返回 (candidates, skipped)。candidates = 需要补图且成片存在的任务。"""
-    types = [task_type] if task_type else list(TASK_TYPES)
+    """只读扫描：返回 (candidates, skipped)。candidates = 需要补图且成片存在的任务。
+
+    类型过滤在 SQL 层完成，LIMIT 作用于目标类型；但 LIMIT 计的是扫描行数（skipped 行同样占额度），
+    文件存在性只能在 Python 侧判定。
+    """
+    types = list(task_types) if task_types else list(TASK_TYPES)
     where = "status = 'ready' AND task_type IN ({})".format(",".join("?" * len(types)))
     params: list[object] = list(types)
     if task_id:
@@ -145,6 +149,8 @@ def backfill(
     for info in candidates:
         output_path = info["output_path"]
         extracted = False
+        thumb: str | None = None
+        existed_before = apply and (Path(output_path).parent / "thumbnail.jpg").exists()
         try:
             if apply:
                 thumb = extractor(output_path, Path(output_path).parent)
@@ -171,6 +177,12 @@ def backfill(
         try:
             _write_thumbnail_path(conn, info["id"], str(thumb))
         except sqlite3.Error as exc:
+            # 写库失败就回收本次新建的缩略图，不留「文件在、引用无」的孤儿（重跑仍能识别为候选）
+            if not existed_before:
+                try:
+                    Path(thumb).unlink(missing_ok=True)
+                except OSError:
+                    pass
             counts["failed"] += 1
             print(f"  [failed] {info['id']} ({info['task_type']}): write-back failed: {exc}")
             continue
@@ -192,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--apply", action="store_true", help="写入 result.thumbnail_path（不传 = dry-run，只读连接）")
     parser.add_argument("--task-type", action="append", default=None, choices=TASK_TYPES, help="只处理指定任务类型（可多次；默认五种）")
     parser.add_argument("--task-id", default=None, help="只处理指定任务")
-    parser.add_argument("--limit", type=int, default=None, help="最多扫描多少行（按创建时间）")
+    parser.add_argument("--limit", type=int, default=None, help="最多扫描多少行（按创建时间；作用于扫描行数而非候选数，skipped 行同样占用额度）")
     args = parser.parse_args(argv)
 
     db_path = find_db(args.db_path)
@@ -203,16 +215,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         candidates, skipped = scan_tasks(
             conn,
-            task_type=args.task_type[0] if args.task_type and len(args.task_type) == 1 else None,
+            task_types=tuple(args.task_type) if args.task_type else None,
             task_id=args.task_id,
             limit=args.limit,
         )
-        if args.task_type and len(args.task_type) > 1:
-            # argparse 的 append 形态允许多个类型：手动过滤（默认五种时不走这里）
-            wanted = set(args.task_type)
-            candidates = [c for c in candidates if c["task_type"] in wanted]
-            skipped = [s for s in skipped if s["task_type"] in wanted]
         print(f"DB: {db_path}")
+        if args.limit and len(candidates) + len(skipped) >= args.limit:
+            print(f"  [limit] 扫描行数已达到 --limit {args.limit}，可能还有未扫描的任务；LIMIT 作用于扫描行数而非候选数。")
         print("[dry-run] 未写库。复核后带 --apply 执行。" if not args.apply else "[apply] 写入 result.thumbnail_path。")
         counts = backfill(conn, candidates, apply=args.apply, extractor=gateway_extractor())
         counts["skipped"] += len(skipped)
