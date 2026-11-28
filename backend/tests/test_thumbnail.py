@@ -220,3 +220,54 @@ def test_helper_seek_ratio_is_keyword_only_and_keeps_positional_signature(video_
     thumb = video_dir / "half.jpg"
     assert mod._ffmpeg_extract_thumbnail(video_dir / "output.mp4", thumb, 30, seek_ratio=0.5) is True
     assert thumb.exists()
+
+
+# ── Batch B Task 7 Step 1：旧图路径的 API 级行为验收 ────────────────────────────────
+
+
+def _mock_task():
+    """与 test_task_with_thumbnail_router_logic 同形态的最小任务行。"""
+    task = MagicMock()
+    task.id = "vg_test123"
+    task.user_id = "u1"
+    task.domain = "video_gen"
+    task.task_type = "ai_image"
+    task.status = "ready"
+    task.progress = 100
+    task.error_message = None
+    task.retry_count = 0
+    task.title = None
+    task.created_at = None
+    task.updated_at = None
+    task.thumbnail_url = None
+    task.amount_source = None
+    task.queue_position = None
+    task.artifact_missing = False
+    task.delivery = None
+    task.cost = None
+    task.currency = None
+    task.payload = None
+    task.result = None
+    return task
+
+
+def test_stale_thumbnail_is_not_served_after_failed_extraction(tmp_path):
+    """任务目录有旧 thumbnail.jpg、result 也指向它；对损坏的成片调用加固后的 helper 失败后，
+    旧图被删，`_task_with_thumbnail` 不再下发 thumbnail_url（列表不再下发旧图）。"""
+    mod = _load_ffmpeg_helpers()
+    from app.gateway.routers.video_gen import _task_with_thumbnail
+
+    broken = tmp_path / "output.mp4"
+    broken.write_bytes(b"broken render")
+    stale = tmp_path / "thumbnail.jpg"
+    stale.write_bytes(b"old frame")
+    task = _mock_task()
+    task.result = json.dumps({"thumbnail_path": str(stale), "output_path": str(broken)})
+
+    assert _task_with_thumbnail(task).thumbnail_url == "/api/video/tasks/vg_test123/thumbnail"
+
+    assert mod._ffmpeg_extract_thumbnail(broken, stale) is False
+    assert not stale.exists()
+    brief = _task_with_thumbnail(task)
+    assert brief.thumbnail_url is None
+    assert brief.artifact_missing is False
